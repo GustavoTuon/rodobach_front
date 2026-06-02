@@ -16,6 +16,8 @@ const NAV = [
   { id: "reports",     label: "Relatórios",   icon: "chart",       title: "Relatórios" },
   { id: "custos",      label: "Custos",       icon: "money",       title: "Despesas e Custos" },
   { id: "receita",     label: "Receita",      icon: "trending-up", title: "Análise de Receita" },
+  { id: "demonstrativo", label: "DRE",        icon: "chart",       title: "Demonstrativo financeiro" },
+  { id: "dre-empresarial", label: "DRE Emp.", icon: "chart",       title: "DRE Empresarial" },
   { id: "placa",       label: "Por Placa",    icon: "compass",     title: "Financeiro por Placa" },
   { id: "clientes",   label: "Clientes",     icon: "user",        title: "Análise de Clientes" },
   { id: "integration", label: "Integração",   icon: "plug",        title: "Saúde da integração" },
@@ -95,6 +97,12 @@ const App = () => {
       break;
     case "receita":
       body = <Receita onGoToVehicle={goVehicle} onNavigate={onNavigate}/>;
+      break;
+    case "demonstrativo":
+      body = <DemonstrativoFinanceiro onNavigate={onNavigate}/>;
+      break;
+    case "dre-empresarial":
+      body = <DreEmpresarial onNavigate={onNavigate}/>;
       break;
     case "placa":
       body = <FinanceiroPlaca onNavigate={onNavigate}/>;

@@ -99,6 +99,21 @@ window.RB_API = {
     const query = buildQuery(params);
     return apiRequest(`/financeiro/por-placa${query}`);
   },
+  getDemonstrativoFinanceiro: (filters) => {
+    const params = typeof filters === "object" ? filters : { period: filters };
+    const query = buildQuery(params);
+    return apiRequest(`/financeiro/demonstrativo${query}`);
+  },
+  getDreEmpresarial: (filters) => {
+    const params = typeof filters === "object" ? filters : { period: filters };
+    return apiRequest(`/financeiro/dre-empresarial${buildQuery(params)}`);
+  },
+  getDreEmpresarialResumo: (filters) => apiRequest(`/financeiro/dre-empresarial/resumo${buildQuery(filters || {})}`),
+  getDreEmpresarialEvolucao: (filters) => apiRequest(`/financeiro/dre-empresarial/evolucao${buildQuery(filters || {})}`),
+  getDreEmpresarialRankings: (filters) => apiRequest(`/financeiro/dre-empresarial/rankings${buildQuery(filters || {})}`),
+  getDreEmpresarialCentros: (filters) => apiRequest(`/financeiro/dre-empresarial/centros${buildQuery(filters || {})}`),
+  getDreEmpresarialPlacas: (filters) => apiRequest(`/financeiro/dre-empresarial/placas${buildQuery(filters || {})}`),
+  getDreEmpresarialLancamentos: (filters) => apiRequest(`/financeiro/dre-empresarial/lancamentos${buildQuery(filters || {})}`),
   getAnaliseClientes: (filters) => {
     const params = typeof filters === "object" ? filters : { period: filters };
     const query = buildQuery(params);
