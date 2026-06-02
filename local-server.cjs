@@ -4,6 +4,7 @@ const path = require("path");
 
 const root = __dirname;
 const port = Number(process.env.PORT || 5173);
+const host = process.env.HOST || "0.0.0.0";
 
 const types = {
   ".html": "text/html; charset=utf-8",
@@ -51,6 +52,6 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(port, "127.0.0.1", () => {
+server.listen(port, host, () => {
   console.log(`rodobach_front on http://localhost:${port}`);
 });
