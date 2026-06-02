@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light" data-density="comfortable">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Norte — Gestão de Frota Inteligente</title>
+
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Crect width='28' height='28' rx='6' fill='%23141936'/%3E%3Cpath d='M7.5 22 L7.5 8.5 L18 19.5 L18 11.5' fill='none' stroke='%23ffffff' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M18 11.5 L22.5 7' stroke='%234f7fab' stroke-width='2.2' stroke-linecap='round'/%3E%3Cpath d='M22.5 7 L20 7 L22.5 7 L22.5 9.5' stroke='%234f7fab' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"/>
+
+<!-- Geist (sans + mono) -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+
+<link rel="stylesheet" href="styles.css"/>
+
+<!-- React + Babel (pinned) -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<!-- Data -->
+<script src="src/data.js"></script>
+<script src="src/api.js"></script>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- Components first, then screens, then app -->
+<script type="text/babel" src="src/components.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="src/screens/simulador.jsx"></script>
+<script type="text/babel" src="src/screens/diarias.jsx"></script>
+<script type="text/babel" src="src/screens/viagens.jsx"></script>
+<script type="text/babel" src="src/screens/custos.jsx"></script>
+<script type="text/babel" src="src/screens/receita.jsx"></script>
+<script type="text/babel" src="src/screens/financeiro-placa.jsx"></script>
+<script type="text/babel" src="src/screens/analise-clientes.jsx"></script>
+<script type="text/babel" src="src/app.jsx"></script>
+
+</body>
+</html>
