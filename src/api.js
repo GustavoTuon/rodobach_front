@@ -1,4 +1,10 @@
-const API_BASE = "http://localhost:3333/api";
+const LOCAL_API_BASE = "http://localhost:3333/api";
+const PRODUCTION_API_BASE = "https://rodobach-rodobach-back-consultoria.eupgpd.easypanel.host/api";
+
+const API_BASE = window.RB_API_BASE
+  || (["localhost", "127.0.0.1"].includes(window.location.hostname)
+    ? LOCAL_API_BASE
+    : PRODUCTION_API_BASE);
 
 function buildQuery(params = {}) {
   const search = new URLSearchParams();
