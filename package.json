@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "build": "node -e \"console.log('Static frontend: no build step')\"",
-    "start": "nginx -c /app/nginx.runtime.conf -g \"daemon off;\""
+    "start": "mkdir -p /tmp/nginx/logs /tmp/nginx/cache && nginx -c /app/nginx.runtime.conf -g \"daemon off;\""
   }
 }
-
