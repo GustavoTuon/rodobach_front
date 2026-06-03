@@ -7,58 +7,88 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 }/*EDITMODE-END*/;
 
 const NAV = [
-  { id: "dashboard",   label: "Dashboard",    icon: "dashboard",   title: "Visão geral" },
-  { id: "vehicles",    label: "Veículos",     icon: "truck",       title: "Veículos" },
-  { id: "alerts",      label: "Alertas",      icon: "alert",       title: "Alertas e ocorrências", badge: 12 },
-  { id: "simulador",   label: "Calculadora",  icon: "calculator",  title: "Calculadora de Frete ANTT" },
-  { id: "diarias",     label: "Diárias",      icon: "clock",       title: "Diárias do Motorista" },
-  { id: "viagens",     label: "Viagens",      icon: "route",       title: "Viagens e Cotações" },
-  { id: "reports",     label: "Relatórios",   icon: "chart",       title: "Relatórios" },
-  { id: "custos",      label: "Custos",       icon: "money",       title: "Despesas e Custos" },
-  { id: "receita",     label: "Receita",      icon: "trending-up", title: "Análise de Receita" },
-  { id: "demonstrativo", label: "DRE",        icon: "chart",       title: "Demonstrativo financeiro" },
-  { id: "dre-empresarial", label: "DRE Emp.", icon: "chart",       title: "DRE Empresarial" },
-  { id: "placa",       label: "Por Placa",    icon: "compass",     title: "Financeiro por Placa" },
-  { id: "clientes",   label: "Clientes",     icon: "user",        title: "Análise de Clientes" },
-  { id: "integration", label: "Integração",   icon: "plug",        title: "Saúde da integração" },
-  { id: "settings",    label: "Configurações", icon: "settings",   title: "Configurações" },
+  { id: "dashboard",       label: "Dashboard",    icon: "dashboard",   title: "Visão geral" },
+  { id: "vehicles",        label: "Veículos",     icon: "truck",       title: "Veículos" },
+  { id: "alerts",          label: "Alertas",      icon: "alert",       title: "Alertas e ocorrências", badge: 12 },
+  { id: "simulador",       label: "Calculadora",  icon: "calculator",  title: "Calculadora de Frete ANTT" },
+  { id: "diarias",         label: "Diárias",      icon: "clock",       title: "Diárias do Motorista" },
+  { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações" },
+  { id: "reports",         label: "Relatórios",   icon: "chart",       title: "Relatórios" },
+  { id: "custos",          label: "Custos",       icon: "money",       title: "Despesas e Custos" },
+  { id: "receita",         label: "Receita",      icon: "trending-up", title: "Análise de Receita" },
+  { id: "demonstrativo",   label: "DRE",          icon: "chart",       title: "Demonstrativo financeiro" },
+  { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial" },
+  { id: "placa",           label: "Por Placa",    icon: "compass",     title: "Financeiro por Placa" },
+  { id: "clientes",        label: "Clientes",     icon: "user",        title: "Análise de Clientes" },
+  { id: "integration",     label: "Integração",   icon: "plug",        title: "Saúde da integração" },
+  { id: "settings",        label: "Configurações", icon: "settings",   title: "Configurações",    sistema: true },
+  { id: "usuarios",        label: "Usuários",     icon: "user",        title: "Gerenciar Usuários", sistema: true, adminOnly: true },
 ];
 
+// Telas sem implementação funcional — nunca exibidas independente de permissões
 const REMOVED_SCREENS = new Set([
-  "map",
-  "vehicles",
-  "vehicle",
-  "alerts",
-  "dashboard",
-  "reports",
-  "integration",
+  "map", "vehicles", "vehicle", "alerts", "dashboard", "reports", "integration",
 ]);
-const APP_NAV = NAV.filter(n => !REMOVED_SCREENS.has(n.id));
+
+const BASE_NAV = NAV.filter(n => !REMOVED_SCREENS.has(n.id));
 const DEFAULT_SCREEN = "simulador";
-const isKnownScreen = (screen) => APP_NAV.some(n => n.id === screen);
+
+function getNavForUser(user) {
+  const permissions = user?.permissions || {};
+  return BASE_NAV.filter(n => {
+    if (n.adminOnly && !user?.admin) return false;
+    return permissions[n.id] !== false;
+  });
+}
 
 function readRoute() {
   const h = (window.location.hash || "").replace(/^#\/?/, "");
   if (!h) return { screen: DEFAULT_SCREEN };
   const parts = h.split("/");
-  return { screen: isKnownScreen(parts[0]) ? parts[0] : DEFAULT_SCREEN };
+  return { screen: parts[0] || DEFAULT_SCREEN };
 }
 
 function setRoute(r) {
-  window.location.hash = "/" + (isKnownScreen(r.screen) ? r.screen : DEFAULT_SCREEN);
+  window.location.hash = "/" + r.screen;
 }
 
+// ── Componente principal ──────────────────────────────────────────────────────
 const App = () => {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [route, setRouteState] = useState(readRoute());
+  const [auth, setAuth] = useState({ checking: true, user: null });
 
+  // Verificar sessão existente ao carregar
+  useEffect(() => {
+    const token = RB_AUTH.getToken();
+    const cachedUser = RB_AUTH.getUser();
+    if (token && cachedUser) {
+      RB_AUTH.me()
+        .then(data => setAuth({ checking: false, user: data.user }))
+        .catch(() => {
+          RB_AUTH.logout();
+          setAuth({ checking: false, user: null });
+        });
+    } else {
+      setAuth({ checking: false, user: null });
+    }
+  }, []);
+
+  // Ouvir evento de sessão expirada
+  useEffect(() => {
+    const handler = () => setAuth({ checking: false, user: null });
+    window.addEventListener("rodobach:unauthorized", handler);
+    return () => window.removeEventListener("rodobach:unauthorized", handler);
+  }, []);
+
+  // Hash change
   useEffect(() => {
     const on = () => setRouteState(readRoute());
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);
 
-  // Apply theme + density to <html>. When theme === "auto" follow the OS.
+  // Tema e densidade
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => {
@@ -76,13 +106,49 @@ const App = () => {
     }
   }, [t.theme, t.density]);
 
-  const go = (screen, extra = {}) => setRoute({ screen, ...extra });
-  const goVehicle = () => {};
+  const handleLogin = ({ user }) => {
+    setAuth({ checking: false, user });
+  };
 
-  const onNavigate = (screen) => go(isKnownScreen(screen) ? screen : DEFAULT_SCREEN);
+  const handleLogout = () => {
+    RB_AUTH.logout();
+    setAuth({ checking: false, user: null });
+    window.location.hash = "";
+  };
+
+  // ── Estados de carregamento e não autenticado ─────────────────────────────
+  if (auth.checking) {
+    return (
+      <div style={{
+        minHeight: "100vh", display: "flex",
+        alignItems: "center", justifyContent: "center",
+        background: "var(--bg)",
+      }}>
+        <div style={{ color: "var(--muted)", fontSize: 13.5 }}>Verificando sessão…</div>
+      </div>
+    );
+  }
+
+  if (!auth.user) {
+    return <LoginScreen onLogin={handleLogin}/>;
+  }
+
+  // ── App autenticado ───────────────────────────────────────────────────────
+  const visibleNav = getNavForUser(auth.user);
+
+  // Se a tela atual não está acessível ao usuário, cair na primeira disponível
+  const currentScreen = visibleNav.some(n => n.id === route.screen)
+    ? route.screen
+    : (visibleNav[0]?.id || DEFAULT_SCREEN);
+
+  const go = (screen) => setRoute({ screen });
+  const goVehicle = () => {};
+  const onNavigate = (screen) => {
+    if (visibleNav.some(n => n.id === screen)) go(screen);
+  };
 
   let body = null;
-  switch (route.screen) {
+  switch (currentScreen) {
     case "simulador":
       body = <SimuladorFrete onNavigate={onNavigate}/>;
       break;
@@ -110,6 +176,9 @@ const App = () => {
     case "clientes":
       body = <AnaliseClientes onNavigate={onNavigate}/>;
       break;
+    case "usuarios":
+      body = <GerenciarUsuarios onNavigate={onNavigate}/>;
+      break;
     case "settings":
       body = <SettingsScreen theme={t.theme} setTheme={(v) => setTweak("theme", v)} density={t.density} setDensity={(v) => setTweak("density", v)}/>;
       break;
@@ -118,40 +187,25 @@ const App = () => {
       break;
   }
 
+  const userLogin = auth.user.login || "Usuário";
+  const userInitials = userLogin.split(".").map(p => p[0] || "").join("").toUpperCase().slice(0, 2) || "U";
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="sidebar-brand">
-          <div className="brand-mark" title="Norte — Gestão de Frota Inteligente">
-            <svg viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              {/* N body: thick road-like stroke */}
-              <path d="M5.5 23 L5.5 8.5 L18 21.5 L18 11.5"
-                    fill="none" stroke="#141936"
-                    strokeWidth="3.8" strokeLinecap="round" strokeLinejoin="round"/>
-              {/* dashed road centerline along the N's left leg */}
-              <path d="M5.5 21 L5.5 10"
-                    fill="none" stroke="#ffffff"
-                    strokeWidth="0.7" strokeDasharray="1.3 1.3" strokeLinecap="round"/>
-              {/* arrow head tip — light blue */}
-              <path d="M18 11.5 L22.5 6.5"
-                    fill="none" stroke="#4f7fab"
-                    strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M22.5 6.5 L19.5 6.5 L22.5 6.5 L22.5 9.5"
-                    fill="none" stroke="#4f7fab"
-                    strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <div className="brand-name">
-            Norte
-            <span className="tag">Gestão de frota</span>
-          </div>
+        <div className="sidebar-brand" style={{ justifyContent: "center", padding: "14px 16px 8px" }}>
+          <img
+            src="uploads/LOGO NORTE-03.png"
+            alt="Norte"
+            style={{ width: "100%", maxHeight: 88, objectFit: "contain", display: "block" }}
+          />
         </div>
 
         <div className="nav-section">
-          {APP_NAV.slice(0, -1).map(n => (
+          {visibleNav.filter(n => !n.sistema).map(n => (
             <button
               key={n.id}
-              className={`nav-item ${route.screen === n.id ? "active" : ""}`}
+              className={`nav-item ${currentScreen === n.id ? "active" : ""}`}
               data-tip={n.label}
               data-has-badge={n.badge != null ? "true" : "false"}
               onClick={() => go(n.id)}
@@ -165,10 +219,10 @@ const App = () => {
 
         <div className="nav-section">
           <div className="nav-label">Sistema</div>
-          {APP_NAV.slice(-1).map(n => (
+          {visibleNav.filter(n => n.sistema).map(n => (
             <button
               key={n.id}
-              className={`nav-item ${route.screen === n.id ? "active" : ""}`}
+              className={`nav-item ${currentScreen === n.id ? "active" : ""}`}
               data-tip={n.label}
               onClick={() => go(n.id)}
             >
@@ -179,11 +233,29 @@ const App = () => {
         </div>
 
         <div className="sidebar-footer">
-          <div className="avatar">JM</div>
-          <div className="who">
-            <div className="who-name">Juliana Martins</div>
-            <div className="who-org">Norte Logística</div>
+          <div className="avatar">{userInitials}</div>
+          <div className="who" style={{ flex: 1, minWidth: 0 }}>
+            <div className="who-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {userLogin}
+            </div>
+            <div className="who-org" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {auth.user.email || "Rodobach"}
+            </div>
           </div>
+          <button
+            onClick={handleLogout}
+            title="Sair do sistema"
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              padding: "4px 6px", color: "var(--muted)", display: "flex",
+              alignItems: "center", borderRadius: 5, flexShrink: 0,
+              transition: "color 120ms",
+            }}
+            onMouseOver={e => e.currentTarget.style.color = "var(--text)"}
+            onMouseOut={e => e.currentTarget.style.color = "var(--muted)"}
+          >
+            <Icon name="external" size={14}/>
+          </button>
         </div>
       </aside>
 
@@ -244,7 +316,6 @@ const SettingsScreen = ({ theme, setTheme, density, setDensity }) => {
   ];
 
   const ThemePreview = ({ kind }) => {
-    // Render a small mock window for each theme option
     const bgs = {
       light: { bg: "#fafafa", surface: "#ffffff", border: "#e8e8eb", text: "#09090b", muted: "#71717a", accent: "#4f7fab" },
       dark:  { bg: "#09090b", surface: "#0f0f11", border: "#232327", text: "#fafafa", muted: "#71717a", accent: "#6a98c4" },
@@ -274,13 +345,11 @@ const SettingsScreen = ({ theme, setTheme, density, setDensity }) => {
       display: "flex",
       gap: 6,
     }}>
-      {/* mini sidebar */}
       <div style={{width: 18, height: "100%", background: "#141936", borderRadius: 3, padding: 4, display: "flex", flexDirection: "column", gap: 3}}>
         <div style={{width: 10, height: 2, background: "#6a98c4", borderRadius: 1}}/>
         <div style={{width: 10, height: 1.5, background: "rgba(255,255,255,0.4)", borderRadius: 1}}/>
         <div style={{width: 10, height: 1.5, background: "rgba(255,255,255,0.4)", borderRadius: 1}}/>
       </div>
-      {/* mini content */}
       <div style={{flex: 1, display: "flex", flexDirection: "column", gap: 4}}>
         <div style={{height: 10, background: c.surface, border: `0.5px solid ${c.border}`, borderRadius: 2, display: "flex", padding: 2, gap: 2, alignItems: "center"}}>
           <div style={{width: 8, height: 4, background: c.text, borderRadius: 1, opacity: 0.6}}/>
@@ -308,7 +377,6 @@ const SettingsScreen = ({ theme, setTheme, density, setDensity }) => {
         </div>
       </div>
 
-      {/* APPEARANCE CARD */}
       <div className="card" style={{marginBottom: 16}}>
         <div className="section-head" style={{marginBottom: 14}}>
           <div>
@@ -317,7 +385,6 @@ const SettingsScreen = ({ theme, setTheme, density, setDensity }) => {
           </div>
         </div>
 
-        {/* Theme selector */}
         <div style={{marginBottom: 22}}>
           <div className="row between" style={{marginBottom: 10}}>
             <div>
@@ -372,7 +439,6 @@ const SettingsScreen = ({ theme, setTheme, density, setDensity }) => {
           </div>
         </div>
 
-        {/* Density selector */}
         <div style={{borderTop: "1px solid var(--divider)", paddingTop: 16}}>
           <div className="row between" style={{marginBottom: 10}}>
             <div>
@@ -422,7 +488,6 @@ const SettingsScreen = ({ theme, setTheme, density, setDensity }) => {
         </div>
       </div>
 
-      {/* OTHER SETTINGS */}
       <div className="section-head"><h2>Outras configurações</h2></div>
       <div className="grid cols-3">
         {[

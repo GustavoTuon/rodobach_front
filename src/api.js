@@ -6,6 +6,9 @@ const API_BASE = window.RB_API_BASE
     ? LOCAL_API_BASE
     : PRODUCTION_API_BASE);
 
+const TOKEN_KEY = "rodobach_token";
+const USER_KEY  = "rodobach_user";
+
 function buildQuery(params = {}) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -18,13 +21,23 @@ function buildQuery(params = {}) {
 }
 
 async function apiRequest(path, options = {}) {
+  const token = localStorage.getItem(TOKEN_KEY);
+
   const response = await fetch(`${API_BASE}${path}`, {
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { "Authorization": `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
     ...options,
   });
+
+  if (response.status === 401) {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    window.dispatchEvent(new Event("rodobach:unauthorized"));
+    throw new Error("Sessão expirada. Faça login novamente.");
+  }
 
   if (response.status === 204) return null;
 
@@ -38,6 +51,42 @@ async function apiRequest(path, options = {}) {
   return data;
 }
 
+// ── Autenticação ──────────────────────────────────────────────────────────────
+window.RB_AUTH = {
+  getToken: () => localStorage.getItem(TOKEN_KEY),
+
+  getUser: () => {
+    try {
+      return JSON.parse(localStorage.getItem(USER_KEY) || "null");
+    } catch {
+      return null;
+    }
+  },
+
+  login: async (login, senha) => {
+    const response = await fetch(`${API_BASE}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ login, senha }),
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error((result?.error) || `Erro ${response.status}`);
+    }
+    localStorage.setItem(TOKEN_KEY, result.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(result.user));
+    return result;
+  },
+
+  logout: () => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+  },
+
+  me: () => apiRequest("/auth/me"),
+};
+
+// ── API ───────────────────────────────────────────────────────────────────────
 window.RB_API = {
   // ── Tabela ANTT ──────────────────────────────────────────────────────────
   listAntt: () => apiRequest("/frete/antt"),
@@ -45,14 +94,12 @@ window.RB_API = {
   // ── Diárias ──────────────────────────────────────────────────────────────
   listDiarias: () => apiRequest("/motoristas/diarias"),
 
-  // Calcula diárias no servidor (period-based)
   calcularDiarias: (payload) => apiRequest("/motoristas/diarias/calcular", {
     method: "POST",
     body: JSON.stringify(payload),
   }),
 
   // ── Frete ─────────────────────────────────────────────────────────────────
-  // Cálculo completo: ANTT + seguro carga + seguro RC + RPA/TAC + ICMS + margem
   calcularFrete: (payload) => apiRequest("/frete/calcular", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -61,7 +108,6 @@ window.RB_API = {
   // ── Viagens ───────────────────────────────────────────────────────────────
   listViagens: (filters = {}) => apiRequest(`/viagens${buildQuery(filters)}`),
 
-  // Retorna listas de clientes, placas, motoristas, etc. para autocomplete
   listOpcoes: (q = "") => apiRequest(`/viagens/opcoes${buildQuery({ q })}`),
   searchViagemPlacas: (q = "") => apiRequest(`/viagens/opcoes/placas${buildQuery({ q })}`),
   searchViagemMotoristas: (q = "") => apiRequest(`/viagens/opcoes/motoristas${buildQuery({ q })}`),
@@ -87,23 +133,19 @@ window.RB_API = {
   },
   getReceitasResumo: (filters) => {
     const params = typeof filters === "object" ? filters : { period: filters };
-    const query = buildQuery(params);
-    return apiRequest(`/financeiro/receitas${query}`);
+    return apiRequest(`/financeiro/receitas${buildQuery(params)}`);
   },
   getCustosResumo: (filters) => {
     const params = typeof filters === "object" ? filters : { period: filters };
-    const query = buildQuery(params);
-    return apiRequest(`/financeiro/custos${query}`);
+    return apiRequest(`/financeiro/custos${buildQuery(params)}`);
   },
   getFinanceiroPorPlaca: (filters) => {
     const params = typeof filters === "object" ? filters : { period: filters };
-    const query = buildQuery(params);
-    return apiRequest(`/financeiro/por-placa${query}`);
+    return apiRequest(`/financeiro/por-placa${buildQuery(params)}`);
   },
   getDemonstrativoFinanceiro: (filters) => {
     const params = typeof filters === "object" ? filters : { period: filters };
-    const query = buildQuery(params);
-    return apiRequest(`/financeiro/demonstrativo${query}`);
+    return apiRequest(`/financeiro/demonstrativo${buildQuery(params)}`);
   },
   getDreEmpresarial: (filters) => {
     const params = typeof filters === "object" ? filters : { period: filters };
@@ -117,7 +159,18 @@ window.RB_API = {
   getDreEmpresarialLancamentos: (filters) => apiRequest(`/financeiro/dre-empresarial/lancamentos${buildQuery(filters || {})}`),
   getAnaliseClientes: (filters) => {
     const params = typeof filters === "object" ? filters : { period: filters };
-    const query = buildQuery(params);
-    return apiRequest(`/financeiro/analise-clientes${query}`);
+    return apiRequest(`/financeiro/analise-clientes${buildQuery(params)}`);
   },
+
+  // ── Gerenciamento de usuários (admin) ─────────────────────────────────────
+  listUsuarios: () => apiRequest("/usuarios"),
+  createUsuario: (payload) => apiRequest("/usuarios", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
+  updateUsuario: (id, payload) => apiRequest(`/usuarios/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  }),
+  deleteUsuario: (id) => apiRequest(`/usuarios/${id}`, { method: "DELETE" }),
 };
