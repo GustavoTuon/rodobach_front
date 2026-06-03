@@ -124,24 +124,24 @@ const App = () => {
     }
   }, [t.theme, t.density]);
 
-  // Carrega as telas após autenticação
+  // Carrega as telas após autenticação via fetch + Babel.transform
   useEffect(() => {
     if (!auth.user || screensReady) return;
-    SCREEN_SCRIPTS.forEach(src => {
-      if (!document.querySelector(`script[src="${src}"]`)) {
-        const s = document.createElement("script");
-        s.type = "text/babel";
-        s.src = src;
-        document.body.appendChild(s);
-      }
-    });
-    const timer = setInterval(() => {
-      if (SCREEN_GLOBALS.every(g => window[g])) {
+    (async () => {
+      try {
+        for (const src of SCREEN_SCRIPTS) {
+          const res = await fetch(src);
+          const code = await res.text();
+          const { code: compiled } = Babel.transform(code, { presets: ["react"], filename: src });
+          // eslint-disable-next-line no-eval
+          eval(compiled);
+        }
         setScreensReady(true);
-        clearInterval(timer);
+      } catch (e) {
+        console.error("Erro ao carregar telas:", e);
+        setScreensReady(true); // mostra o app mesmo assim
       }
-    }, 80);
-    return () => clearInterval(timer);
+    })();
   }, [auth.user]);
 
   const handleLogin = ({ user }) => {
