@@ -66,6 +66,7 @@ window.RB_API = {
   searchViagemPlacas: (q = "") => apiRequest(`/viagens/opcoes/placas${buildQuery({ q })}`),
   searchViagemMotoristas: (q = "") => apiRequest(`/viagens/opcoes/motoristas${buildQuery({ q })}`),
   searchViagemClientes: (q = "") => apiRequest(`/viagens/opcoes/clientes${buildQuery({ q })}`),
+  searchViagemVendedores: (q = "") => apiRequest(`/viagens/opcoes/vendedores${buildQuery({ q })}`),
 
   createViagem: (payload) => apiRequest("/viagens", {
     method: "POST",

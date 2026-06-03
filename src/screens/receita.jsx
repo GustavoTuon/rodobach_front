@@ -362,7 +362,7 @@ const Receita = () => {
       <div className="grid cols-2-1" style={{marginBottom:16}}>
 
         {/* Monthly bar chart */}
-        <div className="card card-flush">
+        <div className="card card-flush chart-card">
           <div className="card-header">
             <h3>Evolução mensal</h3>
             <div className="row" style={{gap:12,fontSize:11.5}}>
@@ -376,7 +376,7 @@ const Receita = () => {
               <div className="muted" style={{textAlign:"center",padding:"28px 0",fontSize:12.5}}>Sem dados no período selecionado</div>
             )}
             {monthly.length > 0 && (
-              <div key={chartKey} style={{
+              <div key={chartKey} className="chart-plot" style={{
                 display:"grid",
                 gridTemplateColumns:`repeat(${monthly.length}, minmax(32px, 1fr))`,
                 gap:6,height:170,alignItems:"flex-end",
@@ -401,10 +401,10 @@ const Receita = () => {
                          onMouseLeave={() => setHoveredBar(null)}>
                       {/* Tooltip */}
                       {isHov && (
-                        <div style={{
-                          position:"absolute",bottom:"calc(100% + 8px)",left:"50%",transform:"translateX(-50%)",
+                        <div className="chart-tooltip" style={{
+                          bottom:"calc(100% + 8px)",left:"50%",transform:"translateX(-50%)",
                           background:"var(--surface)",border:"1px solid var(--border-strong)",borderRadius:8,
-                          padding:"10px 13px",fontSize:12,whiteSpace:"nowrap",zIndex:30,
+                          padding:"10px 13px",fontSize:12,whiteSpace:"nowrap",
                           boxShadow:"var(--shadow-lg)",lineHeight:1.8,minWidth:190,
                         }}>
                           <div style={{fontWeight:600,fontSize:12.5,marginBottom:6,color:"var(--text)"}}>{item.label}</div>

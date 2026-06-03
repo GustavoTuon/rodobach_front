@@ -1,6 +1,22 @@
 // Viagens e Cotações — Norte Telemetria
+
+// ── Helpers de data ──────────────────────────────────────────────────────────
+const vgToday  = () => { const d=new Date(); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-"); };
+const vgDaysAgo = (n) => { const d=new Date(); d.setDate(d.getDate()-n); return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-"); };
+const vgMonthStart = () => { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`; };
+const vgPrevMonth  = () => { const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),last=new Date(y,d.getMonth()+1,0); return { s:`${y}-${m}-01`, e:`${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,"0")}-${String(last.getDate()).padStart(2,"0")}` }; };
+const VG_PERIODS = [
+  { key:"hoje",    label:"Hoje",         gr:()=>({ s:vgToday(),      e:vgToday() }) },
+  { key:"7d",      label:"7 dias",        gr:()=>({ s:vgDaysAgo(6),   e:vgToday() }) },
+  { key:"30d",     label:"30 dias",       gr:()=>({ s:vgDaysAgo(29),  e:vgToday() }) },
+  { key:"mes",     label:"Este mês",      gr:()=>({ s:vgMonthStart(), e:vgToday() }) },
+  { key:"mes-ant", label:"Mês anterior",  gr:vgPrevMonth },
+  { key:"custom",  label:"Personalizado", gr:null },
+];
+
 const SITUACOES = {
   "faltando_dados": { label: "Faltando Dados",  cls: "warn" },
+  "aguardando_veiculo": { label: "Aguardando Veículo", cls: "warn" },
   "aguardando":     { label: "Aguardando",       cls: "info" },
   "aguardando_cte": { label: "Aguardando CT-e",  cls: "info" },
   "em_transito":    { label: "Em Trânsito",      cls: "ok"   },
@@ -41,6 +57,25 @@ const numericValue = (value) => {
   const parsed = Number(normalized.replace(/[^\d.-]/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
 };
+const hasValue = (value) => {
+  const raw = textValue(value).trim();
+  if (!raw) return false;
+  const parsed = Number(raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw);
+  return Number.isNaN(parsed) || parsed !== 0;
+};
+const calcularSituacaoViagem = (input = {}) => {
+  if (["em_transito", "entregue", "cancelado"].includes(input.situacao)) return input.situacao;
+
+  const hasCarga = [input.cliente, input.material, input.peso, input.valorCliente, input.origem, input.destino].some(hasValue);
+  if (hasCarga && (!hasValue(input.placa) || !hasValue(input.motorista))) return "aguardando_veiculo";
+
+  const hasDadosOperacionais = [
+    input.placa, input.motorista, input.cliente, input.material,
+    input.valorCliente, input.valorMotorista, input.origem, input.destino,
+  ].every(hasValue);
+
+  return hasDadosOperacionais ? "aguardando_cte" : "faltando_dados";
+};
 const normalizeDocs = (docs = {}) => ({ ...FORM_EMPTY.docs, ...(docs || {}) });
 const normalizeParadas = (paradas = []) => (Array.isArray(paradas) ? paradas : []).map((p, index) => ({
   id: p.id ?? `${Date.now()}-${index}`,
@@ -58,7 +93,7 @@ const normalizeViagemForm = (input = {}) => ({
   ...input,
   id: input.id ?? null,
   numero: textValue(input.numero),
-  situacao: input.situacao || "faltando_dados",
+  situacao: input.situacao || calcularSituacaoViagem(input),
   data: input.data || FORM_EMPTY.data,
   placa: textValue(input.placa),
   origem: textValue(input.origem),
@@ -93,6 +128,151 @@ const STEPS = [
   { n: 4, label: "Documentos",       icon: "file"       },
 ];
 
+// ── Componentes estáticos fora do Viagens para evitar remontagem a cada keystroke ──
+const fs = {
+  width: "100%", height: 34, padding: "0 10px",
+  border: "1.5px solid var(--border)", borderRadius: "var(--r)",
+  background: "var(--surface)", color: "var(--text)",
+  fontSize: 13, outline: "none", boxSizing: "border-box",
+};
+const Fg = ({ label, children }) => (
+  <div>
+    <div style={{fontSize: 11.5, color: "var(--text-2)", fontWeight: 500, marginBottom: 5}}>{label}</div>
+    {children}
+  </div>
+);
+
+// ── Auxiliares de célula para o Romaneio ──
+const PRCell = ({ label, value }) => (
+  <div>
+    <span style={{display:"block",fontSize:8,color:"#6b7280",textTransform:"uppercase",fontWeight:600,letterSpacing:"0.3px"}}>{label}</span>
+    <strong style={{display:"block",fontSize:10.5,color:"#111827",fontWeight:600,lineHeight:1.3,wordBreak:"break-word"}}>{value || "—"}</strong>
+  </div>
+);
+const PRRow2 = ({ left, right }) => (
+  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:5}}>
+    {left  && <PRCell label={left.label}  value={left.value}/>}
+    {right && <PRCell label={right.label} value={right.value}/>}
+  </div>
+);
+const PRRow1 = ({ label, value }) => (
+  <div style={{marginBottom:5}}>
+    <PRCell label={label} value={value}/>
+  </div>
+);
+
+// ── Romaneio de Viagem (impressão) ──
+const PrintSheet = ({ form }) => {
+  const lucroVal = numericValue(form.valorCliente) - numericValue(form.valorMotorista);
+  const money = (v) => numericValue(v) ? `R$ ${fmtNum(numericValue(v), {minimumFractionDigits: 2})}` : "—";
+  const sit = (SITUACOES[form.situacao] || SITUACOES.faltando_dados).label;
+  const rota = [
+    [form.origem, form.ufOrigem].filter(Boolean).join("/"),
+    [form.destino, form.ufDestino].filter(Boolean).join("/"),
+  ].filter(Boolean).join(" → ");
+  const rsKg = numericValue(form.valorCliente) > 0 && numericValue(form.peso) > 0
+    ? `R$ ${fmtNum(numericValue(form.valorCliente) / numericValue(form.peso), {minimumFractionDigits: 2})}` : "—";
+  const rsTon = numericValue(form.valorCliente) > 0 && numericValue(form.peso) > 0
+    ? `R$ ${fmtNum(numericValue(form.valorCliente) / (numericValue(form.peso) / 1000), {minimumFractionDigits: 2})}` : "—";
+  const kmFmt = form.km ? `${fmtNum(numericValue(form.km))} km` : "—";
+  const pesoFmt = form.peso ? `${fmtNum(numericValue(form.peso))} kg` : "—";
+  const hasValores = numericValue(form.valorCliente) > 0 || numericValue(form.valorMotorista) > 0;
+
+  return (
+    <div className="rb-print-sheet">
+      {/* ── Cabeçalho ── */}
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"stretch",borderBottom:"2px solid #111827"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",flex:1}}>
+          <div style={{display:"flex",flexDirection:"column",width:42,height:42,background:"#1e3a8a",borderRadius:4,color:"#fff",fontSize:9,fontWeight:900,alignItems:"center",justifyContent:"center",lineHeight:1.2,flexShrink:0,letterSpacing:"0.5px",textAlign:"center"}}>
+            <span>RODO</span><span>BACH</span>
+          </div>
+          <div>
+            <div style={{fontSize:9,fontWeight:600,color:"#6b7280",textTransform:"uppercase",letterSpacing:"0.5px"}}>ROMANEIO DE VIAGEM</div>
+            <div style={{fontSize:14,fontWeight:700,color:"#111827",marginTop:2}}>{rota || "Rota não definida"}</div>
+          </div>
+        </div>
+        <div style={{padding:"10px 14px",borderLeft:"2px solid #111827",textAlign:"center",minWidth:72,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+          <div style={{fontSize:9,textTransform:"uppercase",color:"#6b7280",fontWeight:600}}>VIAGEM</div>
+          <div style={{fontSize:13,fontWeight:700,color:"#111827",marginTop:2}}>{form.numero || form.id || "—"}</div>
+        </div>
+      </div>
+
+      {/* ── Cards KPI ── */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",borderBottom:"1px solid #e5e7eb"}}>
+        {[
+          {label:"VALOR DA VIAGEM",  value: money(form.valorCliente)},
+          {label:"LUCRO PREVISTO",   value: hasValores ? money(lucroVal) : "—"},
+          {label:"PEDÁGIO",          value: "—"},
+          {label:"KM DA VIAGEM",     value: kmFmt},
+        ].map((kpi, i, arr) => (
+          <div key={i} style={{padding:"8px 12px",borderRight: i < arr.length - 1 ? "1px solid #e5e7eb" : "none"}}>
+            <div style={{fontSize:8,fontWeight:600,color:"#6b7280",textTransform:"uppercase",marginBottom:3}}>{kpi.label}</div>
+            <strong style={{fontSize:14,fontWeight:700,color:"#111827",display:"block"}}>{kpi.value}</strong>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Aviso ── */}
+      <div style={{background:"#f9fafb",borderBottom:"1px solid #e5e7eb",padding:"4px 12px",fontSize:9,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.3px",display:"flex",gap:20,alignItems:"center",justifyContent:"center",textAlign:"center"}}>
+        <span>TODA DOCUMENTAÇÃO DEVE SER LEGÍVEL</span>
+        <span style={{color:"#6b7280",fontWeight:400}}>CONFERIR ANTES DE ENCAMINHAR PARA FATURAMENTO</span>
+      </div>
+
+      {/* ── Duas colunas principais ── */}
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",borderBottom:"1px solid #e5e7eb"}}>
+        {/* Dados da Viagem */}
+        <div style={{padding:"10px 12px",borderRight:"1px solid #e5e7eb"}}>
+          <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",color:"#374151",borderBottom:"1px solid #e5e7eb",paddingBottom:4,marginBottom:7,letterSpacing:"0.3px"}}>DADOS DA VIAGEM</div>
+          <PRRow2 left={{label:"N° viagem", value:form.numero}} right={{label:"Situação", value:sit}}/>
+          <PRRow1 label="Cliente"           value={form.cliente}/>
+          <PRRow1 label="Cliente final"     value={form.clienteFinal}/>
+          <PRRow1 label="Tomador do serviço" value={form.tomadorServico}/>
+          <PRRow2 left={{label:"Material", value:form.material}}   right={{label:"Peso", value:pesoFmt}}/>
+          <PRRow2 left={{label:"Valor cliente", value:money(form.valorCliente)}} right={{label:"R$/kg", value:rsKg}}/>
+          <PRRow2 left={{label:"R$/ton", value:rsTon}} right={{label:"KM da viagem", value:kmFmt}}/>
+          <PRRow2 left={{label:"Entregas", value:String(form.paradas.length)}} right={{label:"Vendedor", value:form.vendedor}}/>
+        </div>
+
+        {/* Motorista e Pagamento */}
+        <div style={{padding:"10px 12px"}}>
+          <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",color:"#374151",borderBottom:"1px solid #e5e7eb",paddingBottom:4,marginBottom:7,letterSpacing:"0.3px"}}>MOTORISTA E PAGAMENTO</div>
+          <PRRow2 left={{label:"Motorista",      value:form.motorista}}    right={{label:"Placa do veículo",      value:form.placa}}/>
+          <PRRow2 left={{label:"Valor motorista",value:money(form.valorMotorista)}} right={{label:"Lucro previsto", value:hasValores?money(lucroVal):"—"}}/>
+          <PRRow2 left={{label:"Condição de pagamento",value:form.condicaoPagamento}} right={{label:"Número do motorista",value:form.numeroMotorista}}/>
+          <PRRow2 left={{label:"CNH do motorista",value:form.cnh}} right={{label:"ANTT do veículo",value:form.antt}}/>
+          <PRRow2 left={{label:"Conta depósito", value:form.contaDeposito}} right={{label:"Chave PIX", value:form.chavePix}}/>
+        </div>
+      </div>
+
+      {/* ── Entregas da Rota ── */}
+      {form.paradas.length > 0 && (
+        <div style={{padding:"8px 12px",borderBottom:"1px solid #e5e7eb"}}>
+          <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",color:"#374151",borderBottom:"1px solid #e5e7eb",paddingBottom:4,marginBottom:6,letterSpacing:"0.3px"}}>ENTREGAS DA ROTA</div>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:10.5}}>
+            <tbody>
+              {form.paradas.map((p, i) => (
+                <tr key={p.id || i} style={{borderBottom:"1px solid #f3f4f6"}}>
+                  <td style={{width:22,textAlign:"center",fontWeight:700,color:"#111827",padding:"3px 4px"}}>{p.ordem || i + 1}</td>
+                  <td style={{padding:"3px 6px",fontWeight:600,color:"#111827"}}>{[p.cidade, p.uf].filter(Boolean).join("/") || "—"}</td>
+                  <td style={{padding:"3px 6px",color:"#374151"}}>{p.cliente || ""}</td>
+                  <td style={{padding:"3px 6px",textAlign:"right",fontSize:9.5,color:"#6b7280"}}>{p.nf ? `NF ${p.nf}` : ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── Observações ── */}
+      {form.observacoes && (
+        <div style={{padding:"6px 12px",fontSize:9.5,color:"#374151"}}>
+          <span style={{fontWeight:600}}>Observações: </span>{form.observacoes}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Viagens = ({ onNavigate }) => {
   const { useState, useEffect, useRef } = React;
 
@@ -104,6 +284,17 @@ const Viagens = ({ onNavigate }) => {
   const [form,           setForm]           = useState(() => normalizeViagemForm());
   const [search,         setSearch]         = useState("");
   const [filtroSit,      setFiltroSit]      = useState("todos");
+  const [fCliente,       setFCliente]       = useState("");
+  const [fOrigem,        setFOrigem]        = useState("");
+  const [fDestino,       setFDestino]       = useState("");
+  const [fMaterial,      setFMaterial]      = useState("");
+  const [fPeriodo,       setFPeriodo]       = useState("30d");
+  const [fDataInicio,    setFDataInicio]    = useState(() => vgDaysAgo(29));
+  const [fDataFim,       setFDataFim]       = useState(() => vgToday());
+  const [sortCol,        setSortCol]        = useState("data");
+  const [sortDir,        setSortDir]        = useState("desc");
+  const [tablePage,      setTablePage]      = useState(0);
+  const [appliedFilters, setAppliedFilters] = useState(() => ({ dataInicio: vgDaysAgo(29), dataFim: vgToday(), limit: 500 }));
   const [opcoes,         setOpcoes]         = useState({
     clientes: [], clientesFinais: [], tomadores: [], placas: [], motoristas: [],
     vendedores: [], origens: [], destinos: [], paradas: [], materiais: [],
@@ -111,10 +302,19 @@ const Viagens = ({ onNavigate }) => {
   });
   const nextId = useRef(1);
 
+  // Opcoes de autocomplete — carrega uma vez
+  useEffect(() => {
+    window.RB_API.listOpcoes()
+      .then((data) => { if (data) setOpcoes(data); })
+      .catch(() => {});
+  }, []);
+
+  // Viagens — recarrega quando os filtros aplicados mudam
   useEffect(() => {
     setLoadingViagens(true);
     setViagensError("");
-    window.RB_API.listViagens()
+    setTablePage(0);
+    window.RB_API.listViagens(appliedFilters)
       .then((items) => {
         if (!Array.isArray(items)) { setViagensError("Resposta inesperada do servidor."); return; }
         setViagens(items);
@@ -126,11 +326,7 @@ const Viagens = ({ onNavigate }) => {
         setViagensError(error?.message || "Não foi possível carregar as viagens.");
       })
       .finally(() => setLoadingViagens(false));
-
-    window.RB_API.listOpcoes()
-      .then((data) => { if (data) setOpcoes(data); })
-      .catch(() => {});
-  }, []);
+  }, [appliedFilters]);
 
   useEffect(() => {
     if (!VIAGENS_FORM_DEBUG) return;
@@ -243,6 +439,7 @@ const Viagens = ({ onNavigate }) => {
       ...prev,
       [field]: item.nome || prev[field],
       condicaoPagamento: item.condicaoPagamento || prev.condicaoPagamento,
+      vendedor: item.vendedor || prev.vendedor,
     }));
   };
 
@@ -253,13 +450,9 @@ const Viagens = ({ onNavigate }) => {
       placas: window.RB_API.searchViagemPlacas,
       motoristas: window.RB_API.searchViagemMotoristas,
       clientes: window.RB_API.searchViagemClientes,
+      vendedores: window.RB_API.searchViagemVendedores,
     };
     calls[type]?.(q).then(items => mergeOptionDetails(type, items)).catch(() => {});
-  };
-
-  const isIncomplete = (v) => {
-    const docsMissing = DOCS_LABELS.some(doc => !v.docs?.[doc.key]);
-    return !v.placa || !v.motorista || !v.cliente || !v.material || !v.valorCliente || !v.valorMotorista || docsMissing;
   };
 
   const prepareViagem = (v) => ({
@@ -268,7 +461,7 @@ const Viagens = ({ onNavigate }) => {
     km: textValue(v.km).trim() ? numericValue(v.km) : "",
     valorCliente: numericValue(v.valorCliente),
     valorMotorista: numericValue(v.valorMotorista),
-    situacao: isIncomplete(v) ? "faltando_dados" : (v.situacao === "faltando_dados" ? "aguardando" : v.situacao),
+    situacao: calcularSituacaoViagem(v),
   });
 
   const missingHints = [
@@ -354,96 +547,72 @@ const Viagens = ({ onNavigate }) => {
   const setParada = (id, field, val) =>
     setParadas(current => current.map(p => p.id === id ? { ...p, [field]: val } : p));
 
-  const filteredViagens = viagens.filter(v => {
-    if (filtroSit !== "todos" && v.situacao !== filtroSit) return false;
+  const applyVgPeriod = (key) => {
+    const p = VG_PERIODS.find(x => x.key === key);
+    setFPeriodo(key);
+    if (p && p.gr) { const r = p.gr(); setFDataInicio(r.s); setFDataFim(r.e); }
+  };
+  const applyVgFilters = () => {
+    const f = { limit: 500 };
+    if (fCliente.trim())   f.cliente    = fCliente.trim();
+    if (fOrigem.trim())    f.origem     = fOrigem.trim();
+    if (fDestino.trim())   f.destino    = fDestino.trim();
+    if (fMaterial.trim())  f.material   = fMaterial.trim();
+    if (fDataInicio)       f.dataInicio = fDataInicio;
+    if (fDataFim)          f.dataFim    = fDataFim;
+    setAppliedFilters(f);
+  };
+  const clearVgFilters = () => {
+    const r = VG_PERIODS.find(x => x.key === "30d").gr();
+    setFCliente(""); setFOrigem(""); setFDestino(""); setFMaterial("");
+    setFPeriodo("30d"); setFDataInicio(r.s); setFDataFim(r.e);
+    setSearch(""); setFiltroSit("todos"); setTablePage(0);
+    setAppliedFilters({ dataInicio: r.s, dataFim: r.e, limit: 500 });
+  };
+  const toggleSort = (col) => {
+    if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortCol(col); setSortDir("desc"); }
+    setTablePage(0);
+  };
+  const VgSortArrow = ({ col }) => (
+    <span style={{ marginLeft:4, opacity:sortCol===col?1:0.25, fontSize:10 }}>
+      {sortCol===col ? (sortDir==="asc"?"↑":"↓") : "↕"}
+    </span>
+  );
+
+  const PAGE_SIZE = 20;
+
+  const filteredViagens = React.useMemo(() => {
+    let list = viagens;
+    if (filtroSit !== "todos") list = list.filter(v => v.situacao === filtroSit);
     if (search) {
       const q = search.toLowerCase();
-      const notas = (v.paradas || []).map(p => [p.nf, p.cliente, p.cidade, p.obs].filter(Boolean).join(" ")).join(" ");
-      return [v.numero, v.cliente, v.clienteFinal, v.tomadorServico, v.motorista, v.origem, v.destino, v.placa, v.material, notas]
-        .some(x => (x || "").toLowerCase().includes(q));
+      list = list.filter(v => {
+        const notas = (v.paradas || []).map(p => [p.nf, p.cliente, p.cidade, p.obs].filter(Boolean).join(" ")).join(" ");
+        return [v.numero, v.cliente, v.clienteFinal, v.tomadorServico, v.motorista, v.origem, v.destino, v.placa, v.material, notas]
+          .some(x => (x || "").toLowerCase().includes(q));
+      });
     }
-    return true;
-  });
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => {
+      if (sortCol === "data")          return dir * ((a.data||"") < (b.data||"") ? -1 : 1);
+      if (sortCol === "cliente")       return dir * ((a.cliente||"") < (b.cliente||"") ? -1 : 1);
+      if (sortCol === "valorCliente")  return dir * ((a.valorCliente||0) - (b.valorCliente||0));
+      if (sortCol === "margem") {
+        const ma = a.valorCliente>0 ? ((a.valorCliente-a.valorMotorista)/a.valorCliente) : -1;
+        const mb = b.valorCliente>0 ? ((b.valorCliente-b.valorMotorista)/b.valorCliente) : -1;
+        return dir * (ma - mb);
+      }
+      return 0;
+    });
+  }, [viagens, filtroSit, search, sortCol, sortDir]);
 
   const docsOk = (v) => Object.values(v.docs).filter(Boolean).length;
   const margem = (v) => (v.valorCliente > 0 && v.valorMotorista > 0)
     ? (((v.valorCliente - v.valorMotorista) / v.valorCliente) * 100).toFixed(1)
     : null;
-  const money = (value) => numericValue(value) ? `R$ ${fmtNum(numericValue(value), {minimumFractionDigits: 2})}` : "";
-  const lucro = numericValue(form.valorCliente) - numericValue(form.valorMotorista);
-  const printMargin = numericValue(form.valorCliente) > 0 ? ((lucro / numericValue(form.valorCliente)) * 100).toFixed(1) : "";
-  const printDocs = DOCS_LABELS.filter(doc => form.docs?.[doc.key]).map(doc => doc.label).join(", ");
 
-  const PrintBlock = ({ title, rows }) => (
-    <section className="rb-print-block">
-      <h2>{title}</h2>
-      <div className="rb-print-grid">
-        {rows.filter(row => row.value !== undefined && row.value !== null && String(row.value).trim() !== "").map(row => (
-          <div key={row.label} className={row.wide ? "wide" : ""}>
-            <span>{row.label}</span>
-            <strong>{row.value}</strong>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-
-  const PrintSheet = () => (
-    <div className="rb-print-sheet">
-      <div className="rb-print-title">
-        <div>
-          <h1>Viagem {form.numero || form.id || ""}</h1>
-          <p>{form.data ? new Date(form.data + "T12:00:00").toLocaleDateString("pt-BR") : ""}</p>
-        </div>
-        <div className="rb-print-status">{(SITUACOES[form.situacao] || SITUACOES.faltando_dados).label}</div>
-      </div>
-      <PrintBlock title="Dados da viagem" rows={[
-        { label: "Placa", value: form.placa },
-        { label: "Data", value: form.data ? new Date(form.data + "T12:00:00").toLocaleDateString("pt-BR") : "" },
-        { label: "Origem", value: [form.origem, form.ufOrigem].filter(Boolean).join("/") },
-        { label: "Destino", value: [form.destino, form.ufDestino].filter(Boolean).join("/") },
-        { label: "Paradas", value: (form.paradas || []).map(p => [p.cidade, p.uf].filter(Boolean).join("/")).filter(Boolean).join(" | "), wide: true },
-        { label: "KM", value: form.km },
-      ]}/>
-      <PrintBlock title="Cliente e carga" rows={[
-        { label: "Cliente/Tomador", value: form.cliente || form.tomadorServico, wide: true },
-        { label: "Cliente final", value: form.clienteFinal, wide: true },
-        { label: "Material", value: form.material, wide: true },
-        { label: "Peso", value: form.peso ? `${fmtNum(numericValue(form.peso))} kg` : "" },
-        { label: "Valor cliente", value: money(form.valorCliente) },
-        { label: "Cond. pagamento", value: form.condicaoPagamento, wide: true },
-      ]}/>
-      <PrintBlock title="Motorista e pagamento" rows={[
-        { label: "Motorista", value: form.motorista, wide: true },
-        { label: "Telefone", value: form.numeroMotorista },
-        { label: "CNH", value: form.cnh },
-        { label: "ANTT/RNTRC", value: form.antt },
-        { label: "Chave Pix", value: form.chavePix, wide: true },
-        { label: "Conta deposito", value: form.contaDeposito, wide: true },
-        { label: "Valor motorista", value: money(form.valorMotorista) },
-        { label: "Lucro/margem", value: numericValue(form.valorCliente) || numericValue(form.valorMotorista) ? `${money(lucro) || "R$ 0,00"}${printMargin ? ` (${printMargin}%)` : ""}` : "" },
-      ]}/>
-      <PrintBlock title="Documentos/observacoes" rows={[
-        { label: "Notas fiscais", value: (form.paradas || []).map(p => p.nf).filter(Boolean).join(", "), wide: true },
-        { label: "Documentos recebidos", value: printDocs, wide: true },
-        { label: "Observacoes", value: form.observacoes, wide: true },
-      ]}/>
-    </div>
-  );
-
-  // ── Field helpers ────────────────────────────────────────────────────────
-  const fs = {
-    width: "100%", height: 34, padding: "0 10px",
-    border: "1.5px solid var(--border)", borderRadius: "var(--r)",
-    background: "var(--surface)", color: "var(--text)",
-    fontSize: 13, outline: "none", boxSizing: "border-box",
-  };
-  const Fg = ({ label, children, half }) => (
-    <div style={half ? { flex: 1, minWidth: 0 } : {}}>
-      <div style={{fontSize: 11.5, color: "var(--text-2)", fontWeight: 500, marginBottom: 5}}>{label}</div>
-      {children}
-    </div>
-  );
+  // fs e Fg estão definidos fora do componente para evitar remontagem a cada render
 
   // ── LIST view ────────────────────────────────────────────────────────────
   if (mode === "list") {
@@ -486,116 +655,184 @@ const Viagens = ({ onNavigate }) => {
           </div>
         )}
 
-        {/* KPIs rápidos */}
-        <div className="grid cols-4" style={{marginBottom: 16}}>
-          <KPI label="Total de viagens" icon="route"   value={viagens.length}/>
-          <KPI label="Em trânsito"      icon="truck"   value={viagens.filter(v => v.situacao === "em_transito").length}/>
-          <KPI label="Aguardando"       icon="clock"   value={viagens.filter(v => v.situacao === "aguardando" || v.situacao === "faltando_dados").length} delta="com pendências" deltaDir="down"/>
-          <KPI label="Receita total"    icon="trending-up"
-            value={`R$ ${fmtNum(viagens.reduce((s, v) => s + (v.valorCliente || 0), 0), {minimumFractionDigits: 0})}`}/>
+        {/* ── Painel de filtros ── */}
+        <div className="card" style={{marginBottom:14,padding:"14px 18px"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+            <span style={{fontSize:11,fontWeight:600,color:"var(--text-3)",textTransform:"uppercase",letterSpacing:"0.06em"}}>
+              Filtros
+              {[fCliente,fOrigem,fDestino,fMaterial].filter(x=>x.trim()).length > 0 && (
+                <span className="badge info" style={{marginLeft:8,fontSize:10}}>
+                  {[fCliente,fOrigem,fDestino,fMaterial].filter(x=>x.trim()).length} ativo{[fCliente,fOrigem,fDestino,fMaterial].filter(x=>x.trim()).length>1?"s":""}
+                </span>
+              )}
+            </span>
+          </div>
+          {/* Linha 1: campos de texto */}
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:10}}>
+            {[
+              { label:"Cliente",  val:fCliente,  set:setFCliente,  list:"vg-cli",  opts:opcoes.clientes  },
+              { label:"Origem",   val:fOrigem,   set:setFOrigem,   list:"vg-ori",  opts:opcoes.origens   },
+              { label:"Destino",  val:fDestino,  set:setFDestino,  list:"vg-dest", opts:opcoes.destinos  },
+              { label:"Material", val:fMaterial, set:setFMaterial, list:"vg-mat",  opts:opcoes.materiais },
+            ].map(({ label, val, set, list, opts }) => (
+              <div key={label}>
+                <div style={{fontSize:10.5,color:"var(--text-3)",fontWeight:500,marginBottom:3}}>{label}</div>
+                <input list={list} value={val} onChange={e => set(e.target.value)} placeholder="Todos"
+                  style={{width:"100%",height:30,padding:"0 9px",border:"1px solid var(--border)",borderRadius:"var(--r)",background:"var(--surface)",color:"var(--text)",fontSize:12.5,outline:"none",boxSizing:"border-box"}}/>
+                <datalist id={list}>{opts.map(o => <option key={o} value={o}/>)}</datalist>
+              </div>
+            ))}
+          </div>
+          {/* Linha 2: período */}
+          <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+            <span style={{fontSize:10.5,color:"var(--text-3)",fontWeight:500,flexShrink:0}}>Período:</span>
+            {VG_PERIODS.map(p => (
+              <button key={p.key} className={`btn${fPeriodo===p.key?" primary":""}`}
+                style={{padding:"2px 9px",fontSize:11.5}} onClick={() => applyVgPeriod(p.key)}>
+                {p.label}
+              </button>
+            ))}
+            <input type="date" value={fDataInicio} onChange={e=>{setFDataInicio(e.target.value);setFPeriodo("custom");}}
+              style={{height:28,border:"1px solid var(--border)",borderRadius:"var(--r)",background:"var(--surface)",color:"var(--text)",fontSize:12,padding:"0 7px",outline:"none"}}/>
+            <span className="muted" style={{fontSize:11.5}}>até</span>
+            <input type="date" value={fDataFim} onChange={e=>{setFDataFim(e.target.value);setFPeriodo("custom");}}
+              style={{height:28,border:"1px solid var(--border)",borderRadius:"var(--r)",background:"var(--surface)",color:"var(--text)",fontSize:12,padding:"0 7px",outline:"none"}}/>
+            <div style={{marginLeft:"auto",display:"flex",gap:7}}>
+              <button className="btn" onClick={clearVgFilters}><Icon name="x" size={11}/> Limpar</button>
+              <button className="btn primary" onClick={applyVgFilters}><Icon name="search" size={11}/> Filtrar</button>
+            </div>
+          </div>
         </div>
 
-        {/* Toolbar */}
-        <div className="tbl-toolbar" style={{marginBottom: 0}}>
+        {/* KPIs */}
+        {(() => {
+          const valorTotal = viagens.reduce((s, v) => s + (v.valorCliente||0), 0);
+          const valorMotTotal = viagens.reduce((s, v) => s + (v.valorMotorista||0), 0);
+          const lucroTotal = valorTotal - valorMotTotal;
+          return (
+            <div className="grid cols-4" style={{marginBottom:14}}>
+              <KPI label="Fretes no período" icon="route"        value={viagens.length}/>
+              <KPI label="Receita total"     icon="trending-up"  value={`R$ ${fmtNum(valorTotal,{minimumFractionDigits:0})}`}/>
+              <KPI label="Lucro previsto"    icon="money"        value={`R$ ${fmtNum(lucroTotal,{minimumFractionDigits:0})}`}
+                delta={valorTotal>0?`${((lucroTotal/valorTotal)*100).toFixed(1)}% margem`:""}
+                deltaDir={lucroTotal>=0?"up":"down"}/>
+              <KPI label="Em trânsito"       icon="truck"        value={viagens.filter(v=>v.situacao==="em_transito").length}
+                delta={`${viagens.filter(v=>["aguardando","aguardando_veiculo","faltando_dados"].includes(v.situacao)).length} pendentes`}
+                deltaDir="down"/>
+            </div>
+          );
+        })()}
+
+        {/* Toolbar: busca de texto + filtro de status */}
+        <div className="tbl-toolbar" style={{marginBottom:0}}>
           <div className="search">
             <Icon name="search"/>
-            <input placeholder="Buscar por numero, cliente, tomador, motorista, placa, origem, destino, carga ou NF..."
-              value={search} onChange={e => setSearch(e.target.value)}/>
+            <input placeholder="Buscar por numero, cliente, motorista, placa, rota, carga ou NF..."
+              value={search} onChange={e=>{setSearch(e.target.value);setTablePage(0);}}/>
           </div>
-          <div className="row" style={{gap: 6}}>
-            {["todos", ...Object.keys(SITUACOES)].map(id => (
-              <button key={id}
-                className={`tbl-filter${filtroSit === id ? " active" : ""}`}
-                onClick={() => setFiltroSit(id)}>
-                {id === "todos" ? "Todos" : SITUACOES[id].label}
+          <div className="row" style={{gap:6,flexWrap:"wrap"}}>
+            {["todos",...Object.keys(SITUACOES)].map(id=>(
+              <button key={id} className={`tbl-filter${filtroSit===id?" active":""}`} onClick={()=>{setFiltroSit(id);setTablePage(0);}}>
+                {id==="todos"?"Todos":SITUACOES[id].label}
               </button>
             ))}
           </div>
         </div>
 
         {/* Table */}
-        <div className="card card-flush" style={{marginTop: 10}}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th className="num">N° Viagem</th>
-                <th>Data</th>
-                <th>Rota</th>
-                <th>Cliente</th>
-                <th>Motorista / Placa</th>
-                <th className="num">Vr. Cliente</th>
-                <th className="num">Vr. Motorista</th>
-                <th className="num">Margem</th>
-                <th>Situação</th>
-                <th style={{width: 70}}/>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredViagens.length === 0 && (
-                <tr>
-                  <td colSpan="10" style={{textAlign: "center", padding: "32px 0", color: "var(--text-3)"}}>
-                    {loadingViagens ? "Carregando viagens…" : "Nenhuma viagem encontrada."}
-                  </td>
-                </tr>
-              )}
-              {filteredViagens.map(v => {
-                const sit = SITUACOES[v.situacao] || SITUACOES["faltando_dados"];
-                const mg  = margem(v);
-                return (
-                  <tr key={v.id} className={`clickable${v.situacao === "cancelado" ? " row-crit" : v.situacao === "faltando_dados" ? " row-warn" : ""}`}
-                    onClick={() => openEdit(v)}>
-                    <td className="num" style={{fontWeight: 500}}>{v.numero || "—"}</td>
-                    <td className="date" style={{whiteSpace: "nowrap"}}>
-                      {v.data ? new Date(v.data + "T12:00:00").toLocaleDateString("pt-BR", {day: "2-digit", month: "2-digit"}) : "—"}
-                    </td>
-                    <td>
-                      <div style={{fontSize: 12.5}}>{v.origem || "—"} <span className="muted">({v.ufOrigem})</span></div>
-                      <div className="muted" style={{fontSize: 11.5}}>→ {v.destino || "—"} <span>({v.ufDestino})</span></div>
-                    </td>
-                    <td style={{maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
-                      {v.cliente || <span className="muted">—</span>}
-                    </td>
-                    <td>
-                      <div style={{fontSize: 12.5}}>{v.motorista || <span className="muted">—</span>}</div>
-                      {v.placa && <Plate value={v.placa}/>}
-                    </td>
-                    <td className="num">{v.valorCliente ? `R$ ${fmtNum(v.valorCliente, {minimumFractionDigits: 2})}` : <span className="muted">—</span>}</td>
-                    <td className="num">{v.valorMotorista ? `R$ ${fmtNum(v.valorMotorista, {minimumFractionDigits: 2})}` : <span className="muted">—</span>}</td>
-                    <td className="num">
-                      {mg !== null
-                        ? <span style={{color: +mg >= 20 ? "#047857" : +mg >= 10 ? "var(--text)" : "#b91c1c", fontWeight: 500}}>{mg}%</span>
-                        : <span className="muted">—</span>}
-                    </td>
-                    <td>
-                      <span className={`badge ${sit.cls}`}>
-                        <span className="dot"/>{sit.label}
-                      </span>
-                    </td>
-                    <td onClick={e => e.stopPropagation()}>
-                      <div className="row" style={{gap: 4, justifyContent: "flex-end"}}>
-                        <button className="icon-btn" title="Editar" onClick={() => openEdit(v)}>
-                          <Icon name="wrench" size={13}/>
-                        </button>
-                        <button className="icon-btn" title="Imprimir" onClick={() => { setForm(normalizeViagemForm(v)); setMode("print"); }}>
-                          <Icon name="file" size={13}/>
-                        </button>
-                        <button className="icon-btn" title="Excluir"
-                          onClick={() => { if (window.confirm(`Excluir viagem ${v.numero}?`)) deleteViagem(v.id); }}>
-                          <Icon name="x" size={13}/>
-                        </button>
-                      </div>
-                    </td>
+        {(() => {
+          const totalPages = Math.max(1, Math.ceil(filteredViagens.length / PAGE_SIZE));
+          const pageRows   = filteredViagens.slice(tablePage * PAGE_SIZE, (tablePage+1) * PAGE_SIZE);
+          return (
+            <div className="card card-flush" style={{marginTop:10}}>
+              <div className="card-header" style={{paddingBottom:0,borderBottom:"none"}}>
+                <span className="muted" style={{fontSize:12}}>{filteredViagens.length} viagem{filteredViagens.length!==1?"s":""} encontrada{filteredViagens.length!==1?"s":""}</span>
+              </div>
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("data")}>Data <VgSortArrow col="data"/></th>
+                    <th className="num">N°</th>
+                    <th style={{cursor:"pointer"}} onClick={()=>toggleSort("cliente")}>Cliente <VgSortArrow col="cliente"/></th>
+                    <th>Rota</th>
+                    <th>Material</th>
+                    <th>Motorista / Placa</th>
+                    <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("valorCliente")}>Vr. Cliente <VgSortArrow col="valorCliente"/></th>
+                    <th className="num">Vr. Motorista</th>
+                    <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("margem")}>Margem <VgSortArrow col="margem"/></th>
+                    <th>Situação</th>
+                    <th style={{width:70}}/>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {filteredViagens.length > 0 && (
-            <div className="tbl-footer">
-              <span className="muted" style={{fontSize: 12}}>{filteredViagens.length} de {viagens.length} viagens</span>
+                </thead>
+                <tbody>
+                  {pageRows.length === 0 && (
+                    <tr>
+                      <td colSpan="11" style={{textAlign:"center",padding:"32px 0",color:"var(--text-3)"}}>
+                        {loadingViagens ? "Carregando viagens…" : "Nenhuma viagem encontrada com os filtros aplicados."}
+                      </td>
+                    </tr>
+                  )}
+                  {pageRows.map(v => {
+                    const sit = SITUACOES[v.situacao] || SITUACOES["faltando_dados"];
+                    const mg  = margem(v);
+                    return (
+                      <tr key={v.id} className={`clickable${v.situacao==="cancelado"?" row-crit":["faltando_dados","aguardando_veiculo"].includes(v.situacao)?" row-warn":""}`}
+                        onClick={() => openEdit(v)}>
+                        <td className="date" style={{whiteSpace:"nowrap"}}>
+                          {v.data ? new Date(v.data+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"2-digit"}) : "—"}
+                        </td>
+                        <td className="num" style={{fontWeight:500,whiteSpace:"nowrap"}}>{v.numero||"—"}</td>
+                        <td style={{maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={v.cliente}>
+                          {v.cliente||<span className="muted">—</span>}
+                        </td>
+                        <td>
+                          <div style={{fontSize:12.5}}>{v.origem||"—"} <span className="muted">({v.ufOrigem})</span></div>
+                          <div className="muted" style={{fontSize:11.5}}>→ {v.destino||"—"} <span>({v.ufDestino})</span></div>
+                        </td>
+                        <td style={{maxWidth:120,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontSize:12.5}}>
+                          {v.material||<span className="muted">—</span>}
+                        </td>
+                        <td>
+                          <div style={{fontSize:12.5}}>{v.motorista||<span className="muted">—</span>}</div>
+                          {v.placa&&<Plate value={v.placa}/>}
+                        </td>
+                        <td className="num">{v.valorCliente?`R$ ${fmtNum(v.valorCliente,{minimumFractionDigits:2})}` : <span className="muted">—</span>}</td>
+                        <td className="num">{v.valorMotorista?`R$ ${fmtNum(v.valorMotorista,{minimumFractionDigits:2})}` : <span className="muted">—</span>}</td>
+                        <td className="num">
+                          {mg!==null
+                            ? <span style={{color:+mg>=20?"#047857":+mg>=10?"var(--text)":"#b91c1c",fontWeight:500}}>{mg}%</span>
+                            : <span className="muted">—</span>}
+                        </td>
+                        <td><span className={`badge ${sit.cls}`}><span className="dot"/>{sit.label}</span></td>
+                        <td onClick={e=>e.stopPropagation()}>
+                          <div className="row" style={{gap:4,justifyContent:"flex-end"}}>
+                            <button className="icon-btn" title="Editar" onClick={()=>openEdit(v)}><Icon name="wrench" size={13}/></button>
+                            <button className="icon-btn" title="Imprimir" onClick={()=>{setForm(normalizeViagemForm(v));setMode("print");}}><Icon name="file" size={13}/></button>
+                            <button className="icon-btn" title="Excluir"
+                              onClick={()=>{if(window.confirm(`Excluir viagem ${v.numero}?`))deleteViagem(v.id);}}>
+                              <Icon name="x" size={13}/>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              {totalPages > 1 && (
+                <div className="tbl-footer">
+                  <span className="muted" style={{fontSize:12}}>Pág. {tablePage+1}/{totalPages} · {filteredViagens.length} viagens</span>
+                  <div className="pager">
+                    <button onClick={()=>setTablePage(0)} disabled={tablePage===0}>«</button>
+                    <button onClick={()=>setTablePage(p=>p-1)} disabled={tablePage===0}>‹</button>
+                    <button onClick={()=>setTablePage(p=>p+1)} disabled={tablePage>=totalPages-1}>›</button>
+                    <button onClick={()=>setTablePage(totalPages-1)} disabled={tablePage>=totalPages-1}>»</button>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()}
       </div>
     );
   }
@@ -606,52 +843,41 @@ const Viagens = ({ onNavigate }) => {
       <div className="view rb-print-view">
         <style>{`
           .rb-print-view { display: grid; gap: 16px; }
-          .rb-print-actions { display: flex; gap: 8px; justify-content: space-between; align-items: center; }
           .rb-print-sheet {
-            width: min(148mm, 100%);
+            width: min(190mm, 100%);
             margin: 0 auto;
             background: #fff;
             color: #111827;
             border: 1px solid #d1d5db;
             border-radius: 6px;
-            padding: 12mm;
             font-family: Arial, sans-serif;
+            font-size: 11px;
             box-shadow: 0 16px 34px rgba(15, 23, 42, 0.16);
+            overflow: hidden;
           }
-          .rb-print-title { display: flex; justify-content: space-between; gap: 12px; border-bottom: 2px solid #111827; padding-bottom: 8px; margin-bottom: 10px; }
-          .rb-print-title h1 { margin: 0; font-size: 18px; color: #111827; }
-          .rb-print-title p { margin: 3px 0 0; font-size: 11px; color: #4b5563; }
-          .rb-print-status { align-self: flex-start; border: 1px solid #9ca3af; border-radius: 4px; padding: 3px 7px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
-          .rb-print-block { break-inside: avoid; page-break-inside: avoid; margin-top: 9px; }
-          .rb-print-block h2 { margin: 0 0 5px; font-size: 11px; color: #111827; text-transform: uppercase; letter-spacing: 0; border-bottom: 1px solid #e5e7eb; padding-bottom: 3px; }
-          .rb-print-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 10px; }
-          .rb-print-grid div { min-width: 0; }
-          .rb-print-grid .wide { grid-column: 1 / -1; }
-          .rb-print-grid span { display: block; font-size: 9px; color: #6b7280; text-transform: uppercase; }
-          .rb-print-grid strong { display: block; font-size: 11px; line-height: 1.3; color: #111827; overflow-wrap: anywhere; }
           @media print {
             body { background: #fff !important; }
             body * { visibility: hidden !important; }
             .rb-print-sheet, .rb-print-sheet * { visibility: visible !important; }
             .rb-print-sheet {
               position: absolute;
-              left: 0;
-              top: 0;
-              width: 148mm;
+              left: 0; top: 0;
+              width: 190mm;
               margin: 0;
               border: 0;
               border-radius: 0;
               box-shadow: none;
-              padding: 9mm;
+              overflow: visible;
             }
-            .rb-print-actions, .page-head, .actions, .sidebar, .topbar, .app-nav { display: none !important; }
-            @page { size: A4 portrait; margin: 10mm; }
+            .rb-print-view > :not(.rb-print-sheet),
+            .page-head, .sidebar, .topbar, .app-nav { display: none !important; }
+            @page { size: A4 portrait; margin: 8mm; }
           }
         `}</style>
-        <div className="page-head rb-print-actions">
+        <div className="page-head" style={{display:"flex",gap:8,justifyContent:"space-between",alignItems:"center"}}>
           <div>
-            <h1>Resumo para impressao</h1>
-            <div className="sub">Meia folha A4 pronta para enviar ao financeiro.</div>
+            <h1>Romaneio de Viagem</h1>
+            <div className="sub">Pronto para imprimir e enviar ao financeiro.</div>
           </div>
           <div className="actions">
             <button className="btn" onClick={() => setMode("list")}>
@@ -661,11 +887,11 @@ const Viagens = ({ onNavigate }) => {
               <Icon name="wrench"/> Editar
             </button>
             <button className="btn primary" onClick={() => window.print()}>
-              <Icon name="file"/> Imprimir viagem
+              <Icon name="file"/> Imprimir
             </button>
           </div>
         </div>
-        <PrintSheet/>
+        <PrintSheet form={form}/>
       </div>
     );
   }
@@ -711,15 +937,28 @@ const Viagens = ({ onNavigate }) => {
           )}
         </Fg>
         <Fg label="Situação">
-          <select style={fs} value={form.situacao} onChange={e => setF("situacao", e.target.value)}>
-            {Object.entries(SITUACOES).map(([id, s]) => (
-              <option key={id} value={id}>{s.label}</option>
-            ))}
-          </select>
+          {(() => {
+            const situacaoCalculada = calcularSituacaoViagem(form);
+            const sit = SITUACOES[situacaoCalculada] || SITUACOES.faltando_dados;
+            return (
+              <div style={{
+                ...fs,
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                background: "var(--bg)", color: "var(--text-2)",
+              }}>
+                <span>{sit.label}</span>
+                <span className={`badge ${sit.cls || ""}`} style={{fontSize: 11}}>automatico</span>
+              </div>
+            );
+          })()}
         </Fg>
         <Fg label="Vendedor (opcional)">
           <input list="vendedores-list" style={fs} value={form.vendedor}
-            onChange={e => setF("vendedor", e.target.value)} placeholder="Nome do vendedor"/>
+            onChange={e => {
+              const value = e.target.value;
+              setF("vendedor", value);
+              searchAutocomplete("vendedores", value);
+            }} placeholder="Nome do vendedor"/>
           <datalist id="vendedores-list">
             {opcoes.vendedores.map(v => <option key={v} value={v}/>)}
           </datalist>

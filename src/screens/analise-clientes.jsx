@@ -34,6 +34,316 @@ const AC_PERIODS = [
   { key:"12m",  label:"12 meses",getRange:()=>({ start:acNMonthsAgoISO(12), end:acTodayISO() }) },
 ];
 
+// Períodos para Histórico de Fretes
+const HF_PERIODS = [
+  { key:"hoje",    label:"Hoje",         getRange:()=>({ s:acTodayISO(), e:acTodayISO() }) },
+  { key:"7d",      label:"7 dias",        getRange:()=>({ s:acNDaysAgoISO(6), e:acTodayISO() }) },
+  { key:"30d",     label:"30 dias",       getRange:()=>({ s:acNDaysAgoISO(29), e:acTodayISO() }) },
+  { key:"mes",     label:"Este mês",      getRange:()=>{ const d=new Date(); return { s:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-01`, e:acTodayISO() }; } },
+  { key:"mes-ant", label:"Mês anterior",  getRange:()=>{ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),last=new Date(y,d.getMonth()+1,0); return { s:`${y}-${m}-01`, e:`${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,"0")}-${String(last.getDate()).padStart(2,"0")}` }; } },
+  { key:"custom",  label:"Personalizado", getRange:null },
+];
+
+const HF_SITUACOES = {
+  faltando_dados: { label:"Faltando Dados",  cls:"warn" },
+  aguardando:     { label:"Aguardando",       cls:"info" },
+  aguardando_cte: { label:"Aguardando CT-e",  cls:"info" },
+  em_transito:    { label:"Em Trânsito",      cls:"ok"   },
+  entregue:       { label:"Entregue",         cls:"ok"   },
+  cancelado:      { label:"Cancelado",        cls:"crit" },
+};
+
+// ── Componente Histórico de Fretes ────────────────────────────────────────────
+const HistoricoFretes = () => {
+  const { useState, useEffect, useMemo } = React;
+
+  const init30d = HF_PERIODS.find(x => x.key === "30d").getRange();
+
+  const [fCliente,   setFCliente]   = useState("");
+  const [fOrigem,    setFOrigem]    = useState("");
+  const [fDestino,   setFDestino]   = useState("");
+  const [fMaterial,  setFMaterial]  = useState("");
+  const [fPeriodo,   setFPeriodo]   = useState("30d");
+  const [fDataInicio,setFDataInicio]= useState(init30d.s);
+  const [fDataFim,   setFDataFim]   = useState(init30d.e);
+
+  const [opcoes,     setOpcoes]     = useState({ clientes:[], origens:[], destinos:[], materiais:[] });
+  const [fretes,     setFretes]     = useState([]);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState("");
+
+  const [busca,      setBusca]      = useState("");
+  const [sortCol,    setSortCol]    = useState("data");
+  const [sortDir,    setSortDir]    = useState("desc");
+  const [page,       setPage]       = useState(0);
+  const PAGE_SIZE = 20;
+
+  const [applied,    setApplied]    = useState({ dataInicio: init30d.s, dataFim: init30d.e });
+
+  useEffect(() => {
+    window.RB_API.listOpcoes()
+      .then(d => { if (d) setOpcoes({ clientes:d.clientes||[], origens:d.origens||[], destinos:d.destinos||[], materiais:d.materiais||[] }); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true); setError(""); setPage(0);
+    const params = {};
+    if (applied.cliente)    params.cliente    = applied.cliente;
+    if (applied.origem)     params.origem     = applied.origem;
+    if (applied.destino)    params.destino    = applied.destino;
+    if (applied.material)   params.material   = applied.material;
+    if (applied.dataInicio) params.dataInicio = applied.dataInicio;
+    if (applied.dataFim)    params.dataFim    = applied.dataFim;
+    params.limit = 500;
+    window.RB_API.listViagens(params)
+      .then(d => { if (active) setFretes(Array.isArray(d) ? d : []); })
+      .catch(e => { if (active) { setFretes([]); setError(e?.message || "Erro ao carregar fretes."); } })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [applied]);
+
+  const applyPeriodShortcut = (key) => {
+    const p = HF_PERIODS.find(x => x.key === key);
+    setFPeriodo(key);
+    if (p && p.getRange) { const r = p.getRange(); setFDataInicio(r.s); setFDataFim(r.e); }
+  };
+
+  const applyFilters = () => {
+    setApplied({
+      cliente:    fCliente.trim()   || undefined,
+      origem:     fOrigem.trim()    || undefined,
+      destino:    fDestino.trim()   || undefined,
+      material:   fMaterial.trim()  || undefined,
+      dataInicio: fDataInicio       || undefined,
+      dataFim:    fDataFim          || undefined,
+    });
+  };
+
+  const clearFilters = () => {
+    const r = HF_PERIODS.find(x => x.key === "30d").getRange();
+    setFCliente(""); setFOrigem(""); setFDestino(""); setFMaterial("");
+    setFPeriodo("30d"); setFDataInicio(r.s); setFDataFim(r.e);
+    setBusca("");
+    setApplied({ dataInicio: r.s, dataFim: r.e });
+  };
+
+  const sorted = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    let list = fretes;
+    if (q) list = list.filter(v =>
+      [v.numero, v.cliente, v.clienteFinal, v.origem, v.destino, v.material, v.placa, v.motorista]
+        .some(x => (x || "").toLowerCase().includes(q))
+    );
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => {
+      if (sortCol === "data")         return dir * ((a.data || "") < (b.data || "") ? -1 : 1);
+      if (sortCol === "cliente")      return dir * ((a.cliente || "") < (b.cliente || "") ? -1 : 1);
+      if (sortCol === "valorCliente") return dir * (acNum(a.valorCliente) - acNum(b.valorCliente));
+      if (sortCol === "rota")         return dir * ((a.origem || "") < (b.origem || "") ? -1 : 1);
+      return 0;
+    });
+  }, [fretes, busca, sortCol, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const pageRows   = sorted.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  const toggleSort = (col) => {
+    if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortCol(col); setSortDir("desc"); }
+    setPage(0);
+  };
+
+  const valorTotal  = fretes.reduce((s, v) => s + acNum(v.valorCliente), 0);
+  const ticketMedio = fretes.length > 0 ? valorTotal / fretes.length : 0;
+  const ultimaData  = fretes.reduce((lat, v) => (!lat || (v.data && v.data > lat) ? v.data : lat), null);
+
+  const exportCsv = () => {
+    const h = ["Data","N°","Cliente","Origem","Destino","Material","Placa","Motorista","Peso (kg)","Valor","Status"];
+    const rows = sorted.map(v => [
+      acDateFmt(v.data), v.numero||"", v.cliente||"",
+      [v.origem, v.ufOrigem].filter(Boolean).join("/"),
+      [v.destino, v.ufDestino].filter(Boolean).join("/"),
+      v.material||"", v.placa||"", v.motorista||"",
+      v.peso||"", acNum(v.valorCliente).toFixed(2), v.situacao||"",
+    ]);
+    const csv = [h, ...rows].map(r => r.map(x => `"${String(x).replace(/"/g,'""')}"`).join(";")).join("\n");
+    const url = URL.createObjectURL(new Blob([csv], { type:"text/csv;charset=utf-8" }));
+    const a = document.createElement("a"); a.href = url; a.download = "historico-fretes.csv"; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const iS = { height:32, padding:"0 10px", border:"1px solid var(--border)", borderRadius:"var(--r)", background:"var(--surface)", color:"var(--text)", fontSize:12.5, outline:"none", boxSizing:"border-box", width:"100%" };
+  const SortArrow = ({ col }) => (
+    <span style={{ marginLeft:4, opacity:sortCol===col?1:0.3, color:sortCol===col?"var(--accent)":"inherit" }}>
+      {sortCol===col?(sortDir==="asc"?"↑":"↓"):"↕"}
+    </span>
+  );
+
+  const activeFiltersCount = [applied.cliente, applied.origem, applied.destino, applied.material].filter(Boolean).length;
+
+  return (
+    <div>
+      {/* ── Painel de filtros ── */}
+      <div className="card" style={{ marginBottom:16, padding:"16px 20px" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+          <span style={{ fontSize:11.5, fontWeight:600, color:"var(--text-3)", textTransform:"uppercase", letterSpacing:"0.05em" }}>
+            Filtros{activeFiltersCount > 0 && <span className="badge info" style={{ marginLeft:8, fontSize:10 }}>{activeFiltersCount} ativo{activeFiltersCount>1?"s":""}</span>}
+          </span>
+        </div>
+
+        {/* Linha 1: campos de texto */}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:12, marginBottom:12 }}>
+          {[
+            { label:"Cliente",  value:fCliente,  set:setFCliente,  listId:"hf-clientes",  opts:opcoes.clientes  },
+            { label:"Origem",   value:fOrigem,   set:setFOrigem,   listId:"hf-origens",   opts:opcoes.origens   },
+            { label:"Destino",  value:fDestino,  set:setFDestino,  listId:"hf-destinos",  opts:opcoes.destinos  },
+            { label:"Material", value:fMaterial, set:setFMaterial, listId:"hf-materiais", opts:opcoes.materiais },
+          ].map(({ label, value, set, listId, opts }) => (
+            <div key={label}>
+              <div style={{ fontSize:11, color:"var(--text-3)", fontWeight:500, marginBottom:4 }}>{label}</div>
+              <input list={listId} value={value} onChange={e => set(e.target.value)} placeholder="Todos" style={iS}/>
+              <datalist id={listId}>{opts.map(o => <option key={o} value={o}/>)}</datalist>
+            </div>
+          ))}
+        </div>
+
+        {/* Linha 2: período */}
+        <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+          <span style={{ fontSize:11, color:"var(--text-3)", fontWeight:500, flexShrink:0, marginRight:2 }}>Período:</span>
+          {HF_PERIODS.map(p => (
+            <button key={p.key}
+              className={`btn${fPeriodo===p.key?" primary":""}`}
+              style={{ padding:"3px 10px", fontSize:11.5 }}
+              onClick={() => applyPeriodShortcut(p.key)}>
+              {p.label}
+            </button>
+          ))}
+          <input type="date" value={fDataInicio} onChange={e => { setFDataInicio(e.target.value); setFPeriodo("custom"); }}
+            style={{ height:30, border:"1px solid var(--border)", borderRadius:"var(--r)", background:"var(--surface)", color:"var(--text)", fontSize:12, padding:"0 8px", outline:"none" }}/>
+          <span className="muted" style={{ fontSize:12 }}>até</span>
+          <input type="date" value={fDataFim} onChange={e => { setFDataFim(e.target.value); setFPeriodo("custom"); }}
+            style={{ height:30, border:"1px solid var(--border)", borderRadius:"var(--r)", background:"var(--surface)", color:"var(--text)", fontSize:12, padding:"0 8px", outline:"none" }}/>
+          <div style={{ marginLeft:"auto", display:"flex", gap:8 }}>
+            <button className="btn" onClick={clearFilters}><Icon name="x" size={12}/> Limpar</button>
+            <button className="btn primary" onClick={applyFilters}><Icon name="search" size={12}/> Filtrar</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Banner de status */}
+      {(loading || error) && (
+        <div className="card" style={{ marginBottom:12, padding:"9px 14px", borderColor:error?"var(--crit-border)":"var(--border)" }}>
+          <span className={error?"kpi-delta down":"muted"} style={{ fontSize:12.5 }}>
+            {loading ? "Carregando fretes…" : `⚠ ${error}`}
+          </span>
+        </div>
+      )}
+
+      {/* ── KPIs resumo ── */}
+      <div className="grid cols-4" style={{ marginBottom:14 }}>
+        <div className="kpi" style={{ borderLeft:"3px solid #4f7fab" }}>
+          <div className="kpi-label"><Icon name="route"/><span>Fretes encontrados</span></div>
+          <div className="kpi-value">{fretes.length}</div>
+          <span className="kpi-delta flat">{sorted.length !== fretes.length ? `${sorted.length} exibidos` : "no período"}</span>
+        </div>
+        <div className="kpi" style={{ borderLeft:"3px solid #22c55e" }}>
+          <div className="kpi-label"><Icon name="money"/><span>Valor total</span></div>
+          <div className="kpi-value">{acBRL(valorTotal)}</div>
+          <span className="kpi-delta flat">soma dos fretes</span>
+        </div>
+        <div className="kpi" style={{ borderLeft:"3px solid #818cf8" }}>
+          <div className="kpi-label"><Icon name="gauge"/><span>Ticket médio</span></div>
+          <div className="kpi-value">{acBRL(ticketMedio)}</div>
+          <span className="kpi-delta flat">por frete</span>
+        </div>
+        <div className="kpi" style={{ borderLeft:"3px solid #fbbf24" }}>
+          <div className="kpi-label"><Icon name="clock"/><span>Último frete</span></div>
+          <div className="kpi-value" style={{ fontSize:17 }}>{acDateFmt(ultimaData)}</div>
+          <span className="kpi-delta flat">data mais recente</span>
+        </div>
+      </div>
+
+      {/* ── Tabela de fretes ── */}
+      <div className="card card-flush" style={{ marginBottom:16 }}>
+        <div className="card-header">
+          <h3>Fretes</h3>
+          <div className="row" style={{ gap:8 }}>
+            <div style={{ position:"relative" }}>
+              <Icon name="search" size={13} style={{ position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", color:"var(--text-4)", pointerEvents:"none" }}/>
+              <input type="text" placeholder="Buscar em todos os campos…"
+                value={busca} onChange={e => { setBusca(e.target.value); setPage(0); }}
+                style={{ height:28, paddingLeft:27, paddingRight:8, border:"1px solid var(--border)", borderRadius:"var(--r)", background:"var(--surface-2)", fontSize:12.5, width:220, outline:"none" }}/>
+            </div>
+            <span className="muted" style={{ fontSize:11.5 }}>{sorted.length} frete{sorted.length!==1?"s":""}</span>
+            <button className="btn" style={{ padding:"3px 10px", fontSize:12 }} onClick={exportCsv}><Icon name="download" size={12}/> CSV</button>
+          </div>
+        </div>
+
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th style={{ cursor:"pointer", whiteSpace:"nowrap" }} onClick={() => toggleSort("data")}>Data <SortArrow col="data"/></th>
+              <th>N°</th>
+              <th style={{ cursor:"pointer" }} onClick={() => toggleSort("cliente")}>Cliente <SortArrow col="cliente"/></th>
+              <th style={{ cursor:"pointer" }} onClick={() => toggleSort("rota")}>Rota <SortArrow col="rota"/></th>
+              <th>Material</th>
+              <th>Placa</th>
+              <th>Motorista</th>
+              <th className="num">Peso</th>
+              <th className="num" style={{ cursor:"pointer" }} onClick={() => toggleSort("valorCliente")}>Valor <SortArrow col="valorCliente"/></th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pageRows.length === 0 && (
+              <tr><td colSpan="10" className="muted" style={{ padding:24, textAlign:"center", fontSize:12.5 }}>
+                {loading ? "Carregando…" : busca ? "Nenhum resultado para a busca." : "Nenhum frete encontrado com os filtros aplicados."}
+              </td></tr>
+            )}
+            {pageRows.map(v => {
+              const sit = HF_SITUACOES[v.situacao] || { label:v.situacao||"—", cls:"" };
+              return (
+                <tr key={v.id}>
+                  <td className="date" style={{ whiteSpace:"nowrap" }}>
+                    {v.data ? new Date(v.data+"T12:00:00").toLocaleDateString("pt-BR",{ day:"2-digit", month:"2-digit", year:"2-digit" }) : "—"}
+                  </td>
+                  <td style={{ fontFamily:"var(--font-mono)", fontSize:12, whiteSpace:"nowrap" }}>{v.numero || "—"}</td>
+                  <td style={{ maxWidth:160, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }} title={v.cliente}>{v.cliente || "—"}</td>
+                  <td style={{ fontSize:12, whiteSpace:"nowrap" }}>
+                    <span>{[v.origem, v.ufOrigem].filter(Boolean).join("/") || "—"}</span>
+                    <span className="muted" style={{ margin:"0 4px" }}>→</span>
+                    <span>{[v.destino, v.ufDestino].filter(Boolean).join("/") || "—"}</span>
+                  </td>
+                  <td style={{ maxWidth:120, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.material || "—"}</td>
+                  <td style={{ fontFamily:"var(--font-mono)", fontSize:12 }}>{v.placa || "—"}</td>
+                  <td style={{ maxWidth:140, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{v.motorista || "—"}</td>
+                  <td className="num">{v.peso ? `${acNum(v.peso).toLocaleString("pt-BR")} kg` : "—"}</td>
+                  <td className="num" style={{ fontWeight:500 }}>{v.valorCliente ? acBRL(v.valorCliente) : "—"}</td>
+                  <td><span className={`badge ${sit.cls}`}><span className="dot"/>{sit.label}</span></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        {totalPages > 1 && (
+          <div className="tbl-footer">
+            <span>Página {page+1} de {totalPages} · {sorted.length} fretes</span>
+            <div className="pager">
+              <button onClick={() => setPage(0)} disabled={page===0}>«</button>
+              <button onClick={() => setPage(p => p-1)} disabled={page===0}>‹</button>
+              <button onClick={() => setPage(p => p+1)} disabled={page>=totalPages-1}>›</button>
+              <button onClick={() => setPage(totalPages-1)} disabled={page>=totalPages-1}>»</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ── Cores ─────────────────────────────────────────────────────────────────────
 const AC_COLORS = {
   estrategico: "#22c55e",
@@ -160,6 +470,7 @@ const AcClienteModal = ({ row, onClose }) => {
 const AnaliseClientes = () => {
   const defaultRange = AC_PERIODS[3].getRange(); // 12 meses
 
+  const [viewMode,     setViewMode]     = React.useState("fretes"); // "clientes" | "fretes"
   const [periodo,      setPeriodo]      = React.useState("12m");
   const [dataInicio,   setDataInicio]   = React.useState(defaultRange.start);
   const [dataFim,      setDataFim]      = React.useState(defaultRange.end);
@@ -360,17 +671,45 @@ const AnaliseClientes = () => {
       <div className="page-head">
         <div>
           <h1>Análise de Clientes</h1>
-          <div className="sub">financeiro.receber · {periodLabel}</div>
+          <div className="sub">{viewMode==="fretes" ? "Histórico de fretes · viagens cadastradas" : `financeiro.receber · ${periodLabel}`}</div>
         </div>
         <div className="actions">
-          {AC_PERIODS.map(p=>(
+          {viewMode==="clientes" && AC_PERIODS.map(p=>(
             <button key={p.key}
                     className={`btn${!manualFilter&&periodo===p.key?" primary":""}`}
                     onClick={()=>selectShortcut(p.key)}>{p.label}</button>
           ))}
-          <button className="btn" onClick={exportCsv}><Icon name="download"/> Exportar</button>
+          {viewMode==="clientes" && <button className="btn" onClick={exportCsv}><Icon name="download"/> Exportar</button>}
         </div>
       </div>
+
+      {/* ── Tabs ── */}
+      <div className="card" style={{ padding:0, marginBottom:16, overflow:"hidden" }}>
+        <div style={{ display:"flex", borderBottom:"1px solid var(--divider)" }}>
+          {[
+            { key:"fretes",   label:"Histórico de Fretes", icon:"route"  },
+            { key:"clientes", label:"Análise de Clientes",  icon:"user"  },
+          ].map(tab => (
+            <button key={tab.key}
+              onClick={() => setViewMode(tab.key)}
+              style={{
+                flex:1, padding:"12px 16px", background:"transparent",
+                borderBottom:`2px solid ${viewMode===tab.key?"var(--brand-blue)":"transparent"}`,
+                color: viewMode===tab.key ? "var(--brand-blue)" : "var(--text-3)",
+                display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+                fontSize:13, fontWeight:viewMode===tab.key?600:400, transition:"all 120ms",
+              }}>
+              <Icon name={tab.icon} size={14}/>{tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Histórico de Fretes ── */}
+      {viewMode === "fretes" && <HistoricoFretes/>}
+
+      {/* ── Análise de Clientes (conteúdo original, só mostra se aba ativa) ── */}
+      {viewMode === "clientes" && <>
 
       {/* ── Filtros ── */}
       <div className="period-filter">
@@ -449,7 +788,7 @@ const AnaliseClientes = () => {
       <div className="grid cols-2-1" style={{marginBottom:16}}>
 
         {/* Faturamento mensal */}
-        <div className="card card-flush">
+        <div className="card card-flush chart-card">
           <div className="card-header">
             <h3>Faturamento por mês</h3>
             <div className="row" style={{gap:8,fontSize:11.5}}>
@@ -461,7 +800,7 @@ const AnaliseClientes = () => {
               <div className="muted" style={{textAlign:"center",padding:"28px 0",fontSize:12.5}}>Sem dados no período</div>
             )}
             {monthly.length>0&&(
-              <div key={chartKey} style={{
+              <div key={chartKey} className="chart-plot" style={{
                 display:"grid",
                 gridTemplateColumns:`repeat(${monthly.length}, minmax(24px, 1fr))`,
                 gap:5,height:170,alignItems:"flex-end",
@@ -478,7 +817,7 @@ const AnaliseClientes = () => {
                          onMouseLeave={()=>setHoveredBar(null)}>
                       {/* Tooltip */}
                       {isHov&&(
-                        <div style={{position:"absolute",bottom:"calc(100% + 8px)",left:"50%",transform:"translateX(-50%)",background:"var(--surface)",border:"1px solid var(--border-strong)",borderRadius:8,padding:"10px 13px",fontSize:12,whiteSpace:"nowrap",zIndex:30,boxShadow:"var(--shadow-lg)",lineHeight:1.8,minWidth:200}}>
+                        <div className="chart-tooltip" style={{bottom:"calc(100% + 8px)",left:"50%",transform:"translateX(-50%)",background:"var(--surface)",border:"1px solid var(--border-strong)",borderRadius:8,padding:"10px 13px",fontSize:12,whiteSpace:"nowrap",boxShadow:"var(--shadow-lg)",lineHeight:1.8,minWidth:200}}>
                           <div style={{fontWeight:600,fontSize:12.5,marginBottom:6,color:"var(--text)"}}>{item.label}</div>
                           <div style={{display:"grid",gridTemplateColumns:"auto 1fr",gap:"1px 12px"}}>
                             <span style={{color:"var(--text-3)"}}>Faturado</span>
@@ -775,6 +1114,9 @@ const AnaliseClientes = () => {
           </div>
         )}
       </div>
+
+      {/* fim do bloco "clientes" */}
+      </>}
     </div>
   );
 };

@@ -354,6 +354,35 @@ input, select, textarea { font: inherit; color: inherit; }
   padding: var(--pad-card);
 }
 .card-flush { padding: 0; overflow-x: auto; }
+.chart-card {
+  position: relative;
+  overflow: visible;
+  z-index: 1;
+}
+.chart-card:hover {
+  z-index: 1000;
+}
+.chart-card.card-flush,
+.chart-card .card-body,
+.chart-plot {
+  overflow: visible;
+}
+.chart-plot {
+  position: relative;
+  z-index: 2;
+}
+.chart-tooltip {
+  position: absolute;
+  z-index: 9999;
+  pointer-events: none;
+  isolation: isolate;
+}
+.apexcharts-tooltip,
+.recharts-tooltip-wrapper,
+.chartjs-tooltip {
+  z-index: 9999 !important;
+  pointer-events: none;
+}
 .card-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px var(--pad-card);

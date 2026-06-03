@@ -22,6 +22,12 @@ const FP_PERIODS = [
 ];
 
 // ── Format helpers ─────────────────────────────────────────────────────────────
+const FP_TIPOS_PROPRIETARIO = [
+  { key: "frota", label: "Frota" },
+  { key: "terceiros", label: "Terceiros" },
+  { key: "todos", label: "Todos" },
+];
+
 function fpNum(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
 function fpBRL(v) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(fpNum(v));
@@ -270,6 +276,7 @@ const FinanceiroPlaca = () => {
   const [tablePage,    setTablePage]    = React.useState(0);
   const [statusFilter, setStatusFilter] = React.useState("todos");
   const [placaFilter,  setPlacaFilter]  = React.useState("");
+  const [tipoProprietario, setTipoProprietario] = React.useState("frota");
   const PAGE_SIZE = 15;
 
   // Inject animation CSS once
@@ -294,12 +301,13 @@ const FinanceiroPlaca = () => {
     const filters = manualFilter
       ? { dataInicio: manualFilter.dataInicio, dataFim: manualFilter.dataFim }
       : { period: periodo };
+    filters.tipoProprietario = tipoProprietario;
     window.RB_API.getFinanceiroPorPlaca(filters)
       .then(data => { if (active) setDados(fpNormalize(data, periodo)); })
       .catch(err => { if (!active) return; setDados(fpNormalize(null, periodo)); setError(err?.message || "Não foi possível carregar dados por placa."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [periodo, manualFilter]);
+  }, [periodo, manualFilter, tipoProprietario]);
 
   const periodLabel = manualFilter
     ? `${fpDate(manualFilter.dataInicio)} a ${fpDate(manualFilter.dataFim)}`
@@ -376,7 +384,7 @@ const FinanceiroPlaca = () => {
       <div className="page-head">
         <div>
           <h1>Financeiro por Placa</h1>
-          <div className="sub">financeiro.receber + financeiro.pagar · agrupado por placa ou centro de custo · {periodLabel}</div>
+          <div className="sub">Receita: conhecimentos/CT-e · Custo: financeiro.pagar · {periodLabel}</div>
         </div>
         <div className="actions">
           {FP_PERIODS.map(p => (
@@ -391,10 +399,24 @@ const FinanceiroPlaca = () => {
       <div className="period-filter">
         <label>Data inicial<input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)}/></label>
         <label>Data final<input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)}/></label>
+        <div className="row" style={{gap:6,alignItems:"center",flexWrap:"wrap"}}>
+          <span className="muted" style={{fontSize:11.5}}>Proprietário</span>
+          {FP_TIPOS_PROPRIETARIO.map(tipo => (
+            <button
+              key={tipo.key}
+              className={`tbl-filter${tipoProprietario === tipo.key ? " active" : ""}`}
+              onClick={() => {
+                setTipoProprietario(tipo.key);
+                setTablePage(0);
+              }}>
+              {tipo.label}
+            </button>
+          ))}
+        </div>
         <button className="btn primary" onClick={applyManualFilter}>Aplicar</button>
         <button className="btn" onClick={clearManualFilter}>Limpar</button>
         {manualFilter && <span className="badge info">Filtro personalizado ativo</span>}
-        <span className="muted" style={{marginLeft:"auto",fontSize:11.5}}>Base: data de vencimento · financeiro.receber + financeiro.pagar</span>
+        <span className="muted" style={{marginLeft:"auto",fontSize:11.5}}>Receita: data emissão do conhecimento/CT-e · Custo: data vencimento financeiro.pagar</span>
       </div>
 
       {/* ── Status banner ── */}
