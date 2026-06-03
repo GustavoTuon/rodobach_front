@@ -1,6 +1,23 @@
 // Norte Telemetria — App shell, router, sidebar, Tweaks
 const { useState, useEffect } = React;
 
+const SCREEN_SCRIPTS = [
+  "src/screens/simulador.jsx",
+  "src/screens/diarias.jsx",
+  "src/screens/viagens.jsx",
+  "src/screens/custos.jsx",
+  "src/screens/receita.jsx",
+  "src/screens/demonstrativo-financeiro.jsx",
+  "src/screens/dre-empresarial.jsx",
+  "src/screens/financeiro-placa.jsx",
+  "src/screens/analise-clientes.jsx",
+];
+
+const SCREEN_GLOBALS = [
+  "SimuladorFrete", "DiariasMotorista", "Viagens", "Custos", "Receita",
+  "DemonstrativoFinanceiro", "DreEmpresarial", "FinanceiroPlaca", "AnaliseClientes",
+];
+
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "theme": "auto",
   "density": "comfortable"
@@ -57,6 +74,7 @@ const App = () => {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [route, setRouteState] = useState(readRoute());
   const [auth, setAuth] = useState({ checking: true, user: null });
+  const [screensReady, setScreensReady] = useState(false);
 
   // Verificar sessão existente ao carregar
   useEffect(() => {
@@ -106,6 +124,26 @@ const App = () => {
     }
   }, [t.theme, t.density]);
 
+  // Carrega as telas após autenticação
+  useEffect(() => {
+    if (!auth.user || screensReady) return;
+    SCREEN_SCRIPTS.forEach(src => {
+      if (!document.querySelector(`script[src="${src}"]`)) {
+        const s = document.createElement("script");
+        s.type = "text/babel";
+        s.src = src;
+        document.body.appendChild(s);
+      }
+    });
+    const timer = setInterval(() => {
+      if (SCREEN_GLOBALS.every(g => window[g])) {
+        setScreensReady(true);
+        clearInterval(timer);
+      }
+    }, 80);
+    return () => clearInterval(timer);
+  }, [auth.user]);
+
   const handleLogin = ({ user }) => {
     setAuth({ checking: false, user });
   };
@@ -131,6 +169,19 @@ const App = () => {
 
   if (!auth.user) {
     return <LoginScreen onLogin={handleLogin}/>;
+  }
+
+  if (!screensReady) {
+    return (
+      <div style={{
+        minHeight: "100vh", display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center", background: "var(--bg)", gap: 16,
+      }}>
+        <img src="uploads/LOGO NORTE-03.png" alt="Norte"
+          style={{ maxWidth: 160, opacity: 0.7, filter: "invert(var(--logo-invert, 0))" }}/>
+        <div style={{ color: "var(--muted)", fontSize: 13 }}>Carregando o sistema…</div>
+      </div>
+    );
   }
 
   // ── App autenticado ───────────────────────────────────────────────────────
