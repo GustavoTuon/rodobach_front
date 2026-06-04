@@ -45,7 +45,11 @@ async function apiRequest(path, options = {}) {
 
   if (!response.ok) {
     const detail = data?.detail ? ` — ${data.detail}` : "";
-    throw new Error((data?.error || `Erro HTTP ${response.status}`) + detail);
+    const message = data?.error || `Erro HTTP ${response.status}`;
+    if (response.status === 404 && /rota n[aã]o encontrada/i.test(message)) {
+      throw new Error("Nao foi possivel carregar este modulo. Verifique se o backend esta atualizado e acessivel.");
+    }
+    throw new Error(message + detail);
   }
 
   return data;
@@ -173,4 +177,19 @@ window.RB_API = {
     body: JSON.stringify(payload),
   }),
   deleteUsuario: (id) => apiRequest(`/usuarios/${id}`, { method: "DELETE" }),
+  // ── Pneus ─────────────────────────────────────────────────────────────────
+  searchPneusVeiculos: (q = "") => apiRequest(`/pneus/veiculos${buildQuery({ q })}`),
+
+  getPneusPosicoes: () => apiRequest("/pneus/posicoes"),
+
+  getEstadoPneus: (veiculo) => apiRequest(`/pneus/veiculo/${encodeURIComponent(veiculo)}`),
+
+  getPneusEstoque: () => apiRequest("/pneus/estoque"),
+
+  getHistoricoPneus: (filters = {}) => apiRequest(`/pneus/historico${buildQuery(filters)}`),
+
+  registrarMovimentacaoPneu: (payload) => apiRequest("/pneus/movimentar", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
 };

@@ -206,7 +206,7 @@ input, select, textarea { font: inherit; color: inherit; }
 .brand-name {
   font-weight: 600;
   font-size: 13.5px;
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
   color: #f1f3fb;
   line-height: 1.15;
 }
@@ -318,7 +318,7 @@ input, select, textarea { font: inherit; color: inherit; }
   margin: 0;
   font-size: 20px;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 .page-head .sub {
   margin-top: 4px;
@@ -389,7 +389,7 @@ input, select, textarea { font: inherit; color: inherit; }
   border-bottom: 1px solid var(--divider);
 }
 .card-header h3 {
-  margin: 0; font-size: 13px; font-weight: 600; letter-spacing: -0.005em;
+  margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 0;
 }
 .card-header .meta { font-size: 11.5px; color: var(--text-3); }
 .card-body { padding: var(--pad-card); }
@@ -414,7 +414,7 @@ input, select, textarea { font: inherit; color: inherit; }
   font-family: var(--font-mono);
   font-size: 22px;
   font-weight: 500;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   font-feature-settings: "tnum";
   line-height: 1.1;
   margin-top: 2px;
@@ -1007,13 +1007,624 @@ tr.row-ok td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
 /* Tweaks panel scoped tweaks (in case starter doesn't include them) */
 .tweaks-panel { font-family: var(--font-sans); }
 
+/* ── Movimentação de Pneus ──────────────────────────────────────────────────── */
+
+.pneus-view { display: flex; flex-direction: column; gap: var(--gap); padding-bottom: 40px; }
+
+/* Seletor de veículo */
+.pneus-selector-card { padding: var(--pad-card); }
+.pneus-selector-row  { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.vehicle-info-chips  { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding-bottom: 2px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 100px; font-size: var(--font-xs); font-weight: 500;
+  background: var(--accent-soft); color: var(--brand-blue); border: 1px solid var(--accent-border);
+}
+.chip-ok { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-border); }
+
+/* Layout principal */
+.pneus-main-area { display: grid; grid-template-columns: 1fr 150px; gap: var(--gap); align-items: start; }
+.pneus-schematic-card { padding: var(--pad-card); overflow-x: auto; }
+
+/* Estado vazio */
+.pneus-empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 48px; text-align: center;
+}
+
+/* ── Esquema visual ── */
+.truck-schematic { min-width: 300px; }
+.truck-cab-label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: var(--font-sm); font-weight: 600; color: var(--brand-blue);
+  padding-bottom: 12px; border-bottom: 2px solid var(--brand-blue); margin-bottom: 16px;
+}
+.truck-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 32px; color: var(--text-3); }
+.axle-list   { display: flex; flex-direction: column; gap: 10px; }
+
+/* Linha de eixo */
+.axle-row   { display: flex; align-items: center; gap: 6px; }
+.axle-side  { display: flex; gap: 4px; }
+.axle-left  { flex: 1; justify-content: flex-end; }
+.axle-right { flex: 1; justify-content: flex-start; }
+.axle-center { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 52px; flex-shrink: 0; }
+.axle-eixo-label { font-size: 9px; color: var(--text-4); white-space: nowrap; }
+.axle-bar   { height: 6px; width: 100%; background: var(--border-strong); border-radius: 3px; }
+
+/* Estepe */
+.spare-row        { display: flex; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.spare-label-text { font-size: var(--font-xs); color: var(--text-3); white-space: nowrap; width: 52px; text-align: center; }
+.spare-slots      { display: flex; gap: 4px; }
+
+/* ── Slot de posição ── */
+.pslot {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 5px 4px; border-radius: var(--r-lg);
+  border: 1.5px dashed var(--border); cursor: pointer;
+  min-width: 80px; max-width: 110px;
+  transition: border-color 120ms, background 120ms, box-shadow 120ms;
+  text-align: center;
+}
+.pslot:hover         { border-color: var(--brand-blue); background: var(--accent-soft); }
+.pslot-dragover      { border-color: var(--brand-blue) !important; background: var(--accent-soft) !important; box-shadow: 0 0 0 3px var(--accent-border); }
+.pslot-target        { border-style: solid; border-color: var(--brand-blue); }
+.pslot-filled        { border-style: solid; border-color: var(--border-strong); background: var(--surface); }
+.pslot-selecionado   { border-color: var(--brand-blue) !important; border-style: solid; box-shadow: 0 0 0 2px var(--accent-border); }
+
+.pslot-label {
+  font-size: 9px; font-weight: 700; color: var(--text-3);
+  letter-spacing: 0.06em; text-transform: uppercase; width: 100%;
+}
+
+.pslot-vazio {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; min-height: 52px; color: var(--text-4); font-size: 10px;
+}
+
+/* ── Card do pneu dentro do slot ──
+   Número do pneu é o elemento dominante — jamais truncado. */
+.slot-tire-card {
+  width: 100%; border-radius: var(--r); border-left: 3px solid var(--border-strong);
+  padding: 5px 5px 5px 6px; background: var(--surface-2); cursor: pointer;
+  transition: background 100ms;
+}
+.slot-tire-card:hover { background: var(--hover); }
+.slot-tire-selected { background: var(--accent-soft); border-left-color: var(--brand-blue); }
+
+/* Número/código do pneu — GRANDE, nunca truncado, quebra linha */
+.slot-tire-num {
+  font-family: var(--font-mono);
+  font-size: 12px; font-weight: 800;
+  color: var(--text);
+  word-break: break-all; white-space: normal;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.slot-tire-bar-wrap { height: 3px; background: var(--surface-3); border-radius: 2px; overflow: hidden; margin-top: 4px; }
+.slot-tire-bar      { height: 100%; border-radius: 2px; transition: width 300ms; }
+.slot-tire-brand    { font-size: 9.5px; color: var(--text-3); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Destinos (drag/drop desktop) ── */
+.pneus-destinos-col { display: flex; flex-direction: column; gap: 8px; }
+.destinos-label     { font-size: var(--font-xs); font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; }
+.dest-area {
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 12px 6px; border-radius: var(--r-lg); border: 2px dashed var(--border);
+  cursor: pointer; text-align: center; font-size: var(--font-xs); font-weight: 500; color: var(--text-3);
+  transition: all 120ms;
+}
+.dest-info    { border-color: var(--info-border);  color: var(--info);  background: var(--info-bg);  }
+.dest-warn    { border-color: var(--warn-border);  color: var(--warn);  background: var(--warn-bg);  }
+.dest-crit    { border-color: var(--crit-border);  color: var(--crit);  background: var(--crit-bg);  }
+.dest-active  { border-style: solid; }
+.dest-drag-over { transform: scale(1.05); border-style: solid; }
+.dest-label   { font-weight: 700; }
+
+/* ── Estoque ── */
+.pneus-estoque-card { padding: var(--pad-card); }
+.estoque-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.estoque-card {
+  width: 130px; padding: 10px 12px; border-radius: var(--r-lg);
+  border: 1.5px solid var(--border); background: var(--surface);
+  cursor: pointer; transition: border-color 120ms, box-shadow 120ms;
+}
+.estoque-card:hover { border-color: var(--brand-blue); box-shadow: var(--shadow); }
+.estoque-card-num {
+  font-family: var(--font-mono); font-size: 13px; font-weight: 800;
+  color: var(--text); word-break: break-all; white-space: normal; line-height: 1.3;
+}
+.estoque-card-info { font-size: var(--font-xs); color: var(--text-3); margin-top: 4px; }
+
+/* ── Action Sheet (mobile) ── */
+.action-sheet-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 300;
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.action-sheet {
+  background: var(--surface); border-radius: 20px 20px 0 0;
+  width: 100%; max-width: 520px; max-height: 85vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  padding: 0 0 env(safe-area-inset-bottom, 16px);
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.18);
+  animation: sheet-up 220ms ease;
+}
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+.action-sheet-handle {
+  width: 40px; height: 4px; background: var(--border-strong);
+  border-radius: 2px; margin: 12px auto 8px; flex-shrink: 0;
+}
+.action-sheet-head {
+  padding: 4px 20px 12px; border-bottom: 1px solid var(--divider); flex-shrink: 0;
+}
+.action-sheet-pos-badge {
+  display: inline-block; background: var(--accent-soft); color: var(--brand-blue);
+  border: 1px solid var(--accent-border); border-radius: 6px;
+  font-size: 11px; font-weight: 700; padding: 2px 8px; letter-spacing: .04em;
+  margin-bottom: 4px;
+}
+.action-sheet-pos-nome    { font-size: var(--font-xs); color: var(--text-3); }
+.action-sheet-pneu-num    { font-family: var(--font-mono); font-size: 22px; font-weight: 900; color: var(--text); margin-top: 4px; word-break: break-all; line-height: 1.2; }
+.action-sheet-vazio-hint  { font-size: var(--font-sm); color: var(--text-3); margin-top: 4px; font-style: italic; }
+
+.action-sheet-info { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 20px; flex-shrink: 0; }
+.as-info-chip {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 3px 9px; border-radius: 100px; font-size: var(--font-xs); font-weight: 500;
+  background: var(--neutral-bg); color: var(--neutral-text); border: 1px solid var(--neutral-border);
+}
+.as-chip-ok   { background: var(--ok-bg);   color: var(--ok);   border-color: var(--ok-border);   }
+.as-chip-warn { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-border); }
+.as-chip-crit { background: var(--crit-bg); color: var(--crit); border-color: var(--crit-border); }
+
+.action-sheet-section-label { font-size: var(--font-xs); font-weight: 600; color: var(--text-3); padding: 4px 20px 8px; flex-shrink: 0; }
+
+.action-sheet-destinos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 20px 12px; flex-shrink: 0; }
+.as-destino-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 8px; border-radius: var(--r-lg); border: 1.5px solid; font-size: var(--font-sm); font-weight: 600;
+  cursor: pointer; transition: opacity 120ms, transform 80ms;
+}
+.as-destino-btn:active { transform: scale(0.97); }
+.as-btn-info  { background: var(--info-bg);  color: var(--info);  border-color: var(--info-border);  }
+.as-btn-warn  { background: var(--warn-bg);  color: var(--warn);  border-color: var(--warn-border);  }
+.as-btn-crit  { background: var(--crit-bg);  color: var(--crit);  border-color: var(--crit-border);  }
+
+.as-detalhes-btn {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  margin: 0 20px 8px; padding: 12px; border-radius: var(--r-lg);
+  background: var(--surface-2); border: 1px solid var(--border);
+  font-size: var(--font-sm); font-weight: 500; cursor: pointer;
+  flex-shrink: 0;
+}
+.as-detalhes-btn:hover { background: var(--hover); }
+
+.as-estoque-list { flex: 1; overflow-y: auto; padding: 0 8px; }
+.as-estoque-item {
+  width: 100%; display: flex; flex-direction: column; gap: 2px; text-align: left;
+  padding: 12px; border-radius: var(--r-lg); background: none; border: none; cursor: pointer;
+  border-bottom: 1px solid var(--divider);
+}
+.as-estoque-item:hover { background: var(--hover); }
+.as-estoque-num  { font-family: var(--font-mono); font-size: 15px; font-weight: 800; color: var(--text); word-break: break-all; }
+.as-estoque-info { font-size: var(--font-xs); color: var(--text-3); }
+.as-estoque-item:last-child { border-bottom: none; }
+
+.as-cancelar-btn {
+  margin: 8px 20px 4px; padding: 14px; border-radius: var(--r-lg);
+  background: var(--surface-2); border: 1px solid var(--border);
+  font-size: var(--font-sm); font-weight: 600; cursor: pointer; color: var(--text-2);
+  flex-shrink: 0;
+}
+.as-cancelar-btn:hover { background: var(--hover); }
+
+/* ── Histórico ── */
+.historico-panel { padding: 0; overflow: hidden; }
+.historico-toggle {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: var(--pad-card); background: none; border: none; cursor: pointer;
+  font-size: var(--font-sm); font-weight: 500; border-radius: var(--r-xl);
+}
+.historico-toggle:hover { background: var(--hover); }
+.historico-body { padding: 0 var(--pad-card) var(--pad-card); }
+
+/* ── Modais ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center; z-index: 200; padding: 16px;
+}
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg); width: 100%; max-width: 480px; max-height: 90vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.modal-movimento { max-width: 420px; }
+.modal-historico-pneu { max-width: 720px; }
+.modal-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--divider); flex-shrink: 0;
+}
+.modal-head h2 { margin: 0; font-size: 15px; }
+.modal-close {
+  padding: 4px; background: none; border: none; cursor: pointer;
+  color: var(--text-3); border-radius: var(--r); flex-shrink: 0;
+}
+.modal-close:hover { background: var(--hover); }
+.modal-body { padding: 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+.modal-foot {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding: 14px 20px; border-top: 1px solid var(--divider); flex-shrink: 0;
+}
+
+/* Detalhes */
+.detail-grid { display: flex; flex-direction: column; gap: 8px; }
+.detail-row  { display: flex; gap: 12px; align-items: baseline; }
+.detail-row.full { flex-direction: column; gap: 3px; }
+.detail-label { font-size: var(--font-xs); color: var(--text-3); min-width: 110px; flex-shrink: 0; }
+.detail-value { font-size: var(--font-sm); color: var(--text); }
+
+/* Resumo movimentação */
+.movimento-resumo { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; }
+.mov-row   { display: flex; gap: 10px; align-items: baseline; }
+.mov-label { font-size: var(--font-xs); color: var(--text-3); min-width: 65px; flex-shrink: 0; }
+.mov-value { font-size: var(--font-sm); font-weight: 500; }
+.mov-destino { color: var(--brand-blue); }
+
+/* Formulário */
+.form-field    { display: flex; flex-direction: column; gap: 5px; }
+.field-label   { font-size: var(--font-xs); font-weight: 500; color: var(--text-2); }
+.field-required { color: var(--crit); margin-left: 2px; }
+.field-input, .field-select, .field-textarea {
+  width: 100%; padding: 8px 10px; border-radius: var(--r);
+  border: 1.5px solid var(--border); background: var(--surface); font-size: var(--font-sm); color: var(--text);
+  transition: border-color 120ms;
+}
+.field-input:focus, .field-select:focus, .field-textarea:focus { outline: none; border-color: var(--brand-blue); }
+.field-textarea { resize: vertical; min-height: 56px; }
+.form-error {
+  display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: var(--r);
+  background: var(--crit-bg); color: var(--crit); font-size: var(--font-xs); border: 1px solid var(--crit-border);
+}
+
+/* Autocomplete */
+.autocomplete-wrap { position: relative; }
+.autocomplete-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--text-3); cursor: pointer; padding: 2px; border-radius: 3px;
+}
+.autocomplete-list {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 100;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg); max-height: 240px; overflow-y: auto;
+}
+.autocomplete-item {
+  width: 100%; text-align: left; padding: 9px 13px;
+  background: none; border: none; cursor: pointer; color: var(--text); font-size: var(--font-sm);
+}
+.autocomplete-item:hover { background: var(--hover); }
+
+/* Badges */
+.badge-ok   { background: var(--ok-bg);   color: var(--ok);   border: 1px solid var(--ok-border);   }
+.badge-warn { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-border); }
+.badge-crit { background: var(--crit-bg); color: var(--crit); border: 1px solid var(--crit-border); }
+.badge-info { background: var(--info-bg); color: var(--info); border: 1px solid var(--info-border); }
+
+/* Seletor de veículo */
+.pneus-selector-card { padding: var(--pad-card); }
+.pneus-selector-row { display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.pneus-vehicle-field { flex: 1; min-width: 240px; }
+.vehicle-info-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding-bottom: 2px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 100px; font-size: var(--font-xs); font-weight: 500;
+  background: var(--accent-soft); color: var(--brand-blue); border: 1px solid var(--accent-border);
+}
+.chip-neutral { background: var(--neutral-bg); color: var(--neutral-text); border-color: var(--neutral-border); }
+.chip-ok      { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-border); }
+
+/* Banner de pneu selecionado */
+.pneu-selecionado-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 10px 14px; border-radius: var(--r-lg);
+  background: var(--accent-soft); border: 1px solid var(--accent-border);
+  color: var(--brand-blue); font-size: var(--font-sm);
+}
+
+/* Layout principal */
+.pneus-main-area {
+  display: grid;
+  grid-template-columns: 1fr 160px;
+  gap: var(--gap);
+  align-items: start;
+}
+.pneus-schematic-card { padding: var(--pad-card); overflow-x: auto; }
+
+/* Estado vazio */
+.pneus-empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 48px; text-align: center;
+}
+
+/* Esquema do veículo */
+.truck-schematic { min-width: 320px; }
+.truck-cab {
+  display: flex; align-items: center; gap: 8px; padding-bottom: 12px;
+  border-bottom: 2px solid var(--brand-blue); margin-bottom: 16px;
+  font-size: var(--font-sm); font-weight: 600; color: var(--brand-blue);
+}
+.truck-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 32px; color: var(--text-3); text-align: center;
+}
+.axle-list { display: flex; flex-direction: column; gap: 12px; }
+
+/* Linha de eixo */
+.axle-row { display: flex; align-items: center; gap: 8px; }
+.axle-side { display: flex; gap: 4px; }
+.axle-left  { justify-content: flex-end; flex: 1; }
+.axle-right { justify-content: flex-start; flex: 1; }
+.axle-center {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  width: 60px; flex-shrink: 0;
+}
+.axle-label { font-size: 10px; color: var(--text-3); white-space: nowrap; }
+.axle-bar { height: 6px; width: 100%; background: var(--border-strong); border-radius: 3px; }
+
+/* Estepe */
+.spare-row { display: flex; align-items: center; gap: 10px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.spare-label { font-size: var(--font-xs); color: var(--text-3); white-space: nowrap; width: 60px; text-align: center; }
+.spare-slots { display: flex; gap: 4px; }
+
+/* Slot de posição */
+.position-slot {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 4px; border-radius: var(--r-lg);
+  border: 1.5px dashed var(--border);
+  cursor: pointer; transition: all 120ms ease;
+  min-width: 68px;
+}
+.position-slot:hover { border-color: var(--brand-blue); background: var(--accent-soft); }
+.slot-drag-over { border-color: var(--brand-blue) !important; background: var(--accent-soft) !important; box-shadow: 0 0 0 2px var(--accent-border); }
+.slot-target { border-color: var(--brand-blue); border-style: solid; }
+.slot-filled { border-style: solid; border-color: var(--border-strong); }
+.slot-label { font-size: 10px; font-weight: 600; color: var(--text-3); letter-spacing: 0.04em; }
+.slot-placeholder {
+  width: 60px; height: 44px; display: flex; align-items: center; justify-content: center;
+  color: var(--text-4);
+}
+.slot-dash { font-size: 18px; color: var(--text-4); }
+
+/* Card do pneu */
+.tire-card {
+  position: relative; cursor: pointer;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--r); padding: 6px 8px;
+  width: 60px; min-height: 44px;
+  display: flex; flex-direction: column; gap: 2px;
+  transition: all 120ms ease;
+  user-select: none;
+}
+.tire-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow); }
+.tire-selected { border-color: var(--brand-blue) !important; box-shadow: 0 0 0 2px var(--accent-border); background: var(--accent-soft) !important; }
+.tire-warn  { border-left: 3px solid var(--warn); }
+.tire-crit  { border-left: 3px solid var(--crit); }
+.tire-ok    { border-left: 3px solid var(--ok); }
+
+.tire-header { display: flex; align-items: center; justify-content: space-between; gap: 3px; }
+.tire-code   { font-size: 10px; font-weight: 700; color: var(--text); font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tire-badge  { font-size: 9px; font-weight: 600; padding: 1px 4px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
+.tire-brand  { font-size: 9.5px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tire-km     { font-size: 9px; color: var(--text-2); }
+.tire-recap  { font-size: 9px; color: var(--warn); }
+.tire-detail-btn {
+  position: absolute; top: 2px; right: 2px; padding: 1px;
+  background: none; border: none; color: var(--text-4);
+  cursor: pointer; border-radius: 3px;
+}
+.tire-detail-btn:hover { color: var(--brand-blue); }
+
+/* Cards de pneus em estoque (maiores — sem veículo selecionado) */
+.estoque-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+.estoque-grid .tire-card {
+  width: 148px; min-height: auto; padding: 10px 12px;
+  font-size: var(--font-sm);
+}
+.estoque-grid .tire-code { font-size: var(--font-sm); }
+.estoque-grid .tire-brand { font-size: var(--font-xs); }
+.estoque-grid .tire-km    { font-size: var(--font-xs); }
+.estoque-grid .tire-recap { font-size: var(--font-xs); }
+
+/* Painéis de destino */
+.pneus-destinos-col { display: flex; flex-direction: column; gap: 8px; }
+.destinos-label { font-size: var(--font-xs); font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; padding: 0 2px; }
+.dest-area {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px 8px; border-radius: var(--r-lg);
+  border: 2px dashed var(--border); cursor: pointer;
+  transition: all 120ms ease; text-align: center;
+  font-size: var(--font-xs); font-weight: 500; color: var(--text-3);
+}
+.dest-area:hover, .dest-active:hover { transform: scale(1.02); }
+.dest-drag-over { transform: scale(1.04); }
+.dest-info    { border-color: var(--info-border);  color: var(--info);  background: var(--info-bg); }
+.dest-warn    { border-color: var(--warn-border);  color: var(--warn);  background: var(--warn-bg); }
+.dest-crit    { border-color: var(--crit-border);  color: var(--crit);  background: var(--crit-bg); }
+.dest-active  { border-style: solid; }
+.dest-label   { font-weight: 600; }
+
+/* Estoque card */
+.pneus-estoque-card { padding: var(--pad-card); }
+
+/* Histórico */
+.historico-panel { padding: 0; overflow: hidden; }
+.historico-toggle {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: var(--pad-card); background: none; border: none; cursor: pointer;
+  font-size: var(--font-sm); font-weight: 500;
+  border-radius: var(--r-xl);
+}
+.historico-toggle:hover { background: var(--hover); }
+.historico-body { padding: 0 var(--pad-card) var(--pad-card); }
+
+.pneu-history-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 180px;
+  color: var(--text-3);
+  text-align: center;
+}
+
+.pneu-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pneu-history-item {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.pneu-history-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+
+.pneu-history-route {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.pneu-history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.pneu-history-meta span {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-3);
+  font-size: var(--font-xs);
+}
+
+.pneu-history-obs {
+  margin-top: 8px;
+  color: var(--text-2);
+  font-size: var(--font-xs);
+  line-height: 1.4;
+}
+
+/* Modais */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; padding: 16px;
+}
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-xl); box-shadow: var(--shadow-lg);
+  width: 100%; max-width: 480px; max-height: 90vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.modal-movimento { max-width: 420px; }
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--divider); flex-shrink: 0;
+}
+.modal-head h2 { margin: 0; font-size: 15px; }
+.modal-close {
+  padding: 4px; background: none; border: none; cursor: pointer;
+  color: var(--text-3); border-radius: var(--r); transition: background 100ms;
+}
+.modal-close:hover { background: var(--hover); color: var(--text); }
+.modal-body { padding: 20px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px; }
+.modal-foot {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding: 14px 20px; border-top: 1px solid var(--divider); flex-shrink: 0;
+}
+
+/* Detalhes do pneu */
+.detail-grid { display: flex; flex-direction: column; gap: 8px; }
+.detail-row { display: flex; gap: 12px; align-items: baseline; }
+.detail-row.full { flex-direction: column; gap: 3px; }
+.detail-label { font-size: var(--font-xs); color: var(--text-3); min-width: 110px; flex-shrink: 0; }
+.detail-value { font-size: var(--font-sm); color: var(--text); }
+
+/* Resumo da movimentação no modal */
+.movimento-resumo {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.mov-row { display: flex; gap: 10px; align-items: baseline; }
+.mov-label { font-size: var(--font-xs); color: var(--text-3); min-width: 65px; flex-shrink: 0; }
+.mov-value { font-size: var(--font-sm); font-weight: 500; }
+.mov-destino { color: var(--brand-blue); }
+
+/* Formulário nos modais */
+.form-field { display: flex; flex-direction: column; gap: 5px; }
+.field-label { font-size: var(--font-xs); font-weight: 500; color: var(--text-2); }
+.field-required { color: var(--crit); margin-left: 2px; }
+.field-input, .field-select, .field-textarea {
+  width: 100%; padding: 8px 10px; border-radius: var(--r);
+  border: 1.5px solid var(--border); background: var(--surface);
+  font-size: var(--font-sm); color: var(--text);
+  transition: border-color 120ms;
+}
+.field-input:focus, .field-select:focus, .field-textarea:focus {
+  outline: none; border-color: var(--brand-blue);
+}
+.field-textarea { resize: vertical; min-height: 56px; }
+.form-error {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px; border-radius: var(--r);
+  background: var(--crit-bg); color: var(--crit);
+  font-size: var(--font-xs); border: 1px solid var(--crit-border);
+}
+
+/* Autocomplete */
+.autocomplete-wrap { position: relative; }
+.autocomplete-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--text-3); cursor: pointer;
+  padding: 2px; border-radius: 3px;
+}
+.autocomplete-list {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 100;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-lg);
+  max-height: 220px; overflow-y: auto;
+}
+.autocomplete-item {
+  width: 100%; text-align: left; padding: 8px 12px;
+  background: none; border: none; cursor: pointer; color: var(--text);
+  font-size: var(--font-sm);
+}
+.autocomplete-item:hover { background: var(--hover); }
+
 /* responsive: tablet */
 @media (max-width: 960px) {
   .app-shell { --sidebar-w: 56px; }
   .sidebar { padding: 14px 6px; }
-  .nav-item span.lbl, .nav-label, .brand-name, .sidebar-footer .who, .nav-item .badge-count {
-    display: none;
-  }
+  .nav-item span.lbl, .nav-label, .brand-name, .sidebar-footer .who, .nav-item .badge-count { display: none; }
   .nav-item { justify-content: center; padding: 8px; }
   .sidebar-brand { justify-content: center; padding: 6px 0 18px 0; }
   .sidebar-footer { justify-content: center; padding: 10px 4px; }
@@ -1022,4 +1633,547 @@ tr.row-ok td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
   .grid.cols-4 { grid-template-columns: repeat(2, 1fr); }
   .grid.cols-5 { grid-template-columns: repeat(2, 1fr); }
   .grid.cols-6 { grid-template-columns: repeat(3, 1fr); }
+  /* Pneus — tablet: destinos vão embaixo */
+  .pneus-main-area { grid-template-columns: 1fr; }
+  .pneus-destinos-col { flex-direction: row; flex-wrap: wrap; gap: 8px; }
+  .dest-area { flex: 1; min-width: 100px; flex-direction: row; justify-content: center; }
+}
+
+/* responsive: mobile */
+@media (max-width: 640px) {
+  .pneus-selector-row { flex-direction: column; align-items: stretch; }
+  /* Slots maiores para toque */
+  .pslot { min-width: 90px; }
+  .slot-tire-num { font-size: 13px; }
+  /* Modal como bottom sheet */
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal-box { max-width: 100%; border-radius: 20px 20px 0 0; position: fixed; bottom: 0; left: 0; right: 0; max-height: 90vh; }
+  /* Estoque: 2 colunas */
+  .estoque-grid { gap: 8px; }
+  .estoque-card { width: calc(50% - 4px); }
+}
+
+/* Pneus - conferencia espacada e legivel */
+.pneus-view {
+  gap: 18px;
+}
+
+.pneus-main-area {
+  grid-template-columns: minmax(0, 1fr) 132px;
+  gap: 18px;
+}
+
+.pneus-schematic-card {
+  padding: 20px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+}
+
+.truck-schematic {
+  width: max-content;
+  min-width: 640px;
+  margin: 0 auto;
+  padding: 2px 4px 8px;
+}
+
+.truck-cab-label {
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+  font-size: 14px;
+}
+
+.axle-list {
+  gap: 20px;
+}
+
+.axle-row {
+  gap: 16px;
+}
+
+.axle-side {
+  gap: 12px;
+}
+
+.axle-center {
+  width: 76px;
+  gap: 5px;
+}
+
+.axle-eixo-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-3);
+}
+
+.axle-bar {
+  height: 8px;
+  border-radius: 999px;
+}
+
+.spare-row {
+  gap: 14px;
+  padding-top: 16px;
+  margin-top: 2px;
+}
+
+.spare-label-text {
+  width: 76px;
+  font-weight: 700;
+}
+
+.spare-slots {
+  gap: 12px;
+}
+
+.pslot {
+  min-width: 124px;
+  max-width: 148px;
+  min-height: 124px;
+  gap: 7px;
+  padding: 9px;
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.pslot-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  color: var(--brand-blue);
+  line-height: 1.1;
+}
+
+.pslot-empty {
+  border-color: var(--accent-border);
+  background: linear-gradient(180deg, var(--surface), var(--accent-soft));
+}
+
+.pslot-vazio {
+  min-height: 82px;
+  width: 100%;
+  border-radius: 7px;
+  border: 1px solid var(--accent-border);
+  color: var(--brand-blue);
+  background: var(--accent-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pslot-vazio span {
+  line-height: 1.2;
+}
+
+.slot-tire-card {
+  min-height: 86px;
+  padding: 10px 10px 9px 11px;
+  border-radius: 7px;
+  border-left-width: 5px;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.slot-tire-num {
+  font-size: 20px;
+  line-height: 1.12;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  color: var(--text);
+}
+
+.slot-tire-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.slot-tire-pos {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  color: var(--brand-blue);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.slot-tire-pct {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.slot-pct-ok { color: var(--ok); border-color: var(--ok-border); background: var(--ok-bg); }
+.slot-pct-warn { color: var(--warn); border-color: var(--warn-border); background: var(--warn-bg); }
+.slot-pct-crit { color: var(--crit); border-color: var(--crit-border); background: var(--crit-bg); }
+.slot-pct-neutro { color: var(--text-3); }
+
+.slot-tire-bar-wrap {
+  height: 5px;
+  margin-top: 8px;
+  border-radius: 999px;
+}
+
+.slot-tire-bar {
+  border-radius: 999px;
+}
+
+.slot-tire-brand {
+  margin-top: 7px;
+  font-size: 10.5px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+
+.vehicle-layout {
+  width: max-content;
+  min-width: 720px;
+  margin: 0 auto;
+  padding: 2px 8px 10px;
+}
+
+.vehicle-layout-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--accent-border);
+  color: var(--brand-blue);
+}
+
+.vehicle-nose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-soft);
+}
+
+.vehicle-nose-trailer {
+  width: 54px;
+  border-radius: 6px;
+}
+
+.vehicle-layout-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.vehicle-layout-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.vehicle-body-frame {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(90deg, transparent 0, transparent 47%, var(--surface-2) 47%, var(--surface-2) 53%, transparent 53%);
+}
+
+.layout-carreta .vehicle-body-frame {
+  border-radius: 8px;
+  background: linear-gradient(90deg, transparent 0, transparent 48%, var(--surface-2) 48%, var(--surface-2) 52%, transparent 52%);
+}
+
+.vehicle-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.vehicle-section-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.vehicle-axles {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.vehicle-axle-row {
+  display: grid;
+  grid-template-columns: minmax(250px, 1fr) 86px minmax(250px, 1fr);
+  align-items: center;
+  gap: 16px;
+}
+
+.vehicle-side {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.vehicle-side-left {
+  justify-content: flex-end;
+}
+
+.vehicle-side-right {
+  justify-content: flex-start;
+}
+
+.vehicle-axle-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.vehicle-axle-line {
+  width: 78px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border-strong);
+}
+
+.vehicle-axle-steer .vehicle-axle-line {
+  width: 58px;
+  background: var(--accent-border);
+}
+
+.vehicle-axle-trailer .vehicle-axle-line {
+  background: var(--border-strong);
+}
+
+.vehicle-spares-section {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.vehicle-spares-grid {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.layout-cavalo .vehicle-section-front,
+.layout-truck .vehicle-section-front,
+.layout-bitruck .vehicle-section-front {
+  padding-bottom: 4px;
+}
+
+.pneus-destinos-col {
+  gap: 8px;
+}
+
+.destinos-label {
+  letter-spacing: 0;
+}
+
+.dest-area {
+  min-height: 46px;
+  flex-direction: row;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 10px;
+  border-width: 1.5px;
+  border-radius: 8px;
+}
+
+.dest-label {
+  font-size: 12px;
+}
+
+.estoque-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.estoque-card {
+  width: auto;
+  min-height: 104px;
+  padding: 12px 14px;
+  border-radius: 8px;
+}
+
+.estoque-card-num {
+  font-size: 18px;
+  line-height: 1.16;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.estoque-card-info {
+  font-size: 12px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.estoque-card-subtitle {
+  margin-top: 5px;
+  font-size: 11.5px;
+  line-height: 1.25;
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 960px) {
+  .pneus-main-area {
+    grid-template-columns: 1fr;
+  }
+
+  .truck-schematic {
+    min-width: 660px;
+  }
+
+  .vehicle-layout {
+    min-width: 740px;
+    margin: 0;
+  }
+
+  .pneus-destinos-col {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .dest-area {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .pneus-view {
+    padding-bottom: 112px;
+  }
+
+  .pneus-schematic-card {
+    padding: 14px 12px 16px;
+    margin-left: calc(var(--pad-page, 16px) * -1);
+    margin-right: calc(var(--pad-page, 16px) * -1);
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+
+  .truck-schematic {
+    min-width: 690px;
+    margin: 0;
+  }
+
+  .vehicle-layout {
+    min-width: 760px;
+    padding: 0 4px 8px;
+  }
+
+  .vehicle-body-frame {
+    padding: 14px;
+    gap: 18px;
+  }
+
+  .vehicle-axle-row {
+    grid-template-columns: minmax(230px, 1fr) 72px minmax(230px, 1fr);
+    gap: 12px;
+  }
+
+  .vehicle-side {
+    gap: 10px;
+  }
+
+  .vehicle-axle-line {
+    width: 62px;
+  }
+
+  .vehicle-spares-section {
+    grid-template-columns: 76px 1fr;
+    padding: 12px;
+  }
+
+  .pslot {
+    min-width: 118px;
+    min-height: 120px;
+  }
+
+  .slot-tire-num {
+    font-size: 17px;
+  }
+
+  .pneus-destinos-col {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 180;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 6px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.12);
+  }
+
+  .pneus-destinos-col .destinos-label {
+    display: none;
+  }
+
+  .pneus-destinos-col .dest-area {
+    min-height: 46px;
+    padding: 7px 4px;
+    flex-direction: column;
+    gap: 3px;
+    border-style: solid;
+    font-size: 11px;
+  }
+
+  .pneus-destinos-col .dest-label {
+    font-size: 11px;
+  }
+
+  .estoque-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .estoque-card {
+    width: auto;
+    min-height: 110px;
+    padding: 12px;
+  }
+
+  .section-head {
+    align-items: flex-start;
+    gap: 10px;
+  }
 }
