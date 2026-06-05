@@ -1,4 +1,4 @@
-const { useState, useEffect, useRef } = React;
+﻿const { useState, useEffect, useRef } = React;
 
 const TELAS = [
   { id: "perm_simulador",       label: "Calculadora" },
@@ -10,6 +10,7 @@ const TELAS = [
   { id: "perm_dre_empresarial", label: "DRE Empresarial" },
   { id: "perm_placa",           label: "Por Placa" },
   { id: "perm_clientes",        label: "Clientes" },
+  { id: "perm_pneus",           label: "Pneus" },
   { id: "perm_settings",        label: "Configurações" },
 ];
 
@@ -19,7 +20,7 @@ const FORM_VAZIO = {
   perm_simulador: true, perm_diarias: true, perm_viagens: true,
   perm_custos: true, perm_receita: true, perm_demonstrativo: true,
   perm_dre_empresarial: true, perm_placa: true, perm_clientes: true,
-  perm_settings: true,
+  perm_pneus: true, perm_settings: true,
 };
 
 const Toggle = ({ value, onChange, label }) => (
@@ -81,7 +82,8 @@ const GerenciarUsuarios = ({ onNavigate }) => {
       perm_viagens: u.perm_viagens, perm_custos: u.perm_custos,
       perm_receita: u.perm_receita, perm_demonstrativo: u.perm_demonstrativo,
       perm_dre_empresarial: u.perm_dre_empresarial, perm_placa: u.perm_placa,
-      perm_clientes: u.perm_clientes, perm_settings: u.perm_settings,
+      perm_clientes: u.perm_clientes, perm_pneus: u.perm_pneus,
+      perm_settings: u.perm_settings,
     });
     setErro("");
     setModal(u);
