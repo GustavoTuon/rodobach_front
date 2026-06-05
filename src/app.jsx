@@ -206,7 +206,7 @@ const App = () => {
       body = <SimuladorFrete onNavigate={onNavigate}/>;
       break;
     case "diarias":
-      body = <DiáriasMotorista onNavigate={onNavigate}/>;
+      body = <DiariasMotorista onNavigate={onNavigate}/>;
       break;
     case "viagens":
       body = <Viagens onNavigate={onNavigate}/>;
@@ -230,7 +230,7 @@ const App = () => {
       body = <AnaliseClientes onNavigate={onNavigate}/>;
       break;
     case "usuarios":
-      body = <GerenciarUsuários onNavigate={onNavigate}/>;
+      body = <GerenciarUsuarios onNavigate={onNavigate}/>;
       break;
     case "pneus":
       body = <Pneus onNavigate={onNavigate}/>;

@@ -1,9 +1,9 @@
 // Calculadora de Frete ANTT — Rodobach
 const SimuladorFrete = ({ onNavigate }) => {
-  const D = window.NT_DATA;
+  const D = window.NT_DATA || {};
   const { useEffect, useState, useRef } = React;
 
-  const [anttTabela, setAnttTabela] = useState(() => D.ANTT_TABELA);
+  const [anttTabela, setAnttTabela] = useState(() => D.ANTT_TABELA || []);
   const [eixos,      setEixos]      = useState(6);
   const [tipoCarga,  setTipoCarga]  = useState("normal");
   const [operacao,   setOperacao]   = useState("etc");
@@ -52,14 +52,14 @@ const SimuladorFrete = ({ onNavigate }) => {
     }, 400);
   }, [eixos, tipoCarga, operacao, km, pedagio, seguro, margem, icms, pedidoMot]);
 
-  const tabRow = anttTabela.find(r => r.eixos === eixos) || anttTabela[0] || D.ANTT_TABELA[0];
+  const tabRow = anttTabela.find(r => r.eixos === eixos) || anttTabela[0] || (D.ANTT_TABELA || [])[0] || {};
 
   const hasKm         = (+km || 0) > 0;
   const valorMot      = calc?.resultado?.valorMotorista ?? 0;
   const valorCli      = calc?.resultado?.valorCliente   ?? 0;
   const lucro         = calc?.resultado?.lucro          ?? 0;
-  const margemReal    = calc?.resultado?.margemPercent   ?? 0;
-  const icmsValor     = calc?.resultado?.icmsValor       ?? 0;
+  const margemReal    = calc?.resultado?.margemPercent  ?? 0;
+  const icmsValor     = calc?.resultado?.icmsValor      ?? 0;
   const simNeg        = calc?.simulacao;
 
   const margemNum     = +margem || 30;
