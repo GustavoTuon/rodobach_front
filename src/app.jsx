@@ -1,4 +1,4 @@
-﻿// Norte Telemetria â€” App shell, router, sidebar, Tweaks
+﻿// Norte Telemetria — App shell, router, sidebar, Tweaks
 const { useState, useEffect } = React;
 
 const SCREEN_SCRIPTS = [
@@ -25,26 +25,26 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 }/*EDITMODE-END*/;
 
 const NAV = [
-  { id: "dashboard",       label: "Dashboard",    icon: "dashboard",   title: "Visao geral" },
-  { id: "vehicles",        label: "Veiculos",     icon: "truck",       title: "Veiculos" },
-  { id: "alerts",          label: "Alertas",      icon: "alert",       title: "Alertas e ocorrencias", badge: 12 },
-  { id: "pneus",           label: "Pneus",        icon: "truck",       title: "Movimentacao de Pneus" },
+  { id: "dashboard",       label: "Dashboard",    icon: "dashboard",   title: "Visão geral" },
+  { id: "vehicles",        label: "Veículos",     icon: "truck",       title: "Veículos" },
+  { id: "alerts",          label: "Alertas",      icon: "alert",       title: "Alertas e ocorrências", badge: 12 },
+  { id: "pneus",           label: "Pneus",        icon: "truck",       title: "Movimentação de Pneus" },
   { id: "simulador",       label: "Calculadora",  icon: "calculator",  title: "Calculadora de Frete ANTT" },
-  { id: "diarias",         label: "Diarias",      icon: "clock",       title: "Diarias do Motorista" },
-  { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotacoes" },
-  { id: "reports",         label: "Relatorios",   icon: "chart",       title: "Relatorios" },
+  { id: "diarias",         label: "Diárias",      icon: "clock",       title: "Diárias do Motorista" },
+  { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações" },
+  { id: "reports",         label: "Relatórios",   icon: "chart",       title: "Relatórios" },
   { id: "custos",          label: "Custos",       icon: "money",       title: "Despesas e Custos" },
-  { id: "receita",         label: "Receita",      icon: "trending-up", title: "Analise de Receita" },
+  { id: "receita",         label: "Receita",      icon: "trending-up", title: "Análise de Receita" },
   { id: "demonstrativo",   label: "DRE",          icon: "chart",       title: "Demonstrativo financeiro" },
   { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial" },
   { id: "placa",           label: "Por Placa",    icon: "compass",     title: "Financeiro por Placa" },
-  { id: "clientes",        label: "Clientes",     icon: "user",        title: "Analise de Clientes" },
-  { id: "integration",     label: "Integracao",   icon: "plug",        title: "Saude da integracao" },
-  { id: "settings",        label: "Configuracoes", icon: "settings",   title: "Configuracoes",    sistema: true },
-  { id: "usuarios",        label: "Usuarios",     icon: "user",        title: "Gerenciar Usuarios", sistema: true, adminOnly: true },
+  { id: "clientes",        label: "Clientes",     icon: "user",        title: "Análise de Clientes" },
+  { id: "integration",     label: "Integração",   icon: "plug",        title: "Saúde da integração" },
+  { id: "settings",        label: "Configurações", icon: "settings",   title: "Configurações",    sistema: true },
+  { id: "usuarios",        label: "Usuários",     icon: "user",        title: "Gerenciar Usuários", sistema: true, adminOnly: true },
 ];
 
-// Telas sem implementaÃ§Ã£o funcional â€” nunca exibidas independente de permissÃµes
+// Telas sem implementaÃ§Ã£o funcional — nunca exibidas independente de permissÃµes
 const REMOVED_SCREENS = new Set([
   "map", "vehicles", "vehicle", "alerts", "dashboard", "reports", "integration",
 ]);
@@ -164,7 +164,7 @@ const App = () => {
         alignItems: "center", justifyContent: "center",
         background: "var(--bg)",
       }}>
-        <div style={{ color: "var(--muted)", fontSize: 13.5 }}>Verificando sessÃ£oâ€¦</div>
+        <div style={{ color: "var(--muted)", fontSize: 13.5 }}>Verificando sessão…</div>
       </div>
     );
   }
@@ -181,7 +181,7 @@ const App = () => {
       }}>
         <img src="uploads/LOGO NORTE-03.png" alt="Norte"
           style={{ maxWidth: 160, opacity: 0.7, filter: "invert(var(--logo-invert, 0))" }}/>
-        <div style={{ color: "var(--muted)", fontSize: 13 }}>Carregando o sistemaâ€¦</div>
+        <div style={{ color: "var(--muted)", fontSize: 13 }}>Carregando o sistema…</div>
       </div>
     );
   }
@@ -206,7 +206,7 @@ const App = () => {
       body = <SimuladorFrete onNavigate={onNavigate}/>;
       break;
     case "diarias":
-      body = <DiariasMotorista onNavigate={onNavigate}/>;
+      body = <DiáriasMotorista onNavigate={onNavigate}/>;
       break;
     case "viagens":
       body = <Viagens onNavigate={onNavigate}/>;
@@ -230,7 +230,7 @@ const App = () => {
       body = <AnaliseClientes onNavigate={onNavigate}/>;
       break;
     case "usuarios":
-      body = <GerenciarUsuarios onNavigate={onNavigate}/>;
+      body = <GerenciarUsuários onNavigate={onNavigate}/>;
       break;
     case "pneus":
       body = <Pneus onNavigate={onNavigate}/>;
@@ -243,7 +243,7 @@ const App = () => {
       break;
   }
 
-  const userLogin = auth.user.login || "UsuÃ¡rio";
+  const userLogin = auth.user.login || "Usuário";
   const userInitials = userLogin.split(".").map(p => p[0] || "").join("").toUpperCase().slice(0, 2) || "U";
 
   return (
@@ -322,7 +322,7 @@ const App = () => {
       </main>
 
       <TweaksPanel title="Tweaks">
-        <TweakSection title="AparÃªncia">
+        <TweakSection title="Aparência">
           <TweakRadio
             label="Tema"
             value={t.theme}
@@ -338,7 +338,7 @@ const App = () => {
             value={t.density}
             onChange={v => setTweak("density", v)}
             options={[
-              { value: "comfortable", label: "ConfortÃ¡vel" },
+              { value: "comfortable", label: "Confortável" },
               { value: "compact", label: "Compacta" },
             ]}
           />
@@ -348,7 +348,7 @@ const App = () => {
   );
 };
 
-// Settings â€” with theme + density switchers
+// Settings — with theme + density switchers
 const SettingsScreen = ({ theme, setTheme, density, setDensity }) => {
   const themeOptions = [
     {
@@ -428,15 +428,15 @@ const SettingsScreen = ({ theme, setTheme, density, setDensity }) => {
     <div className="view">
       <div className="page-head">
         <div>
-          <h1>ConfiguraÃ§Ãµes</h1>
-          <div className="sub">AparÃªncia, conta, integraÃ§Ãµes e usuÃ¡rios</div>
+          <h1>Configurações</h1>
+          <div className="sub">Aparência, conta, integrações e usuários</div>
         </div>
       </div>
 
       <div className="card" style={{marginBottom: 16}}>
         <div className="section-head" style={{marginBottom: 14}}>
           <div>
-            <h2 style={{color: "var(--text)", fontSize: 14}}>AparÃªncia</h2>
+            <h2 style={{color: "var(--text)", fontSize: 14}}>Aparência</h2>
             <div className="muted" style={{fontSize: 12, marginTop: 2}}>Personalize o tema e a densidade da interface</div>
           </div>
         </div>
@@ -499,13 +499,13 @@ const SettingsScreen = ({ theme, setTheme, density, setDensity }) => {
           <div className="row between" style={{marginBottom: 10}}>
             <div>
               <div style={{fontSize: 12.5, fontWeight: 500}}>Densidade da interface</div>
-              <div className="muted" style={{fontSize: 11.5, marginTop: 2}}>Ajuste o espaÃ§amento de tabelas e cards</div>
+              <div className="muted" style={{fontSize: 11.5, marginTop: 2}}>Ajuste o espaçamento de tabelas e cards</div>
             </div>
           </div>
           <div className="row" style={{gap: 8}}>
             {[
-              { id: "comfortable", label: "ConfortÃ¡vel", desc: "Mais espaÃ§o entre os elementos" },
-              { id: "compact", label: "Compacta", desc: "Mais informaÃ§Ã£o por tela" },
+              { id: "comfortable", label: "Confortável", desc: "Mais espaço entre os elementos" },
+              { id: "compact", label: "Compacta", desc: "Mais informação por tela" },
             ].map(opt => {
               const active = density === opt.id;
               return (
@@ -544,15 +544,15 @@ const SettingsScreen = ({ theme, setTheme, density, setDensity }) => {
         </div>
       </div>
 
-      <div className="section-head"><h2>Outras configuraÃ§Ãµes</h2></div>
+      <div className="section-head"><h2>Outras configurações</h2></div>
       <div className="grid cols-3">
         {[
-          { t: "Conta da empresa", d: "Norte LogÃ­stica Â· CNPJ 32.480.591/0001-04", i: "user" },
-          { t: "UsuÃ¡rios e permissÃµes", d: "8 usuÃ¡rios Â· 3 perfis", i: "user" },
-          { t: "Perfis de alerta", d: "Velocidade Â· RPM Â· Cerca virtual Â· Sirene", i: "bell" },
-          { t: "IntegraÃ§Ã£o Trucks", d: "API v3.4 Â· token expira em 142 dias", i: "plug" },
-          { t: "Webhooks e notificaÃ§Ãµes", d: "2 webhooks ativos", i: "external" },
-          { t: "ExportaÃ§Ã£o e BI", d: "PowerBI Â· Looker Studio Â· CSV", i: "download" },
+          { t: "Conta da empresa", d: "Norte Logística · CNPJ 32.480.591/0001-04", i: "user" },
+          { t: "Usuários e permissões", d: "8 usuários · 3 perfis", i: "user" },
+          { t: "Perfis de alerta", d: "Velocidade · RPM · Cerca virtual · Sirene", i: "bell" },
+          { t: "Integração Trucks", d: "API v3.4 · token expira em 142 dias", i: "plug" },
+          { t: "Webhooks e notificações", d: "2 webhooks ativos", i: "external" },
+          { t: "Exportação e BI", d: "PowerBI · Looker Studio · CSV", i: "download" },
         ].map((c, i) => (
           <div key={i} className="card" style={{cursor: "pointer"}}>
             <div className="row between">

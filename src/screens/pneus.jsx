@@ -1,8 +1,8 @@
-﻿// MovimentaÃ§Ã£o de Pneus â€” Norte GestÃ£o de Frota
+﻿// Movimentação de Pneus — Norte GestÃ£o de Frota
 // Mobile-first: cÃ³digo do pneu sempre legÃ­vel, action sheet ao tocar.
 //
-// Banco do cliente â†’ somente SELECT (via backend).
-// MovimentaÃ§Ãµes â†’ somente no banco prÃ³prio (tabela movimentacoes_pneus).
+// Banco do cliente → somente SELECT (via backend).
+// MovimentaÃ§Ãµes → somente no banco prÃ³prio (tabela movimentacoes_pneus).
 
 const { useState, useEffect, useRef } = React;
 
@@ -18,7 +18,7 @@ const DESTINOS = [
 const TIPO_LABELS = {
   MONTAGEM:      { label: "Montagem",         cor: "ok"   },
   DESMONTAGEM:   { label: "Desmontagem",      cor: "warn" },
-  TROCA_POSICAO: { label: "Troca de posiÃ§Ã£o", cor: "info" },
+  TROCA_POSICAO: { label: "Troca de posição", cor: "info" },
   ESTOQUE:       { label: "Estoque",          cor: "info" },
   CONSERTO:      { label: "Conserto",         cor: "warn" },
   BAIXA:         { label: "Baixa",            cor: "crit" },
@@ -26,7 +26,7 @@ const TIPO_LABELS = {
 };
 
 const LOCAL_LABELS = {
-  veiculo:  "No veÃ­culo",
+  veiculo:  "No veículo",
   estoque:  "Estoque",
   conserto: "Conserto",
   baixa:    "Baixa",
@@ -36,12 +36,12 @@ const LOCAL_LABELS = {
 // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function fmtKm(km) {
-  if (!km && km !== 0) return "â€”";
+  if (!km && km !== 0) return "—";
   return Number(km).toLocaleString("pt-BR") + " km";
 }
 
 function fmtDate(dt) {
-  if (!dt) return "â€”";
+  if (!dt) return "—";
   return new Date(dt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
@@ -111,7 +111,7 @@ const VidaBar = ({ pneu }) => {
 };
 
 // â”€â”€ Card de pneu no slot (versÃ£o compacta no esquema) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// O cÃ³digo/nÃºmero do pneu Ã© o elemento dominante â€” nunca truncado.
+// O cÃ³digo/nÃºmero do pneu Ã© o elemento dominante — nunca truncado.
 
 const SlotTireCard = ({ pneu, posicao, selecionado, onClick, onDragStart, onDragEnd }) => {
   const cor = kmCor(pneu);
@@ -126,9 +126,9 @@ const SlotTireCard = ({ pneu, posicao, selecionado, onClick, onDragStart, onDrag
       draggable={true}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      title={`${pneuCodigo(pneu)} - ${pneuNomeSecundario(pneu) || "sem descricao"} - ${posicao.abreviacaopop || posicao.nomepop}`}
+      title={`${pneuCodigo(pneu)} - ${pneuNomeSecundario(pneu) || "sem descrição"} - ${posicao.abreviacaopop || posicao.nomepop}`}
     >
-      {/* CÃ³digo do pneu â€” elemento dominante, nunca truncado */}
+      {/* Código do pneu — elemento dominante, nunca truncado */}
       <div className="slot-tire-num">{pneuCodigoDisplay(pneu)}</div>
 
       <div className="slot-tire-meta">
@@ -143,7 +143,7 @@ const SlotTireCard = ({ pneu, posicao, selecionado, onClick, onDragStart, onDrag
         </div>
       )}
 
-      {/* Marca â€” secundÃ¡ria */}
+      {/* Marca — secundÃ¡ria */}
     </div>
   );
 };
@@ -396,7 +396,7 @@ const TruckSchematic = ({ veiculo, posicoes, pneusNoVeiculo, pneuSelecionado, dr
     return (
       <div className="truck-empty">
         <Icon name="truck" size={40} style={{ opacity: 0.25 }}/>
-        <div className="muted">Nenhuma posicao cadastrada para este veiculo.</div>
+        <div className="muted">Nenhuma posição cadastrada para este veículo.</div>
       </div>
     );
   }
@@ -409,7 +409,7 @@ const TruckSchematic = ({ veiculo, posicoes, pneusNoVeiculo, pneuSelecionado, dr
         </div>
         <div>
           <div className="vehicle-layout-title">{config.label}</div>
-          <div className="vehicle-layout-sub">{veiculo?.placa || "Veiculo"}</div>
+          <div className="vehicle-layout-sub">{veiculo?.placa || "Veículo"}</div>
         </div>
       </div>
 
@@ -450,7 +450,7 @@ const TruckSchematic = ({ veiculo, posicoes, pneusNoVeiculo, pneuSelecionado, dr
     </div>
   );
 };
-// â”€â”€ Action Sheet â€” abre ao clicar em pneu ou slot vazio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Action Sheet — abre ao clicar em pneu ou slot vazio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // UX mobile: sheet sobe da parte inferior com opÃ§Ãµes claras de aÃ§Ã£o.
 
 const ActionSheet = ({ posicao, pneu, veiculo, pneusEstoque, onMoverParaDestino, onMontarPneu, onDetalhes, onClose }) => {
@@ -484,7 +484,7 @@ const ActionSheet = ({ posicao, pneu, veiculo, pneusEstoque, onMoverParaDestino,
           {!isEmpty && (
             <div className="action-sheet-pneu-num">{pneuCodigoDisplay(pneu)}</div>
           )}
-          {isEmpty && <div className="action-sheet-vazio-hint">PosiÃ§Ã£o vazia</div>}
+          {isEmpty && <div className="action-sheet-vazio-hint">Posição vazia</div>}
         </div>
 
         {/* Info do pneu (se houver) */}
@@ -499,7 +499,7 @@ const ActionSheet = ({ posicao, pneu, veiculo, pneusEstoque, onMoverParaDestino,
           </div>
         )}
 
-        {/* ConteÃºdo: pneu ocupado â†’ mover; vazio â†’ montar do estoque */}
+        {/* ConteÃºdo: pneu ocupado → mover; vazio → montar do estoque */}
         {!isEmpty ? (
           <>
             <div className="action-sheet-section-label">Mover pneu para:</div>
@@ -541,7 +541,7 @@ const ActionSheet = ({ posicao, pneu, veiculo, pneusEstoque, onMoverParaDestino,
                 <button key={e.codigopne} className="as-estoque-item" onClick={() => onMontarPneu(e, posicao)}>
                   <div className="as-estoque-num">{pneuCodigoDisplay(e)}</div>
                   <div className="as-estoque-info">
-                    {[e.marcapne, e.tamanhopne].filter(Boolean).join(" Â· ") || "â€”"}
+                    {[e.marcapne, e.tamanhopne].filter(Boolean).join(" · ") || "—"}
                     {kmPerc(e) !== null && <span className={`as-info-chip as-chip-${kmCor(e)}`} style={{ marginLeft: 6 }}>{kmPerc(e)}%</span>}
                   </div>
                 </button>
@@ -578,7 +578,7 @@ const ModalDetalhe = ({ pneu, posicao, onClose, onMover, onHistorico }) => {
         {p !== null && (
           <div style={{ padding: "12px 20px 0" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4, fontSize: "var(--font-xs)", color: "var(--text-2)" }}>
-              <span>Vida Ãºtil: {fmtKm(pneu.kmacumuladopne)} / {fmtKm(pneu.kmmaximapne)}</span>
+              <span>Vida útil: {fmtKm(pneu.kmacumuladopne)} / {fmtKm(pneu.kmmaximapne)}</span>
               <span style={{ fontWeight: 700, color: colors[cor] }}>{p}%</span>
             </div>
             <div style={{ height: 8, background: "var(--surface-3)", borderRadius: 4, overflow: "hidden" }}>
@@ -590,17 +590,17 @@ const ModalDetalhe = ({ pneu, posicao, onClose, onMover, onHistorico }) => {
         <div className="modal-body">
           <div className="detail-grid">
             {[
-              { l: "CÃ³digo",      v: pneu.codigopne },
+              { l: "Código",      v: pneu.codigopne },
               { l: "Nome / Fogo", v: pneu.nomepne },
               { l: "Marca",       v: pneu.marcapne },
               { l: "Modelo",      v: pneu.modelopne },
               { l: "Tamanho",     v: pneu.tamanhopne },
               { l: "KM Atual",    v: fmtKm(pneu.kmatualpne) },
               { l: "KM Acumulado",v: fmtKm(pneu.kmacumuladopne) },
-              { l: "KM MÃ¡ximo",   v: fmtKm(pneu.kmmaximapne) },
+              { l: "KM Máximo",   v: fmtKm(pneu.kmmaximapne) },
               { l: "Recapagens",  v: pneu.quantidaderecapagenspne || "0" },
               { l: "Local",       v: LOCAL_LABELS[pneu.local] || pneu.local },
-              { l: "PosiÃ§Ã£o",     v: posicao?.nomepop || pneu.posicao || null },
+              { l: "Posição",     v: posicao?.nomepop || pneu.posicao || null },
               { l: "Fornecedor",  v: pneu.fornecedorpne },
               { l: "Nota Fiscal", v: pneu.notafiscalpne },
             ].filter(r => r.v).map(r => (
@@ -611,7 +611,7 @@ const ModalDetalhe = ({ pneu, posicao, onClose, onMover, onHistorico }) => {
             ))}
             {pneu.observacaopne && (
               <div className="detail-row full">
-                <span className="detail-label">ObservaÃ§Ã£o</span>
+                <span className="detail-label">Observação</span>
                 <span className="detail-value">{pneu.observacaopne}</span>
               </div>
             )}
@@ -647,7 +647,7 @@ const ModalMovimento = ({ dados, onClose, onConfirmar, loading }) => {
 
   async function handleConfirmar() {
     setErro(null);
-    if (precisaKm && !km) { setErro("Informe o KM atual do veÃ­culo."); return; }
+    if (precisaKm && !km) { setErro("Informe o KM atual do veículo."); return; }
     try {
       await onConfirmar({ kmVeiculo: precisaKm ? Number(km) : null, observacao: obs.trim() || null, tipoMovimento: tipo });
     } catch (e) { setErro(e.message); }
@@ -657,7 +657,7 @@ const ModalMovimento = ({ dados, onClose, onConfirmar, loading }) => {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box modal-movimento" onClick={e => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>Confirmar MovimentaÃ§Ã£o</h2>
+          <h2>Confirmar Movimentação</h2>
           <button className="modal-close" onClick={onClose}><Icon name="x" size={16}/></button>
         </div>
         <div className="modal-body">
@@ -666,20 +666,20 @@ const ModalMovimento = ({ dados, onClose, onConfirmar, loading }) => {
               <span className="mov-value mono" style={{ fontSize: 15, fontWeight: 700 }}>{pneuLabel(dados.pneu)}</span>
             </div>
             {(dados.pneu.marcapne || dados.pneu.tamanhopne) && (
-              <div className="mov-row"><span className="mov-label">EspecificaÃ§Ã£o</span>
-                <span className="mov-value">{[dados.pneu.marcapne, dados.pneu.tamanhopne].filter(Boolean).join(" Â· ")}</span>
+              <div className="mov-row"><span className="mov-label">Especificação</span>
+                <span className="mov-value">{[dados.pneu.marcapne, dados.pneu.tamanhopne].filter(Boolean).join(" · ")}</span>
               </div>
             )}
             <div className="mov-row"><span className="mov-label">De</span><span className="mov-value">{dados.origemLabel}</span></div>
             <div className="mov-row"><span className="mov-label">Para</span>
               <span className="mov-value mov-destino">{dados.destinoLabel}</span>
             </div>
-            {dados.veiculo && <div className="mov-row"><span className="mov-label">VeÃ­culo</span><span className="mov-value mono">{dados.veiculo}</span></div>}
-            {dados.posicaoDestino && <div className="mov-row"><span className="mov-label">PosiÃ§Ã£o</span><span className="mov-value">{dados.posicaoDestinoLabel || dados.posicaoDestino}</span></div>}
+            {dados.veiculo && <div className="mov-row"><span className="mov-label">Veículo</span><span className="mov-value mono">{dados.veiculo}</span></div>}
+            {dados.posicaoDestino && <div className="mov-row"><span className="mov-label">Posição</span><span className="mov-value">{dados.posicaoDestinoLabel || dados.posicaoDestino}</span></div>}
           </div>
 
           <div className="form-field">
-            <label className="field-label">Tipo de movimentaÃ§Ã£o</label>
+            <label className="field-label">Tipo de movimentação</label>
             <select className="field-select" value={tipo} onChange={e => setTipo(e.target.value)}>
               {Object.entries(TIPO_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v.label}</option>
@@ -689,15 +689,15 @@ const ModalMovimento = ({ dados, onClose, onConfirmar, loading }) => {
 
           <div className="form-field">
             <label className="field-label">
-              KM atual do veÃ­culo {precisaKm && <span className="field-required">*</span>}
+              KM atual do veículo {precisaKm && <span className="field-required">*</span>}
             </label>
             <input ref={kmRef} type="number" className="field-input" placeholder="Ex: 125000"
               value={km} onChange={e => setKm(e.target.value)}/>
           </div>
 
           <div className="form-field">
-            <label className="field-label">ObservaÃ§Ã£o (opcional)</label>
-            <textarea className="field-textarea" rows={2} placeholder="Alguma observaÃ§Ã£o..."
+            <label className="field-label">Observação (opcional)</label>
+            <textarea className="field-textarea" rows={2} placeholder="Alguma observação..."
               value={obs} onChange={e => setObs(e.target.value)}/>
           </div>
 
@@ -734,7 +734,7 @@ const HistoricoPanel = ({ veiculo }) => {
       <button className="historico-toggle" onClick={() => setAberto(v => !v)}>
         <div className="row" style={{ gap: 8 }}>
           <Icon name="clock" size={15}/>
-          <span>HistÃ³rico de MovimentaÃ§Ãµes</span>
+          <span>Histórico de Movimentações</span>
         </div>
         <Icon name={aberto ? "chevron-down" : "chevron-right"} size={14}/>
       </button>
@@ -742,7 +742,7 @@ const HistoricoPanel = ({ veiculo }) => {
         <div className="historico-body">
           {loading && <div className="muted" style={{ padding: "12px 0" }}>Carregando...</div>}
           {!loading && historico.length === 0 && (
-            <div className="muted" style={{ padding: "12px 0" }}>Nenhuma movimentaÃ§Ã£o registrada.</div>
+            <div className="muted" style={{ padding: "12px 0" }}>Nenhuma movimentação registrada.</div>
           )}
           {!loading && historico.length > 0 && (
             <div className="tbl-wrap">
@@ -750,7 +750,7 @@ const HistoricoPanel = ({ veiculo }) => {
                 <thead>
                   <tr>
                     <th>Data</th><th>Pneu</th><th>Tipo</th>
-                    <th>De</th><th>Para</th><th>KM VeÃ­culo</th><th>Obs.</th>
+                    <th>De</th><th>Para</th><th>KM Veículo</th><th>Obs.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -766,8 +766,8 @@ const HistoricoPanel = ({ veiculo }) => {
                         <td><span className={`badge badge-${tip.cor}`}>{tip.label}</span></td>
                         <td>{origemLabel}</td>
                         <td>{destinoLabel}</td>
-                        <td>{h.km_veiculo ? Number(h.km_veiculo).toLocaleString("pt-BR") : "â€”"}</td>
-                        <td style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={h.observacao || ""}>{h.observacao || "â€”"}</td>
+                        <td>{h.km_veiculo ? Number(h.km_veiculo).toLocaleString("pt-BR") : "—"}</td>
+                        <td style={{ maxWidth: 140, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={h.observacao || ""}>{h.observacao || "—"}</td>
                       </tr>
                     );
                   })}
@@ -866,7 +866,7 @@ const ModalHistoricoPneu = ({ pneu, onClose }) => {
 // â”€â”€ Componente principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const Pneus = ({ onNavigate }) => {
-  // VeÃ­culo
+  // Veículo
   const [veiculoSearch, setVeiculoSearch] = useState("");
   const [veiculos, setVeiculos] = useState([]);
   const [selectedVeiculo, setSelectedVeiculo] = useState(null);
@@ -962,12 +962,12 @@ const Pneus = ({ onNavigate }) => {
   }
 
   function origemLabel(pneu) {
-    if (pneu.local === "veiculo") return `VeÃ­culo ${pneu.veiculo || ""}${pneu.posicao ? ` â€” ${pneu.posicao}` : ""}`;
+    if (pneu.local === "veiculo") return `Veículo ${pneu.veiculo || ""}${pneu.posicao ? ` — ${pneu.posicao}` : ""}`;
     return LOCAL_LABELS[pneu.local] || pneu.local;
   }
 
   function destinoLabel(destino, posicao) {
-    if (posicao) return `PosiÃ§Ã£o ${posicao.abreviacaopop} â€” ${posicao.nomepop}`;
+    if (posicao) return `Posição ${posicao.abreviacaopop} — ${posicao.nomepop}`;
     if (destino?.label) return destino.label;
     return LOCAL_LABELS[String(destino || "").toLowerCase()] || String(destino);
   }
@@ -1067,8 +1067,8 @@ const Pneus = ({ onNavigate }) => {
       {/* CabeÃ§alho */}
       <div className="page-head">
         <div>
-          <h1>MovimentaÃ§Ã£o de Pneus</h1>
-          <div className="sub">Toque em uma posiÃ§Ã£o para ver opÃ§Ãµes de movimentaÃ§Ã£o</div>
+          <h1>Movimentação de Pneus</h1>
+          <div className="sub">Toque em uma posição para ver opções de movimentação</div>
         </div>
         {selectedVeiculo && (
           <button className="btn" onClick={recarregarTudo} title="Atualizar">
@@ -1081,7 +1081,7 @@ const Pneus = ({ onNavigate }) => {
       <div className="card pneus-selector-card">
         <div className="pneus-selector-row">
           <div className="pneus-vehicle-field" style={{ position: "relative", flex: 1, minWidth: 240 }}>
-            <label className="field-label">VeÃ­culo</label>
+            <label className="field-label">Veículo</label>
             <div className="autocomplete-wrap" style={{ position: "relative" }}>
               <Icon name="search" size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--text-3)", pointerEvents: "none" }}/>
               <input
@@ -1106,7 +1106,7 @@ const Pneus = ({ onNavigate }) => {
                   <div className="autocomplete-item" style={{ color: "var(--crit)", fontSize: "var(--font-xs)" }}>Erro: {erroVeiculos}</div>
                 )}
                 {!loadingVeiculos && !erroVeiculos && veiculos.length === 0 && (
-                  <div className="autocomplete-item muted">Nenhum veÃ­culo encontrado.</div>
+                  <div className="autocomplete-item muted">Nenhum veículo encontrado.</div>
                 )}
                 {veiculos.map(v => (
                   <button key={v.placa} className="autocomplete-item"
@@ -1134,12 +1134,12 @@ const Pneus = ({ onNavigate }) => {
       {!selectedVeiculo && !loadingEstado && (
         <div className="pneus-empty-state card">
           <Icon name="truck" size={48} style={{ opacity: 0.2, color: "var(--brand-blue)" }}/>
-          <div style={{ marginTop: 12, color: "var(--text-3)" }}>Selecione um veÃ­culo para ver os pneus</div>
+          <div style={{ marginTop: 12, color: "var(--text-3)" }}>Selecione um veículo para ver os pneus</div>
         </div>
       )}
       {loadingEstado && (
         <div className="pneus-empty-state card">
-          <div className="muted">Carregando pneus do veÃ­culo...</div>
+          <div className="muted">Carregando pneus do veículo...</div>
         </div>
       )}
       {erroEstado && (
@@ -1148,11 +1148,11 @@ const Pneus = ({ onNavigate }) => {
         </div>
       )}
 
-      {/* Ãrea principal: esquema + destinos */}
+      {/* Área principal: esquema + destinos */}
       {selectedVeiculo && !loadingEstado && (
         <div className="pneus-main-area">
 
-          {/* Esquema do veÃ­culo */}
+          {/* Esquema do veículo */}
           <div className="card pneus-schematic-card">
             <TruckSchematic
               veiculo={selectedVeiculo}
@@ -1209,7 +1209,7 @@ const Pneus = ({ onNavigate }) => {
           </div>
         )}
         {!loadingEstoque && !erroEstoque && pneusEstoque.length === 0 && (
-          <div className="muted" style={{ padding: "8px 0" }}>Estoque vazio ou nÃ£o configurado.</div>
+          <div className="muted" style={{ padding: "8px 0" }}>Estoque vazio ou não configurado.</div>
         )}
         {!loadingEstoque && pneusEstoque.length > 0 && (
           <div className="estoque-grid">
@@ -1225,11 +1225,11 @@ const Pneus = ({ onNavigate }) => {
                   onDragStart={e => handleDragStart(e, p)}
                   onDragEnd={handleDragEnd}
                   onClick={() => setModalDetalhe({ pneu: p, posicao: null })}
-                  title={`${pneuCodigo(p)} - ${pneuNomeSecundario(p) || "sem descricao"}`}
+                  title={`${pneuCodigo(p)} - ${pneuNomeSecundario(p) || "sem descrição"}`}
                 >
                   <div className="estoque-card-num">{pneuCodigoDisplay(p)}</div>
                   {pneuNomeSecundario(p) && <div className="estoque-card-subtitle">{pneuNomeSecundario(p)}</div>}
-                  <div className="estoque-card-info">{[p.marcapne, p.tamanhopne].filter(Boolean).join(" Â· ") || "â€”"}</div>
+                  <div className="estoque-card-info">{[p.marcapne, p.tamanhopne].filter(Boolean).join(" · ") || "—"}</div>
                   {pc !== null && (
                     <>
                       <div style={{ height: 3, background: "var(--surface-3)", borderRadius: 2, marginTop: 6, overflow: "hidden" }}>
@@ -1248,7 +1248,7 @@ const Pneus = ({ onNavigate }) => {
       {/* HistÃ³rico */}
       {selectedVeiculo && <HistoricoPanel veiculo={selectedVeiculo.placa}/>}
 
-      {/* Action Sheet â€” toque em posiÃ§Ã£o */}
+      {/* Action Sheet — toque em posiÃ§Ã£o */}
       {actionSheet && (
         <ActionSheet
           posicao={actionSheet.posicao}

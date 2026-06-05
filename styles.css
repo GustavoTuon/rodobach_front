@@ -1,4 +1,4 @@
-/* Norte Telemetria — Design Tokens */
+﻿/* Norte Telemetria — Design Tokens */
 
 :root {
   /* ── Color: Light theme ──────────────────────────── */
@@ -2214,4 +2214,281 @@ tr.row-ok td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
     align-items: flex-start;
     gap: 10px;
   }
+}
+
+/* Overrides finais: pneus mobile, sem afetar desktop. */
+@media (max-width: 640px) {
+  .app-shell { --sidebar-w: 44px; }
+  .sidebar { padding: 8px 4px; }
+  .sidebar-brand { padding: 4px 0 12px; }
+  .sidebar-brand img { max-width: 30px; max-height: 26px !important; object-fit: contain; }
+  .nav-section { gap: 5px; }
+  .nav-item { min-height: 38px; padding: 7px; border-radius: 8px; }
+  .sidebar-footer { padding: 8px 2px; }
+  .main { min-width: 0; }
+
+  .pneus-view {
+    gap: 12px;
+    padding: 14px 10px 112px;
+    overflow-x: hidden;
+  }
+
+  .pneus-view .page-head {
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 0;
+  }
+
+  .pneus-view .page-head h1 {
+    max-width: 190px;
+    font-size: 22px;
+    line-height: 1.12;
+  }
+
+  .pneus-view .page-head .sub {
+    max-width: 220px;
+    font-size: 12.5px;
+    line-height: 1.35;
+  }
+
+  .pneus-view .page-head .actions {
+    margin-left: auto;
+    padding-top: 42px;
+  }
+
+  .pneus-view .page-head .actions .btn {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .pneus-selector-card {
+    padding: 12px;
+    border-radius: 8px;
+  }
+
+  .pneus-selector-row { gap: 10px; }
+  .pneus-vehicle-field { width: 100%; min-width: 0 !important; }
+  .pneus-vehicle-field input { height: 38px !important; font-size: 12.5px !important; }
+  .vehicle-info-chips { gap: 6px; }
+  .chip { max-width: 100%; font-size: 11.5px; line-height: 1.15; overflow-wrap: anywhere; }
+
+  .pneus-main-area {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .pneus-schematic-card {
+    padding: 10px;
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 8px;
+    overflow-x: hidden;
+    overflow-y: visible;
+  }
+
+  .truck-schematic,
+  .vehicle-layout {
+    width: 100%;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  .vehicle-layout-head {
+    gap: 10px;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+  }
+
+  .vehicle-nose {
+    width: 38px;
+    height: 32px;
+    border-radius: 7px;
+  }
+
+  .vehicle-layout-title { font-size: 14px; }
+  .vehicle-layout-sub { font-size: 11.5px; }
+
+  .vehicle-body-frame {
+    padding: 12px;
+    gap: 16px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, transparent 0, transparent 48%, var(--surface-2) 48%, var(--surface-2) 52%, transparent 52%);
+  }
+
+  .vehicle-section { gap: 10px; }
+  .vehicle-section-title { padding-left: 2px; font-size: 11px; line-height: 1.15; }
+  .vehicle-axles { gap: 14px; }
+
+  .vehicle-axle-row {
+    grid-template-columns: 1fr;
+    grid-template-areas: "left" "center" "right";
+    gap: 7px;
+    padding: 3px 0 12px;
+    border-bottom: 1px solid var(--divider);
+  }
+
+  .vehicle-axle-row:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .vehicle-side {
+    min-width: 0;
+    gap: 7px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .vehicle-side-left { grid-area: left; justify-content: center; }
+  .vehicle-side-right { grid-area: right; justify-content: center; }
+
+  .vehicle-axle-center {
+    grid-area: center;
+    flex-direction: row;
+    justify-content: center;
+    gap: 7px;
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .vehicle-axle-line {
+    width: 50px;
+    height: 5px;
+  }
+
+  .vehicle-spares-section {
+    grid-template-columns: 1fr;
+    padding: 12px;
+    text-align: center;
+  }
+
+  .vehicle-spares-grid { justify-content: center; }
+
+  .pslot {
+    width: min(112px, calc(50vw - 34px));
+    min-width: 96px;
+    max-width: 112px;
+    min-height: 104px;
+    padding: 7px;
+    gap: 5px;
+    border-radius: 8px;
+  }
+
+  .pslot-label {
+    font-size: 12px;
+    line-height: 1;
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
+    hyphens: none;
+  }
+
+  .pslot-vazio {
+    min-height: 70px;
+    font-size: 12px;
+  }
+
+  .slot-tire-card {
+    min-height: 76px;
+    padding: 8px 8px 7px 9px;
+    border-left-width: 5px;
+  }
+
+  .slot-tire-num {
+    font-size: 18px;
+    line-height: 1.05;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .slot-tire-meta {
+    gap: 5px;
+    margin-top: 6px;
+  }
+
+  .slot-tire-pos,
+  .slot-tire-pct {
+    min-height: 19px;
+    padding: 2px 6px;
+    font-size: 10.5px;
+    line-height: 1;
+    white-space: nowrap;
+    word-break: keep-all;
+    overflow-wrap: normal;
+    hyphens: none;
+  }
+
+  .slot-tire-bar-wrap {
+    height: 4px;
+    margin-top: 7px;
+  }
+
+  .pneus-destinos-col {
+    position: fixed;
+    left: var(--sidebar-w, 44px);
+    right: 0;
+    bottom: 0;
+    z-index: 180;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+    padding: 7px 7px calc(7px + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.12);
+  }
+
+  .pneus-destinos-col .destinos-label { display: none; }
+
+  .pneus-destinos-col .dest-area {
+    min-width: 0;
+    min-height: 48px;
+    padding: 6px 2px;
+    flex-direction: column;
+    gap: 3px;
+    border-style: solid;
+    font-size: 11px;
+  }
+
+  .pneus-destinos-col .dest-label {
+    font-size: 10px;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 390px) {
+  .pneus-view {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .pneus-schematic-card { padding: 8px; }
+  .vehicle-body-frame { padding: 10px 8px; }
+
+  .pslot {
+    width: min(104px, calc(50vw - 30px));
+    min-width: 92px;
+    max-width: 104px;
+  }
+
+  .slot-tire-num { font-size: 17px; }
+
+  .slot-tire-pos,
+  .slot-tire-pct {
+    padding-left: 5px;
+    padding-right: 5px;
+    font-size: 10px;
+  }
+
+  .pneus-destinos-col {
+    gap: 4px;
+    padding-left: 5px;
+    padding-right: 5px;
+  }
+
+  .pneus-destinos-col .dest-label { font-size: 9.5px; }
 }
