@@ -5,18 +5,15 @@ const SCREEN_SCRIPTS = [
   "src/screens/simulador.jsx",
   "src/screens/diarias.jsx",
   "src/screens/viagens.jsx",
-  "src/screens/custos.jsx",
-  "src/screens/receita.jsx",
   "src/screens/demonstrativo-financeiro.jsx",
   "src/screens/dre-empresarial.jsx",
-  "src/screens/financeiro-placa.jsx",
   "src/screens/analise-clientes.jsx",
   "src/screens/pneus.jsx?v=20260603-historico-pneu",
 ];
 
 const SCREEN_GLOBALS = [
-  "SimuladorFrete", "DiariasMotorista", "Viagens", "Custos", "Receita",
-  "DemonstrativoFinanceiro", "DreEmpresarial", "FinanceiroPlaca", "AnaliseClientes", "Pneus",
+  "SimuladorFrete", "DiariasMotorista", "Viagens",
+  "DemonstrativoFinanceiro", "DreEmpresarial", "AnaliseClientes", "Pneus",
 ];
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -33,11 +30,8 @@ const NAV = [
   { id: "diarias",         label: "Diárias",      icon: "clock",       title: "Diárias do Motorista" },
   { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações" },
   { id: "reports",         label: "Relatórios",   icon: "chart",       title: "Relatórios" },
-  { id: "custos",          label: "Custos",       icon: "money",       title: "Despesas e Custos" },
-  { id: "receita",         label: "Receita",      icon: "trending-up", title: "Análise de Receita" },
   { id: "demonstrativo",   label: "DRE",          icon: "chart",       title: "Demonstrativo financeiro" },
   { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial" },
-  { id: "placa",           label: "Por Placa",    icon: "compass",     title: "Financeiro por Placa" },
   { id: "clientes",        label: "Clientes",     icon: "user",        title: "Análise de Clientes" },
   { id: "integration",     label: "Integração",   icon: "plug",        title: "Saúde da integração" },
   { id: "settings",        label: "Configurações", icon: "settings",   title: "Configurações",    sistema: true },
@@ -195,7 +189,6 @@ const App = () => {
     : (visibleNav[0]?.id || DEFAULT_SCREEN);
 
   const go = (screen) => setRoute({ screen });
-  const goVehicle = () => {};
   const onNavigate = (screen) => {
     if (visibleNav.some(n => n.id === screen)) go(screen);
   };
@@ -211,20 +204,11 @@ const App = () => {
     case "viagens":
       body = <Viagens onNavigate={onNavigate}/>;
       break;
-    case "custos":
-      body = <Custos onGoToVehicle={goVehicle} onNavigate={onNavigate}/>;
-      break;
-    case "receita":
-      body = <Receita onGoToVehicle={goVehicle} onNavigate={onNavigate}/>;
-      break;
     case "demonstrativo":
       body = <DemonstrativoFinanceiro onNavigate={onNavigate}/>;
       break;
     case "dre-empresarial":
       body = <DreEmpresarial onNavigate={onNavigate}/>;
-      break;
-    case "placa":
-      body = <FinanceiroPlaca onNavigate={onNavigate}/>;
       break;
     case "clientes":
       body = <AnaliseClientes onNavigate={onNavigate}/>;
