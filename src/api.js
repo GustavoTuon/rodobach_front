@@ -109,6 +109,8 @@ window.RB_API = {
     body: JSON.stringify(payload),
   }),
 
+  searchCidades: (search = "") => apiRequest(`/localidades/cidades${buildQuery({ search })}`),
+
   // ── Viagens ───────────────────────────────────────────────────────────────
   listViagens: (filters = {}) => apiRequest(`/viagens${buildQuery(filters)}`),
 
@@ -147,6 +149,9 @@ window.RB_API = {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/por-placa${buildQuery(params)}`);
   },
+  getCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos${buildQuery(filters || {})}`),
+  getCustosVeiculosFiltros: () => apiRequest("/financeiro/custos-veiculos/filtros"),
+  getCustosVeiculoDetalhe: (placa, filters = {}) => apiRequest(`/financeiro/custos-veiculos/${encodeURIComponent(placa)}${buildQuery(filters || {})}`),
   getDemonstrativoFinanceiro: (filters) => {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/demonstrativo${buildQuery(params)}`);

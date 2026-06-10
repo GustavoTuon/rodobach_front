@@ -57,6 +57,20 @@ const numericValue = (value) => {
   const parsed = Number(normalized.replace(/[^\d.-]/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
 };
+const sanitizeIntegerInput = (value) => textValue(value).replace(/\D/g, "");
+const sanitizeMoneyInput = (value) => {
+  const raw = textValue(value).replace(/[^\d,.]/g, "");
+  const hasSeparator = /[,.]/.test(raw);
+  if (!hasSeparator) return raw.replace(/\D/g, "");
+
+  const trailingSeparator = /[,.]$/.test(raw);
+  const parts = raw.split(/[,.]/);
+  const integer = parts.shift().replace(/\D/g, "");
+  const decimals = parts.join("").replace(/\D/g, "").slice(0, 2);
+
+  if (trailingSeparator && !decimals) return `${integer},`;
+  return decimals ? `${integer},${decimals}` : integer;
+};
 const hasValue = (value) => {
   const raw = textValue(value).trim();
   if (!raw) return false;
@@ -145,18 +159,18 @@ const Fg = ({ label, children }) => (
 // ── Auxiliares de célula para o Romaneio ──
 const PRCell = ({ label, value }) => (
   <div>
-    <span style={{display:"block",fontSize:8,color:"#6b7280",textTransform:"uppercase",fontWeight:600,letterSpacing:"0.3px"}}>{label}</span>
+    <span style={{display:"block",fontSize:9,color:"#6b7280",textTransform:"uppercase",fontWeight:600,letterSpacing:"0.3px",marginBottom:2}}>{label}</span>
     <strong style={{display:"block",fontSize:10.5,color:"#111827",fontWeight:600,lineHeight:1.3,wordBreak:"break-word"}}>{value || "—"}</strong>
   </div>
 );
 const PRRow2 = ({ left, right }) => (
-  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:5}}>
+  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:9}}>
     {left  && <PRCell label={left.label}  value={left.value}/>}
     {right && <PRCell label={right.label} value={right.value}/>}
   </div>
 );
 const PRRow1 = ({ label, value }) => (
-  <div style={{marginBottom:5}}>
+  <div style={{marginBottom:9}}>
     <PRCell label={label} value={value}/>
   </div>
 );
@@ -219,10 +233,10 @@ const PrintSheet = ({ form }) => {
       </div>
 
       {/* ── Duas colunas principais ── */}
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",borderBottom:"1px solid #e5e7eb"}}>
+      <div className="rb-print-data-grid" style={{display:"grid",gridTemplateColumns:"1fr 1fr",borderBottom:"1px solid #e5e7eb",minHeight:"96mm"}}>
         {/* Dados da Viagem */}
-        <div style={{padding:"10px 12px",borderRight:"1px solid #e5e7eb"}}>
-          <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",color:"#374151",borderBottom:"1px solid #e5e7eb",paddingBottom:4,marginBottom:7,letterSpacing:"0.3px"}}>DADOS DA VIAGEM</div>
+        <div style={{padding:"14px 16px",borderRight:"1px solid #e5e7eb"}}>
+          <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",color:"#374151",borderBottom:"1px solid #e5e7eb",paddingBottom:6,marginBottom:12,letterSpacing:"0.3px"}}>DADOS DA VIAGEM</div>
           <PRRow2 left={{label:"N° viagem", value:form.numero}} right={{label:"Situação", value:sit}}/>
           <PRRow1 label="Cliente"           value={form.cliente}/>
           <PRRow1 label="Cliente final"     value={form.clienteFinal}/>
@@ -234,8 +248,8 @@ const PrintSheet = ({ form }) => {
         </div>
 
         {/* Motorista e Pagamento */}
-        <div style={{padding:"10px 12px"}}>
-          <div style={{fontSize:9,fontWeight:700,textTransform:"uppercase",color:"#374151",borderBottom:"1px solid #e5e7eb",paddingBottom:4,marginBottom:7,letterSpacing:"0.3px"}}>MOTORISTA E PAGAMENTO</div>
+        <div style={{padding:"14px 16px"}}>
+          <div style={{fontSize:10,fontWeight:700,textTransform:"uppercase",color:"#374151",borderBottom:"1px solid #e5e7eb",paddingBottom:6,marginBottom:12,letterSpacing:"0.3px"}}>MOTORISTA E PAGAMENTO</div>
           <PRRow2 left={{label:"Motorista",      value:form.motorista}}    right={{label:"Placa do veículo",      value:form.placa}}/>
           <PRRow2 left={{label:"Valor motorista",value:money(form.valorMotorista)}} right={{label:"Lucro previsto", value:hasValores?money(lucroVal):"—"}}/>
           <PRRow2 left={{label:"Condição de pagamento",value:form.condicaoPagamento}} right={{label:"Número do motorista",value:form.numeroMotorista}}/>
@@ -300,7 +314,14 @@ const Viagens = ({ onNavigate }) => {
     vendedores: [], origens: [], destinos: [], paradas: [], materiais: [],
     detalhes: { clientes: [], placas: [], motoristas: [] },
   });
+  const [cidadeOptions,  setCidadeOptions]  = useState({ origem: [], destino: [] });
+  const [cidadeLoading,  setCidadeLoading]  = useState({ origem: false, destino: false });
+  const [activeAuto,     setActiveAuto]     = useState("");
   const nextId = useRef(1);
+  const citySearchTimers = useRef({});
+  const activeAutoRef = useRef("");
+  const autoFieldRef = useRef(null);
+  activeAutoRef.current = activeAuto;
 
   // Opcoes de autocomplete — carrega uma vez
   useEffect(() => {
@@ -443,6 +464,23 @@ const Viagens = ({ onNavigate }) => {
     }));
   };
 
+  const autocompleteText = (item) => String([
+    item?.placa, item?.nome, item?.label, item?.motorista, item?.modelo, item?.cidadePlaca,
+    item?.documento, item?.cnpj, item?.cpf, item?.cidade,
+  ].filter(Boolean).join(" ")).toLowerCase();
+
+  const filterAutocompleteOptions = (items, value, limit = 30) => {
+    const q = String(value || "").trim().toLowerCase();
+    const list = Array.isArray(items) ? items : [];
+    if (!q) return list.slice(0, limit);
+    const cleanQ = q.replace(/[^a-z0-9]/gi, "");
+    return list.filter((item) => {
+      const text = autocompleteText(item);
+      const cleanText = text.replace(/[^a-z0-9]/gi, "");
+      return text.includes(q) || (cleanQ && cleanText.includes(cleanQ));
+    }).slice(0, limit);
+  };
+
   const searchAutocomplete = (type, value) => {
     const q = String(value || "").trim();
     if (q.length < 2) return;
@@ -454,6 +492,87 @@ const Viagens = ({ onNavigate }) => {
     };
     calls[type]?.(q).then(items => mergeOptionDetails(type, items)).catch(() => {});
   };
+
+  const searchCidade = (field, value) => {
+    const q = String(value || "").trim();
+    window.clearTimeout(citySearchTimers.current[field]);
+    if (q.length < 2) {
+      setCidadeOptions(prev => ({ ...prev, [field]: [] }));
+      setCidadeLoading(prev => ({ ...prev, [field]: false }));
+      return;
+    }
+    setCidadeLoading(prev => ({ ...prev, [field]: true }));
+    citySearchTimers.current[field] = window.setTimeout(() => {
+      window.RB_API.searchCidades(q)
+        .then(items => setCidadeOptions(prev => ({ ...prev, [field]: Array.isArray(items) ? items : [] })))
+        .catch(() => setCidadeOptions(prev => ({ ...prev, [field]: [] })))
+        .finally(() => setCidadeLoading(prev => ({ ...prev, [field]: false })));
+    }, 260);
+  };
+
+  const selectCidade = (field, city) => {
+    if (!city) return;
+    if (field === "origem") {
+      setForm(prev => ({
+        ...prev,
+        origem: city.nome || "",
+        ufOrigem: String(city.uf || "").toUpperCase().slice(0, 2),
+      }));
+    } else {
+      setForm(prev => ({
+        ...prev,
+        destino: city.nome || "",
+        ufDestino: String(city.uf || "").toUpperCase().slice(0, 2),
+      }));
+    }
+    setCidadeOptions(prev => ({ ...prev, [field]: [] }));
+    setActiveAuto("");
+  };
+
+  const selectParadaCidade = (id, city) => {
+    if (!city) return;
+    setParada(id, "cidade", city.nome || city.label || "");
+    setParada(id, "uf", String(city.uf || "").toUpperCase().slice(0, 2));
+    setCidadeOptions(prev => ({ ...prev, [`parada-${id}`]: [] }));
+    setActiveAuto("");
+  };
+
+  if (!autoFieldRef.current) {
+    autoFieldRef.current = ({ value, placeholder, options = [], loading = false, activeKey, onChange, onSelect, renderOption, optionKey, style }) => (
+      <div className="trip-autocomplete-field" style={style}>
+        <input
+          style={fs}
+          value={value}
+          onFocus={() => setActiveAuto(activeKey)}
+          onChange={e => {
+            setActiveAuto(activeKey);
+            onChange(e.target.value);
+          }}
+          placeholder={placeholder}
+          autoComplete="off"
+        />
+        {activeAutoRef.current === activeKey && (loading || String(value || "").trim().length >= 2) && (
+          <div className="trip-autocomplete-list">
+            {loading && <div className="trip-autocomplete-empty">Buscando...</div>}
+            {!loading && options.map((item, index) => (
+              <button
+                key={optionKey ? optionKey(item, index) : index}
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => onSelect(item)}
+              >
+                {renderOption(item)}
+              </button>
+            ))}
+            {!loading && String(value || "").trim().length >= 2 && options.length === 0 && (
+              <div className="trip-autocomplete-empty">Nenhum resultado encontrado.</div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+  const AutoField = autoFieldRef.current;
 
   const prepareViagem = (v) => ({
     ...normalizeViagemForm(v),
@@ -855,6 +974,11 @@ const Viagens = ({ onNavigate }) => {
             box-shadow: 0 16px 34px rgba(15, 23, 42, 0.16);
             overflow: hidden;
           }
+          .rb-print-data-grid strong {
+            font-size: 12.5px !important;
+            font-weight: 700 !important;
+            line-height: 1.38 !important;
+          }
           @media print {
             body { background: #fff !important; }
             body * { visibility: hidden !important; }
@@ -910,31 +1034,36 @@ const Viagens = ({ onNavigate }) => {
             <input type="date" style={fs} value={form.data} onChange={e => setF("data", e.target.value)}/>
           </Fg>
         </div>
-        <Fg label="Placa do veículo">
-          {opcoes.placas.length > 0 ? (
-            <>
-              <input list="placas-list" style={fs} value={form.placa}
-                onChange={e => {
-                  const value = e.target.value;
-                  setF("placa", value);
-                  searchAutocomplete("placas", value);
-                  applyPlaca(value);
-                }}
-                placeholder="Digite ou selecione a placa..."/>
-              <datalist id="placas-list">
-                {opcoes.placas.map(p => <option key={p} value={p}/>)}
-              </datalist>
-            </>
-          ) : (
-            <input style={fs} value={form.placa}
-              onChange={e => {
-                const value = e.target.value;
-                setF("placa", value);
-                searchAutocomplete("placas", value);
-                applyPlaca(value);
-              }}
-              placeholder="Ex: ABC-1234"/>
-          )}
+                <Fg label="Placa do veiculo">
+          <AutoField
+            value={form.placa}
+            activeKey="placa"
+            placeholder="Digite ou selecione a placa..."
+            options={filterAutocompleteOptions(
+              opcoes.detalhes?.placas?.length
+                ? opcoes.detalhes.placas
+                : opcoes.placas.map(p => ({ placa: p })),
+              form.placa,
+            )}
+            optionKey={(item, index) => item.placa || item.label || index}
+            onChange={value => {
+              setF("placa", value);
+              searchAutocomplete("placas", value);
+              applyPlaca(value);
+            }}
+            onSelect={item => {
+              const value = item.placa || item.label || "";
+              setF("placa", value);
+              applyPlaca(value);
+              setActiveAuto("");
+            }}
+            renderOption={item => (
+              <>
+                <span>{item.placa || item.label}</span>
+                <b>{item.motorista || item.modelo || item.cidadePlaca || ""}</b>
+              </>
+            )}
+          />
         </Fg>
         <Fg label="Situação">
           {(() => {
@@ -978,16 +1107,27 @@ const Viagens = ({ onNavigate }) => {
 
           <Fg label="Cidade de Origem">
             <div className="row" style={{gap: 8}}>
-              <input list="origens-list" style={{...fs, flex: 3}} value={form.origem}
-                onChange={e => {
-                  const v = e.target.value;
-                  const parts = v.split("/");
-                  setF("origem", parts[0].trim());
-                  if (parts[1]) setF("ufOrigem", parts[1].trim().toUpperCase().slice(0, 2));
-                }} placeholder="Ex: São Paulo"/>
-              <datalist id="origens-list">
-                {opcoes.origens.map(o => <option key={o} value={o}/>)}
-              </datalist>
+                            <AutoField
+                value={form.origem}
+                activeKey="origem"
+                placeholder="Ex: Sao Paulo"
+                style={{flex: 3}}
+                options={cidadeOptions.origem}
+                loading={cidadeLoading.origem}
+                optionKey={(city, index) => city.codigo || `${city.nome}-${city.uf}-${index}`}
+                onChange={value => {
+                  setF("origem", value);
+                  setF("ufOrigem", "");
+                  searchCidade("origem", value);
+                }}
+                onSelect={city => selectCidade("origem", city)}
+                renderOption={city => (
+                  <>
+                    <span>{city.nome || city.label}</span>
+                    <b>{city.uf || "--"}</b>
+                  </>
+                )}
+              />
               <input style={{...fs, flex: 1, textAlign: "center"}} value={form.ufOrigem}
                 onChange={e => setF("ufOrigem", e.target.value.toUpperCase().slice(0, 2))}
                 placeholder="UF" maxLength="2"/>
@@ -1000,16 +1140,27 @@ const Viagens = ({ onNavigate }) => {
 
           <Fg label="Cidade de Destino">
             <div className="row" style={{gap: 8}}>
-              <input list="destinos-list" style={{...fs, flex: 3}} value={form.destino}
-                onChange={e => {
-                  const v = e.target.value;
-                  const parts = v.split("/");
-                  setF("destino", parts[0].trim());
-                  if (parts[1]) setF("ufDestino", parts[1].trim().toUpperCase().slice(0, 2));
-                }} placeholder="Ex: Belo Horizonte"/>
-              <datalist id="destinos-list">
-                {opcoes.destinos.map(d => <option key={d} value={d}/>)}
-              </datalist>
+                            <AutoField
+                value={form.destino}
+                activeKey="destino"
+                placeholder="Ex: Belo Horizonte"
+                style={{flex: 3}}
+                options={cidadeOptions.destino}
+                loading={cidadeLoading.destino}
+                optionKey={(city, index) => city.codigo || `${city.nome}-${city.uf}-${index}`}
+                onChange={value => {
+                  setF("destino", value);
+                  setF("ufDestino", "");
+                  searchCidade("destino", value);
+                }}
+                onSelect={city => selectCidade("destino", city)}
+                renderOption={city => (
+                  <>
+                    <span>{city.nome || city.label}</span>
+                    <b>{city.uf || "--"}</b>
+                  </>
+                )}
+              />
               <input style={{...fs, flex: 1, textAlign: "center"}} value={form.ufDestino}
                 onChange={e => setF("ufDestino", e.target.value.toUpperCase().slice(0, 2))}
                 placeholder="UF" maxLength="2"/>
@@ -1054,25 +1205,57 @@ const Viagens = ({ onNavigate }) => {
                 </Fg>
                 <Fg label="Cidade / UF">
                   <div className="row" style={{gap: 6}}>
-                    <input list="paradas-list" style={{...fs, flex: 3}} value={p.cidade}
-                      onChange={e => {
-                        const value = e.target.value;
-                        const parts = value.split("/");
-                        setParada(p.id, "cidade", parts[0].trim());
-                        if (parts[1]) setParada(p.id, "uf", parts[1].trim().toUpperCase().slice(0, 2));
-                      }} placeholder="Cidade"/>
-                    <datalist id="paradas-list">
-                      {(opcoes.paradas || []).map(c => <option key={c} value={c}/>)}
-                    </datalist>
+                                        <AutoField
+                      value={p.cidade}
+                      activeKey={`parada-cidade-${p.id}`}
+                      placeholder="Cidade"
+                      style={{flex: 3}}
+                      options={cidadeOptions[`parada-${p.id}`] || []}
+                      loading={cidadeLoading[`parada-${p.id}`]}
+                      optionKey={(city, index) => city.codigo || `${city.nome}-${city.uf}-${index}`}
+                      onChange={value => {
+                        setParada(p.id, "cidade", value);
+                        setParada(p.id, "uf", "");
+                        searchCidade(`parada-${p.id}`, value);
+                      }}
+                      onSelect={city => selectParadaCidade(p.id, city)}
+                      renderOption={city => (
+                        <>
+                          <span>{city.nome || city.label}</span>
+                          <b>{city.uf || "--"}</b>
+                        </>
+                      )}
+                    />
                     <input style={{...fs, flex: 1}} value={p.uf} onChange={e => setParada(p.id, "uf", e.target.value.toUpperCase().slice(0,2))} placeholder="UF" maxLength="2"/>
                   </div>
                 </Fg>
-                <Fg label="Cliente / Destinatário">
-                  <input list="clientes-list" style={fs} value={p.cliente}
-                    onChange={e => {
-                      setParada(p.id, "cliente", e.target.value);
-                      searchAutocomplete("clientes", e.target.value);
-                    }} placeholder="Nome do cliente"/>
+                                <Fg label="Cliente / Destinatario">
+                  <AutoField
+                    value={p.cliente}
+                    activeKey={`parada-cliente-${p.id}`}
+                    placeholder="Nome do cliente"
+                    options={filterAutocompleteOptions(
+                      opcoes.detalhes?.clientes?.length
+                        ? opcoes.detalhes.clientes
+                        : opcoes.clientes.map(c => ({ nome: c })),
+                      p.cliente,
+                    )}
+                    optionKey={(item, index) => item.nome || item.label || index}
+                    onChange={value => {
+                      setParada(p.id, "cliente", value);
+                      searchAutocomplete("clientes", value);
+                    }}
+                    onSelect={item => {
+                      setParada(p.id, "cliente", item.nome || item.label || "");
+                      setActiveAuto("");
+                    }}
+                    renderOption={item => (
+                      <>
+                        <span>{item.nome || item.label}</span>
+                        <b>{item.documento || item.cnpj || item.cpf || item.cidade || ""}</b>
+                      </>
+                    )}
+                  />
                 </Fg>
                 <Fg label="N° Nota Fiscal">
                   <input style={fs} value={p.nf} onChange={e => setParada(p.id, "nf", e.target.value)} placeholder="NF-000000"/>
@@ -1088,41 +1271,98 @@ const Viagens = ({ onNavigate }) => {
   const renderStep2 = () => (
     <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20}}>
       <div className="col" style={{gap: 14}}>
-        <Fg label="Cliente (tomador do frete)">
-          <input list="clientes-list" style={fs} value={form.cliente}
-            onChange={e => {
-              const value = e.target.value;
+                <Fg label="Cliente (tomador do frete)">
+          <AutoField
+            value={form.cliente}
+            activeKey="cliente"
+            placeholder="Razao social ou nome"
+            options={filterAutocompleteOptions(
+              opcoes.detalhes?.clientes?.length
+                ? opcoes.detalhes.clientes
+                : opcoes.clientes.map(c => ({ nome: c })),
+              form.cliente,
+            )}
+            optionKey={(item, index) => item.nome || item.label || index}
+            onChange={value => {
               setF("cliente", value);
               searchAutocomplete("clientes", value);
               applyCliente("cliente", value);
-            }} placeholder="Razão social ou nome"/>
-          <datalist id="clientes-list">
-            {opcoes.clientes.map(c => <option key={c} value={c}/>)}
-          </datalist>
+            }}
+            onSelect={item => {
+              const value = item.nome || item.label || "";
+              setF("cliente", value);
+              applyCliente("cliente", value);
+              setActiveAuto("");
+            }}
+            renderOption={item => (
+              <>
+                <span>{item.nome || item.label}</span>
+                <b>{item.documento || item.cnpj || item.cpf || item.cidade || ""}</b>
+              </>
+            )}
+          />
         </Fg>
-        <Fg label="Cliente Final (se diferente)">
-          <input list="clientes-finais-list" style={fs} value={form.clienteFinal}
-            onChange={e => {
-              const value = e.target.value;
+                <Fg label="Cliente Final (se diferente)">
+          <AutoField
+            value={form.clienteFinal}
+            activeKey="clienteFinal"
+            placeholder="Opcional"
+            options={filterAutocompleteOptions(
+              opcoes.detalhes?.clientes?.length
+                ? opcoes.detalhes.clientes
+                : (opcoes.clientesFinais || opcoes.clientes || []).map(c => ({ nome: c })),
+              form.clienteFinal,
+            )}
+            optionKey={(item, index) => item.nome || item.label || index}
+            onChange={value => {
               setF("clienteFinal", value);
               searchAutocomplete("clientes", value);
               applyCliente("clienteFinal", value);
-            }} placeholder="Opcional"/>
-          <datalist id="clientes-finais-list">
-            {(opcoes.clientesFinais || opcoes.clientes || []).map(c => <option key={c} value={c}/>)}
-          </datalist>
+            }}
+            onSelect={item => {
+              const value = item.nome || item.label || "";
+              setF("clienteFinal", value);
+              applyCliente("clienteFinal", value);
+              setActiveAuto("");
+            }}
+            renderOption={item => (
+              <>
+                <span>{item.nome || item.label}</span>
+                <b>{item.documento || item.cnpj || item.cpf || item.cidade || ""}</b>
+              </>
+            )}
+          />
         </Fg>
-        <Fg label="Tomador de Serviço">
-          <input list="tomadores-list" style={fs} value={form.tomadorServico}
-            onChange={e => {
-              const value = e.target.value;
+                <Fg label="Tomador de Servico">
+          <AutoField
+            value={form.tomadorServico}
+            activeKey="tomadorServico"
+            placeholder="Opcional"
+            options={filterAutocompleteOptions(
+              opcoes.detalhes?.clientes?.length
+                ? opcoes.detalhes.clientes
+                : (opcoes.tomadores || opcoes.clientes || []).map(c => ({ nome: c })),
+              form.tomadorServico,
+            )}
+            optionKey={(item, index) => item.nome || item.label || index}
+            onChange={value => {
               setF("tomadorServico", value);
               searchAutocomplete("clientes", value);
               applyCliente("tomadorServico", value);
-            }} placeholder="Opcional"/>
-          <datalist id="tomadores-list">
-            {(opcoes.tomadores || opcoes.clientes || []).map(c => <option key={c} value={c}/>)}
-          </datalist>
+            }}
+            onSelect={item => {
+              const value = item.nome || item.label || "";
+              setF("tomadorServico", value);
+              applyCliente("tomadorServico", value);
+              setActiveAuto("");
+            }}
+            renderOption={item => (
+              <>
+                <span>{item.nome || item.label}</span>
+                <b>{item.documento || item.cnpj || item.cpf || item.cidade || ""}</b>
+              </>
+            )}
+          />
         </Fg>
         <Fg label="Condição de Pagamento">
           <input style={fs} value={form.condicaoPagamento} onChange={e => setF("condicaoPagamento", e.target.value)} placeholder="Ex: 30 dias, à vista, 10/20/30..."/>
@@ -1139,14 +1379,14 @@ const Viagens = ({ onNavigate }) => {
           <Fg label="Peso (kg)">
             <div className="row" style={{gap: 6, alignItems: "center"}}>
               <input type="text" inputMode="decimal" style={{...fs, flex: 1}} value={form.peso}
-                onChange={e => setF("peso", e.target.value)} placeholder="Ex: 24000"/>
+                onChange={e => setF("peso", sanitizeIntegerInput(e.target.value))} placeholder="Ex: 24000"/>
               <span className="muted" style={{fontSize: 12, flexShrink: 0}}>kg</span>
             </div>
           </Fg>
           <Fg label="KM da viagem (opcional)">
             <div className="row" style={{gap: 6, alignItems: "center"}}>
               <input type="text" inputMode="decimal" style={{...fs, flex: 1}} value={form.km ?? ""}
-                onChange={e => setF("km", e.target.value)} placeholder="Ex: 850"/>
+                onChange={e => setF("km", sanitizeIntegerInput(e.target.value))} placeholder="Ex: 850"/>
               <span className="muted" style={{fontSize: 12, flexShrink: 0}}>km</span>
             </div>
           </Fg>
@@ -1159,7 +1399,7 @@ const Viagens = ({ onNavigate }) => {
               <div className="row" style={{gap: 6, alignItems: "center"}}>
                 <span className="muted" style={{fontSize: 12, flexShrink: 0}}>R$</span>
                 <input type="text" inputMode="decimal" style={{...fs, flex: 1}} value={form.valorCliente}
-                  onChange={e => setF("valorCliente", e.target.value)} placeholder="0,00"/>
+                  onChange={e => setF("valorCliente", sanitizeMoneyInput(e.target.value))} placeholder="0,00"/>
               </div>
             </Fg>
             <div style={{paddingTop: 20}}>
@@ -1219,7 +1459,7 @@ const Viagens = ({ onNavigate }) => {
             <div className="row" style={{gap: 6, alignItems: "center"}}>
               <span className="muted" style={{fontSize: 12, flexShrink: 0}}>R$</span>
               <input type="text" inputMode="decimal" style={{...fs, flex: 1}} value={form.valorMotorista}
-                onChange={e => setF("valorMotorista", e.target.value)} placeholder="0,00"/>
+                onChange={e => setF("valorMotorista", sanitizeMoneyInput(e.target.value))} placeholder="0,00"/>
             </div>
           </Fg>
           {numericValue(form.valorCliente) > 0 && numericValue(form.valorMotorista) > 0 && (
