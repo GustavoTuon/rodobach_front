@@ -1,4 +1,4 @@
-const { useState, useEffect, useRef } = React;
+﻿const { useState, useEffect, useRef } = React;
 
 const TELAS = [
   { id: "perm_simulador",       label: "Calculadora" },
@@ -83,7 +83,8 @@ const GerenciarUsuarios = ({ onNavigate }) => {
       perm_viagens: u.perm_viagens, perm_custos: u.perm_custos,
       perm_receita: u.perm_receita, perm_demonstrativo: u.perm_demonstrativo,
       perm_dre_empresarial: u.perm_dre_empresarial, perm_placa: u.perm_placa,
-      perm_clientes: u.perm_clientes, perm_settings: u.perm_settings,
+      perm_clientes: u.perm_clientes, perm_pneus: u.perm_pneus,
+      perm_settings: u.perm_settings,
     });
     setErro("");
     setModal(u);

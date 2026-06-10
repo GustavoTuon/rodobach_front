@@ -45,7 +45,11 @@ async function apiRequest(path, options = {}) {
 
   if (!response.ok) {
     const detail = data?.detail ? ` — ${data.detail}` : "";
-    throw new Error((data?.error || `Erro HTTP ${response.status}`) + detail);
+    const message = data?.error || `Erro HTTP ${response.status}`;
+    if (response.status === 404 && /rota n[aã]o encontrada/i.test(message)) {
+      throw new Error("Nao foi possivel carregar este modulo. Verifique se o backend esta atualizado e acessivel.");
+    }
+    throw new Error(message + detail);
   }
 
   return data;
@@ -105,6 +109,8 @@ window.RB_API = {
     body: JSON.stringify(payload),
   }),
 
+  searchCidades: (search = "") => apiRequest(`/localidades/cidades${buildQuery({ search })}`),
+
   // ── Viagens ───────────────────────────────────────────────────────────────
   listViagens: (filters = {}) => apiRequest(`/viagens${buildQuery(filters)}`),
 
@@ -143,6 +149,9 @@ window.RB_API = {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/por-placa${buildQuery(params)}`);
   },
+  getCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos${buildQuery(filters || {})}`),
+  getCustosVeiculosFiltros: () => apiRequest("/financeiro/custos-veiculos/filtros"),
+  getCustosVeiculoDetalhe: (placa, filters = {}) => apiRequest(`/financeiro/custos-veiculos/${encodeURIComponent(placa)}${buildQuery(filters || {})}`),
   getDemonstrativoFinanceiro: (filters) => {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/demonstrativo${buildQuery(params)}`);
@@ -190,4 +199,19 @@ window.RB_API = {
     body: JSON.stringify(payload),
   }),
   deleteUsuario: (id) => apiRequest(`/usuarios/${id}`, { method: "DELETE" }),
+  // ── Pneus ─────────────────────────────────────────────────────────────────
+  searchPneusVeiculos: (q = "") => apiRequest(`/pneus/veiculos${buildQuery({ q })}`),
+
+  getPneusPosicoes: () => apiRequest("/pneus/posicoes"),
+
+  getEstadoPneus: (veiculo) => apiRequest(`/pneus/veiculo/${encodeURIComponent(veiculo)}`),
+
+  getPneusEstoque: () => apiRequest("/pneus/estoque"),
+
+  getHistoricoPneus: (filters = {}) => apiRequest(`/pneus/historico${buildQuery(filters)}`),
+
+  registrarMovimentacaoPneu: (payload) => apiRequest("/pneus/movimentar", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
 };

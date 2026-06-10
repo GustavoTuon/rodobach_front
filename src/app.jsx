@@ -1,23 +1,22 @@
-// Norte Telemetria — App shell, router, sidebar, Tweaks
+﻿// Norte Telemetria — App shell, router, sidebar, Tweaks
 const { useState, useEffect } = React;
 
 const SCREEN_SCRIPTS = [
   "src/screens/simulador.jsx",
   "src/screens/diarias.jsx",
   "src/screens/viagens.jsx",
-  "src/screens/custos.jsx",
-  "src/screens/receita.jsx",
   "src/screens/demonstrativo-financeiro.jsx",
   "src/screens/dre-empresarial.jsx",
-  "src/screens/financeiro-placa.jsx",
+  "src/screens/custos-veiculos.jsx",
   "src/screens/analise-clientes.jsx",
   "src/screens/manutencao.jsx",
+  "src/screens/pneus.jsx?v=20260603-historico-pneu",
 ];
 
 const SCREEN_GLOBALS = [
   "SimuladorFrete", "DiariasMotorista", "Viagens", "Custos", "Receita",
   "DemonstrativoFinanceiro", "DreEmpresarial", "FinanceiroPlaca", "AnaliseClientes",
-  "ManutencaoMensagens",
+  "ManutencaoMensagens", "Pneus", "CustosVeiculos",
 ];
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -29,15 +28,14 @@ const NAV = [
   { id: "dashboard",       label: "Dashboard",    icon: "dashboard",   title: "Visão geral" },
   { id: "vehicles",        label: "Veículos",     icon: "truck",       title: "Veículos" },
   { id: "alerts",          label: "Alertas",      icon: "alert",       title: "Alertas e ocorrências", badge: 12 },
+  { id: "pneus",           label: "Pneus",        icon: "truck",       title: "Movimentação de Pneus" },
   { id: "simulador",       label: "Calculadora",  icon: "calculator",  title: "Calculadora de Frete ANTT" },
   { id: "diarias",         label: "Diárias",      icon: "clock",       title: "Diárias do Motorista" },
   { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações" },
   { id: "reports",         label: "Relatórios",   icon: "chart",       title: "Relatórios" },
-  { id: "custos",          label: "Custos",       icon: "money",       title: "Despesas e Custos" },
-  { id: "receita",         label: "Receita",      icon: "trending-up", title: "Análise de Receita" },
   { id: "demonstrativo",   label: "DRE",          icon: "chart",       title: "Demonstrativo financeiro" },
   { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial" },
-  { id: "placa",           label: "Por Placa",    icon: "compass",     title: "Financeiro por Placa" },
+  { id: "custos-veiculos", label: "Custos Veic.", icon: "truck",       title: "Custos por Veiculo" },
   { id: "clientes",        label: "Clientes",     icon: "user",        title: "Análise de Clientes" },
   { id: "manutencao",      label: "Manutenção",   icon: "wrench",      title: "Automação de Manutenção" },
   { id: "integration",     label: "Integração",   icon: "plug",        title: "Saúde da integração" },
@@ -45,7 +43,7 @@ const NAV = [
   { id: "usuarios",        label: "Usuários",     icon: "user",        title: "Gerenciar Usuários", sistema: true, adminOnly: true },
 ];
 
-// Telas sem implementação funcional — nunca exibidas independente de permissões
+// Telas sem implementaÃ§Ã£o funcional — nunca exibidas independente de permissÃµes
 const REMOVED_SCREENS = new Set([
   "map", "vehicles", "vehicle", "alerts", "dashboard", "reports", "integration",
 ]);
@@ -73,14 +71,14 @@ function setRoute(r) {
   window.location.hash = "/" + r.screen;
 }
 
-// ── Componente principal ──────────────────────────────────────────────────────
+// â”€â”€ Componente principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const App = () => {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [route, setRouteState] = useState(readRoute());
   const [auth, setAuth] = useState({ checking: true, user: null });
   const [screensReady, setScreensReady] = useState(false);
 
-  // Verificar sessão existente ao carregar
+  // Verificar sessÃ£o existente ao carregar
   useEffect(() => {
     const token = RB_AUTH.getToken();
     const cachedUser = RB_AUTH.getUser();
@@ -96,7 +94,7 @@ const App = () => {
     }
   }, []);
 
-  // Ouvir evento de sessão expirada
+  // Ouvir evento de sessÃ£o expirada
   useEffect(() => {
     const handler = () => setAuth({ checking: false, user: null });
     window.addEventListener("rodobach:unauthorized", handler);
@@ -128,7 +126,7 @@ const App = () => {
     }
   }, [t.theme, t.density]);
 
-  // Carrega as telas após autenticação via fetch + Babel.transform
+  // Carrega as telas apÃ³s autenticaÃ§Ã£o via fetch + Babel.transform
   useEffect(() => {
     if (!auth.user || screensReady) return;
     (async () => {
@@ -158,7 +156,7 @@ const App = () => {
     window.location.hash = "";
   };
 
-  // ── Estados de carregamento e não autenticado ─────────────────────────────
+  // â”€â”€ Estados de carregamento e nÃ£o autenticado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (auth.checking) {
     return (
       <div style={{
@@ -188,16 +186,15 @@ const App = () => {
     );
   }
 
-  // ── App autenticado ───────────────────────────────────────────────────────
+  // â”€â”€ App autenticado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const visibleNav = getNavForUser(auth.user);
 
-  // Se a tela atual não está acessível ao usuário, cair na primeira disponível
+  // Se a tela atual nÃ£o estÃ¡ acessÃ­vel ao usuÃ¡rio, cair na primeira disponÃ­vel
   const currentScreen = visibleNav.some(n => n.id === route.screen)
     ? route.screen
     : (visibleNav[0]?.id || DEFAULT_SCREEN);
 
   const go = (screen) => setRoute({ screen });
-  const goVehicle = () => {};
   const onNavigate = (screen) => {
     if (visibleNav.some(n => n.id === screen)) go(screen);
   };
@@ -213,20 +210,14 @@ const App = () => {
     case "viagens":
       body = <Viagens onNavigate={onNavigate}/>;
       break;
-    case "custos":
-      body = <Custos onGoToVehicle={goVehicle} onNavigate={onNavigate}/>;
-      break;
-    case "receita":
-      body = <Receita onGoToVehicle={goVehicle} onNavigate={onNavigate}/>;
-      break;
     case "demonstrativo":
       body = <DemonstrativoFinanceiro onNavigate={onNavigate}/>;
       break;
     case "dre-empresarial":
       body = <DreEmpresarial onNavigate={onNavigate}/>;
       break;
-    case "placa":
-      body = <FinanceiroPlaca onNavigate={onNavigate}/>;
+    case "custos-veiculos":
+      body = <CustosVeiculos onNavigate={onNavigate}/>;
       break;
     case "clientes":
       body = <AnaliseClientes onNavigate={onNavigate}/>;
@@ -236,6 +227,9 @@ const App = () => {
       break;
     case "usuarios":
       body = <GerenciarUsuarios onNavigate={onNavigate}/>;
+      break;
+    case "pneus":
+      body = <Pneus onNavigate={onNavigate}/>;
       break;
     case "settings":
       body = <SettingsScreen theme={t.theme} setTheme={(v) => setTweak("theme", v)} density={t.density} setDensity={(v) => setTweak("density", v)}/>;

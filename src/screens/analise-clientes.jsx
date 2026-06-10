@@ -1,4 +1,4 @@
-// Análise de Clientes — faturamento real via financeiro.receber
+﻿// Análise de Clientes — faturamento real via financeiro.receber
 
 // ── Helpers de data ───────────────────────────────────────────────────────────
 function acTodayISO() {
@@ -470,7 +470,7 @@ const AcClienteModal = ({ row, onClose }) => {
 const AnaliseClientes = () => {
   const defaultRange = AC_PERIODS[3].getRange(); // 12 meses
 
-  const [viewMode,     setViewMode]     = React.useState("fretes"); // "clientes" | "fretes"
+  const viewMode = "clientes";
   const [periodo,      setPeriodo]      = React.useState("12m");
   const [dataInicio,   setDataInicio]   = React.useState(defaultRange.start);
   const [dataFim,      setDataFim]      = React.useState(defaultRange.end);
@@ -671,7 +671,7 @@ const AnaliseClientes = () => {
       <div className="page-head">
         <div>
           <h1>Análise de Clientes</h1>
-          <div className="sub">{viewMode==="fretes" ? "Histórico de fretes · viagens cadastradas" : `financeiro.receber · ${periodLabel}`}</div>
+          <div className="sub">{`financeiro.receber - ${periodLabel}`}</div>
         </div>
         <div className="actions">
           {viewMode==="clientes" && AC_PERIODS.map(p=>(
@@ -682,34 +682,8 @@ const AnaliseClientes = () => {
           {viewMode==="clientes" && <button className="btn" onClick={exportCsv}><Icon name="download"/> Exportar</button>}
         </div>
       </div>
-
-      {/* ── Tabs ── */}
-      <div className="card" style={{ padding:0, marginBottom:16, overflow:"hidden" }}>
-        <div style={{ display:"flex", borderBottom:"1px solid var(--divider)" }}>
-          {[
-            { key:"fretes",   label:"Histórico de Fretes", icon:"route"  },
-            { key:"clientes", label:"Análise de Clientes",  icon:"user"  },
-          ].map(tab => (
-            <button key={tab.key}
-              onClick={() => setViewMode(tab.key)}
-              style={{
-                flex:1, padding:"12px 16px", background:"transparent",
-                borderBottom:`2px solid ${viewMode===tab.key?"var(--brand-blue)":"transparent"}`,
-                color: viewMode===tab.key ? "var(--brand-blue)" : "var(--text-3)",
-                display:"flex", alignItems:"center", justifyContent:"center", gap:7,
-                fontSize:13, fontWeight:viewMode===tab.key?600:400, transition:"all 120ms",
-              }}>
-              <Icon name={tab.icon} size={14}/>{tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Histórico de Fretes ── */}
-      {viewMode === "fretes" && <HistoricoFretes/>}
-
-      {/* ── Análise de Clientes (conteúdo original, só mostra se aba ativa) ── */}
-      {viewMode === "clientes" && <>
+      {/* Analise de Clientes */}
+      <>
 
       {/* ── Filtros ── */}
       <div className="period-filter">
