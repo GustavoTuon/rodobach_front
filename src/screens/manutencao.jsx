@@ -1,0 +1,820 @@
+const { useState, useEffect, useCallback, useRef } = React;
+
+const EMPTY_FORM = {
+  selecionadas: [], // [{ placa, km_atual }]
+  titulo: "",
+  mensagem: "",
+  intervalo_km: "",
+};
+
+function fmtKm(v) {
+  if (v == null || v === "") return "—";
+  return Number(v).toLocaleString("pt-BR") + " km";
+}
+
+// ── Multi-select de placas com odômetro ──────────────────────────────────────
+function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
+  const [open, setOpen] = useState(false);
+  const [busca, setBusca] = useState("");
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    function onClickFora(e) {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+        setBusca("");
+      }
+    }
+    document.addEventListener("mousedown", onClickFora);
+    return () => document.removeEventListener("mousedown", onClickFora);
+  }, []);
+
+  const placasSelecionadas = selecionadas.map(s => s.placa);
+
+  const filtrados = veiculos.filter(v =>
+    v.placa.toLowerCase().includes(busca.toLowerCase())
+  );
+
+  function toggle(veiculo) {
+    const jaEsta = placasSelecionadas.includes(veiculo.placa);
+    if (jaEsta) {
+      onChange(selecionadas.filter(s => s.placa !== veiculo.placa));
+    } else {
+      onChange([...selecionadas, { placa: veiculo.placa, km_atual: Number(veiculo.odometro) || 0 }]);
+    }
+  }
+
+  function toggleTodos() {
+    if (selecionadas.length === veiculos.length) {
+      onChange([]);
+    } else {
+      onChange(veiculos.map(v => ({ placa: v.placa, km_atual: Number(v.odometro) || 0 })));
+    }
+  }
+
+  const todasMarcadas = veiculos.length > 0 && selecionadas.length === veiculos.length;
+  const algumasMarcadas = selecionadas.length > 0 && !todasMarcadas;
+
+  function remover(placa, e) {
+    e.stopPropagation();
+    onChange(selecionadas.filter(s => s.placa !== placa));
+  }
+
+  return (
+    <div ref={containerRef} style={{ position: "relative" }}>
+      <div
+        onClick={() => !carregando && setOpen(o => !o)}
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 5,
+          padding: selecionadas.length === 0 ? "8px 10px" : "6px 8px",
+          border: `1px solid ${open ? "var(--brand-blue)" : "var(--border)"}`,
+          borderRadius: 6,
+          background: "var(--bg)",
+          cursor: carregando ? "wait" : "pointer",
+          minHeight: 38,
+          alignItems: "center",
+          userSelect: "none",
+          boxShadow: open ? "0 0 0 3px color-mix(in oklab, var(--brand-blue) 12%, transparent)" : "none",
+          transition: "border-color 120ms, box-shadow 120ms",
+        }}
+      >
+        {selecionadas.length === 0 ? (
+          <span style={{ color: "var(--muted)", fontSize: 13 }}>
+            {carregando ? "Carregando veículos…" : "Selecione os veículos…"}
+          </span>
+        ) : (
+          selecionadas.map(s => (
+            <span key={s.placa} style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              background: "var(--accent-soft)",
+              color: "var(--brand-blue)",
+              border: "1px solid var(--accent-border)",
+              borderRadius: 4,
+              padding: "2px 6px 2px 8px",
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: "var(--font-mono, monospace)",
+              letterSpacing: "0.04em",
+            }}>
+              {s.placa}
+              <button
+                type="button"
+                onClick={e => remover(s.placa, e)}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  padding: 0, lineHeight: 1, color: "var(--brand-blue)",
+                  display: "flex", alignItems: "center", opacity: 0.7,
+                }}
+              >
+                <Icon name="x" size={11}/>
+              </button>
+            </span>
+          ))
+        )}
+        <div style={{ marginLeft: "auto", color: "var(--muted)", display: "flex", alignItems: "center", paddingLeft: 4 }}>
+          <Icon name={open ? "chevron-up" : "chevron-down"} size={14}/>
+        </div>
+      </div>
+
+      {open && (
+        <div style={{
+          position: "absolute",
+          top: "calc(100% + 4px)",
+          left: 0,
+          right: 0,
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 8,
+          boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
+          zIndex: 200,
+          overflow: "hidden",
+        }}>
+          <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)" }}>
+            <input
+              autoFocus
+              type="text"
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar placa…"
+              onClick={e => e.stopPropagation()}
+              style={{
+                width: "100%",
+                border: "1px solid var(--border)",
+                borderRadius: 5,
+                padding: "5px 9px",
+                fontSize: 12.5,
+                background: "var(--bg)",
+                color: "var(--text)",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          {veiculos.length > 0 && (
+            <div
+              onClick={e => { e.stopPropagation(); toggleTodos(); }}
+              style={{
+                padding: "7px 12px",
+                display: "flex", alignItems: "center", gap: 9,
+                cursor: "pointer",
+                borderBottom: "1px solid var(--divider, var(--border))",
+                fontSize: 12.5, color: "var(--muted)",
+                background: "var(--surface)",
+              }}
+              onMouseOver={e => e.currentTarget.style.background = "var(--hover, #f4f4f5)"}
+              onMouseOut={e => e.currentTarget.style.background = "var(--surface)"}
+            >
+              <CheckBox checked={todasMarcadas} indeterminate={algumasMarcadas}/>
+              <span>Selecionar todos</span>
+            </div>
+          )}
+
+          <div style={{ maxHeight: 240, overflowY: "auto" }}>
+            {filtrados.length === 0 ? (
+              <div style={{ padding: "12px", color: "var(--muted)", fontSize: 13, textAlign: "center" }}>
+                {veiculos.length === 0 ? "Nenhum veículo encontrado no banco" : "Nenhuma placa encontrada"}
+              </div>
+            ) : filtrados.map(v => {
+              const marcado = placasSelecionadas.includes(v.placa);
+              return (
+                <div
+                  key={v.placa}
+                  onClick={e => { e.stopPropagation(); toggle(v); }}
+                  style={{
+                    padding: "7px 12px",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    cursor: "pointer",
+                    background: marcado ? "var(--accent-soft)" : "transparent",
+                    gap: 8,
+                  }}
+                  onMouseOver={e => { if (!marcado) e.currentTarget.style.background = "var(--hover, #f4f4f5)"; }}
+                  onMouseOut={e => { if (!marcado) e.currentTarget.style.background = "transparent"; }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                    <CheckBox checked={marcado}/>
+                    <span style={{
+                      fontSize: 13,
+                      fontFamily: "var(--font-mono, monospace)",
+                      fontWeight: marcado ? 600 : 400,
+                      color: marcado ? "var(--brand-blue)" : "var(--text)",
+                      letterSpacing: "0.03em",
+                    }}>
+                      {v.placa}
+                    </span>
+                  </div>
+                  {v.odometro != null && (
+                    <span style={{ fontSize: 11.5, color: "var(--muted)" }}>
+                      {fmtKm(v.odometro)}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {selecionadas.length > 0 && (
+            <div style={{
+              padding: "7px 12px",
+              borderTop: "1px solid var(--border)",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              fontSize: 12, color: "var(--muted)",
+            }}>
+              <span>{selecionadas.length} selecionado{selecionadas.length !== 1 ? "s" : ""}</span>
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); onChange([]); }}
+                style={{
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "var(--danger, #e54d2e)", fontSize: 12, padding: 0,
+                }}
+              >
+                Limpar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CheckBox({ checked, indeterminate }) {
+  return (
+    <div style={{
+      width: 15, height: 15, borderRadius: 3, flexShrink: 0,
+      border: `1.5px solid ${checked || indeterminate ? "var(--brand-blue)" : "var(--border-strong, #aaa)"}`,
+      background: checked || indeterminate ? "var(--brand-blue)" : "transparent",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      transition: "all 120ms",
+    }}>
+      {indeterminate && !checked && (
+        <div style={{ width: 7, height: 1.5, background: "#fff", borderRadius: 1 }}/>
+      )}
+      {checked && <Icon name="check" size={9} strokeWidth={3} style={{ color: "#fff" }}/>}
+    </div>
+  );
+}
+
+// ── Tela principal ────────────────────────────────────────────────────────────
+function ManutencaoMensagens() {
+  const [automacoes, setAutomacoes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState(null);
+
+  const [veiculos, setVeiculos] = useState([]);
+  const [veiculosCarregando, setVeiculosCarregando] = useState(false);
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editando, setEditando] = useState(null);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [salvando, setSalvando] = useState(false);
+  const [formErro, setFormErro] = useState(null);
+
+  const [deletandoId, setDeletandoId] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  const [kmModal, setKmModal] = useState(null);
+  const [kmValor, setKmValor] = useState("");
+  const [kmSalvando, setKmSalvando] = useState(false);
+
+  const carregar = useCallback(async () => {
+    setLoading(true);
+    setErro(null);
+    try {
+      const data = await RB_API.listManutencao();
+      setAutomacoes(data.automacoes || []);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  async function carregarVeiculos() {
+    setVeiculosCarregando(true);
+    try {
+      const data = await RB_API.listVeiculosManutencao();
+      setVeiculos(data.veiculos || []);
+    } catch (e) {
+      console.error("Erro ao carregar veículos:", e.message);
+      setVeiculos([]);
+    } finally {
+      setVeiculosCarregando(false);
+    }
+  }
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  function abrirNovo() {
+    setEditando(null);
+    setForm(EMPTY_FORM);
+    setFormErro(null);
+    setModalOpen(true);
+    if (veiculos.length === 0) carregarVeiculos();
+  }
+
+  function abrirEditar(a) {
+    setEditando(a);
+    setForm({
+      selecionadas: [{ placa: a.placa, km_atual: a.km_atual }],
+      titulo: a.titulo,
+      mensagem: a.mensagem,
+      intervalo_km: String(a.intervalo_km),
+    });
+    setFormErro(null);
+    setModalOpen(true);
+    if (veiculos.length === 0) carregarVeiculos();
+  }
+
+  function fecharModal() {
+    setModalOpen(false);
+    setEditando(null);
+    setFormErro(null);
+  }
+
+  async function salvar(e) {
+    e.preventDefault();
+    setFormErro(null);
+
+    if (form.selecionadas.length === 0) {
+      setFormErro("Selecione ao menos um veículo.");
+      return;
+    }
+    if (!form.titulo.trim() || !form.mensagem.trim() || !form.intervalo_km) {
+      setFormErro("Preencha todos os campos obrigatórios.");
+      return;
+    }
+    if (Number(form.intervalo_km) <= 0) {
+      setFormErro("O intervalo de KM deve ser maior que zero.");
+      return;
+    }
+
+    setSalvando(true);
+    try {
+      if (editando) {
+        // Edição: atualiza apenas o registro específico
+        await RB_API.updateManutencao(editando.id, {
+          titulo: form.titulo.trim(),
+          mensagem: form.mensagem.trim(),
+          intervalo_km: Number(form.intervalo_km),
+          km_atual: form.selecionadas[0]?.km_atual ?? editando.km_atual,
+        });
+      } else {
+        // Criação: um registro por placa selecionada
+        await RB_API.createManutencao({
+          placas: form.selecionadas,
+          titulo: form.titulo.trim(),
+          mensagem: form.mensagem.trim(),
+          intervalo_km: Number(form.intervalo_km),
+        });
+      }
+      fecharModal();
+      await carregar();
+    } catch (e) {
+      setFormErro(e.message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function confirmarDelete(id) {
+    setDeletandoId(id);
+    try {
+      await RB_API.deleteManutencao(id);
+      setConfirmDelete(null);
+      await carregar();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setDeletandoId(null);
+    }
+  }
+
+  async function salvarKm(e) {
+    e.preventDefault();
+    setKmSalvando(true);
+    try {
+      await RB_API.updateManutencao(kmModal.id, { km_atual: Number(kmValor) });
+      setKmModal(null);
+      setKmValor("");
+      await carregar();
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      setKmSalvando(false);
+    }
+  }
+
+  async function toggleAtivo(a) {
+    try {
+      await RB_API.updateManutencao(a.id, { ativo: !a.ativo });
+      await carregar();
+    } catch (e) {
+      alert(e.message);
+    }
+  }
+
+  return (
+    <div className="view">
+      <div className="page-head">
+        <div>
+          <h1>Manutenção</h1>
+          <div className="sub">Automação de mensagens de manutenção por KM rodado</div>
+        </div>
+        <button className="btn btn-primary" onClick={abrirNovo}>
+          <Icon name="plus" size={14}/> Nova Automação
+        </button>
+      </div>
+
+      {erro && (
+        <div className="card" style={{ color: "var(--danger)", marginBottom: 16, fontSize: 13 }}>
+          Erro ao carregar: {erro}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="card" style={{ color: "var(--muted)", fontSize: 13 }}>Carregando…</div>
+      ) : automacoes.length === 0 ? (
+        <div className="card" style={{ textAlign: "center", padding: "40px 24px" }}>
+          <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.3 }}>🔧</div>
+          <div style={{ fontWeight: 500, marginBottom: 6 }}>Nenhuma automação cadastrada</div>
+          <div className="muted" style={{ fontSize: 13, marginBottom: 20 }}>
+            Crie automações para enviar mensagens de manutenção quando o veículo atingir um determinado KM.
+          </div>
+          <button className="btn btn-primary" onClick={abrirNovo}>
+            <Icon name="plus" size={14}/> Criar primeira automação
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {automacoes.map(a => (
+            <div key={a.id} className="card" style={{
+              opacity: a.ativo ? 1 : 0.55,
+              borderLeft: `3px solid ${a.ativo ? "var(--brand-blue)" : "var(--border)"}`,
+              padding: "12px 16px",
+            }}>
+              <div className="row between" style={{ alignItems: "flex-start", gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="row" style={{ gap: 8, alignItems: "center", marginBottom: 5, flexWrap: "wrap" }}>
+                    <span style={{
+                      background: "var(--accent-soft)",
+                      color: "var(--brand-blue)",
+                      border: "1px solid var(--accent-border)",
+                      borderRadius: 5,
+                      padding: "2px 9px",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      fontFamily: "var(--font-mono, monospace)",
+                      letterSpacing: "0.05em",
+                    }}>{a.placa}</span>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>{a.titulo}</span>
+                    {!a.ativo && (
+                      <span style={{
+                        background: "var(--surface-alt, #f4f4f5)",
+                        color: "var(--muted)",
+                        borderRadius: 4,
+                        padding: "1px 7px",
+                        fontSize: 11,
+                        border: "1px solid var(--border)",
+                      }}>Inativa</span>
+                    )}
+                  </div>
+                  <div className="muted" style={{ fontSize: 12.5, marginBottom: 8, lineHeight: 1.5 }}>
+                    {a.mensagem}
+                  </div>
+                  <div className="row" style={{ gap: 20, flexWrap: "wrap" }}>
+                    <div style={{ fontSize: 12 }}>
+                      <span className="muted">Intervalo: </span>
+                      <strong>a cada {fmtKm(a.intervalo_km)}</strong>
+                    </div>
+                    <div style={{ fontSize: 12 }}>
+                      <span className="muted">KM atual: </span>
+                      <strong>{fmtKm(a.km_atual)}</strong>
+                    </div>
+                    <div style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
+                      <span className="muted">Enviar no KM: </span>
+                      <strong style={{
+                        color: "var(--brand-blue)",
+                        background: "var(--accent-soft)",
+                        border: "1px solid var(--accent-border)",
+                        borderRadius: 4,
+                        padding: "1px 7px",
+                        fontFamily: "var(--font-mono, monospace)",
+                        fontSize: 12,
+                      }}>
+                        {fmtKm(a.km_proximo_envio)}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="row" style={{ gap: 5, flexShrink: 0 }}>
+                  <button
+                    onClick={() => { setKmModal(a); setKmValor(String(a.km_atual)); }}
+                    title="Atualizar KM"
+                    style={{
+                      background: "var(--surface)", border: "1px solid var(--border)",
+                      borderRadius: 6, padding: "5px 10px", cursor: "pointer",
+                      fontSize: 12, color: "var(--text)", display: "flex", alignItems: "center", gap: 5,
+                    }}
+                  >
+                    <Icon name="trending-up" size={13}/> KM
+                  </button>
+                  <button
+                    onClick={() => toggleAtivo(a)}
+                    title={a.ativo ? "Desativar" : "Ativar"}
+                    style={{
+                      background: "var(--surface)", border: "1px solid var(--border)",
+                      borderRadius: 6, padding: "5px 8px", cursor: "pointer",
+                      color: a.ativo ? "var(--danger, #e54d2e)" : "var(--muted)",
+                    }}
+                  >
+                    <Icon name={a.ativo ? "x" : "check"} size={14}/>
+                  </button>
+                  <button
+                    onClick={() => abrirEditar(a)}
+                    title="Editar"
+                    style={{
+                      background: "var(--surface)", border: "1px solid var(--border)",
+                      borderRadius: 6, padding: "5px 8px", cursor: "pointer", color: "var(--muted)",
+                    }}
+                  >
+                    <Icon name="edit" size={14}/>
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(a)}
+                    title="Excluir"
+                    style={{
+                      background: "var(--surface)", border: "1px solid var(--border)",
+                      borderRadius: 6, padding: "5px 8px", cursor: "pointer",
+                      color: "var(--danger, #e54d2e)",
+                    }}
+                  >
+                    <Icon name="trash" size={14}/>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Modal criar / editar ── */}
+      {modalOpen && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1000, padding: 16,
+        }} onClick={e => { if (e.target === e.currentTarget) fecharModal(); }}>
+          <div style={{
+            background: "var(--surface)", border: "1px solid var(--border)",
+            borderRadius: 12, padding: 24, width: "100%", maxWidth: 520,
+            maxHeight: "90vh", overflowY: "auto",
+          }}>
+            <div className="row between" style={{ marginBottom: 20 }}>
+              <h2 style={{ margin: 0, fontSize: 16 }}>
+                {editando ? "Editar automação" : "Nova automação"}
+              </h2>
+              <button onClick={fecharModal} style={{
+                background: "none", border: "none", cursor: "pointer", color: "var(--muted)", padding: 4,
+              }}>
+                <Icon name="x" size={18}/>
+              </button>
+            </div>
+
+            <form onSubmit={salvar}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+
+                <div>
+                  <label style={{ fontSize: 12.5, fontWeight: 500, display: "block", marginBottom: 5 }}>
+                    Veículos *
+                  </label>
+                  {editando ? (
+                    // Em edição: só mostra a placa atual, sem trocar
+                    <div style={{
+                      padding: "8px 10px", border: "1px solid var(--border)",
+                      borderRadius: 6, background: "var(--bg)", fontSize: 13,
+                      fontFamily: "var(--font-mono, monospace)", fontWeight: 600,
+                      color: "var(--brand-blue)",
+                    }}>
+                      {editando.placa}
+                    </div>
+                  ) : (
+                    <MultiSelectVeiculos
+                      selecionadas={form.selecionadas}
+                      onChange={sel => setForm(f => ({ ...f, selecionadas: sel }))}
+                      veiculos={veiculos}
+                      carregando={veiculosCarregando}
+                    />
+                  )}
+                  {!editando && form.selecionadas.length > 0 && (
+                    <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+                      Será criado 1 registro por veículo com o KM atual de cada um.
+                    </div>
+                  )}
+                </div>
+
+                {/* Prévia dos KMs selecionados (apenas no modo criação) */}
+                {!editando && form.selecionadas.length > 0 && (
+                  <div style={{
+                    background: "var(--accent-soft)",
+                    border: "1px solid var(--accent-border)",
+                    borderRadius: 6,
+                    padding: "10px 12px",
+                  }}>
+                    <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 7, color: "var(--brand-blue)" }}>
+                      Resumo por veículo
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr", gap: "4px 12px", alignItems: "center" }}>
+                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>Placa</span>
+                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>KM atual</span>
+                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>Enviar no KM</span>
+                      {form.selecionadas.map(s => {
+                        const kmAtual = Number(s.km_atual) || 0;
+                        const intervalo = Number(form.intervalo_km) || 0;
+                        return (
+                          <React.Fragment key={s.placa}>
+                            <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 700, fontSize: 12, color: "var(--brand-blue)" }}>{s.placa}</span>
+                            <span style={{ fontSize: 12 }}>{fmtKm(kmAtual)}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: intervalo ? "var(--text)" : "var(--muted)" }}>
+                              {intervalo ? fmtKm(kmAtual + intervalo) : "—"}
+                            </span>
+                          </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label style={{ fontSize: 12.5, fontWeight: 500, display: "block", marginBottom: 5 }}>
+                    Título da mensagem *
+                  </label>
+                  <input
+                    type="text"
+                    value={form.titulo}
+                    onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))}
+                    placeholder="Ex: Troca de óleo"
+                    style={{
+                      width: "100%", padding: "8px 10px", border: "1px solid var(--border)",
+                      borderRadius: 6, background: "var(--bg)", color: "var(--text)",
+                      fontSize: 13, boxSizing: "border-box",
+                    }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12.5, fontWeight: 500, display: "block", marginBottom: 5 }}>
+                    Mensagem *
+                  </label>
+                  <textarea
+                    value={form.mensagem}
+                    onChange={e => setForm(f => ({ ...f, mensagem: e.target.value }))}
+                    placeholder="Ex: Olá! O veículo atingiu 10.000 km. Realize a troca de óleo."
+                    rows={4}
+                    style={{
+                      width: "100%", padding: "8px 10px", border: "1px solid var(--border)",
+                      borderRadius: 6, background: "var(--bg)", color: "var(--text)",
+                      fontSize: 13, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box",
+                    }}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12.5, fontWeight: 500, display: "block", marginBottom: 5 }}>
+                    Enviar a cada (KM) *
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={form.intervalo_km}
+                    onChange={e => setForm(f => ({ ...f, intervalo_km: e.target.value }))}
+                    placeholder="Ex: 10000"
+                    style={{
+                      width: "100%", padding: "8px 10px", border: "1px solid var(--border)",
+                      borderRadius: 6, background: "var(--bg)", color: "var(--text)",
+                      fontSize: 13, boxSizing: "border-box",
+                    }}
+                    required
+                  />
+                </div>
+
+                {formErro && (
+                  <div style={{
+                    background: "color-mix(in oklab, var(--danger, #e54d2e) 10%, transparent)",
+                    border: "1px solid color-mix(in oklab, var(--danger, #e54d2e) 30%, transparent)",
+                    borderRadius: 6, padding: "8px 12px",
+                    color: "var(--danger, #e54d2e)", fontSize: 13,
+                  }}>
+                    {formErro}
+                  </div>
+                )}
+
+                <div className="row" style={{ gap: 8, justifyContent: "flex-end", marginTop: 4 }}>
+                  <button type="button" onClick={fecharModal} className="btn" style={{ fontSize: 13 }}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={salvando} style={{ fontSize: 13 }}>
+                    {salvando ? "Salvando…" : editando
+                      ? "Salvar alterações"
+                      : `Criar ${form.selecionadas.length > 1 ? form.selecionadas.length + " automações" : "automação"}`
+                    }
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal atualizar KM ── */}
+      {kmModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1000, padding: 16,
+        }} onClick={e => { if (e.target === e.currentTarget) { setKmModal(null); setKmValor(""); }}}>
+          <div style={{
+            background: "var(--surface)", border: "1px solid var(--border)",
+            borderRadius: 12, padding: 24, width: "100%", maxWidth: 360,
+          }}>
+            <div className="row between" style={{ marginBottom: 16 }}>
+              <h2 style={{ margin: 0, fontSize: 15 }}>Atualizar KM — {kmModal.placa}</h2>
+              <button onClick={() => { setKmModal(null); setKmValor(""); }} style={{
+                background: "none", border: "none", cursor: "pointer", color: "var(--muted)", padding: 4,
+              }}>
+                <Icon name="x" size={16}/>
+              </button>
+            </div>
+            <div className="muted" style={{ fontSize: 12.5, marginBottom: 16 }}>
+              KM atual registrado: <strong>{fmtKm(kmModal.km_atual)}</strong>
+            </div>
+            <form onSubmit={salvarKm}>
+              <input
+                type="number"
+                min="0"
+                value={kmValor}
+                onChange={e => setKmValor(e.target.value)}
+                placeholder="Novo KM do veículo"
+                autoFocus
+                style={{
+                  width: "100%", padding: "9px 11px", border: "1px solid var(--border)",
+                  borderRadius: 6, background: "var(--bg)", color: "var(--text)",
+                  fontSize: 14, boxSizing: "border-box", marginBottom: 14,
+                }}
+                required
+              />
+              <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
+                <button type="button" className="btn" onClick={() => { setKmModal(null); setKmValor(""); }}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary" disabled={kmSalvando}>
+                  {kmSalvando ? "Salvando…" : "Atualizar KM"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirmação de exclusão ── */}
+      {confirmDelete && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1000, padding: 16,
+        }} onClick={e => { if (e.target === e.currentTarget) setConfirmDelete(null); }}>
+          <div style={{
+            background: "var(--surface)", border: "1px solid var(--border)",
+            borderRadius: 12, padding: 24, width: "100%", maxWidth: 380,
+          }}>
+            <h2 style={{ margin: "0 0 10px", fontSize: 15 }}>Excluir automação</h2>
+            <p style={{ margin: "0 0 20px", fontSize: 13, color: "var(--muted)" }}>
+              Tem certeza que deseja excluir <strong>"{confirmDelete.titulo}"</strong> do veículo <strong>{confirmDelete.placa}</strong>?
+            </p>
+            <div className="row" style={{ gap: 8, justifyContent: "flex-end" }}>
+              <button className="btn" onClick={() => setConfirmDelete(null)}>Cancelar</button>
+              <button
+                className="btn"
+                disabled={deletandoId === confirmDelete.id}
+                onClick={() => confirmarDelete(confirmDelete.id)}
+                style={{ background: "var(--danger, #e54d2e)", color: "#fff", border: "none" }}
+              >
+                {deletandoId === confirmDelete.id ? "Excluindo…" : "Excluir"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+window.ManutencaoMensagens = ManutencaoMensagens;

@@ -10,6 +10,8 @@ const TELAS = [
   { id: "perm_dre_empresarial", label: "DRE Empresarial" },
   { id: "perm_placa",           label: "Por Placa" },
   { id: "perm_clientes",        label: "Clientes" },
+  { id: "perm_pneus",           label: "Pneus" },
+  { id: "perm_manutencao",      label: "Manutenção" },
   { id: "perm_settings",        label: "Configurações" },
 ];
 
@@ -19,7 +21,7 @@ const FORM_VAZIO = {
   perm_simulador: true, perm_diarias: true, perm_viagens: true,
   perm_custos: true, perm_receita: true, perm_demonstrativo: true,
   perm_dre_empresarial: true, perm_placa: true, perm_clientes: true,
-  perm_settings: true,
+  perm_pneus: true, perm_manutencao: true, perm_settings: true,
 };
 
 const Toggle = ({ value, onChange, label }) => (

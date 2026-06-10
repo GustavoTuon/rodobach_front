@@ -11,11 +11,13 @@ const SCREEN_SCRIPTS = [
   "src/screens/dre-empresarial.jsx",
   "src/screens/financeiro-placa.jsx",
   "src/screens/analise-clientes.jsx",
+  "src/screens/manutencao.jsx",
 ];
 
 const SCREEN_GLOBALS = [
   "SimuladorFrete", "DiariasMotorista", "Viagens", "Custos", "Receita",
   "DemonstrativoFinanceiro", "DreEmpresarial", "FinanceiroPlaca", "AnaliseClientes",
+  "ManutencaoMensagens",
 ];
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -37,6 +39,7 @@ const NAV = [
   { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial" },
   { id: "placa",           label: "Por Placa",    icon: "compass",     title: "Financeiro por Placa" },
   { id: "clientes",        label: "Clientes",     icon: "user",        title: "Análise de Clientes" },
+  { id: "manutencao",      label: "Manutenção",   icon: "wrench",      title: "Automação de Manutenção" },
   { id: "integration",     label: "Integração",   icon: "plug",        title: "Saúde da integração" },
   { id: "settings",        label: "Configurações", icon: "settings",   title: "Configurações",    sistema: true },
   { id: "usuarios",        label: "Usuários",     icon: "user",        title: "Gerenciar Usuários", sistema: true, adminOnly: true },
@@ -46,6 +49,7 @@ const NAV = [
 const REMOVED_SCREENS = new Set([
   "map", "vehicles", "vehicle", "alerts", "dashboard", "reports", "integration",
 ]);
+
 
 const BASE_NAV = NAV.filter(n => !REMOVED_SCREENS.has(n.id));
 const DEFAULT_SCREEN = "simulador";
@@ -227,6 +231,9 @@ const App = () => {
     case "clientes":
       body = <AnaliseClientes onNavigate={onNavigate}/>;
       break;
+    case "manutencao":
+      body = <ManutencaoMensagens onNavigate={onNavigate}/>;
+      break;
     case "usuarios":
       body = <GerenciarUsuarios onNavigate={onNavigate}/>;
       break;
@@ -343,8 +350,62 @@ const App = () => {
   );
 };
 
+function formatPhone(raw) {
+  if (!raw) return raw;
+  const num = String(raw).replace(/\D/g, "");
+  if (num.length === 13 && num.startsWith("55")) {
+    return `+55 (${num.slice(2, 4)}) ${num.slice(4, 9)}-${num.slice(9)}`;
+  }
+  if (num.length === 12 && num.startsWith("55")) {
+    return `+55 (${num.slice(2, 4)}) ${num.slice(4, 8)}-${num.slice(8)}`;
+  }
+  return `+${num}`;
+}
+
 // Settings — with theme + density switchers
 const SettingsScreen = ({ theme, setTheme, density, setDensity }) => {
+  const [showWaModal, setShowWaModal] = React.useState(false);
+  const [waState, setWaState] = React.useState({ loading: false, qrcode: null, connected: false, phone: null, profileName: null, error: null });
+const pollRef = React.useRef(null);
+
+  React.useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
+
+  async function loadQrCode() {
+    setWaState({ loading: true, qrcode: null, connected: false, error: null });
+    try {
+      const data = await RB_API.whatsappConnect();
+      if (data.connected) {
+        setWaState({ loading: false, qrcode: null, connected: true, phone: data.phone, profileName: data.profileName, error: null });
+        return;
+      }
+      setWaState({ loading: false, qrcode: data.qrcode, connected: false, phone: null, profileName: null, error: null });
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(async () => {
+        try {
+          const status = await RB_API.whatsappStatus();
+          if (status.state === "open") {
+            setWaState({ loading: false, qrcode: null, connected: true, phone: status.phone, profileName: status.profileName, error: null });
+            clearInterval(pollRef.current);
+          }
+        } catch {}
+      }, 3000);
+    } catch (err) {
+      setWaState({ loading: false, qrcode: null, connected: false, error: err.message });
+    }
+  }
+
+  function openWaModal() {
+    setShowWaModal(true);
+    loadQrCode();
+  }
+
+  function closeWaModal() {
+    setShowWaModal(false);
+    if (pollRef.current) clearInterval(pollRef.current);
+    setWaState({ loading: false, qrcode: null, connected: false, error: null });
+  }
   const themeOptions = [
     {
       id: "auto",
@@ -568,7 +629,130 @@ const SettingsScreen = ({ theme, setTheme, density, setDensity }) => {
             <div className="muted" style={{fontSize: 12, marginTop: 8}}>{c.d}</div>
           </div>
         ))}
+
+        {/* Card WhatsApp */}
+        <div className="card" style={{cursor: "pointer"}} onClick={openWaModal}>
+          <div className="row between">
+            <div className="row" style={{gap: 10}}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 6,
+                background: "color-mix(in oklab, #25d366 12%, transparent)",
+                display: "grid", placeItems: "center",
+                color: "#25d366",
+                border: "1px solid color-mix(in oklab, #25d366 25%, transparent)",
+              }}>
+                <Icon name="whatsapp" size={15}/>
+              </div>
+              <h3 style={{margin: 0, fontSize: 13}}>WhatsApp</h3>
+            </div>
+            <Icon name="chevron-right" size={14} className="dim"/>
+          </div>
+          <div className="muted" style={{fontSize: 12, marginTop: 8}}>Conectar celular para automações</div>
+        </div>
       </div>
+
+      {/* Modal QR Code WhatsApp */}
+      {showWaModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1000, padding: 16,
+        }} onClick={e => { if (e.target === e.currentTarget) closeWaModal(); }}>
+          <div style={{
+            background: "var(--surface)", border: "1px solid var(--border)",
+            borderRadius: 12, padding: 24, width: "100%", maxWidth: 380,
+          }}>
+            <div className="row between" style={{marginBottom: 20}}>
+              <div className="row" style={{gap: 8}}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 6,
+                  background: "color-mix(in oklab, #25d366 12%, transparent)",
+                  display: "grid", placeItems: "center", color: "#25d366",
+                  border: "1px solid color-mix(in oklab, #25d366 25%, transparent)",
+                }}>
+                  <Icon name="whatsapp" size={13}/>
+                </div>
+                <h2 style={{margin: 0, fontSize: 15}}>Conectar WhatsApp</h2>
+              </div>
+              <button onClick={closeWaModal} style={{
+                background: "none", border: "none", cursor: "pointer",
+                color: "var(--muted)", padding: 4,
+              }}>
+                <Icon name="x" size={18}/>
+              </button>
+            </div>
+
+            {waState.loading && (
+              <div style={{textAlign: "center", padding: "40px 0", color: "var(--muted)", fontSize: 13}}>
+                Gerando QR Code...
+              </div>
+            )}
+
+            {waState.connected && (
+              <div>
+                <div style={{display: "flex", alignItems: "center", gap: 12, padding: "16px 0 20px"}}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: "50%", flexShrink: 0,
+                    background: "color-mix(in oklab, #25d366 12%, transparent)",
+                    border: "2px solid #25d366",
+                    display: "grid", placeItems: "center",
+                    color: "#25d366",
+                  }}>
+                    <Icon name="check" size={20} strokeWidth={2.5}/>
+                  </div>
+                  <div>
+                    <div style={{fontSize: 14, fontWeight: 600, color: "#25d366"}}>WhatsApp conectado!</div>
+                    {waState.profileName && (
+                      <div style={{fontSize: 12.5, color: "var(--text)", marginTop: 1}}>{waState.profileName}</div>
+                    )}
+                    {waState.phone && (
+                      <div className="muted" style={{fontSize: 12, marginTop: 1}}>
+                        {formatPhone(waState.phone)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+<div className="row" style={{gap: 8, justifyContent: "flex-end"}}>
+                  <button onClick={closeWaModal} className="btn primary" style={{fontSize: 13}}>
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {waState.qrcode && !waState.connected && (
+              <div style={{textAlign: "center"}}>
+                <div className="muted" style={{fontSize: 12, marginBottom: 14, lineHeight: 1.5}}>
+                  Abra o WhatsApp → <strong>Dispositivos vinculados</strong> → <strong>Vincular um dispositivo</strong>
+                </div>
+                <img
+                  src={waState.qrcode}
+                  alt="QR Code WhatsApp"
+                  style={{width: 220, height: 220, borderRadius: 8, border: "1px solid var(--border)"}}
+                />
+                <div className="muted" style={{fontSize: 11.5, marginTop: 10}}>
+                  Aguardando leitura do QR Code...
+                </div>
+                <button onClick={loadQrCode} className="btn primary" style={{marginTop: 14, fontSize: 13}}>
+                  Gerar novo QR Code
+                </button>
+              </div>
+            )}
+
+            {waState.error && (
+              <div style={{textAlign: "center", padding: "20px 0"}}>
+                <div style={{color: "#dc2626", fontSize: 13, marginBottom: 12}}>
+                  {waState.error}
+                </div>
+                <button onClick={loadQrCode} className="btn primary" style={{fontSize: 13}}>
+                  Tentar novamente
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

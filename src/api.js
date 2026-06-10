@@ -162,6 +162,23 @@ window.RB_API = {
     return apiRequest(`/financeiro/analise-clientes${buildQuery(params)}`);
   },
 
+  // ── Manutenção ────────────────────────────────────────────────────────────
+  listVeiculosManutencao: () => apiRequest("/manutencao/veiculos"),
+  listManutencao: () => apiRequest("/manutencao"),
+  createManutencao: (payload) => apiRequest("/manutencao", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
+  updateManutencao: (id, payload) => apiRequest(`/manutencao/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  }),
+  deleteManutencao: (id) => apiRequest(`/manutencao/${id}`, { method: "DELETE" }),
+
+  // ── WhatsApp / Evolution API ──────────────────────────────────────────────
+  whatsappStatus: () => apiRequest("/whatsapp/status"),
+  whatsappConnect: () => apiRequest("/whatsapp/connect", { method: "POST" }),
+
   // ── Gerenciamento de usuários (admin) ─────────────────────────────────────
   listUsuarios: () => apiRequest("/usuarios"),
   createUsuario: (payload) => apiRequest("/usuarios", {
