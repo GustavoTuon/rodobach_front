@@ -394,6 +394,1268 @@ input, select, textarea { font: inherit; color: inherit; }
 .card-header .meta { font-size: 11.5px; color: var(--text-3); }
 .card-body { padding: var(--pad-card); }
 
+/* Calculadora de frete */
+.frete-view { gap: 16px; }
+.frete-layout {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.95fr) minmax(420px, 1.05fr);
+  gap: 16px;
+  align-items: start;
+}
+.frete-form-card,
+.frete-result-card { border-radius: 8px; }
+.frete-setup-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+.frete-setup-wide {
+  grid-column: 1 / -1;
+}
+.frete-official-card,
+.frete-simulation-card {
+  border-color: rgba(96, 165, 250, 0.28);
+}
+.frete-official-card {
+  background: linear-gradient(180deg, rgba(96, 165, 250, 0.06), transparent 190px), var(--surface);
+}
+.frete-official-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.frete-official-grid .frete-stat-card:last-child {
+  grid-column: span 2;
+}
+.frete-simulation-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.45fr) minmax(420px, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.frete-simulation-inputs {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.frete-simulation-results {
+  min-width: 0;
+}
+.frete-alert-list {
+  display: grid;
+  gap: 8px;
+}
+.frete-choice-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.frete-choice-grid .btn {
+  flex: 1 1 92px;
+  min-width: 86px;
+  justify-content: center;
+}
+.frete-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.frete-city-field {
+  position: relative;
+  min-width: 0;
+}
+.frete-city-list {
+  position: absolute;
+  z-index: 80;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+}
+.frete-city-list button {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  padding: 7px 9px;
+  text-align: left;
+}
+.frete-city-list button:hover {
+  background: var(--hover);
+}
+.frete-city-list button b {
+  color: var(--brand-blue);
+  font-size: 11px;
+}
+.frete-city-empty {
+  padding: 9px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.trip-autocomplete-field {
+  position: relative;
+  min-width: 0;
+}
+.trip-autocomplete-list {
+  position: absolute;
+  z-index: 90;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+}
+.trip-autocomplete-list button {
+  width: 100%;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  padding: 7px 9px;
+  text-align: left;
+}
+.trip-autocomplete-list button:hover {
+  background: var(--hover);
+}
+.trip-autocomplete-list button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trip-autocomplete-list button b {
+  color: var(--brand-blue);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.trip-autocomplete-empty {
+  padding: 9px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+/* Custos por Veiculo */
+.cv-view {
+  gap: 16px;
+}
+.cv-filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+.cv-filters label {
+  display: grid;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-3);
+  font-weight: 600;
+  min-width: 0;
+}
+.cv-filters input,
+.cv-filters select {
+  width: 100%;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+  box-sizing: border-box;
+}
+.cv-filter-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.cv-kpi-grid,
+.cv-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.cv-kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 14px 16px;
+  min-width: 0;
+}
+.cv-panels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.cv-panels.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.cv-bar {
+  width: 100%;
+  display: block;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 0;
+  margin: 0 0 12px;
+}
+.cv-bar.clickable {
+  cursor: pointer;
+}
+.cv-bar.clickable:hover .cv-bar-head span {
+  color: var(--brand-blue);
+}
+.cv-bar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+.cv-bar-head span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.cv-bar-head strong {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text);
+}
+.cv-bar-track {
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.cv-bar-track div {
+  height: 100%;
+  border-radius: 6px;
+}
+.cv-modal {
+  width: min(1180px, calc(100vw - 32px));
+  max-height: min(860px, calc(100vh - 32px));
+  overflow: auto;
+  padding: 18px;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(2px);
+}
+.table-wrap {
+  width: 100%;
+  overflow: auto;
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--divider);
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.data-table tbody td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--divider);
+  vertical-align: middle;
+  color: var(--text);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.data-table.compact tbody td {
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+.data-table .num,
+.data-table td.num {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+.data-table tr.clickable {
+  cursor: pointer;
+}
+.data-table tr.clickable:hover {
+  background: var(--surface-2);
+}
+.cv-vehicle-info {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px 14px;
+  margin: 14px 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.cv-vehicle-info span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cv-mini-list {
+  display: grid;
+  gap: 8px;
+}
+.cv-mini-list > div:not(.muted) {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  border-bottom: 1px solid var(--divider);
+  padding-bottom: 7px;
+}
+.cv-mini-list strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cv-mini-list span,
+.cv-mini-list em {
+  color: var(--text-3);
+  font-style: normal;
+}
+
+@media (max-width: 980px) {
+  .cv-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cv-kpi-grid,
+  .cv-detail-grid,
+  .cv-panels,
+  .cv-panels.three,
+  .cv-vehicle-info {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .cv-filters {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+  .cv-filter-actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--surface);
+    padding-top: 8px;
+  }
+  .cv-filter-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+  .cv-kpi {
+    padding: 12px;
+  }
+  .cv-modal {
+    width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    padding: 12px;
+  }
+  .cv-mini-list > div:not(.muted) {
+    grid-template-columns: 74px minmax(0, 1fr);
+  }
+  .cv-mini-list em {
+    grid-column: 2;
+  }
+}
+.frete-field-example {
+  margin-top: 5px;
+  color: var(--text-3);
+  font-size: 11.5px;
+  line-height: 1.25;
+}
+.frete-field-example.warn {
+  color: #fbbf24;
+}
+.frete-input-unit {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+}
+.frete-input-unit span {
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+.frete-segment {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.frete-segment button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.frete-segment button.active {
+  background: var(--brand-blue);
+  color: #fff;
+}
+.frete-margin-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.frete-custom-margin {
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+.frete-custom-margin.active {
+  border-color: var(--brand-blue);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.frete-custom-margin span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.frete-custom-margin input {
+  width: 100%;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  text-align: center;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+  box-sizing: border-box;
+}
+.frete-sim-box {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  margin-bottom: 12px;
+}
+.frete-sim-result {
+  min-height: 74px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.frete-sim-result span,
+.frete-stat-top,
+.frete-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.frete-sim-result b {
+  font-size: 18px;
+  line-height: 1.15;
+  color: var(--brand-blue);
+}
+.frete-sim-result small {
+  font-size: 11.5px;
+  color: var(--text-3);
+  line-height: 1.35;
+}
+.frete-result-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.frete-result-head h2 {
+  margin: 2px 0 4px;
+  font-size: 18px;
+  line-height: 1.2;
+}
+.frete-result-head p,
+.frete-copy-box p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.frete-loading {
+  flex-shrink: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 11.5px;
+}
+.frete-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.frete-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.frete-stat-card {
+  min-height: 104px;
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.frete-stat-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.frete-stat-value {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  line-height: 1.15;
+  font-weight: 850;
+  color: var(--text);
+}
+.frete-stat-sub {
+  margin-top: auto;
+  color: var(--text-3);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+.frete-stat-card.info {
+  border-color: rgba(96, 165, 250, 0.45);
+  background: rgba(96, 165, 250, 0.08);
+}
+.frete-stat-card.success {
+  border-color: rgba(16, 185, 129, 0.45);
+  background: rgba(16, 185, 129, 0.08);
+}
+.frete-stat-card.warn {
+  border-color: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.1);
+}
+.frete-stat-card.danger {
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(239, 68, 68, 0.12);
+}
+.frete-status-panel {
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  background: var(--bg);
+}
+.frete-status-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.frete-status-title {
+  font-size: 13.5px;
+  font-weight: 850;
+  line-height: 1.25;
+}
+.frete-status-text {
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-2);
+}
+.frete-status-panel.success {
+  border-color: rgba(16, 185, 129, 0.55);
+  background: rgba(16, 185, 129, 0.1);
+  color: #34d399;
+}
+.frete-status-panel.warn {
+  border-color: rgba(245, 158, 11, 0.55);
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+}
+.frete-status-panel.danger {
+  border-color: rgba(239, 68, 68, 0.65);
+  background: rgba(239, 68, 68, 0.14);
+  color: #f87171;
+}
+.frete-scenario-list {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+}
+.frete-scenario-card {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.frete-scenario-card.success {
+  border-color: rgba(16, 185, 129, 0.42);
+}
+.frete-scenario-card.warn {
+  border-color: rgba(245, 158, 11, 0.5);
+}
+.frete-scenario-card.danger {
+  border-color: rgba(239, 68, 68, 0.6);
+  background: rgba(239, 68, 68, 0.08);
+}
+.frete-scenario-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.frete-scenario-head h3 {
+  margin: 0 0 3px;
+  font-size: 15px;
+  line-height: 1.25;
+}
+.frete-scenario-head p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.frete-status-pill {
+  flex-shrink: 0;
+  max-width: 190px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+}
+.frete-status-pill.success {
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #34d399;
+}
+.frete-status-pill.warn {
+  border-color: rgba(245, 158, 11, 0.55);
+  color: #fbbf24;
+}
+.frete-status-pill.danger {
+  border-color: rgba(239, 68, 68, 0.65);
+  color: #f87171;
+}
+.frete-scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.frete-scenario-grid div {
+  min-height: 58px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+}
+.frete-scenario-grid span {
+  display: block;
+  color: var(--text-2);
+  font-size: 10.8px;
+  line-height: 1.2;
+  margin-bottom: 5px;
+}
+.frete-scenario-grid b {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.15;
+}
+.frete-scenario-alert {
+  margin-top: 10px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 700;
+}
+.frete-scenario-alert.success {
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.09);
+  color: #34d399;
+}
+.frete-scenario-alert.warn {
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  background: rgba(245, 158, 11, 0.1);
+  color: #fbbf24;
+}
+.frete-scenario-alert.danger {
+  border: 1px solid rgba(239, 68, 68, 0.55);
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+.frete-alert-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px 12px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(239, 68, 68, 0.25);
+  font-size: 12px;
+}
+.frete-alert-grid span { color: var(--text-2); }
+.frete-alert-grid b {
+  font-family: var(--font-mono);
+  color: inherit;
+}
+.frete-copy-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  margin: 14px 0 12px;
+}
+.frete-copy-box .btn { flex-shrink: 0; }
+.btn.danger {
+  background: rgba(127, 29, 29, 0.55);
+  border-color: rgba(239, 68, 68, 0.55);
+  color: #fecaca;
+}
+.btn.danger:disabled {
+  opacity: 0.85;
+  cursor: not-allowed;
+}
+.frete-collapse-btn {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  border-top: 1px solid var(--divider);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 10px 0;
+}
+.frete-breakdown {
+  display: grid;
+  gap: 7px;
+  padding: 12px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 12px;
+}
+.frete-breakdown-total {
+  border-top: 1px solid var(--divider);
+  padding-top: 8px;
+  margin-top: 2px;
+  font-weight: 800;
+}
+
+/* ── Bloco wrapper (Calculadora ANTT) ──────────────── */
+.frete-bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.frete-bloco-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 10px;
+  border-bottom: 2px solid var(--divider);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-2);
+}
+.frete-bloco-header svg { flex-shrink: 0; }
+.frete-bloco-header.info {
+  color: var(--brand-blue);
+  border-color: rgba(79, 127, 171, 0.4);
+}
+.frete-bloco-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-3);
+  text-align: right;
+}
+
+/* ── Seção title dentro de card ─────────────────────── */
+.frete-section-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--divider);
+}
+
+/* ── Estado vazio / bloqueado ───────────────────────── */
+.frete-sem-dados {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: var(--pad-card);
+  border-radius: var(--r-lg);
+  border: 1px dashed var(--border-strong);
+  background: var(--bg);
+  color: var(--text-2);
+}
+.frete-sem-dados-icon {
+  flex-shrink: 0;
+  color: var(--text-3);
+  margin-top: 2px;
+}
+.frete-sem-dados-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.frete-sem-dados-text {
+  font-size: 12.5px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+.frete-sim-bloqueado {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px;
+  border-radius: var(--r-lg);
+  background: var(--bg);
+  border: 1px dashed var(--border-strong);
+  color: var(--text-2);
+}
+.frete-calculando {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: var(--r-lg);
+}
+
+/* ── Card resultado oficial (referência ANTT) ──────── */
+.frete-official-ref-card {
+  background: linear-gradient(180deg, rgba(79, 127, 171, 0.06) 0%, transparent 160px), var(--surface);
+  border: 1px solid rgba(79, 127, 171, 0.3);
+  border-radius: var(--r-lg);
+  padding: var(--pad-card);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.frete-ref-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.frete-ref-context-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+.frete-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.frete-tag-margem {
+  background: rgba(79, 127, 171, 0.1);
+  border-color: rgba(79, 127, 171, 0.35);
+  color: var(--brand-blue);
+  flex-shrink: 0;
+}
+
+/* ── Hero cards (3 números principais ANTT) ─────────── */
+.frete-hero-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.frete-hero-card {
+  padding: 16px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.frete-hero-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  line-height: 1.3;
+}
+.frete-hero-value {
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.frete-hero-sub {
+  font-size: 11.5px;
+  color: var(--text-3);
+  line-height: 1.35;
+  margin-top: auto;
+}
+.frete-hero-card.info {
+  border-color: rgba(79, 127, 171, 0.4);
+  background: rgba(79, 127, 171, 0.07);
+}
+.frete-hero-card.info .frete-hero-label { color: var(--brand-blue); }
+.frete-hero-card.success {
+  border-color: rgba(4, 120, 87, 0.35);
+  background: rgba(4, 120, 87, 0.06);
+}
+.frete-hero-card.success .frete-hero-label { color: var(--ok); }
+.frete-hero-card.danger {
+  border-color: rgba(185, 28, 28, 0.4);
+  background: rgba(185, 28, 28, 0.08);
+}
+.frete-hero-card.danger .frete-hero-label { color: var(--crit); }
+
+/* ── Detail chips (informações secundárias ANTT) ───── */
+.frete-detail-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.frete-detail-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--bg);
+  min-width: 100px;
+}
+.frete-detail-chip span {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-3);
+}
+.frete-detail-chip b {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── Status dentro do card oficial ─────────────────── */
+.frete-official-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.frete-official-status.success {
+  border-color: rgba(4, 120, 87, 0.4);
+  background: rgba(4, 120, 87, 0.07);
+  color: var(--ok);
+}
+.frete-official-status.warn {
+  border-color: rgba(180, 83, 9, 0.4);
+  background: rgba(180, 83, 9, 0.08);
+  color: var(--warn);
+}
+.frete-official-status.danger {
+  border-color: rgba(185, 28, 28, 0.45);
+  background: rgba(185, 28, 28, 0.09);
+  color: var(--crit);
+}
+.frete-official-status .frete-status-title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: inherit;
+}
+.frete-official-status .frete-status-text {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: inherit;
+  opacity: 0.8;
+}
+
+/* ── Painel título (simulação) ──────────────────────── */
+.frete-sim-panel-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  margin-bottom: 12px;
+}
+
+/* ── Mini resumo de entradas ─────────────────────────── */
+.frete-sim-input-summary {
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.frete-sim-input-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.frete-sim-input-summary-row span {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.frete-sim-input-summary-row b {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ── Stack de alertas ────────────────────────────────── */
+.frete-alert-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 4px 0 8px;
+}
+.frete-alert-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.frete-alert-banner-title { font-weight: 700; color: inherit; }
+.frete-alert-banner-text { font-size: 11.5px; opacity: 0.85; margin-top: 2px; }
+.frete-alert-banner.success {
+  border: 1px solid rgba(4, 120, 87, 0.4);
+  background: rgba(4, 120, 87, 0.08);
+  color: var(--ok);
+}
+.frete-alert-banner.warn {
+  border: 1px solid rgba(180, 83, 9, 0.45);
+  background: rgba(180, 83, 9, 0.09);
+  color: var(--warn);
+}
+.frete-alert-banner.danger {
+  border: 1px solid rgba(185, 28, 28, 0.5);
+  background: rgba(185, 28, 28, 0.1);
+  color: var(--crit);
+}
+
+/* ── Card de resumo final da simulação ──────────────── */
+.frete-sim-resumo-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+  margin: 8px 0;
+}
+.frete-sim-resumo-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  margin-bottom: 12px;
+}
+.frete-sim-resumo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.frete-sim-resumo-item {
+  padding: 10px 12px;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.frete-sim-resumo-item span {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-3);
+  line-height: 1.3;
+}
+.frete-sim-resumo-item b {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.2;
+}
+.frete-sim-resumo-item.success { border-color: rgba(4, 120, 87, 0.35); background: rgba(4, 120, 87, 0.06); }
+.frete-sim-resumo-item.success b { color: var(--ok); }
+.frete-sim-resumo-item.warn { border-color: rgba(180, 83, 9, 0.4); background: rgba(180, 83, 9, 0.07); }
+.frete-sim-resumo-item.warn b { color: var(--warn); }
+.frete-sim-resumo-item.danger { border-color: rgba(185, 28, 28, 0.4); background: rgba(185, 28, 28, 0.07); }
+.frete-sim-resumo-item.danger b { color: var(--crit); }
+.frete-sim-resumo-item.info { border-color: rgba(79, 127, 171, 0.35); background: rgba(79, 127, 171, 0.06); }
+.frete-sim-resumo-item.info b { color: var(--brand-blue); }
+
+/* ── Responsividade mobile ───────────────────────────── */
+@media (max-width: 768px) {
+  .frete-bloco-badge { display: none; }
+  .frete-setup-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .frete-setup-grid .frete-setup-wide { grid-column: 1 / -1; }
+  .frete-hero-row { grid-template-columns: 1fr; }
+  .frete-hero-value { font-size: 22px; }
+  .frete-detail-chips { gap: 6px; }
+  .frete-detail-chip { min-width: 80px; padding: 6px 9px; }
+  .frete-simulation-layout { grid-template-columns: 1fr; }
+  .frete-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .frete-sim-resumo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .frete-official-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .frete-official-grid .frete-stat-card:last-child { grid-column: span 1; }
+}
+@media (max-width: 480px) {
+  .frete-hero-row { gap: 7px; }
+  .frete-hero-card { padding: 12px; }
+  .frete-hero-value { font-size: 19px; }
+  .frete-stat-grid { grid-template-columns: 1fr; }
+  .frete-sim-resumo-grid { grid-template-columns: 1fr; }
+  .frete-sem-dados { flex-direction: column; }
+  .frete-sim-bloqueado { flex-direction: column; }
+  .frete-ref-head { flex-direction: column; }
+}
+
+/* ── Dark theme: ajustes frete ──────────────────────── */
+:root[data-theme="dark"] .frete-official-ref-card {
+  background: linear-gradient(180deg, rgba(79, 127, 171, 0.09) 0%, transparent 160px), var(--surface);
+}
+:root[data-theme="dark"] .frete-hero-card.info { background: rgba(79, 127, 171, 0.12); }
+:root[data-theme="dark"] .frete-hero-card.success { background: rgba(4, 120, 87, 0.1); }
+:root[data-theme="dark"] .frete-hero-card.danger { background: rgba(185, 28, 28, 0.13); }
+
 /* KPI tile */
 .kpi {
   background: var(--surface);
@@ -2491,4 +3753,82 @@ tr.row-ok td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
   }
 
   .pneus-destinos-col .dest-label { font-size: 9.5px; }
+}
+
+/* Overrides finais: calculadora de frete mobile. */
+@media (max-width: 960px) {
+  .frete-layout { grid-template-columns: 1fr; }
+  .frete-setup-grid,
+  .frete-official-grid,
+  .frete-simulation-layout {
+    grid-template-columns: 1fr;
+  }
+  .frete-official-grid .frete-stat-card:last-child {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .frete-view { gap: 12px; }
+  .frete-view .page-head {
+    gap: 12px;
+    align-items: stretch;
+  }
+  .frete-view .page-head .actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .frete-form-card,
+  .frete-result-card {
+    padding: 12px;
+    border-radius: 8px;
+  }
+  .frete-form-grid,
+  .frete-sim-box,
+  .frete-stat-grid,
+  .frete-setup-grid,
+  .frete-official-grid {
+    grid-template-columns: 1fr;
+  }
+  .frete-summary-grid {
+    grid-template-columns: 1fr;
+  }
+  .frete-scenario-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .frete-status-pill {
+    max-width: none;
+    text-align: left;
+  }
+  .frete-scenario-grid {
+    grid-template-columns: 1fr;
+  }
+  .frete-choice-grid .btn,
+  .frete-segment button,
+  .frete-margin-row .btn {
+    min-height: 40px;
+  }
+  .frete-margin-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .frete-stat-card {
+    min-height: 92px;
+  }
+  .frete-stat-value {
+    font-size: 19px;
+  }
+  .frete-result-head,
+  .frete-copy-box {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .frete-copy-box .btn,
+  .frete-result-card > .col .btn {
+    min-height: 42px;
+  }
+  .frete-alert-grid {
+    grid-template-columns: 1fr;
+  }
 }

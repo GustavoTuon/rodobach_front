@@ -7,6 +7,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/viagens.jsx",
   "src/screens/demonstrativo-financeiro.jsx",
   "src/screens/dre-empresarial.jsx",
+  "src/screens/custos-veiculos.jsx",
   "src/screens/analise-clientes.jsx",
   "src/screens/pneus.jsx?v=20260603-historico-pneu",
 ];
@@ -14,6 +15,7 @@ const SCREEN_SCRIPTS = [
 const SCREEN_GLOBALS = [
   "SimuladorFrete", "DiariasMotorista", "Viagens",
   "DemonstrativoFinanceiro", "DreEmpresarial", "AnaliseClientes", "Pneus",
+  "CustosVeiculos",
 ];
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -32,6 +34,7 @@ const NAV = [
   { id: "reports",         label: "Relatórios",   icon: "chart",       title: "Relatórios" },
   { id: "demonstrativo",   label: "DRE",          icon: "chart",       title: "Demonstrativo financeiro" },
   { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial" },
+  { id: "custos-veiculos", label: "Custos Veic.", icon: "truck",       title: "Custos por Veiculo" },
   { id: "clientes",        label: "Clientes",     icon: "user",        title: "Análise de Clientes" },
   { id: "integration",     label: "Integração",   icon: "plug",        title: "Saúde da integração" },
   { id: "settings",        label: "Configurações", icon: "settings",   title: "Configurações",    sistema: true },
@@ -209,6 +212,9 @@ const App = () => {
       break;
     case "dre-empresarial":
       body = <DreEmpresarial onNavigate={onNavigate}/>;
+      break;
+    case "custos-veiculos":
+      body = <CustosVeiculos onNavigate={onNavigate}/>;
       break;
     case "clientes":
       body = <AnaliseClientes onNavigate={onNavigate}/>;
