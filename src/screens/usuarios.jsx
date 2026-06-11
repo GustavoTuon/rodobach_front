@@ -2,14 +2,11 @@
 
 const TELAS = [
   { id: "perm_simulador",       label: "Calculadora" },
-  { id: "perm_diarias",         label: "Diárias" },
   { id: "perm_viagens",         label: "Viagens" },
-  { id: "perm_custos",          label: "Custos" },
-  { id: "perm_receita",         label: "Receita" },
-  { id: "perm_demonstrativo",   label: "DRE" },
   { id: "perm_dre_empresarial", label: "DRE Empresarial" },
-  { id: "perm_placa",           label: "Por Placa" },
+  { id: "perm_custos_veiculos", label: "Custos por Veiculo" },
   { id: "perm_clientes",        label: "Clientes" },
+  { id: "perm_clientes_lucro",  label: "Clientes Lucro" },
   { id: "perm_pneus",           label: "Pneus" },
   { id: "perm_manutencao",      label: "Manutenção" },
   { id: "perm_settings",        label: "Configurações" },
@@ -18,10 +15,9 @@ const TELAS = [
 const FORM_VAZIO = {
   login: "", senha: "", email: "", numero: "",
   admin: false, ativo: true,
-  perm_simulador: true, perm_diarias: true, perm_viagens: true,
-  perm_custos: true, perm_receita: true, perm_demonstrativo: true,
-  perm_dre_empresarial: true, perm_placa: true, perm_clientes: true,
-  perm_pneus: true, perm_manutencao: true, perm_settings: true,
+  perm_simulador: true, perm_viagens: true, perm_dre_empresarial: true, perm_custos_veiculos: true,
+  perm_clientes: true, perm_clientes_lucro: true, perm_pneus: true,
+  perm_manutencao: true, perm_settings: true,
 };
 
 const Toggle = ({ value, onChange, label }) => (
@@ -51,15 +47,18 @@ const GerenciarUsuarios = ({ onNavigate }) => {
   const [form, setForm] = useState(FORM_VAZIO);
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState("");
+  const [erroLista, setErroLista] = useState("");
   const [showSenha, setShowSenha] = useState(false);
 
   const carregar = async () => {
     setLoading(true);
+    setErroLista("");
     try {
       const data = await RB_API.listUsuarios();
-      setUsuarios(data.usuarios);
+      setUsuarios(Array.isArray(data?.usuarios) ? data.usuarios : []);
     } catch (e) {
       console.error(e);
+      setErroLista(e.message || "Nao foi possivel carregar os usuarios.");
     } finally {
       setLoading(false);
     }
@@ -79,12 +78,15 @@ const GerenciarUsuarios = ({ onNavigate }) => {
       login: u.login, senha: "",
       email: u.email || "", numero: u.numero || "",
       admin: u.admin, ativo: u.ativo,
-      perm_simulador: u.perm_simulador, perm_diarias: u.perm_diarias,
-      perm_viagens: u.perm_viagens, perm_custos: u.perm_custos,
-      perm_receita: u.perm_receita, perm_demonstrativo: u.perm_demonstrativo,
-      perm_dre_empresarial: u.perm_dre_empresarial, perm_placa: u.perm_placa,
-      perm_clientes: u.perm_clientes, perm_pneus: u.perm_pneus,
-      perm_settings: u.perm_settings,
+      perm_simulador: u.perm_simulador ?? true,
+      perm_viagens: u.perm_viagens ?? true,
+      perm_dre_empresarial: u.perm_dre_empresarial ?? true,
+      perm_custos_veiculos: u.perm_custos_veiculos ?? true,
+      perm_clientes: u.perm_clientes ?? true,
+      perm_clientes_lucro: u.perm_clientes_lucro ?? true,
+      perm_pneus: u.perm_pneus ?? true,
+      perm_settings: u.perm_settings ?? true,
+      perm_manutencao: u.perm_manutencao ?? true,
     });
     setErro("");
     setModal(u);
@@ -155,6 +157,8 @@ const GerenciarUsuarios = ({ onNavigate }) => {
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {loading ? (
           <div style={{ padding: 24, color: "var(--muted)", fontSize: 13 }}>Carregando…</div>
+        ) : erroLista ? (
+          <div style={{ padding: 24, color: "#ef4444", fontSize: 13 }}>{erroLista}</div>
         ) : (
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>

@@ -3,20 +3,19 @@ const { useState, useEffect } = React;
 
 const SCREEN_SCRIPTS = [
   "src/screens/simulador.jsx",
-  "src/screens/diarias.jsx",
   "src/screens/viagens.jsx",
-  "src/screens/demonstrativo-financeiro.jsx",
   "src/screens/dre-empresarial.jsx",
   "src/screens/custos-veiculos.jsx",
   "src/screens/analise-clientes.jsx",
+  "src/screens/rentabilidade-clientes.jsx",
   "src/screens/manutencao.jsx",
   "src/screens/pneus.jsx?v=20260603-historico-pneu",
 ];
 
 const SCREEN_GLOBALS = [
-  "SimuladorFrete", "DiariasMotorista", "Viagens", "Custos", "Receita",
-  "DemonstrativoFinanceiro", "DreEmpresarial", "FinanceiroPlaca", "AnaliseClientes",
-  "ManutencaoMensagens", "Pneus", "CustosVeiculos",
+  "SimuladorFrete", "Viagens", "Custos", "Receita",
+  "DreEmpresarial", "FinanceiroPlaca", "AnaliseClientes",
+  "RentabilidadeClientes", "ManutencaoMensagens", "Pneus", "CustosVeiculos",
 ];
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -30,13 +29,12 @@ const NAV = [
   { id: "alerts",          label: "Alertas",      icon: "alert",       title: "Alertas e ocorrências", badge: 12 },
   { id: "pneus",           label: "Pneus",        icon: "truck",       title: "Movimentação de Pneus" },
   { id: "simulador",       label: "Calculadora",  icon: "calculator",  title: "Calculadora de Frete ANTT" },
-  { id: "diarias",         label: "Diárias",      icon: "clock",       title: "Diárias do Motorista" },
   { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações" },
   { id: "reports",         label: "Relatórios",   icon: "chart",       title: "Relatórios" },
-  { id: "demonstrativo",   label: "DRE",          icon: "chart",       title: "Demonstrativo financeiro" },
   { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial" },
   { id: "custos-veiculos", label: "Custos Veic.", icon: "truck",       title: "Custos por Veiculo" },
   { id: "clientes",        label: "Clientes",     icon: "user",        title: "Análise de Clientes" },
+  { id: "clientes-lucro",  label: "Clientes Lucro", icon: "chart",     title: "Rentabilidade Clientes" },
   { id: "manutencao",      label: "Manutenção",   icon: "wrench",      title: "Automação de Manutenção" },
   { id: "integration",     label: "Integração",   icon: "plug",        title: "Saúde da integração" },
   { id: "settings",        label: "Configurações", icon: "settings",   title: "Configurações",    sistema: true },
@@ -204,14 +202,8 @@ const App = () => {
     case "simulador":
       body = <SimuladorFrete onNavigate={onNavigate}/>;
       break;
-    case "diarias":
-      body = <DiariasMotorista onNavigate={onNavigate}/>;
-      break;
     case "viagens":
       body = <Viagens onNavigate={onNavigate}/>;
-      break;
-    case "demonstrativo":
-      body = <DemonstrativoFinanceiro onNavigate={onNavigate}/>;
       break;
     case "dre-empresarial":
       body = <DreEmpresarial onNavigate={onNavigate}/>;
@@ -221,6 +213,9 @@ const App = () => {
       break;
     case "clientes":
       body = <AnaliseClientes onNavigate={onNavigate}/>;
+      break;
+    case "clientes-lucro":
+      body = <RentabilidadeClientes onNavigate={onNavigate}/>;
       break;
     case "manutencao":
       body = <ManutencaoMensagens onNavigate={onNavigate}/>;

@@ -170,6 +170,7 @@ window.RB_API = {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/analise-clientes${buildQuery(params)}`);
   },
+  getRentabilidadeClientes: (filters = {}) => apiRequest(`/clientes/rentabilidade${buildQuery(filters || {})}`),
 
   // ── Manutenção ────────────────────────────────────────────────────────────
   listVeiculosManutencao: () => apiRequest("/manutencao/veiculos"),

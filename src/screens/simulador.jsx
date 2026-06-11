@@ -303,7 +303,6 @@ const SimuladorFrete = ({ onNavigate }) => {
           <div className="sub">Referencia oficial separada da simulacao comercial.</div>
         </div>
         <div className="actions">
-          <button className="btn" onClick={() => onNavigate("diarias")}><Icon name="clock"/> Diarias</button>
           <button className="btn" onClick={() => onNavigate("viagens")}><Icon name="route"/> Viagens</button>
         </div>
       </div>
@@ -715,10 +714,6 @@ const SimuladorFrete = ({ onNavigate }) => {
                 <button className="btn primary" style={{ width: "100%", justifyContent: "center" }}
                   onClick={usarComoCotacao} disabled={!hasKm || simulation.status.tone === "danger"}>
                   <Icon name="route"/> Usar como cotacao de viagem
-                </button>
-                <button className="btn" style={{ width: "100%", justifyContent: "center" }}
-                  onClick={() => onNavigate("diarias")}>
-                  <Icon name="clock"/> Calcular diarias do motorista
                 </button>
               </div>
 
