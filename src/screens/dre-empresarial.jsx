@@ -138,6 +138,7 @@ const DreEmpresarial = () => {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [tab, setTab] = React.useState("despesas");
+  const [hoveredMonth, setHoveredMonth] = React.useState(null);
 
   React.useEffect(() => {
     let active = true;
@@ -159,7 +160,7 @@ const DreEmpresarial = () => {
     ? (manualFilter.mesAno || `${dreEmpDate(manualFilter.dataInicio)} a ${dreEmpDate(manualFilter.dataFim)}`)
     : DRE_EMP_PERIODS.find((item) => item.key === periodo)?.label || "Este mes";
   const s = data.summary || {};
-  const maxMonthly = Math.max(1, ...data.monthly.map((m) => Math.max(dreEmpNum(m.receita), dreEmpNum(m.custo), Math.abs(dreEmpNum(m.lucro)))));
+  const maxMonthly = Math.max(1, ...data.monthly.map((m) => Math.max(dreEmpNum(m.receita), dreEmpNum(m.custo))));
   const maxExpense = Math.max(1, ...data.accounts.map((a) => dreEmpNum(a.custo)));
   const maxPlate = Math.max(1, ...data.plates.map((p) => dreEmpNum(p.custo)));
   const maxCategory = Math.max(1, ...data.categories.map((c) => dreEmpNum(c.custo)));
@@ -217,7 +218,7 @@ const DreEmpresarial = () => {
       <div className="page-head">
         <div>
           <h1>DRE Empresarial</h1>
-          <div className="sub">Receita CT-e, impostos e custos financeiros - {periodLabel}</div>
+          <div className="sub">Receita CT-e, impostos e custos financeiros por data de lan\u00e7amento - {periodLabel}</div>
         </div>
         <div className="actions">
           {DRE_EMP_PERIODS.map((p) => (
@@ -228,8 +229,8 @@ const DreEmpresarial = () => {
       </div>
 
       <div className="period-filter" style={{alignItems: "end", flexWrap: "wrap"}}>
-        <label>Data inicial<input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></label>
-        <label>Data final<input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)}/></label>
+        <label>Lan\u00e7amento inicial<input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></label>
+        <label>Lan\u00e7amento final<input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)}/></label>
         <label>Mes/Ano<input type="month" value={mesAno} onChange={(e) => setMesAno(e.target.value)}/></label>
         <label>Centro<input type="number" value={centro} placeholder="Codigo" onChange={(e) => setCentro(e.target.value)}/></label>
         <label>Conta<input type="number" value={conta} placeholder="Codigo" onChange={(e) => setConta(e.target.value)}/></label>
@@ -240,6 +241,7 @@ const DreEmpresarial = () => {
         <label style={{minWidth: 190}}>Busca<input type="text" value={search} placeholder="Conta, centro, placa..." onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyFilter(); }}/></label>
         <button className="btn primary" onClick={applyFilter}>Aplicar</button>
         <button className="btn" onClick={clearFilter}>Limpar</button>
+        <span className="muted" style={{marginLeft: "auto", fontSize: 11.5}}>Base: data de lan\u00e7amento</span>
       </div>
 
       {(loading || error) && (
@@ -282,23 +284,61 @@ const DreEmpresarial = () => {
           </div>
         </div>
 
-        <div className="card card-flush">
-          <div className="card-header"><h3>Evolucao mensal</h3><span className="meta muted">receita x custo x lucro</span></div>
-          <div className="card-body">
-            <div style={{height: 245, display: "flex", alignItems: "flex-end", gap: 10}}>
-              {data.monthly.map((m) => (
-                <div key={m.mes} style={{flex: 1, minWidth: 46, display: "flex", flexDirection: "column", alignItems: "center", gap: 6}}>
-                  <div style={{fontSize: 10, fontFamily: "var(--font-mono)", color: "var(--text-3)"}}>{dreEmpShort(m.lucro)}</div>
-                  <div style={{height: 180, display: "flex", alignItems: "flex-end", gap: 3}}>
-                    <div title={`Receita ${dreEmpBRL(m.receita)}`} style={{width: 10, height: Math.max(4, dreEmpNum(m.receita) / maxMonthly * 170), background: "#38bdf8", borderRadius: 4}}/>
-                    <div title={`Custo ${dreEmpBRL(m.custo)}`} style={{width: 10, height: Math.max(4, dreEmpNum(m.custo) / maxMonthly * 170), background: "#f59e0b", borderRadius: 4}}/>
-                    <div title={`Lucro ${dreEmpBRL(m.lucro)}`} style={{width: 10, height: Math.max(4, Math.abs(dreEmpNum(m.lucro)) / maxMonthly * 170), background: dreEmpNum(m.lucro) >= 0 ? "#22c55e" : "#f87171", borderRadius: 4}}/>
-                  </div>
-                  <span style={{fontSize: 11, color: "var(--text-3)"}}>{m.label}</span>
-                </div>
-              ))}
-              {data.monthly.length === 0 && <div className="muted" style={{fontSize: 12.5}}>Sem dados no periodo.</div>}
+        <div className="card card-flush chart-card">
+          <div className="card-header">
+            <h3>Evolucao mensal</h3>
+            <div className="row" style={{gap: 12, fontSize: 11.5}}>
+              <span className="row" style={{gap: 4}}><span style={{width: 8, height: 8, borderRadius: 2, background: "#38bdf8", display: "inline-block"}}/>Receita</span>
+              <span className="row" style={{gap: 4}}><span style={{width: 8, height: 8, borderRadius: 2, background: "#f59e0b", display: "inline-block"}}/>Custo</span>
+              <span className="row" style={{gap: 4}}><span style={{width: 8, height: 8, borderRadius: 2, background: "#22c55e", display: "inline-block"}}/>Lucro</span>
             </div>
+          </div>
+          <div className="card-body" style={{paddingTop: 18, paddingBottom: 14}}>
+            {data.monthly.length === 0 && (
+              <div className="muted" style={{textAlign: "center", padding: "60px 0", fontSize: 12.5}}>Sem dados no periodo.</div>
+            )}
+            {data.monthly.length > 0 && (
+              <div className="chart-plot" style={{display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 18, height: 195}}>
+                {data.monthly.map((m, index) => {
+                  const receita = dreEmpNum(m.receita);
+                  const custo = dreEmpNum(m.custo);
+                  const lucro = dreEmpNum(m.lucro);
+                  const lucroTone = lucro >= 0 ? "#22c55e" : "#f87171";
+                  const isHov = hoveredMonth === index;
+                  return (
+                    <div key={m.mes || index}
+                         style={{flex: "1 1 0", maxWidth: 120, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, position: "relative", cursor: "default"}}
+                         onMouseEnter={() => setHoveredMonth(index)}
+                         onMouseLeave={() => setHoveredMonth(null)}>
+                      {isHov && (
+                        <div className="chart-tooltip" style={{
+                          bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)",
+                          background: "var(--surface)", border: "1px solid var(--border-strong)", borderRadius: 8,
+                          padding: "10px 13px", fontSize: 12, whiteSpace: "nowrap",
+                          boxShadow: "var(--shadow-lg)", lineHeight: 1.8, minWidth: 175,
+                        }}>
+                          <div style={{fontWeight: 600, fontSize: 12.5, marginBottom: 6, color: "var(--text)"}}>{m.label}</div>
+                          <div style={{display: "grid", gridTemplateColumns: "auto 1fr", gap: "1px 12px"}}>
+                            <span style={{color: "#38bdf8"}}>● Receita</span>
+                            <span style={{fontFamily: "var(--font-mono)", textAlign: "right"}}>{dreEmpBRL(receita)}</span>
+                            <span style={{color: "#f59e0b"}}>● Custo</span>
+                            <span style={{fontFamily: "var(--font-mono)", textAlign: "right"}}>{dreEmpBRL(custo)}</span>
+                            <span style={{color: lucroTone}}>● Lucro</span>
+                            <span style={{fontFamily: "var(--font-mono)", textAlign: "right", color: lucroTone}}>{dreEmpBRL(lucro)}</span>
+                          </div>
+                        </div>
+                      )}
+                      <span style={{fontSize: 11, fontFamily: "var(--font-mono)", fontWeight: 600, color: lucroTone, background: lucro >= 0 ? "rgba(34,197,94,0.12)" : "rgba(248,113,113,0.12)", borderRadius: 6, padding: "2px 8px"}}>{dreEmpShort(lucro)}</span>
+                      <div style={{display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 6, width: "100%", height: 130, borderBottom: "1px solid var(--divider)"}}>
+                        <div title={`Receita ${dreEmpBRL(receita)}`} style={{width: 22, height: Math.max(4, receita / maxMonthly * 126), background: "#38bdf8", borderRadius: "4px 4px 0 0", opacity: isHov ? 1 : 0.85, transition: "opacity .15s, height .4s ease"}}/>
+                        <div title={`Custo ${dreEmpBRL(custo)}`} style={{width: 22, height: Math.max(4, custo / maxMonthly * 126), background: "#f59e0b", borderRadius: "4px 4px 0 0", opacity: isHov ? 1 : 0.85, transition: "opacity .15s, height .4s ease"}}/>
+                      </div>
+                      <span style={{fontSize: 11.5, color: "var(--text-3)"}}>{m.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>

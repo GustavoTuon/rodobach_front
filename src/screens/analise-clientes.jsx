@@ -434,6 +434,10 @@ const AcClienteModal = ({ row, onClose }) => {
     ["Status comercial",   <AcStatusBadge status={row.statusComercial}/>],
     ["Ação sugerida",      <AcAcaoBadge acao={row.acaoSugerida}/>],
     ["Total no período",   acBRL(row.totalPeriodo)],
+    ["Recebido",           acBRL(row.totalRecebido)],
+    ["Em aberto",          acBRL(row.totalAberto)],
+    ["Vencido",            acBRL(row.totalVencido)],
+    ["Inadimplente",       acBRL(row.totalInadimplente)],
     ["Total anterior",     acBRL(row.totalAnterior)],
     ["Crescimento",        row.crescimento !== null ? (
       <span className={`kpi-delta ${acNum(row.crescimento)>=0?"up":"down"}`}>
@@ -537,6 +541,10 @@ const AnaliseClientes = () => {
   const clients  = data?.clients  || [];
 
   const totalFaturado   = acNum(summary.totalFaturado);
+  const totalRecebido   = acNum(summary.totalRecebido);
+  const totalAberto     = acNum(summary.totalAberto);
+  const totalVencido    = acNum(summary.totalVencido);
+  const totalInadimplente = acNum(summary.totalInadimplente);
   const clientesAtivos  = acNum(summary.clientesAtivos);
   const ticketMedio     = acNum(summary.ticketMedio);
   const inativo30       = acNum(summary.inativo30);
@@ -622,6 +630,9 @@ const AnaliseClientes = () => {
     return [...list].sort((a,b)=>{
       if (sortCol==="nome")           return dir*((a.nome||"")<(b.nome||"")?-1:1);
       if (sortCol==="totalPeriodo")   return dir*(acNum(a.totalPeriodo)-acNum(b.totalPeriodo));
+      if (sortCol==="totalRecebido")   return dir*(acNum(a.totalRecebido)-acNum(b.totalRecebido));
+      if (sortCol==="totalAberto")     return dir*(acNum(a.totalAberto)-acNum(b.totalAberto));
+      if (sortCol==="totalVencido")    return dir*(acNum(a.totalVencido)-acNum(b.totalVencido));
       if (sortCol==="diasSemFaturar") return dir*(acNum(a.diasSemFaturar)-acNum(b.diasSemFaturar));
       if (sortCol==="ticketMedio")    return dir*(acNum(a.ticketMedio)-acNum(b.ticketMedio));
       if (sortCol==="lancamentos")    return dir*(acNum(a.lancamentos)-acNum(b.lancamentos));
@@ -645,10 +656,12 @@ const AnaliseClientes = () => {
   );
 
   const exportCsv = () => {
-    const header = ["Cliente","Documento","Último Faturamento","Total Período","Total Anterior","Crescimento %","Lançamentos","Ticket Médio","Dias Sem Faturar","Status","Ação"];
+    const header = ["Cliente","Documento","Último Faturamento","Total Faturado","Recebido","Em Aberto","Vencido","Inadimplente","Total Anterior","Crescimento %","Lançamentos","Ticket Médio","Dias Sem Faturar","Status","Ação"];
     const lines = sortedClients.map(c=>[
       c.nome||"",c.documento||"",acDateFmt(c.ultimoFaturamento),
-      acNum(c.totalPeriodo).toFixed(2),acNum(c.totalAnterior).toFixed(2),
+      acNum(c.totalPeriodo).toFixed(2),acNum(c.totalRecebido).toFixed(2),
+      acNum(c.totalAberto).toFixed(2),acNum(c.totalVencido).toFixed(2),
+      acNum(c.totalInadimplente).toFixed(2),acNum(c.totalAnterior).toFixed(2),
       c.crescimento!==null?acNum(c.crescimento).toFixed(1):"",
       c.lancamentos,acNum(c.ticketMedio).toFixed(2),
       c.diasSemFaturar,
@@ -721,8 +734,27 @@ const AnaliseClientes = () => {
         <div className="kpi" style={{borderLeft:"3px solid #22c55e"}}>
           <div className="kpi-label"><Icon name="money"/><span>Total faturado</span></div>
           <div className="kpi-value">{acBRL(totalFaturado)}</div>
-          <span className="kpi-delta flat">{periodLabel}</span>
+          <span className="kpi-delta flat" title="financeiro.receber.valorduplicatarec por data de emissão">{periodLabel}</span>
         </div>
+        <div className="kpi" style={{borderLeft:"3px solid #38bdf8"}}>
+          <div className="kpi-label"><Icon name="check"/><span>Recebido</span></div>
+          <div className="kpi-value">{acBRL(totalRecebido)}</div>
+          <span className="kpi-delta flat" title="financeiro.receberrecebimentos.valorrecebidorcb por data de recebimento">baixas no período</span>
+        </div>
+        <div className="kpi" style={{borderLeft:"3px solid #818cf8"}}>
+          <div className="kpi-label"><Icon name="clock"/><span>Em aberto</span></div>
+          <div className="kpi-value">{acBRL(totalAberto)}</div>
+          <span className="kpi-delta flat" title="financeiro.receber.valorabertorec nos títulos emitidos no período">a receber</span>
+        </div>
+        <div className="kpi" style={{borderLeft:"3px solid #ef4444"}}>
+          <div className="kpi-label"><Icon name="alert"/><span>Vencido</span></div>
+          <div className="kpi-value">{acBRL(totalVencido)}</div>
+          <span className="kpi-delta down" title="Aberto com vencimento anterior a hoje">Inadimplente: {acBRL(totalInadimplente)}</span>
+        </div>
+      </div>
+
+      {/* ── KPIs — Linha 2 (comercial) ── */}
+      <div className="grid cols-4" style={{marginBottom:16}}>
         <div className="kpi" style={{borderLeft:"3px solid #38bdf8"}}>
           <div className="kpi-label"><Icon name="user"/><span>Clientes ativos</span></div>
           <div className="kpi-value">{clientesAtivos}</div>
@@ -740,9 +772,14 @@ const AnaliseClientes = () => {
           </div>
           <span className="kpi-delta up" style={{fontSize:11}}>{summary.topCliente?acBRL(summary.topCliente.valor):""}</span>
         </div>
+        <div className="kpi" style={{borderLeft:"3px solid #ef4444"}}>
+          <div className="kpi-label"><Icon name="alert"/><span>Risco financeiro</span></div>
+          <div className="kpi-value">{acBRL(totalInadimplente)}</div>
+          <span className="kpi-delta down">vencido há mais de 5 dias</span>
+        </div>
       </div>
 
-      {/* ── KPIs — Linha 2 (inativos) ── */}
+      {/* ── KPIs — Linha 3 (inativos) ── */}
       <div className="grid cols-4" style={{marginBottom:16}}>
         {[
           { label:"Sem faturar 30–60d", val:inativo30,  color:"#fbbf24", desc:"atenção comercial" },
@@ -1038,7 +1075,10 @@ const AnaliseClientes = () => {
           <thead>
             <tr>
               <th style={{cursor:"pointer"}} onClick={()=>toggleSort("nome")}>Cliente <SortArrow col="nome"/></th>
-              <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalPeriodo")}>Total período <SortArrow col="totalPeriodo"/></th>
+              <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalPeriodo")}>Faturado <SortArrow col="totalPeriodo"/></th>
+              <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalRecebido")}>Recebido <SortArrow col="totalRecebido"/></th>
+              <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalAberto")}>Em aberto <SortArrow col="totalAberto"/></th>
+              <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalVencido")}>Vencido <SortArrow col="totalVencido"/></th>
               <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("lancamentos")}>Lançamentos <SortArrow col="lancamentos"/></th>
               <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("ticketMedio")}>Ticket médio <SortArrow col="ticketMedio"/></th>
               <th>Último fat.</th>
@@ -1049,7 +1089,7 @@ const AnaliseClientes = () => {
           </thead>
           <tbody>
             {pageRows.length===0&&(
-              <tr><td colSpan="8" className="muted" style={{padding:20,textAlign:"center",fontSize:12.5}}>
+              <tr><td colSpan="11" className="muted" style={{padding:20,textAlign:"center",fontSize:12.5}}>
                 {tableSearch?"Nenhum resultado para a busca.":"Nenhum cliente encontrado."}
               </td></tr>
             )}
@@ -1060,6 +1100,9 @@ const AnaliseClientes = () => {
                 <td style={{maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}
                     title={row.nome}>{row.nome}</td>
                 <td className="num">{acBRL(row.totalPeriodo)}</td>
+                <td className="num">{acBRL(row.totalRecebido)}</td>
+                <td className="num">{acBRL(row.totalAberto)}</td>
+                <td className="num" style={{color:acNum(row.totalVencido)>0?"#ef4444":"inherit"}}>{acBRL(row.totalVencido)}</td>
                 <td className="num">{row.lancamentos}</td>
                 <td className="num">{acBRL(row.ticketMedio)}</td>
                 <td className="date">{acDateFmt(row.ultimoFaturamento)}</td>

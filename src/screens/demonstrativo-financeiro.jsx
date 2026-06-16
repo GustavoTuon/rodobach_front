@@ -189,7 +189,7 @@ const DemonstrativoFinanceiro = () => {
       <div className="page-head">
         <div>
           <h1>Demonstrativo financeiro</h1>
-          <div className="sub">Centro de custo / Conta financeira - {periodLabel}</div>
+          <div className="sub">Centro de custo / Conta financeira por data de lan\u00e7amento - {periodLabel}</div>
         </div>
         <div className="actions">
           {DRE_PERIODS.map((p) => (
@@ -202,12 +202,12 @@ const DemonstrativoFinanceiro = () => {
       </div>
 
       <div className="period-filter">
-        <label>Data inicial<input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></label>
-        <label>Data final<input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)}/></label>
+        <label>Lan\u00e7amento inicial<input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></label>
+        <label>Lan\u00e7amento final<input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)}/></label>
         <label style={{minWidth: 220}}>Busca<input type="text" value={search} placeholder="Centro ou conta" onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyFilter(); }}/></label>
         <button className="btn primary" onClick={applyFilter}>Aplicar</button>
         <button className="btn" onClick={clearFilter}>Limpar</button>
-        <span className="muted" style={{marginLeft: "auto", fontSize: 11.5}}>Base: vencimento - rateios financeiros</span>
+        <span className="muted" style={{marginLeft: "auto", fontSize: 11.5}}>Base: data de lan\u00e7amento - rateios e movimentos financeiros</span>
       </div>
 
       {(loading || error) && (

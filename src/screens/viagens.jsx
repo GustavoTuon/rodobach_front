@@ -28,6 +28,7 @@ const DOCS_LABELS = [
   { key: "placas",              label: "Placas do veículo" },
   { key: "antt",                label: "ANTT / RNTRC" },
   { key: "cnh",                 label: "CNH do motorista" },
+  { key: "consultaMotorista",   label: "Consulta do motorista" },
   { key: "contaDeposito",       label: "Conta depósito" },
   { key: "chavePix",            label: "Chave Pix" },
   { key: "comprovanteResidencia", label: "Comprovante de residência" },
@@ -37,13 +38,14 @@ const DOCS_LABELS = [
 const FORM_EMPTY = {
   id: null, numero: "", situacao: "faltando_dados",
   data: new Date().toISOString().slice(0, 10), placa: "",
+  vehicleOwnershipType: null, tipoPropriedade: "", veiculoNome: "",
   origem: "", ufOrigem: "", destino: "", ufDestino: "",
   cliente: "", clienteFinal: "", material: "", peso: "", km: "",
   valorCliente: "", condicaoPagamento: "", tomadorServico: "", vendedor: "",
   motorista: "", numeroMotorista: "", cnh: "", antt: "",
   contaDeposito: "", chavePix: "", valorMotorista: "",
-  docs: { placas: false, antt: false, cnh: false, contaDeposito: false, chavePix: false, comprovanteResidencia: false, numeroMotorista: false },
-  paradas: [], observacoes: "",
+  docs: { placas: false, antt: false, cnh: false, consultaMotorista: false, contaDeposito: false, chavePix: false, comprovanteResidencia: false, numeroMotorista: false },
+  paradas: [], documentosFinanceiros: [], rotaMapsUrl: "", observacoes: "",
 };
 
 const VIAGENS_FORM_DEBUG = true;
@@ -77,16 +79,25 @@ const hasValue = (value) => {
   const parsed = Number(raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw);
   return Number.isNaN(parsed) || parsed !== 0;
 };
+const normalizeVehicleOwnershipType = (value) => {
+  const raw = textValue(value).trim().toUpperCase();
+  if (!raw) return null;
+  if (["T", "TERCEIRO", "TERCEIROS"].includes(raw)) return "TERCEIRO";
+  if (["F", "FROTA", "PROPRIO", "PRÓPRIO"].includes(raw)) return "FROTA";
+  return raw === "TERCEIRO" ? "TERCEIRO" : "FROTA";
+};
 const calcularSituacaoViagem = (input = {}) => {
   if (["em_transito", "entregue", "cancelado"].includes(input.situacao)) return input.situacao;
 
+  const ownershipType = normalizeVehicleOwnershipType(input.vehicleOwnershipType || input.ownershipType || input.tipoPropriedade);
   const hasCarga = [input.cliente, input.material, input.peso, input.valorCliente, input.origem, input.destino].some(hasValue);
-  if (hasCarga && (!hasValue(input.placa) || !hasValue(input.motorista))) return "aguardando_veiculo";
+  if (hasCarga && !hasValue(input.placa)) return "aguardando_veiculo";
+  if (ownershipType !== "FROTA" && hasCarga && !hasValue(input.motorista)) return "aguardando_veiculo";
 
-  const hasDadosOperacionais = [
-    input.placa, input.motorista, input.cliente, input.material,
-    input.valorCliente, input.valorMotorista, input.origem, input.destino,
-  ].every(hasValue);
+  const baseOk = [input.placa, input.cliente, input.material, input.valorCliente, input.origem, input.destino].every(hasValue);
+  const hasDadosOperacionais = ownershipType === "FROTA"
+    ? baseOk
+    : baseOk && [input.motorista, input.valorMotorista].every(hasValue);
 
   return hasDadosOperacionais ? "aguardando_cte" : "faltando_dados";
 };
@@ -102,6 +113,45 @@ const normalizeParadas = (paradas = []) => (Array.isArray(paradas) ? paradas : [
   nf: textValue(p.nf),
   obs: textValue(p.obs),
 }));
+const normalizeDocumentosFinanceiros = (documentos = []) => (Array.isArray(documentos) ? documentos : []).map((doc, index) => ({
+  id: doc.id ?? `doc-${Date.now()}-${index}`,
+  tipo: textValue(doc.tipo || doc.tipoDocumento || "CT-e") || "CT-e",
+  numero: textValue(doc.numero || doc.numeroDocumento),
+  chave: textValue(doc.chave || doc.chaveDocumento),
+  link: textValue(doc.link || doc.linkDocumento),
+  observacoes: textValue(doc.observacoes || doc.obs),
+  criadoPorLogin: textValue(doc.criadoPorLogin),
+  atualizadoPorLogin: textValue(doc.atualizadoPorLogin),
+  atualizadoEm: doc.atualizadoEm || null,
+}));
+const formatRoutePoint = (cidade, uf) => [textValue(cidade).trim(), textValue(uf).trim().toUpperCase()].filter(Boolean).join(", ");
+const buildRoutePoints = (input = {}) => {
+  const origem = formatRoutePoint(input.origem, input.ufOrigem);
+  const destino = formatRoutePoint(input.destino, input.ufDestino);
+  const paradas = normalizeParadas(input.paradas)
+    .sort((a, b) => Number(a.ordem || 0) - Number(b.ordem || 0))
+    .map((p) => formatRoutePoint(p.cidade, p.uf))
+    .filter(Boolean);
+  return [origem, ...paradas, destino].filter(Boolean);
+};
+const buildGoogleMapsRouteUrl = (input = {}) => {
+  const points = buildRoutePoints(input);
+  if (points.length < 2) return "";
+  const params = new URLSearchParams({
+    api: "1",
+    origin: points[0],
+    destination: points[points.length - 1],
+    travelmode: "driving",
+  });
+  if (points.length > 2) params.set("waypoints", points.slice(1, -1).join("|"));
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
+};
+const normalizeMapsUrl = (value) => {
+  const url = textValue(value).trim();
+  if (!url) return "";
+  if (/^https?:\/\/(www\.)?(google\.[^/]+\/maps|maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(url)) return url;
+  return url;
+};
 const normalizeViagemForm = (input = {}) => ({
   ...FORM_EMPTY,
   ...input,
@@ -110,6 +160,9 @@ const normalizeViagemForm = (input = {}) => ({
   situacao: input.situacao || calcularSituacaoViagem(input),
   data: input.data || FORM_EMPTY.data,
   placa: textValue(input.placa),
+  vehicleOwnershipType: normalizeVehicleOwnershipType(input.vehicleOwnershipType || input.ownershipType || input.tipoVeiculo || input.tipoPropriedade),
+  tipoPropriedade: textValue(input.tipoPropriedade),
+  veiculoNome: textValue(input.veiculoNome || input.veiculo),
   origem: textValue(input.origem),
   ufOrigem: textValue(input.ufOrigem).slice(0, 2).toUpperCase(),
   destino: textValue(input.destino),
@@ -132,6 +185,8 @@ const normalizeViagemForm = (input = {}) => ({
   valorMotorista: textValue(input.valorMotorista),
   docs: normalizeDocs(input.docs),
   paradas: normalizeParadas(input.paradas),
+  documentosFinanceiros: normalizeDocumentosFinanceiros(input.documentosFinanceiros),
+  rotaMapsUrl: normalizeMapsUrl(input.rotaMapsUrl),
   observacoes: textValue(input.observacoes),
 });
 
@@ -443,6 +498,9 @@ const Viagens = ({ onNavigate }) => {
     setForm(prev => ({
       ...prev,
       placa: item.placa || prev.placa,
+      vehicleOwnershipType: normalizeVehicleOwnershipType(item.vehicleOwnershipType || item.ownershipType || item.tipoPropriedade),
+      tipoPropriedade: item.tipoPropriedade || prev.tipoPropriedade,
+      veiculoNome: item.veiculo || item.nome || prev.veiculoNome,
       motorista: item.motorista || prev.motorista,
       numeroMotorista: item.numeroMotorista || prev.numeroMotorista,
       cnh: item.cnh || prev.cnh,
@@ -574,23 +632,60 @@ const Viagens = ({ onNavigate }) => {
   }
   const AutoField = autoFieldRef.current;
 
-  const prepareViagem = (v) => ({
-    ...normalizeViagemForm(v),
-    peso: numericValue(v.peso),
-    km: textValue(v.km).trim() ? numericValue(v.km) : "",
-    valorCliente: numericValue(v.valorCliente),
-    valorMotorista: numericValue(v.valorMotorista),
-    situacao: calcularSituacaoViagem(v),
-  });
+  const selectedVehicleOption = (() => {
+    const clean = String(form.placa || "").replace(/[^a-z0-9]/gi, "").toLowerCase();
+    if (!clean) return null;
+    return (opcoes.detalhes?.placas || []).find(p => String(p.placa || "").replace(/[^a-z0-9]/gi, "").toLowerCase() === clean) || null;
+  })();
+  const vehicleOwnershipType = normalizeVehicleOwnershipType(
+    form.vehicleOwnershipType
+    || selectedVehicleOption?.vehicleOwnershipType
+    || selectedVehicleOption?.ownershipType
+    || selectedVehicleOption?.tipoPropriedade
+  );
+  const isFleetVehicle = vehicleOwnershipType === "FROTA";
+  const isThirdPartyVehicle = vehicleOwnershipType === "TERCEIRO";
+  const selectedVehicleName = form.veiculoNome || selectedVehicleOption?.veiculo || "";
+  const visibleDocsLabels = isFleetVehicle
+    ? []
+    : DOCS_LABELS;
+  const visibleSteps = isFleetVehicle
+    ? STEPS.filter(s => s.n !== 3).map((s, index) => ({ ...s, displayN: index + 1, label: s.n === 4 ? "Documentos / Finaliza\u00e7\u00e3o" : s.label }))
+    : STEPS.map((s, index) => ({ ...s, displayN: index + 1 }));
+  const currentStepIndex = Math.max(0, visibleSteps.findIndex(s => s.n === step));
+  const previousStep = visibleSteps[Math.max(0, currentStepIndex - 1)]?.n || 1;
+  const nextStep = visibleSteps[Math.min(visibleSteps.length - 1, currentStepIndex + 1)]?.n || step;
+  const isLastStep = currentStepIndex === visibleSteps.length - 1;
+
+  const prepareViagem = (v) => {
+    const normalized = normalizeViagemForm({ ...v, vehicleOwnershipType });
+    return {
+      ...normalized,
+      peso: numericValue(v.peso),
+      km: textValue(v.km).trim() ? numericValue(v.km) : "",
+      valorCliente: numericValue(v.valorCliente),
+      valorMotorista: isFleetVehicle ? 0 : numericValue(v.valorMotorista),
+      situacao: calcularSituacaoViagem(normalized),
+    };
+  };
 
   const missingHints = [
     !form.placa && "placa",
-    !form.motorista && "motorista",
+    !isFleetVehicle && !form.motorista && "motorista",
     !form.cliente && "cliente",
     !form.material && "material/carga",
     !form.valorCliente && "valor do cliente",
-    !form.valorMotorista && "valor do motorista",
+    !isFleetVehicle && !form.valorMotorista && "valor do motorista",
   ].filter(Boolean);
+  const routePoints = buildRoutePoints(form);
+  const googleMapsRouteUrl = buildGoogleMapsRouteUrl(form);
+  const routeMapsUrl = normalizeMapsUrl(form.rotaMapsUrl) || googleMapsRouteUrl;
+  const hasCustomMapsRoute = Boolean(normalizeMapsUrl(form.rotaMapsUrl));
+  const consultaMotoristaOk = Boolean(form.docs?.consultaMotorista);
+
+  useEffect(() => {
+    if (isFleetVehicle && step === 3) setStep(4);
+  }, [isFleetVehicle, step]);
 
   const openNew = () => {
     const num = `V-${new Date().getFullYear()}-${String(nextId.current).padStart(3, "0")}`;
@@ -616,10 +711,10 @@ const Viagens = ({ onNavigate }) => {
     setViagens(prev => prev.filter(v => v.id !== id));
   };
 
-  const saveForm = async () => {
+  const persistForm = async () => {
     if (!form.data) {
       window.alert("Informe a data da viagem antes de salvar.");
-      return;
+      return null;
     }
 
     const payload = prepareViagem(form);
@@ -640,20 +735,31 @@ const Viagens = ({ onNavigate }) => {
       });
       if (VIAGENS_FORM_DEBUG) console.debug("[Viagens][salvar] retorno backend", saved);
       setForm(normalizeViagemForm(saved));
-      setMode("print");
+      return saved;
     } catch (error) {
       console.warn("Nao foi possivel salvar no backend. Salvando localmente.", error);
       if (payload.id) {
         setViagens(prev => prev.map(v => v.id === payload.id ? { ...payload } : v));
         setForm(normalizeViagemForm(payload));
+        return payload;
       } else {
         const id = nextId.current++;
         const localSaved = { ...payload, id };
         setViagens(prev => [...prev, localSaved]);
         setForm(normalizeViagemForm(localSaved));
+        return localSaved;
       }
-      setMode("print");
     }
+  };
+
+  const saveForm = async () => {
+    const saved = await persistForm();
+    if (saved) setMode("print");
+  };
+
+  const saveAndGoNext = async () => {
+    const saved = await persistForm();
+    if (saved) setStep(nextStep);
   };
 
   const addParada = () => {
@@ -665,6 +771,16 @@ const Viagens = ({ onNavigate }) => {
   const removeParada = (id) => setParadas(current => current.filter(p => p.id !== id).map((p, index) => ({ ...p, ordem: index + 1 })));
   const setParada = (id, field, val) =>
     setParadas(current => current.map(p => p.id === id ? { ...p, [field]: val } : p));
+  const addDocumentoFinanceiro = () => {
+    setF("documentosFinanceiros", [
+      ...normalizeDocumentosFinanceiros(form.documentosFinanceiros),
+      { id: `local-${Date.now()}`, tipo: "CT-e", numero: "", chave: "", link: "", observacoes: "" },
+    ]);
+  };
+  const removeDocumentoFinanceiro = (id) =>
+    setF("documentosFinanceiros", normalizeDocumentosFinanceiros(form.documentosFinanceiros).filter(doc => doc.id !== id));
+  const setDocumentoFinanceiro = (id, field, value) =>
+    setF("documentosFinanceiros", normalizeDocumentosFinanceiros(form.documentosFinanceiros).map(doc => doc.id === id ? { ...doc, [field]: value } : doc));
 
   const applyVgPeriod = (key) => {
     const p = VG_PERIODS.find(x => x.key === key);
@@ -688,6 +804,21 @@ const Viagens = ({ onNavigate }) => {
     setSearch(""); setFiltroSit("todos"); setTablePage(0);
     setAppliedFilters({ dataInicio: r.s, dataFim: r.e, limit: 500 });
   };
+  const simpleAutoOptions = (items = []) =>
+    [...new Set((items || []).filter(Boolean).map(item => String(item).trim()).filter(Boolean))]
+      .map(label => ({ label }));
+
+  const selectFilterOption = (setter, item) => {
+    setter(item?.label || item?.nome || "");
+    setActiveAuto("");
+  };
+
+  const renderSimpleAutoOption = (item, detail = "") => (
+    <>
+      <span>{item.label || item.nome}</span>
+      <b>{detail}</b>
+    </>
+  );
   const toggleSort = (col) => {
     if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortCol(col); setSortDir("desc"); }
@@ -789,16 +920,23 @@ const Viagens = ({ onNavigate }) => {
           {/* Linha 1: campos de texto */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:10}}>
             {[
-              { label:"Cliente",  val:fCliente,  set:setFCliente,  list:"vg-cli",  opts:opcoes.clientes  },
-              { label:"Origem",   val:fOrigem,   set:setFOrigem,   list:"vg-ori",  opts:opcoes.origens   },
-              { label:"Destino",  val:fDestino,  set:setFDestino,  list:"vg-dest", opts:opcoes.destinos  },
-              { label:"Material", val:fMaterial, set:setFMaterial, list:"vg-mat",  opts:opcoes.materiais },
-            ].map(({ label, val, set, list, opts }) => (
+              { label:"Cliente",  val:fCliente,  set:setFCliente,  key:"vg-cli",  opts:opcoes.clientes,  detail:"Cliente"  },
+              { label:"Origem",   val:fOrigem,   set:setFOrigem,   key:"vg-ori",  opts:opcoes.origens,   detail:"Origem"   },
+              { label:"Destino",  val:fDestino,  set:setFDestino,  key:"vg-dest", opts:opcoes.destinos,  detail:"Destino"  },
+              { label:"Material", val:fMaterial, set:setFMaterial, key:"vg-mat",  opts:opcoes.materiais, detail:"Material" },
+            ].map(({ label, val, set, key, opts, detail }) => (
               <div key={label}>
                 <div style={{fontSize:10.5,color:"var(--text-3)",fontWeight:500,marginBottom:3}}>{label}</div>
-                <input list={list} value={val} onChange={e => set(e.target.value)} placeholder="Todos"
-                  style={{width:"100%",height:30,padding:"0 9px",border:"1px solid var(--border)",borderRadius:"var(--r)",background:"var(--surface)",color:"var(--text)",fontSize:12.5,outline:"none",boxSizing:"border-box"}}/>
-                <datalist id={list}>{opts.map(o => <option key={o} value={o}/>)}</datalist>
+                <AutoField
+                  value={val}
+                  activeKey={key}
+                  placeholder="Todos"
+                  options={filterAutocompleteOptions(simpleAutoOptions(opts), val)}
+                  optionKey={(item, index) => item.label || index}
+                  onChange={set}
+                  onSelect={item => selectFilterOption(set, item)}
+                  renderOption={item => renderSimpleAutoOption(item, detail)}
+                />
               </div>
             ))}
           </div>
@@ -1034,7 +1172,7 @@ const Viagens = ({ onNavigate }) => {
             <input type="date" style={fs} value={form.data} onChange={e => setF("data", e.target.value)}/>
           </Fg>
         </div>
-                <Fg label="Placa do veiculo">
+        <Fg label="Placa do veículo">
           <AutoField
             value={form.placa}
             activeKey="placa"
@@ -1060,37 +1198,66 @@ const Viagens = ({ onNavigate }) => {
             renderOption={item => (
               <>
                 <span>{item.placa || item.label}</span>
-                <b>{item.motorista || item.modelo || item.cidadePlaca || ""}</b>
+                <b>{[item.vehicleOwnershipType || item.ownershipType, item.motorista || item.modelo || item.cidadePlaca].filter(Boolean).join(" - ")}</b>
               </>
             )}
           />
         </Fg>
         <Fg label="Situação">
           {(() => {
-            const situacaoCalculada = calcularSituacaoViagem(form);
+            const situacaoCalculada = calcularSituacaoViagem({ ...form, vehicleOwnershipType });
             const sit = SITUACOES[situacaoCalculada] || SITUACOES.faltando_dados;
             return (
-              <div style={{
-                ...fs,
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                background: "var(--bg)", color: "var(--text-2)",
-              }}>
-                <span>{sit.label}</span>
-                <span className={`badge ${sit.cls || ""}`} style={{fontSize: 11}}>automatico</span>
+              <div className="col" style={{gap: 8}}>
+                {vehicleOwnershipType && (
+                  <div style={{
+                    ...fs, height: "auto", minHeight: 34, padding: "8px 10px",
+                    display: "block",
+                    borderColor: isFleetVehicle ? "#a7f3d0" : "#fde68a",
+                    background: isFleetVehicle ? "rgba(4, 120, 87, 0.10)" : "rgba(245, 158, 11, 0.10)",
+                  }}>
+                    <div className="row between" style={{alignItems: "center"}}>
+                      <span style={{fontWeight: 700, color: isFleetVehicle ? "#047857" : "#b45309"}}>
+                        {isFleetVehicle ? "Ve\u00edculo Frota" : "Ve\u00edculo Terceiro"}
+                      </span>
+                      {selectedVehicleName && <span className="muted">{selectedVehicleName}</span>}
+                    </div>
+                    {isFleetVehicle && (
+                      <div style={{marginTop: 6, fontSize: 12, color: "var(--text-2)"}}>
+                        {"Ve\u00edculo de frota selecionado. Os dados do motorista e documentos ser\u00e3o usados do cadastro interno."}
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div style={{
+                  ...fs,
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  background: "var(--bg)", color: "var(--text-2)",
+                }}>
+                  <span>{sit.label}</span>
+                  <span className={`badge ${sit.cls || ""}`} style={{fontSize: 11}}>automático</span>
+                </div>
               </div>
             );
           })()}
         </Fg>
         <Fg label="Vendedor (opcional)">
-          <input list="vendedores-list" style={fs} value={form.vendedor}
-            onChange={e => {
-              const value = e.target.value;
+          <AutoField
+            value={form.vendedor}
+            activeKey="vendedor"
+            placeholder="Nome do vendedor"
+            options={filterAutocompleteOptions(simpleAutoOptions(opcoes.vendedores), form.vendedor)}
+            optionKey={(item, index) => item.label || index}
+            onChange={value => {
               setF("vendedor", value);
               searchAutocomplete("vendedores", value);
-            }} placeholder="Nome do vendedor"/>
-          <datalist id="vendedores-list">
-            {opcoes.vendedores.map(v => <option key={v} value={v}/>)}
-          </datalist>
+            }}
+            onSelect={item => {
+              setF("vendedor", item.label || item.nome || "");
+              setActiveAuto("");
+            }}
+            renderOption={item => renderSimpleAutoOption(item, "Vendedor")}
+          />
         </Fg>
       </div>
 
@@ -1487,10 +1654,12 @@ const Viagens = ({ onNavigate }) => {
   const renderStep4 = () => (
     <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20}}>
       <div className="col" style={{gap: 10}}>
-        <div style={{fontSize: 12.5, fontWeight: 500, color: "var(--text-2)", marginBottom: 4}}>
-          Documentos recebidos
-        </div>
-        {DOCS_LABELS.map(doc => {
+        {!isFleetVehicle && (
+          <div style={{fontSize: 12.5, fontWeight: 500, color: "var(--text-2)", marginBottom: 4}}>
+            Documentos recebidos
+          </div>
+        )}
+        {!isFleetVehicle && visibleDocsLabels.map(doc => {
           const on = form.docs[doc.key];
           return (
             <div key={doc.key}
@@ -1516,8 +1685,79 @@ const Viagens = ({ onNavigate }) => {
             </div>
           );
         })}
-        <div style={{marginTop: 6, padding: "8px 12px", background: "var(--bg)", borderRadius: "var(--r)", fontSize: 12}}>
-          <span className="muted">{Object.values(form.docs).filter(Boolean).length}</span> de {DOCS_LABELS.length} documentos recebidos
+        {!isFleetVehicle && (
+          <div style={{marginTop: 6, padding: "8px 12px", background: "var(--bg)", borderRadius: "var(--r)", fontSize: 12}}>
+            <span className="muted">{Object.values(form.docs).filter(Boolean).length}</span> de {visibleDocsLabels.length} documentos recebidos
+          </div>
+        )}
+        {isFleetVehicle && (
+          <div style={{
+            padding: "10px 12px", border: "1px solid #a7f3d0", borderRadius: "var(--r)",
+            background: "rgba(4, 120, 87, 0.10)", color: "var(--text-2)", fontSize: 12.5,
+          }}>
+            <b style={{color: "#047857"}}>{"Ve\u00edculo de frota selecionado."}</b> {"Os documentos de motorista/terceiro n\u00e3o s\u00e3o necess\u00e1rios nesta viagem."}
+          </div>
+        )}
+        <div style={{
+          marginTop: 10, border: "1px solid var(--border)", borderRadius: "var(--r)",
+          padding: 12, background: "var(--bg)",
+        }}>
+          <div className="row between" style={{alignItems: "center", marginBottom: 10}}>
+            <div style={{fontSize: 12.5, fontWeight: 600, color: "var(--text)"}}>Frota e rota do veículo</div>
+            <span style={{
+              fontSize: 11, fontWeight: 700, borderRadius: 999, padding: "3px 8px",
+              color: isFleetVehicle || consultaMotoristaOk ? "#047857" : "#b45309",
+              background: isFleetVehicle || consultaMotoristaOk ? "#ecfdf5" : "#fffbeb",
+              border: `1px solid ${isFleetVehicle || consultaMotoristaOk ? "#a7f3d0" : "#fde68a"}`,
+            }}>
+              {isFleetVehicle ? "Cadastro interno" : consultaMotoristaOk ? "Consulta feita" : "Consulta pendente"}
+            </span>
+          </div>
+          <div className="col" style={{gap: 7, fontSize: 12.5}}>
+            <div className="row between">
+              <span className="muted">Placa</span>
+              <span className="num">{form.placa || "Nao informada"}</span>
+            </div>
+            <div className="row between">
+              <span className="muted">Motorista</span>
+              <span className="num" style={{maxWidth: 210, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>{form.motorista || "Nao informado"}</span>
+            </div>
+            <div className="row between">
+              <span className="muted">Pontos da rota</span>
+              <span className="num">{routePoints.length || 0}</span>
+            </div>
+          </div>
+          <div style={{marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--divider)"}}>
+            <Fg label="Link da rota no Google Maps">
+              <input
+                style={fs}
+                value={form.rotaMapsUrl}
+                onChange={e => setF("rotaMapsUrl", e.target.value)}
+                placeholder="Cole aqui a rota montada no Google Maps"
+              />
+            </Fg>
+            <div className="muted" style={{fontSize: 11.5, marginTop: -4, marginBottom: 10}}>
+              {hasCustomMapsRoute ? "O botao vai abrir a rota colada neste campo." : "Sem link colado, o botao monta a rota pela origem, paradas e destino."}
+            </div>
+            <div className="col" style={{gap: 5, marginBottom: 10}}>
+              {routePoints.length > 0 ? routePoints.map((point, index) => (
+                <div key={`${point}-${index}`} className="row" style={{gap: 8, fontSize: 12}}>
+                  <span className="num" style={{width: 18, color: "var(--brand-blue)"}}>{index + 1}</span>
+                  <span style={{color: "var(--text)"}}>{point}</span>
+                </div>
+              )) : (
+                <div className="muted" style={{fontSize: 12}}>Informe origem e destino para montar a rota.</div>
+              )}
+            </div>
+            <button
+              className="btn"
+              disabled={!routeMapsUrl}
+              onClick={() => routeMapsUrl && window.open(routeMapsUrl, "_blank", "noopener,noreferrer")}
+              style={{width: "100%", justifyContent: "center"}}
+            >
+              <Icon name="map" size={14}/> Abrir rota no Google Maps
+            </button>
+          </div>
         </div>
       </div>
       <div className="col" style={{gap: 14}}>
@@ -1533,6 +1773,73 @@ const Viagens = ({ onNavigate }) => {
             fontFamily: "inherit", lineHeight: 1.5,
           }}/>
 
+        <div style={{
+          border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 12,
+          background: "var(--bg)",
+        }}>
+          <div className="row between" style={{alignItems: "center", marginBottom: 10}}>
+            <div>
+              <div style={{fontSize: 12.5, fontWeight: 600, color: "var(--text)"}}>Documentos financeiros</div>
+              <div className="muted" style={{fontSize: 11.5}}>Vincule CT-e, MDF-e, NF ou outro documento emitido.</div>
+            </div>
+            <button className="btn" type="button" onClick={addDocumentoFinanceiro}>
+              <Icon name="plus" size={13}/> Adicionar
+            </button>
+          </div>
+
+          {normalizeDocumentosFinanceiros(form.documentosFinanceiros).length === 0 && (
+            <div className="muted" style={{fontSize: 12, padding: "8px 0"}}>
+              Nenhum documento vinculado.
+            </div>
+          )}
+
+          <div className="col" style={{gap: 10}}>
+            {normalizeDocumentosFinanceiros(form.documentosFinanceiros).map((doc, index) => (
+              <div key={doc.id} style={{
+                border: "1px solid var(--border)", borderRadius: "var(--r)",
+                padding: 10, background: "var(--surface)",
+              }}>
+                <div className="row between" style={{alignItems: "center", marginBottom: 8}}>
+                  <span style={{fontSize: 12, fontWeight: 600, color: "var(--text-2)"}}>Documento {index + 1}</span>
+                  <button className="icon-btn" type="button" onClick={() => removeDocumentoFinanceiro(doc.id)} title="Remover documento">
+                    <Icon name="x" size={13}/>
+                  </button>
+                </div>
+                <div style={{display: "grid", gridTemplateColumns: "110px 1fr", gap: 8, marginBottom: 8}}>
+                  <Fg label="Tipo">
+                    <select style={fs} value={doc.tipo} onChange={e => setDocumentoFinanceiro(doc.id, "tipo", e.target.value)}>
+                      <option value="CT-e">CT-e</option>
+                      <option value="MDF-e">MDF-e</option>
+                      <option value="NF">NF</option>
+                      <option value="Fatura">Fatura</option>
+                      <option value="Outro">Outro</option>
+                    </select>
+                  </Fg>
+                  <Fg label="Número">
+                    <input style={fs} value={doc.numero} onChange={e => setDocumentoFinanceiro(doc.id, "numero", e.target.value)} placeholder="Ex: 12345"/>
+                  </Fg>
+                </div>
+                <Fg label="Chave / Código">
+                  <input style={fs} value={doc.chave} onChange={e => setDocumentoFinanceiro(doc.id, "chave", e.target.value)} placeholder="Chave de acesso ou código do documento"/>
+                </Fg>
+                <div style={{height: 8}}/>
+                <Fg label="Link do documento">
+                  <input style={fs} value={doc.link} onChange={e => setDocumentoFinanceiro(doc.id, "link", e.target.value)} placeholder="Cole o link do PDF/XML ou sistema"/>
+                </Fg>
+                <div style={{height: 8}}/>
+                <Fg label="Observação">
+                  <input style={fs} value={doc.observacoes} onChange={e => setDocumentoFinanceiro(doc.id, "observacoes", e.target.value)} placeholder="Opcional"/>
+                </Fg>
+                {(doc.atualizadoPorLogin || doc.criadoPorLogin) && (
+                  <div className="muted" style={{fontSize: 11, marginTop: 8}}>
+                    Atualizado por {doc.atualizadoPorLogin || doc.criadoPorLogin}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Resumo final */}
         <div style={{
           border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 14,
@@ -1544,8 +1851,14 @@ const Viagens = ({ onNavigate }) => {
               { l: "N°",          v: form.numero },
               { l: "Data",        v: form.data ? new Date(form.data + "T12:00:00").toLocaleDateString("pt-BR") : "" },
               { l: "Rota",        v: form.origem && form.destino ? `${form.origem} (${form.ufOrigem}) → ${form.destino} (${form.ufDestino})` : "" },
+              { l: "Placa",       v: form.placa },
+              { l: "KM",          v: form.km ? `${fmtNum(numericValue(form.km))} km` : "" },
+              { l: "Paradas",     v: routePoints.length > 2 ? String(routePoints.length - 2) : "0" },
+              { l: "Docs financeiro", v: String(normalizeDocumentosFinanceiros(form.documentosFinanceiros).length) },
+              { l: "Rota Maps",   v: hasCustomMapsRoute ? "Link colado" : "" },
               { l: "Cliente",     v: form.cliente },
               { l: "Motorista",   v: form.motorista },
+              { l: "Consulta",    v: consultaMotoristaOk ? "Motorista consultado" : "Consulta pendente" },
               { l: "Vr. Cliente", v: form.valorCliente ? `R$ ${fmtNum(+form.valorCliente, {minimumFractionDigits: 2})}` : "" },
               { l: "Vr. Motorista", v: form.valorMotorista ? `R$ ${fmtNum(+form.valorMotorista, {minimumFractionDigits: 2})}` : "" },
             ].map(row => row.v && (
@@ -1560,7 +1873,8 @@ const Viagens = ({ onNavigate }) => {
     </div>
   );
 
-  const stepContent = [renderStep1, renderStep2, renderStep3, renderStep4][step - 1];
+  const stepContentMap = { 1: renderStep1, 2: renderStep2, 3: renderStep3, 4: renderStep4 };
+  const stepContent = stepContentMap[step] || renderStep1;
 
   return (
     <div className="view">
@@ -1570,11 +1884,16 @@ const Viagens = ({ onNavigate }) => {
           <h1>{isEdit ? `Editando ${form.numero}` : "Nova Viagem"}</h1>
           <div className="sub">
             {form.origem && form.destino
-              ? `${form.origem} → ${form.destino}`
-              : "Preencha as informações da viagem"}
+              ? `${form.origem} -> ${form.destino}`
+              : "Preencha as informa\u00e7\u00f5es da viagem"}
           </div>
         </div>
         <div className="actions">
+          {isEdit && (
+            <button className="btn" onClick={() => setStep(visibleSteps[visibleSteps.length - 1]?.n || 4)}>
+              <Icon name="file"/> Ir para documentos
+            </button>
+          )}
           <button className="btn" onClick={() => setMode("list")}>
             <Icon name="arrow-right" style={{transform: "rotate(180deg)"}}/> Voltar
           </button>
@@ -1584,16 +1903,17 @@ const Viagens = ({ onNavigate }) => {
       {/* Stepper */}
       <div className="card" style={{padding: 0, marginBottom: 16, overflow: "hidden"}}>
         <div style={{display: "flex", borderBottom: "1px solid var(--divider)"}}>
-          {STEPS.map((s) => {
-            const done    = step > s.n;
+          {visibleSteps.map((s, index) => {
+            const done    = index < currentStepIndex;
             const current = step === s.n;
+            const canOpen = done || isEdit;
             return (
               <button key={s.n}
-                onClick={() => done && setStep(s.n)}
+                onClick={() => canOpen && setStep(s.n)}
                 style={{
                   flex: 1, padding: "14px 8px", background: "transparent",
                   borderBottom: `2px solid ${current ? "var(--brand-blue)" : "transparent"}`,
-                  cursor: done ? "pointer" : "default",
+                  cursor: canOpen ? "pointer" : "default",
                   color: current ? "var(--brand-blue)" : done ? "var(--text)" : "var(--text-3)",
                   display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                   fontSize: 12.5, fontWeight: current ? 600 : 400, transition: "all 120ms",
@@ -1605,7 +1925,7 @@ const Viagens = ({ onNavigate }) => {
                   color: done || current ? "#fff" : "var(--text-3)",
                   display: "grid", placeItems: "center", fontSize: 11, fontWeight: 600,
                 }}>
-                  {done ? <Icon name="check" size={11} strokeWidth={3}/> : s.n}
+                  {done ? <Icon name="check" size={11} strokeWidth={3}/> : s.displayN}
                 </div>
                 {s.label}
               </button>
@@ -1634,30 +1954,30 @@ const Viagens = ({ onNavigate }) => {
           display: "flex", justifyContent: "space-between", alignItems: "center",
           background: "var(--bg)",
         }}>
-          <button className="btn" onClick={() => step > 1 ? setStep(step - 1) : setMode("list")}
+          <button className="btn" onClick={() => currentStepIndex > 0 ? setStep(previousStep) : setMode("list")}
             style={{minWidth: 100}}>
             <Icon name="arrow-right" size={14} style={{transform: "rotate(180deg)"}}/>
-            {step === 1 ? "Cancelar" : "Anterior"}
+            {currentStepIndex === 0 ? "Cancelar" : "Anterior"}
           </button>
 
           <div className="row" style={{gap: 6}}>
-            {STEPS.map(s => (
+            {visibleSteps.map((s, index) => (
               <div key={s.n} style={{
                 width: step === s.n ? 20 : 6, height: 6,
                 borderRadius: 3,
-                background: step > s.n ? "#047857" : step === s.n ? "var(--brand-blue)" : "var(--border)",
+                background: index < currentStepIndex ? "#047857" : step === s.n ? "var(--brand-blue)" : "var(--border)",
                 transition: "all 200ms",
               }}/>
             ))}
           </div>
 
-          {step < STEPS.length ? (
-            <button className="btn primary" onClick={() => setStep(step + 1)} style={{minWidth: 100}}>
-              Próximo <Icon name="arrow-right" size={14}/>
+          {!isLastStep ? (
+            <button className="btn primary" onClick={saveAndGoNext} style={{minWidth: 100}}>
+              {"Pr\u00f3ximo"} <Icon name="arrow-right" size={14}/>
             </button>
           ) : (
             <button className="btn primary" onClick={saveForm} style={{minWidth: 140}}>
-              <Icon name="check" size={14}/> {isEdit ? "Salvar alterações" : "Cadastrar viagem"}
+              <Icon name="check" size={14}/> {isEdit ? "Salvar altera\u00e7\u00f5es" : "Cadastrar viagem"}
             </button>
           )}
         </div>

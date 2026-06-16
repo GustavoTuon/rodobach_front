@@ -152,6 +152,9 @@ window.RB_API = {
   getCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos${buildQuery(filters || {})}`),
   getCustosVeiculosFiltros: () => apiRequest("/financeiro/custos-veiculos/filtros"),
   getCustosVeiculoDetalhe: (placa, filters = {}) => apiRequest(`/financeiro/custos-veiculos/${encodeURIComponent(placa)}${buildQuery(filters || {})}`),
+  getManutencoesVeiculos: (filters = {}) => apiRequest(`/financeiro/manutencoes-veiculos${buildQuery(filters || {})}`),
+  getManutencoesVeiculosFiltros: () => apiRequest("/financeiro/manutencoes-veiculos/filtros"),
+  getManutencaoVeiculoDetalhe: (placa, filters = {}) => apiRequest(`/financeiro/manutencoes-veiculos/${encodeURIComponent(placa)}${buildQuery(filters || {})}`),
   getDemonstrativoFinanceiro: (filters) => {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/demonstrativo${buildQuery(params)}`);
@@ -170,6 +173,7 @@ window.RB_API = {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/analise-clientes${buildQuery(params)}`);
   },
+  getRentabilidadeClientes: (filters = {}) => apiRequest(`/clientes/rentabilidade${buildQuery(filters || {})}`),
 
   // ── Manutenção ────────────────────────────────────────────────────────────
   listVeiculosManutencao: () => apiRequest("/manutencao/veiculos"),
