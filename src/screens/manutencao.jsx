@@ -41,6 +41,10 @@ function dedupeSelecionadas(selecionadas) {
   return [...porPlaca.values()];
 }
 
+function normalizarNumero(numero) {
+  return String(numero || "").replace(/[^\d]/g, "");
+}
+
 function agruparAutomacoes(automacoes) {
   const grupos = new Map();
   for (const item of automacoes || []) {
@@ -49,6 +53,7 @@ function agruparAutomacoes(automacoes) {
       String(item.mensagem || "").trim().toLowerCase(),
       Number(item.intervalo_km) || 0,
       Boolean(item.ativo),
+      String(item.numeros || "").trim().toLowerCase(),
     ].join("|");
 
     if (!grupos.has(chave)) {
@@ -401,6 +406,142 @@ function InputNumeros({ numeros, onChange }) {
   );
 }
 
+function ContatoEnvio({ contatos, carregando, form, onToggle, onAdd, onManualNumbers, onCreate }) {
+  const [novo, setNovo] = useState({ nome: "", numero: "" });
+  const [criando, setCriando] = useState(false);
+  const [erro, setErro] = useState(null);
+  const numerosSelecionados = new Set((form.numeros || []).map(normalizarNumero).filter(Boolean));
+
+  async function salvarContato() {
+    const nome = novo.nome.trim();
+    const numero = normalizarNumero(novo.numero);
+    setErro(null);
+    if (!nome || !numero) {
+      setErro("Informe nome e numero.");
+      return;
+    }
+
+    setCriando(true);
+    try {
+      const contato = await onCreate({ nome, numero });
+      setNovo({ nome: "", numero: "" });
+      onAdd(contato);
+    } catch (e) {
+      setErro(e.message);
+    } finally {
+      setCriando(false);
+    }
+  }
+
+  return (
+    <div style={{
+      border: "1px solid var(--border)",
+      borderRadius: 8,
+      background: "var(--bg)",
+      overflow: "hidden",
+    }}>
+      <div style={{ padding: 12, borderBottom: "1px solid var(--border)" }}>
+        <label style={{ fontSize: 12.5, fontWeight: 600, display: "block", marginBottom: 6 }}>
+          Contatos de envio *
+        </label>
+        {carregando ? (
+          <div className="muted" style={{ fontSize: 12 }}>Carregando contatos...</div>
+        ) : contatos.length === 0 ? (
+          <div className="muted" style={{ fontSize: 12 }}>Nenhum contato cadastrado.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 150, overflowY: "auto" }}>
+            {contatos.map(contato => {
+              const numero = normalizarNumero(contato.numero);
+              const marcado = numerosSelecionados.has(numero);
+              return (
+                <button
+                  key={contato.id}
+                  type="button"
+                  onClick={() => onToggle(contato)}
+                  style={{
+                    border: "1px solid var(--border)",
+                    borderRadius: 6,
+                    background: marcado ? "var(--accent-soft)" : "var(--surface)",
+                    color: "var(--text)",
+                    padding: "7px 9px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    textAlign: "left",
+                    cursor: "pointer",
+                  }}
+                >
+                  <CheckBox checked={marcado}/>
+                  <span style={{ fontWeight: 600, fontSize: 12.5 }}>{contato.nome}</span>
+                  <span className="muted" style={{ fontSize: 12, marginLeft: "auto", fontFamily: "var(--font-mono, monospace)" }}>
+                    {numero}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: 12 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 8 }}>
+          Cadastrar contato
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, alignItems: "center" }}>
+          <input
+            type="text"
+            value={novo.nome}
+            onChange={e => setNovo(n => ({ ...n, nome: e.target.value }))}
+            placeholder="Nome"
+            style={{
+              minWidth: 0,
+              padding: "8px 10px",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              background: "var(--surface)",
+              color: "var(--text)",
+              fontSize: 13,
+            }}
+          />
+          <input
+            type="tel"
+            inputMode="tel"
+            value={novo.numero}
+            onChange={e => setNovo(n => ({ ...n, numero: e.target.value }))}
+            placeholder="5548996523702"
+            style={{
+              minWidth: 0,
+              padding: "8px 10px",
+              border: "1px solid var(--border)",
+              borderRadius: 6,
+              background: "var(--surface)",
+              color: "var(--text)",
+              fontSize: 13,
+            }}
+          />
+          <button
+            type="button"
+            className="btn"
+            disabled={criando}
+            onClick={salvarContato}
+            style={{ fontSize: 13, whiteSpace: "nowrap" }}
+          >
+            {criando ? "Salvando..." : "Salvar"}
+          </button>
+        </div>
+        {erro && <div style={{ color: "var(--danger, #e54d2e)", fontSize: 12, marginTop: 6 }}>{erro}</div>}
+
+        <div style={{ marginTop: 12 }}>
+          <InputNumeros
+            numeros={form.numeros}
+            onChange={onManualNumbers}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CheckBox({ checked, indeterminate }) {
   return (
     <div style={{
@@ -426,6 +567,8 @@ function ManutencaoMensagens() {
 
   const [veiculos, setVeiculos] = useState([]);
   const [veiculosCarregando, setVeiculosCarregando] = useState(false);
+  const [contatos, setContatos] = useState([]);
+  const [contatosCarregando, setContatosCarregando] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -467,7 +610,69 @@ function ManutencaoMensagens() {
     }
   }
 
+  async function carregarContatos() {
+    setContatosCarregando(true);
+    try {
+      const data = await RB_API.listContatosManutencao();
+      setContatos(data.contatos || []);
+    } catch (e) {
+      console.error("Erro ao carregar contatos:", e.message);
+      setContatos([]);
+    } finally {
+      setContatosCarregando(false);
+    }
+  }
+
+  function alternarContato(contato) {
+    if (!contato) return;
+    const numero = normalizarNumero(contato.numero);
+    if (!numero) return;
+    setForm(f => ({
+      ...f,
+      numeros: f.numeros.map(normalizarNumero).includes(numero)
+        ? f.numeros.map(normalizarNumero).filter(n => n !== numero)
+        : [...f.numeros.map(normalizarNumero).filter(Boolean), numero],
+    }));
+  }
+
+  function adicionarContato(contato) {
+    if (!contato) return;
+    const numero = normalizarNumero(contato.numero);
+    if (!numero) return;
+    setForm(f => {
+      const numeros = f.numeros.map(normalizarNumero).filter(Boolean);
+      return {
+        ...f,
+        numeros: numeros.includes(numero) ? numeros : [...numeros, numero],
+      };
+    });
+  }
+
+  function alterarNumeros(nums) {
+    const limpos = nums.map(normalizarNumero).filter(Boolean);
+    setForm(f => ({
+      ...f,
+      numeros: limpos,
+    }));
+  }
+
+  async function criarContato(payload) {
+    const data = await RB_API.createContatoManutencao(payload);
+    const contato = data.contato;
+    setContatos(lista => {
+      const semDuplicado = lista.filter(c => String(c.id) !== String(contato.id) && c.numero !== contato.numero);
+      return [...semDuplicado, contato].sort((a, b) => String(a.nome).localeCompare(String(b.nome)));
+    });
+    return contato;
+  }
+
+  function nomeDoContato(numero) {
+    const limpo = normalizarNumero(numero);
+    return contatos.find(c => normalizarNumero(c.numero) === limpo)?.nome || "";
+  }
+
   useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => { carregarContatos(); }, []);
 
   function abrirNovo() {
     setEditando(null);
@@ -475,6 +680,7 @@ function ManutencaoMensagens() {
     setFormErro(null);
     setModalOpen(true);
     if (veiculos.length === 0) carregarVeiculos();
+    if (contatos.length === 0) carregarContatos();
   }
 
   function abrirEditar(a) {
@@ -490,6 +696,7 @@ function ManutencaoMensagens() {
     setFormErro(null);
     setModalOpen(true);
     if (veiculos.length === 0) carregarVeiculos();
+    if (contatos.length === 0) carregarContatos();
   }
 
   function fecharModal() {
@@ -521,6 +728,12 @@ function ManutencaoMensagens() {
 
     setSalvando(true);
     try {
+      const contatoPayload = {
+        numeros: form.numeros.map(normalizarNumero).filter(Boolean).join(","),
+        contato_id: null,
+        contato_nome: null,
+        contato_numero: null,
+      };
       if (editando) {
         // Edição: atualiza apenas o registro específico
         const ids = editando.ids || [editando.id];
@@ -528,6 +741,7 @@ function ManutencaoMensagens() {
           titulo: form.titulo.trim(),
           mensagem: form.mensagem.trim(),
           intervalo_km: Number(form.intervalo_km),
+          ...contatoPayload,
         };
         if (ids.length === 1) {
           payload.km_atual = form.selecionadas[0]?.km_atual ?? editando.km_atual;
@@ -540,7 +754,7 @@ function ManutencaoMensagens() {
           titulo: form.titulo.trim(),
           mensagem: form.mensagem.trim(),
           intervalo_km: Number(form.intervalo_km),
-          numeros: form.numeros.join(","),
+          ...contatoPayload,
         });
       }
       fecharModal();
@@ -664,17 +878,22 @@ function ManutencaoMensagens() {
                   {a.numeros && (
                     <div className="row" style={{ gap: 5, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
                       <span className="muted" style={{ fontSize: 12 }}>Enviar para:</span>
-                      {String(a.numeros).split(",").filter(Boolean).map(n => (
+                      {String(a.numeros).split(",").filter(Boolean).map(n => {
+                        const nome = nomeDoContato(n);
+                        return (
                         <span key={n} style={{
-                          background: "var(--surface-alt, #f4f4f5)",
-                          border: "1px solid var(--border)",
+                          background: "var(--accent-soft)",
+                          border: "1px solid var(--accent-border)",
                           borderRadius: 4,
                           padding: "1px 7px",
                           fontSize: 11.5,
                           fontFamily: "var(--font-mono, monospace)",
-                          color: "var(--text)",
-                        }}>{n}</span>
-                      ))}
+                          color: "var(--brand-blue)",
+                        }}>
+                          {nome ? `${nome} - ${normalizarNumero(n)}` : normalizarNumero(n)}
+                        </span>
+                        );
+                      })}
                     </div>
                   )}
                   <div className="row" style={{ gap: 20, flexWrap: "wrap" }}>
@@ -893,15 +1112,15 @@ function ManutencaoMensagens() {
                   />
                 </div>
 
-                <div>
-                  <label style={{ fontSize: 12.5, fontWeight: 500, display: "block", marginBottom: 5 }}>
-                    Enviar para os números *
-                  </label>
-                  <InputNumeros
-                    numeros={form.numeros}
-                    onChange={nums => setForm(f => ({ ...f, numeros: nums }))}
-                  />
-                </div>
+                <ContatoEnvio
+                  contatos={contatos}
+                  carregando={contatosCarregando}
+                  form={form}
+                  onToggle={alternarContato}
+                  onAdd={adicionarContato}
+                  onManualNumbers={alterarNumeros}
+                  onCreate={criarContato}
+                />
 
                 <div>
                   <label style={{ fontSize: 12.5, fontWeight: 500, display: "block", marginBottom: 5 }}>

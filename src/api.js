@@ -177,6 +177,11 @@ window.RB_API = {
 
   // ── Manutenção ────────────────────────────────────────────────────────────
   listVeiculosManutencao: () => apiRequest("/manutencao/veiculos"),
+  listContatosManutencao: () => apiRequest("/manutencao/contatos"),
+  createContatoManutencao: (payload) => apiRequest("/manutencao/contatos", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
   listManutencao: () => apiRequest("/manutencao"),
   createManutencao: (payload) => apiRequest("/manutencao", {
     method: "POST",
