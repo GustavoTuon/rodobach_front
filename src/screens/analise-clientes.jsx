@@ -203,8 +203,7 @@ const HistoricoFretes = () => {
           ].map(({ label, value, set, listId, opts }) => (
             <div key={label}>
               <div style={{ fontSize:11, color:"var(--text-3)", fontWeight:500, marginBottom:4 }}>{label}</div>
-              <input list={listId} value={value} onChange={e => set(e.target.value)} placeholder="Todos" style={iS}/>
-              <datalist id={listId}>{opts.map(o => <option key={o} value={o}/>)}</datalist>
+              <RBCombobox value={value} onChange={set} options={opts} placeholder="Todos" tag={() => label}/>
             </div>
           ))}
         </div>
