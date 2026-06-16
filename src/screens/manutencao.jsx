@@ -5,6 +5,7 @@ const EMPTY_FORM = {
   titulo: "",
   mensagem: "",
   intervalo_km: "",
+  numeros: [], // ["5546999990000", ...]
 };
 
 function fmtKm(v) {
@@ -305,6 +306,101 @@ function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
   );
 }
 
+// ── Input de números de destino (chips) ─────────────────────────────────────
+function InputNumeros({ numeros, onChange }) {
+  const [valor, setValor] = useState("");
+
+  function adicionar(texto) {
+    const limpos = String(texto)
+      .split(/[,;\s]+/)
+      .map(n => n.replace(/[^\d+]/g, ""))
+      .filter(Boolean);
+    if (limpos.length === 0) { setValor(""); return; }
+    const novos = [...numeros];
+    for (const n of limpos) if (!novos.includes(n)) novos.push(n);
+    onChange(novos);
+    setValor("");
+  }
+
+  function onKeyDown(e) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      adicionar(valor);
+    } else if (e.key === "Backspace" && valor === "" && numeros.length > 0) {
+      onChange(numeros.slice(0, -1));
+    }
+  }
+
+  return (
+    <div>
+      <div style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 5,
+        padding: numeros.length === 0 ? "4px 6px" : "6px 8px",
+        border: "1px solid var(--border)",
+        borderRadius: 6,
+        background: "var(--bg)",
+        minHeight: 38,
+        alignItems: "center",
+        boxSizing: "border-box",
+      }}>
+        {numeros.map(n => (
+          <span key={n} style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            background: "var(--accent-soft)",
+            color: "var(--brand-blue)",
+            border: "1px solid var(--accent-border)",
+            borderRadius: 4,
+            padding: "2px 6px 2px 8px",
+            fontSize: 12,
+            fontWeight: 600,
+            fontFamily: "var(--font-mono, monospace)",
+            letterSpacing: "0.03em",
+          }}>
+            {n}
+            <button
+              type="button"
+              onClick={() => onChange(numeros.filter(x => x !== n))}
+              style={{
+                background: "none", border: "none", cursor: "pointer",
+                padding: 0, lineHeight: 1, color: "var(--brand-blue)",
+                display: "flex", alignItems: "center", opacity: 0.7,
+              }}
+            >
+              <Icon name="x" size={11}/>
+            </button>
+          </span>
+        ))}
+        <input
+          type="text"
+          inputMode="tel"
+          value={valor}
+          onChange={e => setValor(e.target.value)}
+          onKeyDown={onKeyDown}
+          onBlur={() => valor.trim() && adicionar(valor)}
+          placeholder={numeros.length === 0 ? "Ex: 5546999990000 — Enter para adicionar" : ""}
+          style={{
+            flex: 1,
+            minWidth: 140,
+            border: "none",
+            outline: "none",
+            background: "transparent",
+            color: "var(--text)",
+            fontSize: 13,
+            padding: "4px 4px",
+          }}
+        />
+      </div>
+      <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+        Digite o número com DDI + DDD e pressione Enter (ou vírgula). Pode colar vários separados por vírgula.
+      </div>
+    </div>
+  );
+}
+
 function CheckBox({ checked, indeterminate }) {
   return (
     <div style={{
@@ -389,6 +485,7 @@ function ManutencaoMensagens() {
       titulo: a.titulo,
       mensagem: a.mensagem,
       intervalo_km: String(a.intervalo_km),
+      numeros: String(a.numeros || "").split(",").filter(Boolean),
     });
     setFormErro(null);
     setModalOpen(true);
@@ -417,6 +514,10 @@ function ManutencaoMensagens() {
       setFormErro("O intervalo de KM deve ser maior que zero.");
       return;
     }
+    if (form.numeros.length === 0) {
+      setFormErro("Adicione ao menos um número de destino.");
+      return;
+    }
 
     setSalvando(true);
     try {
@@ -439,6 +540,7 @@ function ManutencaoMensagens() {
           titulo: form.titulo.trim(),
           mensagem: form.mensagem.trim(),
           intervalo_km: Number(form.intervalo_km),
+          numeros: form.numeros.join(","),
         });
       }
       fecharModal();
@@ -559,6 +661,22 @@ function ManutencaoMensagens() {
                   <div className="muted" style={{ fontSize: 12.5, marginBottom: 8, lineHeight: 1.5 }}>
                     {a.mensagem}
                   </div>
+                  {a.numeros && (
+                    <div className="row" style={{ gap: 5, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
+                      <span className="muted" style={{ fontSize: 12 }}>Enviar para:</span>
+                      {String(a.numeros).split(",").filter(Boolean).map(n => (
+                        <span key={n} style={{
+                          background: "var(--surface-alt, #f4f4f5)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 4,
+                          padding: "1px 7px",
+                          fontSize: 11.5,
+                          fontFamily: "var(--font-mono, monospace)",
+                          color: "var(--text)",
+                        }}>{n}</span>
+                      ))}
+                    </div>
+                  )}
                   <div className="row" style={{ gap: 20, flexWrap: "wrap" }}>
                     <div style={{ fontSize: 12 }}>
                       <span className="muted">Intervalo: </span>
@@ -772,6 +890,16 @@ function ManutencaoMensagens() {
                       fontSize: 13, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box",
                     }}
                     required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12.5, fontWeight: 500, display: "block", marginBottom: 5 }}>
+                    Enviar para os números *
+                  </label>
+                  <InputNumeros
+                    numeros={form.numeros}
+                    onChange={nums => setForm(f => ({ ...f, numeros: nums }))}
                   />
                 </div>
 
