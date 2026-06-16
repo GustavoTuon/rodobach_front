@@ -224,7 +224,97 @@ const Tabs = ({ tabs, active, onChange }) => (
   </div>
 );
 
+const RBCombobox = ({ value, onChange, options = [], placeholder = "Todos", getLabel, getValue, tag, transform, max = 8 }) => {
+  const [open, setOpen] = React.useState(false);
+  const [active, setActive] = React.useState(0);
+  const ref = React.useRef(null);
+
+  React.useEffect(() => {
+    const close = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, []);
+
+  const labelOf = (item) => getLabel ? getLabel(item) : String(item ?? "");
+  const valueOf = (item) => getValue ? getValue(item) : labelOf(item);
+  const normalizedValue = String(value || "");
+  const query = normalizedValue.trim().toLowerCase();
+  const unique = [];
+  const seen = new Set();
+
+  for (const option of options || []) {
+    const label = labelOf(option);
+    const optionValue = valueOf(option);
+    const key = String(optionValue || label).trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push({ raw: option, label, value: optionValue });
+  }
+
+  const filtered = unique
+    .filter((item) => !query || `${item.label} ${item.value}`.toLowerCase().includes(query))
+    .slice(0, max);
+
+  const select = (item) => {
+    onChange(String(item.value || ""));
+    setOpen(false);
+    setActive(0);
+  };
+
+  return (
+    <div className="rb-combo" ref={ref}>
+      <input
+        value={normalizedValue}
+        placeholder={placeholder}
+        onFocus={() => setOpen(true)}
+        onChange={(event) => {
+          const next = transform ? transform(event.target.value) : event.target.value;
+          onChange(next);
+          setOpen(true);
+          setActive(0);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setOpen(true);
+            setActive((i) => Math.min(i + 1, Math.max(filtered.length - 1, 0)));
+          } else if (event.key === "ArrowUp") {
+            event.preventDefault();
+            setActive((i) => Math.max(i - 1, 0));
+          } else if (event.key === "Enter" && open && filtered[active]) {
+            event.preventDefault();
+            select(filtered[active]);
+          } else if (event.key === "Escape") {
+            setOpen(false);
+          }
+        }}
+      />
+      {open && filtered.length > 0 && (
+        <div className="rb-combo-menu">
+          {filtered.map((item, index) => (
+            <button
+              key={`${item.value}-${index}`}
+              type="button"
+              className={index === active ? "active" : ""}
+              onMouseEnter={() => setActive(index)}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                select(item);
+              }}
+            >
+              <span>{item.label}</span>
+              {tag && <em>{tag(item.raw)}</em>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 Object.assign(window, {
-  Icon, StatusBadge, SeverityBadge, Plate, KPI, MiniBar, Sparkline, BarChart, Tabs,
+  Icon, StatusBadge, SeverityBadge, Plate, KPI, MiniBar, Sparkline, BarChart, Tabs, RBCombobox,
   fmtNum, fmtKm, pad,
 });

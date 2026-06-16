@@ -357,8 +357,7 @@ const ManutencoesVeiculos = () => {
           <input type="date" value={dataFim} onChange={e => { setDataFim(e.target.value); setPeriodo("custom"); }}/>
         </label>
         <label>Placa
-          <input list="mv-placas" value={placa} placeholder="Todas" onChange={e => setPlaca(e.target.value.toUpperCase())}/>
-          <datalist id="mv-placas">{opcoes.placas.map(p => <option key={p} value={p}/>)}</datalist>
+          <RBCombobox value={placa} onChange={setPlaca} options={opcoes.placas} placeholder="Todas" transform={(v) => v.toUpperCase()} tag={() => "Placa"}/>
         </label>
         <label>Categoria
           <select value={categoria} onChange={e => setCategoria(e.target.value)}
@@ -368,16 +367,13 @@ const ManutencoesVeiculos = () => {
           </select>
         </label>
         <label>Fornecedor
-          <input list="mv-fornecedores" value={fornecedor} placeholder="Todos" onChange={e => setFornecedor(e.target.value)}/>
-          <datalist id="mv-fornecedores">{opcoes.fornecedores.map(f => <option key={`${f.codigo}-${f.nome}`} value={f.nome}/>)}</datalist>
+          <RBCombobox value={fornecedor} onChange={setFornecedor} options={opcoes.fornecedores} placeholder="Todos" getLabel={(f) => f.nome} getValue={(f) => f.nome} tag={() => "Fornecedor"}/>
         </label>
         <label>Centro de custo
-          <input list="mv-centros" value={centro} placeholder="Todos" onChange={e => setCentro(e.target.value)}/>
-          <datalist id="mv-centros">{opcoes.centrosCusto.map(c => <option key={`${c.codigo}-${c.nome}`} value={c.nome}/>)}</datalist>
+          <RBCombobox value={centro} onChange={setCentro} options={opcoes.centrosCusto} placeholder="Todos" getLabel={(c) => c.nome} getValue={(c) => c.nome} tag={() => "Centro"}/>
         </label>
         <label>Produto/Serviço
-          <input list="mv-produtos" value={produto} placeholder="Todos" onChange={e => setProduto(e.target.value)}/>
-          <datalist id="mv-produtos">{opcoes.produtos.map(p => <option key={`${p.codigo}-${p.nome}`} value={p.nome}/>)}</datalist>
+          <RBCombobox value={produto} onChange={setProduto} options={opcoes.produtos} placeholder="Todos" getLabel={(p) => p.nome} getValue={(p) => p.nome} tag={() => "Produto"}/>
         </label>
         <button className="btn primary" onClick={applyFilters}><Icon name="filter" size={12}/> Aplicar</button>
         <button className="btn" onClick={clearFilters}><Icon name="x" size={12}/> Limpar</button>

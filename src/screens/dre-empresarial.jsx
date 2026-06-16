@@ -166,6 +166,15 @@ const DreEmpresarial = () => {
   const maxCategory = Math.max(1, ...data.categories.map((c) => dreEmpNum(c.custo)));
   const topCost = data.accounts.filter((a) => dreEmpNum(a.custo) > 0)[0];
   const tableRows = data.rows.slice(0, 160);
+  const pessoas = React.useMemo(() => {
+    const map = new Map();
+    data.rows.forEach((row) => {
+      if (!row.pessoaNome && !row.clienteCodigo) return;
+      const key = row.clienteCodigo || row.pessoaNome;
+      if (!map.has(key)) map.set(key, { codigo: row.clienteCodigo, nome: row.pessoaNome || String(row.clienteCodigo) });
+    });
+    return [...map.values()].sort((a, b) => String(a.nome).localeCompare(String(b.nome)));
+  }, [data.rows]);
 
   const selectShortcut = (key) => {
     const p = DRE_EMP_PERIODS.find((item) => item.key === key);
@@ -229,13 +238,13 @@ const DreEmpresarial = () => {
       </div>
 
       <div className="period-filter" style={{alignItems: "end", flexWrap: "wrap"}}>
-        <label>Lan\u00e7amento inicial<input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></label>
-        <label>Lan\u00e7amento final<input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)}/></label>
-        <label>Mes/Ano<input type="month" value={mesAno} onChange={(e) => setMesAno(e.target.value)}/></label>
-        <label>Centro<input type="number" value={centro} placeholder="Codigo" onChange={(e) => setCentro(e.target.value)}/></label>
-        <label>Conta<input type="number" value={conta} placeholder="Codigo" onChange={(e) => setConta(e.target.value)}/></label>
-        <label>Placa<input type="text" value={placa} placeholder="AAA0A00" onChange={(e) => setPlaca(e.target.value.toUpperCase())}/></label>
-        <label>Cliente<input type="number" value={cliente} placeholder="Codigo" onChange={(e) => setCliente(e.target.value)}/></label>
+        <label>Lançamento inicial<input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></label>
+        <label>Lançamento final<input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)}/></label>
+        <label>Mês/Ano<input type="month" value={mesAno} onChange={(e) => setMesAno(e.target.value)}/></label>
+        <label>Centro<RBCombobox value={centro} onChange={setCentro} options={data.centers} placeholder="Código ou nome" getLabel={(c) => `${c.centroCodigo || ""} ${c.centroCusto || "Sem centro"}`.trim()} getValue={(c) => c.centroCodigo || c.centroCusto || ""} tag={() => "Centro"}/></label>
+        <label>Conta<RBCombobox value={conta} onChange={setConta} options={data.accounts} placeholder="Código ou nome" getLabel={(c) => `${c.contaCodigo || ""} ${c.contaNome || "Sem conta"}`.trim()} getValue={(c) => c.contaCodigo || c.contaNome || ""} tag={() => "Conta"}/></label>
+        <label>Placa<RBCombobox value={placa} onChange={setPlaca} options={data.plates} placeholder="AAA0A00" getLabel={(p) => p.placa} getValue={(p) => p.placa} transform={(v) => v.toUpperCase()} tag={() => "Placa"}/></label>
+        <label>Cliente<RBCombobox value={cliente} onChange={setCliente} options={pessoas} placeholder="Nome ou código" getLabel={(p) => `${p.codigo || ""} ${p.nome}`.trim()} getValue={(p) => p.codigo || p.nome || ""} tag={() => "Cliente"}/></label>
         <label>Tipo<select value={tipo} onChange={(e) => setTipo(e.target.value)}><option value="todos">Todos</option><option value="administrativo">Administrativo</option><option value="frota">Frota</option></select></label>
         <label>Status<select value={status} onChange={(e) => setStatus(e.target.value)}><option value="todos">Todos</option><option value="pago">Pago</option><option value="aberto">Aberto</option><option value="vencido">Vencido</option><option value="recebido">Recebido</option><option value="pendente">Pendente</option></select></label>
         <label style={{minWidth: 190}}>Busca<input type="text" value={search} placeholder="Conta, centro, placa..." onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") applyFilter(); }}/></label>
@@ -364,7 +373,7 @@ const DreEmpresarial = () => {
           <div className="card-header"><h3>Distribuicao por categoria</h3><span className="meta muted">{data.categories.length} grupos</span></div>
           <div className="card-body">
             {data.categories.filter((c) => c.custo > 0 || c.receita > 0).map((c) => (
-              <DreEmpBar key={c.categoriaDre} label={c.categoriaDre} value={c.custo || c.receita} total={maxCategory} tone={c.receita > 0 ? "#38bdf8" : "#a78bfa"} meta={`${c.lancamentos} lancamentos`}/>
+              <DreEmpBar key={c.categoriaDre} label={c.categoriaDre} value={c.custo || c.receita} total={maxCategory} tone={c.receita > 0 ? "#38bdf8" : "#a78bfa"} meta={`${c.lancamentos} lançamentos`}/>
             ))}
           </div>
         </div>
@@ -393,7 +402,7 @@ const DreEmpresarial = () => {
         </div>
 
         <div className="card card-flush">
-          <div className="card-header"><h3>Centros com pior resultado</h3><span className="meta muted">prejuizo</span></div>
+          <div className="card-header"><h3>Centros com pior resultado</h3><span className="meta muted">prejuízo</span></div>
           <div className="card-body">
             {data.centers.slice(0, 12).map((c) => (
               <DreEmpBar key={c.centroCodigo || c.centroCusto} label={`${c.centroMascara || ""} ${c.centroCusto || "Sem centro"}`.trim()} value={c.valor} total={Math.max(1, ...data.centers.map((x) => Math.abs(dreEmpNum(x.valor))))} tone={dreEmpNum(c.valor) >= 0 ? "#22c55e" : "#f87171"} meta={`Receita ${dreEmpBRL(c.receita)} - custo ${dreEmpBRL(c.custo)}`}/>
@@ -403,7 +412,7 @@ const DreEmpresarial = () => {
       </div>
 
       <div className="card card-flush">
-        <div className="card-header"><h3>Lancamentos detalhados da DRE</h3><span className="meta muted">{tableRows.length} exibidos</span></div>
+        <div className="card-header"><h3>Lançamentos detalhados da DRE</h3><span className="meta muted">{tableRows.length} exibidos</span></div>
         <table className="tbl">
           <thead>
             <tr>
@@ -421,7 +430,7 @@ const DreEmpresarial = () => {
             </tr>
           </thead>
           <tbody>
-            {tableRows.length === 0 && <tr><td colSpan="11" className="muted" style={{padding: 20, textAlign: "center"}}>Sem lancamentos para os filtros.</td></tr>}
+            {tableRows.length === 0 && <tr><td colSpan="11" className="muted" style={{padding: 20, textAlign: "center"}}>Sem lançamentos para os filtros.</td></tr>}
             {tableRows.map((row, index) => (
               <tr key={`${row.data}-${row.origem}-${row.documento}-${index}`}>
                 <td>{dreEmpDate(row.data)}</td>

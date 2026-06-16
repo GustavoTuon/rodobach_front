@@ -59,7 +59,7 @@ const CV_STATUS = {
 const CV_RESULT_STATUS = {
   lucro: { label: "Lucro", cls: "ok", color: "#22c55e" },
   empate: { label: "Empate", cls: "info", color: "#3b82f6" },
-  prejuizo: { label: "Prejuizo", cls: "crit", color: "#ef4444" },
+  prejuizo: { label: "Prejuízo", cls: "crit", color: "#ef4444" },
 };
 
 const CV_PERIODS = [
@@ -105,7 +105,7 @@ const CvDetailModal = ({ placa, filters, onClose }) => {
     setError("");
     window.RB_API.getCustosVeiculoDetalhe(placa, filters)
       .then((payload) => { if (active) setData(payload); })
-      .catch((err) => { if (active) setError(err?.message || "Nao foi possivel carregar o veiculo."); })
+      .catch((err) => { if (active) setError(err?.message || "Não foi possível carregar o veículo."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [placa, JSON.stringify(filters)]);
@@ -122,7 +122,7 @@ const CvDetailModal = ({ placa, filters, onClose }) => {
         <div className="row between" style={{ marginBottom: 14, gap: 12 }}>
           <div>
             <h2 style={{ margin: 0, fontSize: 18 }}>{placa}</h2>
-            <div className="muted" style={{ fontSize: 12 }}>{v.nome || v.modelo || "Resumo individual do veiculo"}</div>
+            <div className="muted" style={{ fontSize: 12 }}>{v.nome || v.modelo || "Resumo individual do veículo"}</div>
           </div>
           <button className="icon-btn" onClick={onClose} title="Fechar"><Icon name="x"/></button>
         </div>
@@ -132,7 +132,7 @@ const CvDetailModal = ({ placa, filters, onClose }) => {
         {!loading && !error && (
           <>
             <div className="cv-detail-grid">
-              <CvKpi label="Total gasto" value={cvBRL(d.summary.custoTotal)} sub={`${d.summary.quantidadeLancamentos || 0} lancamentos`} tone="#ef4444" icon="money"/>
+              <CvKpi label="Total gasto" value={cvBRL(d.summary.custoTotal)} sub={`${d.summary.quantidadeLancamentos || 0} lançamentos`} tone="#ef4444" icon="money"/>
               <CvKpi label="Custo por km" value={cvBRL(v.custoPorKm)} sub={v.kmAtual ? `${Number(v.kmAtual).toLocaleString("pt-BR")} km atual` : "Sem km informado"} tone="#3b82f6" icon="speedometer"/>
               <CvKpi label="Aberto" value={cvBRL(d.summary.custoAberto)} sub={`Vencido: ${cvBRL(d.summary.custoVencido)}`} tone="#f59e0b" icon="clock"/>
             </div>
@@ -140,7 +140,7 @@ const CvDetailModal = ({ placa, filters, onClose }) => {
             <div className="cv-vehicle-info">
               <span><b>Centro:</b> {v.centroCusto || "-"}</span>
               <span><b>Empresa:</b> {v.empresa || "-"}</span>
-              <span><b>Proprietario:</b> {v.proprietario || "-"}</span>
+              <span><b>Proprietário:</b> {v.proprietario || "-"}</span>
               <span><b>Aquisicao:</b> {cvDate(v.dataAquisicao)}</span>
             </div>
 
@@ -277,12 +277,12 @@ const CustosVeiculos = () => {
     <div className="view cv-view">
       <div className="page-head">
         <div>
-          <h1>Custos por Veiculo</h1>
-          <div className="sub">Despesas da frota e lucro/prejuizo por placa com receita de conhecimentos/CT-e</div>
+          <h1>Custos por Veículo</h1>
+          <div className="sub">Despesas da frota e lucro/prejuízo por placa com receita de conhecimentos/CT-e</div>
         </div>
         <div className="actions">
           <button className={`btn${modo === "despesas" ? " primary" : ""}`} onClick={() => setModo("despesas")}>Despesas da frota</button>
-          <button className={`btn${modo === "lucro" ? " primary" : ""}`} onClick={() => setModo("lucro")}>Lucro por veiculo</button>
+          <button className={`btn${modo === "lucro" ? " primary" : ""}`} onClick={() => setModo("lucro")}>Lucro por veículo</button>
           {CV_PERIODS.map((p) => <button key={p.key} className="btn" onClick={() => applyShortcut(p.key)}>{p.label}</button>)}
           <button className="btn" onClick={() => window.RB_API.getCustosVeiculos(filters).then((payload) => setData(cvNormalize(payload)))}><Icon name="refresh"/> Atualizar</button>
         </div>
@@ -291,16 +291,16 @@ const CustosVeiculos = () => {
       <div className="cv-filters card">
         <label>Data inicial<input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></label>
         <label>Data final<input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)}/></label>
-        <label>Placa<input list="cv-placas" value={placa} placeholder="Todas" onChange={(e) => setPlaca(e.target.value.toUpperCase())}/><datalist id="cv-placas">{(options.placas || []).map((p) => <option key={p} value={p}/>)}</datalist></label>
-        <label>Centro de custo<input list="cv-centros" value={centro} placeholder="Todos" onChange={(e) => setCentro(e.target.value)}/><datalist id="cv-centros">{(options.centros || []).map((c) => <option key={`${c.codigo}-${c.nome}`} value={c.codigo ? `${c.codigo} - ${c.nome}` : c.nome}/>)}</datalist></label>
+        <label>Placa<RBCombobox value={placa} onChange={setPlaca} options={options.placas || []} placeholder="Todas" transform={(v) => v.toUpperCase()} tag={() => "Placa"}/></label>
+        <label>Centro de custo<RBCombobox value={centro} onChange={setCentro} options={options.centros || []} placeholder="Todos" getLabel={(c) => c.codigo ? `${c.codigo} - ${c.nome}` : c.nome} getValue={(c) => c.codigo ? `${c.codigo} - ${c.nome}` : c.nome} tag={() => "Centro"}/></label>
         <label>Tipo de custo<select value={tipoCusto} onChange={(e) => setTipoCusto(e.target.value)}><option value="todos">Todos</option>{(options.tipos || []).map((t) => <option key={t} value={t}>{t}</option>)}</select></label>
-        <label>Situacao<select value={situacao} onChange={(e) => setSituacao(e.target.value)}><option value="todos">Todas</option>{(options.situacoes || []).map((st) => <option key={st} value={st}>{CV_STATUS[st]?.label || st}</option>)}</select></label>
-        <label>Fornecedor<input list="cv-fornecedores" value={fornecedor} placeholder="Todos" onChange={(e) => setFornecedor(e.target.value)}/><datalist id="cv-fornecedores">{(options.fornecedores || []).map((f) => <option key={`${f.codigo}-${f.nome}`} value={f.codigo ? `${f.codigo} - ${f.nome}` : f.nome}/>)}</datalist></label>
+        <label>Situação<select value={situacao} onChange={(e) => setSituacao(e.target.value)}><option value="todos">Todas</option>{(options.situacoes || []).map((st) => <option key={st} value={st}>{CV_STATUS[st]?.label || st}</option>)}</select></label>
+        <label>Fornecedor<RBCombobox value={fornecedor} onChange={setFornecedor} options={options.fornecedores || []} placeholder="Todos" getLabel={(f) => f.codigo ? `${f.codigo} - ${f.nome}` : f.nome} getValue={(f) => f.codigo ? `${f.codigo} - ${f.nome}` : f.nome} tag={() => "Fornecedor"}/></label>
         <label>Empresa<select value={empresa} onChange={(e) => setEmpresa(e.target.value)}><option value="">Todas</option>{(options.empresas || []).map((e) => <option key={e} value={e}>{e}</option>)}</select></label>
-        <label>Proprietario<select value={proprietario} onChange={(e) => setProprietario(e.target.value)}><option value="frota">Frota</option><option value="terceiro">Terceiros</option><option value="todos">Todos</option></select></label>
-        <label>Valor minimo<input type="number" value={valorMin} placeholder="0,00" onChange={(e) => setValorMin(e.target.value)}/></label>
-        <label>Valor maximo<input type="number" value={valorMax} placeholder="Sem limite" onChange={(e) => setValorMax(e.target.value)}/></label>
-        <label>Busca livre<input value={search} placeholder="Descricao, documento, origem..." onChange={(e) => setSearch(e.target.value)}/></label>
+        <label>Proprietário<select value={proprietario} onChange={(e) => setProprietario(e.target.value)}><option value="frota">Frota</option><option value="terceiro">Terceiros</option><option value="todos">Todos</option></select></label>
+        <label>Valor mínimo<input type="number" value={valorMin} placeholder="0,00" onChange={(e) => setValorMin(e.target.value)}/></label>
+        <label>Valor máximo<input type="number" value={valorMax} placeholder="Sem limite" onChange={(e) => setValorMax(e.target.value)}/></label>
+        <label>Busca livre<input value={search} placeholder="Descrição, documento, origem..." onChange={(e) => setSearch(e.target.value)}/></label>
         <div className="cv-filter-actions"><button className="btn primary" onClick={applyFilters}><Icon name="search"/> Filtrar</button><button className="btn" onClick={clearFilters}><Icon name="x"/> Limpar</button></div>
       </div>
 
@@ -350,14 +350,14 @@ const CustosVeiculos = () => {
 
       <div className="card">
         <div className="section-head">
-          <div><h2>Detalhamento dos lancamentos</h2><div className="muted" style={{ fontSize: 12 }}>Origem: financeiro.pagar, rateios e abastecimentos operacionais nao duplicados</div></div>
+          <div><h2>Detalhamento dos lançamentos</h2><div className="muted" style={{ fontSize: 12 }}>Origem: financeiro.pagar, rateios e abastecimentos operacionais não duplicados</div></div>
           <div className="muted" style={{ fontSize: 12 }}>Validacao: base filtrada {cvBRL(data.validation.baseFiltrada)}</div>
         </div>
         <div className="table-wrap">
           <table className="data-table compact">
             <thead>
               <tr>
-                <th>Data</th><th>Placa/Centro</th><th>Centro de custo</th><th>Tipo</th><th>Fornecedor</th><th>Descricao</th><th className="num">Valor</th><th>Vencimento</th><th>Pagamento</th><th>Status</th><th>Origem</th>
+                <th>Data</th><th>Placa/Centro</th><th>Centro de custo</th><th>Tipo</th><th>Fornecedor</th><th>Descrição</th><th className="num">Valor</th><th>Vencimento</th><th>Pagamento</th><th>Status</th><th>Origem</th>
               </tr>
             </thead>
             <tbody>
@@ -376,7 +376,7 @@ const CustosVeiculos = () => {
                   <td>{row.origem}</td>
                 </tr>
               ))}
-              {!data.launches.length && <tr><td colSpan="11" className="muted">Nenhum lancamento encontrado para os filtros.</td></tr>}
+              {!data.launches.length && <tr><td colSpan="11" className="muted">Nenhum lançamento encontrado para os filtros.</td></tr>}
             </tbody>
           </table>
         </div>

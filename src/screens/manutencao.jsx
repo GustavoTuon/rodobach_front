@@ -12,6 +12,66 @@ function fmtKm(v) {
   return Number(v).toLocaleString("pt-BR") + " km";
 }
 
+function normalizarPlaca(placa) {
+  return String(placa || "").trim().toUpperCase();
+}
+
+function dedupeVeiculos(veiculos) {
+  const porPlaca = new Map();
+  for (const veiculo of veiculos || []) {
+    const placa = normalizarPlaca(veiculo.placa);
+    if (!placa) continue;
+    const atual = porPlaca.get(placa);
+    const odometro = Number(veiculo.odometro) || 0;
+    if (!atual || odometro > (Number(atual.odometro) || 0)) {
+      porPlaca.set(placa, { ...veiculo, placa });
+    }
+  }
+  return [...porPlaca.values()].sort((a, b) => a.placa.localeCompare(b.placa));
+}
+
+function dedupeSelecionadas(selecionadas) {
+  const porPlaca = new Map();
+  for (const item of selecionadas || []) {
+    const placa = normalizarPlaca(item.placa);
+    if (!placa || porPlaca.has(placa)) continue;
+    porPlaca.set(placa, { ...item, placa, km_atual: Number(item.km_atual) || 0 });
+  }
+  return [...porPlaca.values()];
+}
+
+function agruparAutomacoes(automacoes) {
+  const grupos = new Map();
+  for (const item of automacoes || []) {
+    const chave = [
+      String(item.titulo || "").trim().toLowerCase(),
+      String(item.mensagem || "").trim().toLowerCase(),
+      Number(item.intervalo_km) || 0,
+      Boolean(item.ativo),
+    ].join("|");
+
+    if (!grupos.has(chave)) {
+      grupos.set(chave, {
+        ...item,
+        ids: [item.id],
+        placas: [item.placa],
+        itens: [item],
+      });
+      continue;
+    }
+
+    const grupo = grupos.get(chave);
+    grupo.ids.push(item.id);
+    grupo.placas.push(item.placa);
+    grupo.itens.push(item);
+  }
+
+  return [...grupos.values()].map(grupo => ({
+    ...grupo,
+    placas: [...new Set(grupo.placas.map(normalizarPlaca).filter(Boolean))].sort(),
+  }));
+}
+
 // ── Multi-select de placas com odômetro ──────────────────────────────────────
 function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
   const [open, setOpen] = useState(false);
@@ -29,9 +89,11 @@ function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
     return () => document.removeEventListener("mousedown", onClickFora);
   }, []);
 
-  const placasSelecionadas = selecionadas.map(s => s.placa);
+  const veiculosUnicos = dedupeVeiculos(veiculos);
+  const selecionadasUnicas = dedupeSelecionadas(selecionadas);
+  const placasSelecionadas = selecionadasUnicas.map(s => s.placa);
 
-  const filtrados = veiculos.filter(v =>
+  const filtrados = veiculosUnicos.filter(v =>
     v.placa.toLowerCase().includes(busca.toLowerCase())
   );
 
@@ -40,24 +102,24 @@ function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
     if (jaEsta) {
       onChange(selecionadas.filter(s => s.placa !== veiculo.placa));
     } else {
-      onChange([...selecionadas, { placa: veiculo.placa, km_atual: Number(veiculo.odometro) || 0 }]);
+      onChange(dedupeSelecionadas([...selecionadas, { placa: veiculo.placa, km_atual: Number(veiculo.odometro) || 0 }]));
     }
   }
 
   function toggleTodos() {
-    if (selecionadas.length === veiculos.length) {
+    if (selecionadasUnicas.length === veiculosUnicos.length) {
       onChange([]);
     } else {
-      onChange(veiculos.map(v => ({ placa: v.placa, km_atual: Number(v.odometro) || 0 })));
+      onChange(veiculosUnicos.map(v => ({ placa: v.placa, km_atual: Number(v.odometro) || 0 })));
     }
   }
 
-  const todasMarcadas = veiculos.length > 0 && selecionadas.length === veiculos.length;
-  const algumasMarcadas = selecionadas.length > 0 && !todasMarcadas;
+  const todasMarcadas = veiculosUnicos.length > 0 && selecionadasUnicas.length === veiculosUnicos.length;
+  const algumasMarcadas = selecionadasUnicas.length > 0 && !todasMarcadas;
 
   function remover(placa, e) {
     e.stopPropagation();
-    onChange(selecionadas.filter(s => s.placa !== placa));
+    onChange(selecionadasUnicas.filter(s => s.placa !== normalizarPlaca(placa)));
   }
 
   return (
@@ -68,7 +130,7 @@ function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
           display: "flex",
           flexWrap: "wrap",
           gap: 5,
-          padding: selecionadas.length === 0 ? "8px 10px" : "6px 8px",
+          padding: selecionadasUnicas.length === 0 ? "8px 10px" : "6px 8px",
           border: `1px solid ${open ? "var(--brand-blue)" : "var(--border)"}`,
           borderRadius: 6,
           background: "var(--bg)",
@@ -80,12 +142,12 @@ function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
           transition: "border-color 120ms, box-shadow 120ms",
         }}
       >
-        {selecionadas.length === 0 ? (
+        {selecionadasUnicas.length === 0 ? (
           <span style={{ color: "var(--muted)", fontSize: 13 }}>
             {carregando ? "Carregando veículos…" : "Selecione os veículos…"}
           </span>
         ) : (
-          selecionadas.map(s => (
+          selecionadasUnicas.map(s => (
             <span key={s.placa} style={{
               display: "inline-flex",
               alignItems: "center",
@@ -155,7 +217,7 @@ function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
             />
           </div>
 
-          {veiculos.length > 0 && (
+          {veiculosUnicos.length > 0 && (
             <div
               onClick={e => { e.stopPropagation(); toggleTodos(); }}
               style={{
@@ -217,14 +279,14 @@ function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
             })}
           </div>
 
-          {selecionadas.length > 0 && (
+          {selecionadasUnicas.length > 0 && (
             <div style={{
               padding: "7px 12px",
               borderTop: "1px solid var(--border)",
               display: "flex", justifyContent: "space-between", alignItems: "center",
               fontSize: 12, color: "var(--muted)",
             }}>
-              <span>{selecionadas.length} selecionado{selecionadas.length !== 1 ? "s" : ""}</span>
+              <span>{selecionadasUnicas.length} selecionado{selecionadasUnicas.length !== 1 ? "s" : ""}</span>
               <button
                 type="button"
                 onClick={e => { e.stopPropagation(); onChange([]); }}
@@ -281,6 +343,7 @@ function ManutencaoMensagens() {
   const [kmModal, setKmModal] = useState(null);
   const [kmValor, setKmValor] = useState("");
   const [kmSalvando, setKmSalvando] = useState(false);
+  const automacoesAgrupadas = agruparAutomacoes(automacoes);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -299,7 +362,7 @@ function ManutencaoMensagens() {
     setVeiculosCarregando(true);
     try {
       const data = await RB_API.listVeiculosManutencao();
-      setVeiculos(data.veiculos || []);
+      setVeiculos(dedupeVeiculos(data.veiculos || []));
     } catch (e) {
       console.error("Erro ao carregar veículos:", e.message);
       setVeiculos([]);
@@ -319,9 +382,10 @@ function ManutencaoMensagens() {
   }
 
   function abrirEditar(a) {
+    const itens = a.itens || [a];
     setEditando(a);
     setForm({
-      selecionadas: [{ placa: a.placa, km_atual: a.km_atual }],
+      selecionadas: dedupeSelecionadas(itens.map(item => ({ placa: item.placa, km_atual: item.km_atual }))),
       titulo: a.titulo,
       mensagem: a.mensagem,
       intervalo_km: String(a.intervalo_km),
@@ -358,16 +422,20 @@ function ManutencaoMensagens() {
     try {
       if (editando) {
         // Edição: atualiza apenas o registro específico
-        await RB_API.updateManutencao(editando.id, {
+        const ids = editando.ids || [editando.id];
+        const payload = {
           titulo: form.titulo.trim(),
           mensagem: form.mensagem.trim(),
           intervalo_km: Number(form.intervalo_km),
-          km_atual: form.selecionadas[0]?.km_atual ?? editando.km_atual,
-        });
+        };
+        if (ids.length === 1) {
+          payload.km_atual = form.selecionadas[0]?.km_atual ?? editando.km_atual;
+        }
+        await Promise.all(ids.map(id => RB_API.updateManutencao(id, payload)));
       } else {
         // Criação: um registro por placa selecionada
         await RB_API.createManutencao({
-          placas: form.selecionadas,
+          placas: dedupeSelecionadas(form.selecionadas),
           titulo: form.titulo.trim(),
           mensagem: form.mensagem.trim(),
           intervalo_km: Number(form.intervalo_km),
@@ -382,10 +450,11 @@ function ManutencaoMensagens() {
     }
   }
 
-  async function confirmarDelete(id) {
-    setDeletandoId(id);
+  async function confirmarDelete(item) {
+    const ids = item.ids || [item.id];
+    setDeletandoId(item.id);
     try {
-      await RB_API.deleteManutencao(id);
+      await Promise.all(ids.map(id => RB_API.deleteManutencao(id)));
       setConfirmDelete(null);
       await carregar();
     } catch (e) {
@@ -412,7 +481,8 @@ function ManutencaoMensagens() {
 
   async function toggleAtivo(a) {
     try {
-      await RB_API.updateManutencao(a.id, { ativo: !a.ativo });
+      const ids = a.ids || [a.id];
+      await Promise.all(ids.map(id => RB_API.updateManutencao(id, { ativo: !a.ativo })));
       await carregar();
     } catch (e) {
       alert(e.message);
@@ -452,8 +522,8 @@ function ManutencaoMensagens() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {automacoes.map(a => (
-            <div key={a.id} className="card" style={{
+          {automacoesAgrupadas.map(a => (
+            <div key={(a.ids || [a.id]).join("-")} className="card" style={{
               opacity: a.ativo ? 1 : 0.55,
               borderLeft: `3px solid ${a.ativo ? "var(--brand-blue)" : "var(--border)"}`,
               padding: "12px 16px",
@@ -461,17 +531,19 @@ function ManutencaoMensagens() {
               <div className="row between" style={{ alignItems: "flex-start", gap: 12 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="row" style={{ gap: 8, alignItems: "center", marginBottom: 5, flexWrap: "wrap" }}>
-                    <span style={{
-                      background: "var(--accent-soft)",
-                      color: "var(--brand-blue)",
-                      border: "1px solid var(--accent-border)",
-                      borderRadius: 5,
-                      padding: "2px 9px",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      fontFamily: "var(--font-mono, monospace)",
-                      letterSpacing: "0.05em",
-                    }}>{a.placa}</span>
+                    {(a.placas || [a.placa]).map(placa => (
+                      <span key={placa} style={{
+                        background: "var(--accent-soft)",
+                        color: "var(--brand-blue)",
+                        border: "1px solid var(--accent-border)",
+                        borderRadius: 5,
+                        padding: "2px 9px",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        fontFamily: "var(--font-mono, monospace)",
+                        letterSpacing: "0.05em",
+                      }}>{placa}</span>
+                    ))}
                     <span style={{ fontWeight: 600, fontSize: 14 }}>{a.titulo}</span>
                     {!a.ativo && (
                       <span style={{
@@ -494,7 +566,7 @@ function ManutencaoMensagens() {
                     </div>
                     <div style={{ fontSize: 12 }}>
                       <span className="muted">KM atual: </span>
-                      <strong>{fmtKm(a.km_atual)}</strong>
+                      <strong>{(a.itens || [a]).length > 1 ? "por placa" : fmtKm(a.km_atual)}</strong>
                     </div>
                     <div style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
                       <span className="muted">Enviar no KM: </span>
@@ -507,24 +579,40 @@ function ManutencaoMensagens() {
                         fontFamily: "var(--font-mono, monospace)",
                         fontSize: 12,
                       }}>
-                        {fmtKm(a.km_proximo_envio)}
+                        {(a.itens || [a]).length > 1 ? "por placa" : fmtKm(a.km_proximo_envio)}
                       </strong>
                     </div>
                   </div>
+                  {(a.itens || []).length > 1 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                      {a.itens.map(item => (
+                        <span key={item.id} className="muted" style={{
+                          border: "1px solid var(--border)",
+                          borderRadius: 5,
+                          padding: "2px 7px",
+                          fontSize: 11,
+                        }}>
+                          {item.placa}: {fmtKm(item.km_atual)} -> {fmtKm(item.km_proximo_envio)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="row" style={{ gap: 5, flexShrink: 0 }}>
-                  <button
-                    onClick={() => { setKmModal(a); setKmValor(String(a.km_atual)); }}
-                    title="Atualizar KM"
-                    style={{
-                      background: "var(--surface)", border: "1px solid var(--border)",
-                      borderRadius: 6, padding: "5px 10px", cursor: "pointer",
-                      fontSize: 12, color: "var(--text)", display: "flex", alignItems: "center", gap: 5,
-                    }}
-                  >
-                    <Icon name="trending-up" size={13}/> KM
-                  </button>
+                  {(a.itens || [a]).length === 1 && (
+                    <button
+                      onClick={() => { setKmModal(a); setKmValor(String(a.km_atual)); }}
+                      title="Atualizar KM"
+                      style={{
+                        background: "var(--surface)", border: "1px solid var(--border)",
+                        borderRadius: 6, padding: "5px 10px", cursor: "pointer",
+                        fontSize: 12, color: "var(--text)", display: "flex", alignItems: "center", gap: 5,
+                      }}
+                    >
+                      <Icon name="trending-up" size={13}/> KM
+                    </button>
+                  )}
                   <button
                     onClick={() => toggleAtivo(a)}
                     title={a.ativo ? "Desativar" : "Ativar"}
@@ -602,7 +690,7 @@ function ManutencaoMensagens() {
                       fontFamily: "var(--font-mono, monospace)", fontWeight: 600,
                       color: "var(--brand-blue)",
                     }}>
-                      {editando.placa}
+                      {(editando.placas || [editando.placa]).join(", ")}
                     </div>
                   ) : (
                     <MultiSelectVeiculos
@@ -614,7 +702,7 @@ function ManutencaoMensagens() {
                   )}
                   {!editando && form.selecionadas.length > 0 && (
                     <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-                      Será criado 1 registro por veículo com o KM atual de cada um.
+                      As placas selecionadas ficarao agrupadas nesta automacao.
                     </div>
                   )}
                 </div>
@@ -724,7 +812,7 @@ function ManutencaoMensagens() {
                   <button type="submit" className="btn btn-primary" disabled={salvando} style={{ fontSize: 13 }}>
                     {salvando ? "Salvando…" : editando
                       ? "Salvar alterações"
-                      : `Criar ${form.selecionadas.length > 1 ? form.selecionadas.length + " automações" : "automação"}`
+                      : "Criar automacao"
                     }
                   </button>
                 </div>
@@ -804,7 +892,7 @@ function ManutencaoMensagens() {
               <button
                 className="btn"
                 disabled={deletandoId === confirmDelete.id}
-                onClick={() => confirmarDelete(confirmDelete.id)}
+                onClick={() => confirmarDelete(confirmDelete)}
                 style={{ background: "var(--danger, #e54d2e)", color: "#fff", border: "none" }}
               >
                 {deletandoId === confirmDelete.id ? "Excluindo…" : "Excluir"}

@@ -53,7 +53,7 @@ const RC_STATUS = {
   lucrativo: { label: "Lucrativo", cls: "ok", color: "#22c55e" },
   atencao: { label: "Atencao", cls: "warn", color: "#facc15" },
   "margem-baixa": { label: "Margem baixa", cls: "info", color: "#fb923c" },
-  prejuizo: { label: "Prejuizo", cls: "crit", color: "#ef4444" },
+  prejuizo: { label: "Prejuízo", cls: "crit", color: "#ef4444" },
 };
 
 const RC_PERIODS = [
@@ -312,27 +312,23 @@ const RentabilidadeClientes = () => {
       <div className="period-filter">
         <label>Data inicial<input type="date" value={dataInicial} onChange={(e) => setDataInicial(e.target.value)}/></label>
         <label>Data final<input type="date" value={dataFinal} onChange={(e) => setDataFinal(e.target.value)}/></label>
-        <label>Cliente<input value={cliente} list="rc-clientes" onChange={(e) => setCliente(e.target.value)} placeholder="Nome, codigo ou CNPJ"/></label>
-        <label>Placa<input value={placa} list="rc-placas" onChange={(e) => setPlaca(e.target.value)} placeholder="Placa"/></label>
-        <label>Origem<input value={origem} list="rc-origens" onChange={(e) => setOrigem(e.target.value)} placeholder="Cidade"/></label>
-        <label>Destino<input value={destino} list="rc-destinos" onChange={(e) => setDestino(e.target.value)} placeholder="Cidade"/></label>
-        <label>Material<input value={material} list="rc-materiais" onChange={(e) => setMaterial(e.target.value)} placeholder="Codigo/material"/></label>
+        <label>Cliente<RBCombobox value={cliente} onChange={setCliente} options={data.filtros?.clientes || []} placeholder="Nome, codigo ou CNPJ" tag={() => "Cliente"}/></label>
+        <label>Placa<RBCombobox value={placa} onChange={setPlaca} options={data.filtros?.placas || []} placeholder="Placa" transform={(v) => v.toUpperCase()} tag={() => "Placa"}/></label>
+        <label>Origem<RBCombobox value={origem} onChange={setOrigem} options={data.filtros?.origens || []} placeholder="Cidade" tag={() => "Origem"}/></label>
+        <label>Destino<RBCombobox value={destino} onChange={setDestino} options={data.filtros?.destinos || []} placeholder="Cidade" tag={() => "Destino"}/></label>
+        <label>Material<RBCombobox value={material} onChange={setMaterial} options={data.filtros?.materiais || []} placeholder="Codigo/material" tag={() => "Material"}/></label>
         <label>Tipo
           <select value={statusMargem} onChange={(e) => setStatusMargem(e.target.value)}>
             <option value="todos">Todos</option>
             <option value="lucrativo">Lucrativo</option>
             <option value="atencao">Atencao</option>
             <option value="margem-baixa">Margem baixa</option>
-            <option value="prejuizo">Prejuizo</option>
+            <option value="prejuizo">Prejuízo</option>
           </select>
         </label>
         <button className="btn primary" onClick={applyFilters}>Aplicar</button>
         <button className="btn" onClick={clearFilters}>Limpar</button>
       </div>
-
-      {["clientes","placas","origens","destinos","materiais"].map((key) => (
-        <datalist key={key} id={`rc-${key}`}>{(data.filtros?.[key] || []).map((item) => <option key={item} value={item}/>)}</datalist>
-      ))}
 
       {(loading || error) && (
         <div className="card" style={{ marginBottom: 16, padding: "9px 14px", borderColor: error ? "var(--crit-border)" : "var(--border)" }}>
@@ -356,7 +352,7 @@ const RentabilidadeClientes = () => {
       <div className="grid cols-4" style={{ marginBottom: 16 }}>
         <RcKpi label="Viagens/CT-e" value={resumo.quantidadeViagens || 0} sub="linhas operacionais" tone="#a78bfa" icon="route"/>
         <RcKpi label="Cliente mais lucrativo" value={resumo.clienteMaisLucrativo?.cliente || "-"} sub={resumo.clienteMaisLucrativo ? rcBRL(resumo.clienteMaisLucrativo.valor) : ""} tone="#22c55e" icon="user"/>
-        <RcKpi label="Maior prejuizo" value={resumo.clienteMaiorPrejuizo?.cliente || "-"} sub={resumo.clienteMaiorPrejuizo ? rcBRL(resumo.clienteMaiorPrejuizo.valor) : ""} tone="#ef4444" icon="alert"/>
+        <RcKpi label="Maior prejuízo" value={resumo.clienteMaiorPrejuizo?.cliente || "-"} sub={resumo.clienteMaiorPrejuizo ? rcBRL(resumo.clienteMaiorPrejuizo.valor) : ""} tone="#ef4444" icon="alert"/>
         <RcKpi label="Margem media" value={rcPct(resumo.margemMedia)} sub="lucro / receita" tone="#facc15" icon="gauge"/>
       </div>
 
@@ -366,8 +362,8 @@ const RentabilidadeClientes = () => {
           <div className="card-body">{rankingLucro.length ? rankingLucro.map((item) => <RcBar key={item.clienteCodigo || item.cliente} label={item.cliente} value={item.lucro} max={maxLucro} tone="#22c55e" meta={`Margem ${rcPct(item.margem)}`}/>) : <div className="muted">Sem lucro no periodo.</div>}</div>
         </div>
         <div className="card card-flush">
-          <div className="card-header"><h3>Ranking por prejuizo</h3><span className="meta muted">maiores perdas</span></div>
-          <div className="card-body">{rankingPrejuizo.length ? rankingPrejuizo.map((item) => <RcBar key={item.clienteCodigo || item.cliente} label={item.cliente} value={item.lucro} max={maxPrejuizo} tone="#ef4444" meta={`Margem ${rcPct(item.margem)}`}/>) : <div className="muted">Nenhum cliente com prejuizo.</div>}</div>
+          <div className="card-header"><h3>Ranking por prejuízo</h3><span className="meta muted">maiores perdas</span></div>
+          <div className="card-body">{rankingPrejuizo.length ? rankingPrejuizo.map((item) => <RcBar key={item.clienteCodigo || item.cliente} label={item.cliente} value={item.lucro} max={maxPrejuizo} tone="#ef4444" meta={`Margem ${rcPct(item.margem)}`}/>) : <div className="muted">Nenhum cliente com prejuízo.</div>}</div>
         </div>
         <div className="card card-flush">
           <div className="card-header"><h3>Margem por cliente</h3><span className="meta muted">maiores margens</span></div>
