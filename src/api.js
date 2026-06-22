@@ -149,6 +149,7 @@ window.RB_API = {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/por-placa${buildQuery(params)}`);
   },
+  getAnaliseFrota: (filters = {}) => apiRequest(`/frota/analise${buildQuery(filters || {})}`),
   getCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos${buildQuery(filters || {})}`),
   getCustosVeiculosFiltros: () => apiRequest("/financeiro/custos-veiculos/filtros"),
   getCustosVeiculoDetalhe: (placa, filters = {}) => apiRequest(`/financeiro/custos-veiculos/${encodeURIComponent(placa)}${buildQuery(filters || {})}`),

@@ -5,6 +5,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/simulador.jsx",
   "src/screens/viagens.jsx",
   "src/screens/dre-empresarial.jsx",
+  "src/screens/analise-frota.jsx",
   "src/screens/custos-veiculos.jsx",
   "src/screens/manutencoes-veiculos.jsx",
   "src/screens/analise-clientes.jsx",
@@ -16,7 +17,7 @@ const SCREEN_SCRIPTS = [
 const SCREEN_GLOBALS = [
   "SimuladorFrete", "Viagens", "Custos", "Receita",
   "DreEmpresarial", "FinanceiroPlaca", "AnaliseClientes",
-  "RentabilidadeClientes", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos",
+  "RentabilidadeClientes", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota",
 ];
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -33,6 +34,7 @@ const NAV = [
   { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações" },
   { id: "reports",         label: "Relatórios",   icon: "chart",       title: "Relatórios" },
   { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial" },
+  { id: "analise-frota",   label: "Frota BI",      icon: "truck",       title: "Analise de Frota" },
   { id: "custos-veiculos",      label: "Custos Veic.", icon: "truck",   title: "Custos por Veiculo" },
   { id: "manutencoes-veiculos", label: "Manut. Veic.", icon: "wrench", title: "Manutenções e Custos por Veículo" },
   { id: "clientes",        label: "Clientes",     icon: "user",        title: "Análise de Clientes" },
@@ -209,6 +211,9 @@ const App = () => {
       break;
     case "dre-empresarial":
       body = <DreEmpresarial onNavigate={onNavigate}/>;
+      break;
+    case "analise-frota":
+      body = <AnaliseFrota onNavigate={onNavigate}/>;
       break;
     case "custos-veiculos":
       body = <CustosVeiculos onNavigate={onNavigate}/>;
