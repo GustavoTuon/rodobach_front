@@ -636,6 +636,8 @@ const ModalDetalhe = ({ pneu, posicao, onClose, onMover, onHistorico }) => {
 
 const ModalMovimento = ({ dados, onClose, onConfirmar, loading }) => {
   const [km, setKm] = useState("");
+  const [odometroInfo, setOdometroInfo] = useState(null);
+  const [loadingOdometro, setLoadingOdometro] = useState(false);
   const [obs, setObs] = useState("");
   const [tipo, setTipo] = useState(dados.tipoSugerido || "ESTOQUE");
   const [erro, setErro] = useState(null);
@@ -643,7 +645,43 @@ const ModalMovimento = ({ dados, onClose, onConfirmar, loading }) => {
 
   useEffect(() => { kmRef.current?.focus(); }, []);
 
+  useEffect(() => {
+    if (!dados.veiculo) return;
+    let active = true;
+    setLoadingOdometro(true);
+    setOdometroInfo(null);
+    window.RB_API.getOdometroPneusVeiculo(dados.veiculo)
+      .then((info) => {
+        if (!active) return;
+        setOdometroInfo(info);
+        if (info?.odometro != null && info.odometro !== "") {
+          setKm(String(Math.round(Number(info.odometro))));
+        }
+      })
+      .catch((e) => {
+        if (active) setOdometroInfo({ erro: e.message });
+      })
+      .finally(() => {
+        if (active) setLoadingOdometro(false);
+      });
+    return () => { active = false; };
+  }, [dados.veiculo]);
+
   const precisaKm = ["MONTAGEM", "DESMONTAGEM", "TROCA_POSICAO"].includes(tipo);
+  const origemOdometroLabel = (() => {
+    if (loadingOdometro) return "Buscando km atual...";
+    if (!odometroInfo) return "";
+    if (odometroInfo.erro) return `Nao foi possivel buscar o km: ${odometroInfo.erro}`;
+    if (odometroInfo.odometro == null) return "Km automatico nao encontrado.";
+    const placaOdometro = odometroInfo.placaOdometro || odometroInfo.placa;
+    const isEngate = odometroInfo.engate?.placaPrincipal && placaOdometro && placaOdometro !== odometroInfo.placaSolicitada;
+    const origem = String(odometroInfo.origem || "");
+    if (isEngate && origem.includes("hodometro")) return `Km do hodometro do cavalo engatado ${placaOdometro}.`;
+    if (isEngate) return `Km da telemetria do cavalo engatado ${placaOdometro}.`;
+    if (origem.includes("hodometro")) return "Km preenchido pelo hodometro.";
+    if (String(odometroInfo.origem || "").includes("telemetria")) return "Km preenchido pela telemetria.";
+    return "Km preenchido pelo cadastro do frotas.";
+  })();
 
   async function handleConfirmar() {
     setErro(null);
@@ -693,6 +731,9 @@ const ModalMovimento = ({ dados, onClose, onConfirmar, loading }) => {
             </label>
             <input ref={kmRef} type="number" className="field-input" placeholder="Ex: 125000"
               value={km} onChange={e => setKm(e.target.value)}/>
+            {origemOdometroLabel && (
+              <div className="field-hint">{origemOdometroLabel}</div>
+            )}
           </div>
 
           <div className="form-field">

@@ -809,7 +809,7 @@ function ManutencaoMensagens() {
     <div className="view">
       <div className="page-head">
         <div>
-          <h1>Manutenção</h1>
+          <h1>Automações</h1>
           <div className="sub">Automação de mensagens de manutenção por KM rodado</div>
         </div>
         <button className="btn btn-primary" onClick={abrirNovo}>

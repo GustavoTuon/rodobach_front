@@ -2599,6 +2599,7 @@ tr.row-ok td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
 /* Formulário */
 .form-field    { display: flex; flex-direction: column; gap: 5px; }
 .field-label   { font-size: var(--font-xs); font-weight: 500; color: var(--text-2); }
+.field-hint    { font-size: var(--font-xs); color: var(--text-3); line-height: 1.35; }
 .field-required { color: var(--crit); margin-left: 2px; }
 .field-input, .field-select, .field-textarea {
   width: 100%; padding: 8px 10px; border-radius: var(--r);
