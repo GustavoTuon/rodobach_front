@@ -1,21 +1,26 @@
 ﻿const { useState, useEffect, useRef } = React;
 
 const TELAS = [
+  { id: "perm_diretoria",       label: "Diretoria" },
   { id: "perm_simulador",       label: "Calculadora" },
   { id: "perm_viagens",         label: "Viagens" },
   { id: "perm_dre_empresarial", label: "DRE Empresarial" },
+  { id: "perm_analise_frota",   label: "Frota BI" },
   { id: "perm_custos_veiculos", label: "Custos por Veiculo" },
+  { id: "perm_manutencoes_veiculos", label: "Lançamentos Manutenção" },
   { id: "perm_clientes",        label: "Clientes" },
   { id: "perm_clientes_lucro",  label: "Clientes Lucro" },
   { id: "perm_pneus",           label: "Pneus" },
-  { id: "perm_manutencao",      label: "Manutenção" },
+  { id: "perm_manutencao",      label: "Automações" },
   { id: "perm_settings",        label: "Configurações" },
 ];
 
 const FORM_VAZIO = {
   login: "", senha: "", email: "", numero: "",
   admin: false, ativo: true,
-  perm_simulador: true, perm_viagens: true, perm_dre_empresarial: true, perm_custos_veiculos: true,
+  perm_diretoria: true, perm_simulador: true, perm_viagens: true,
+  perm_dre_empresarial: true, perm_analise_frota: true,
+  perm_custos_veiculos: true, perm_manutencoes_veiculos: true,
   perm_clientes: true, perm_clientes_lucro: true, perm_pneus: true,
   perm_manutencao: true, perm_settings: true,
 };
@@ -78,10 +83,13 @@ const GerenciarUsuarios = ({ onNavigate }) => {
       login: u.login, senha: "",
       email: u.email || "", numero: u.numero || "",
       admin: u.admin, ativo: u.ativo,
+      perm_diretoria: u.perm_diretoria ?? true,
       perm_simulador: u.perm_simulador ?? true,
       perm_viagens: u.perm_viagens ?? true,
       perm_dre_empresarial: u.perm_dre_empresarial ?? true,
+      perm_analise_frota: u.perm_analise_frota ?? true,
       perm_custos_veiculos: u.perm_custos_veiculos ?? true,
+      perm_manutencoes_veiculos: u.perm_manutencoes_veiculos ?? true,
       perm_clientes: u.perm_clientes ?? true,
       perm_clientes_lucro: u.perm_clientes_lucro ?? true,
       perm_pneus: u.perm_pneus ?? true,

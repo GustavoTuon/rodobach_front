@@ -2,6 +2,7 @@
 const { useState, useEffect } = React;
 
 const SCREEN_SCRIPTS = [
+  "src/screens/diretoria.jsx",
   "src/screens/simulador.jsx",
   "src/screens/viagens.jsx",
   "src/screens/dre-empresarial.jsx",
@@ -15,8 +16,8 @@ const SCREEN_SCRIPTS = [
 ];
 
 const SCREEN_GLOBALS = [
-  "SimuladorFrete", "Viagens", "Custos", "Receita",
-  "DreEmpresarial", "FinanceiroPlaca", "AnaliseClientes",
+  "Diretoria", "SimuladorFrete", "Viagens",
+  "DreEmpresarial", "AnaliseClientes",
   "RentabilidadeClientes", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota",
 ];
 
@@ -26,33 +27,81 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 }/*EDITMODE-END*/;
 
 const NAV = [
-  { id: "dashboard",       label: "Dashboard",    icon: "dashboard",   title: "Visão geral" },
-  { id: "vehicles",        label: "Veículos",     icon: "truck",       title: "Veículos" },
-  { id: "alerts",          label: "Alertas",      icon: "alert",       title: "Alertas e ocorrências", badge: 12 },
-  { id: "pneus",           label: "Pneus",        icon: "truck",       title: "Movimentação de Pneus" },
-  { id: "simulador",       label: "Calculadora",  icon: "calculator",  title: "Calculadora de Frete ANTT" },
-  { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações" },
-  { id: "reports",         label: "Relatórios",   icon: "chart",       title: "Relatórios" },
-  { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial" },
-  { id: "analise-frota",   label: "Frota BI",      icon: "truck",       title: "Analise de Frota" },
-  { id: "custos-veiculos",      label: "Custos Veic.", icon: "truck",   title: "Custos por Veiculo" },
-  { id: "manutencoes-veiculos", label: "Manut. Veic.", icon: "wrench", title: "Manutenções e Custos por Veículo" },
-  { id: "clientes",        label: "Clientes",     icon: "user",        title: "Análise de Clientes" },
-  { id: "clientes-lucro",  label: "Clientes Lucro", icon: "chart",     title: "Rentabilidade Clientes" },
-  { id: "manutencao",      label: "Manutenção",   icon: "wrench",      title: "Automação de Manutenção" },
-  { id: "integration",     label: "Integração",   icon: "plug",        title: "Saúde da integração" },
+  { id: "diretoria",       label: "Diretoria",    icon: "dashboard",   title: "Resumo executivo", section: "direcao" },
+  { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial", section: "direcao" },
+  { id: "analise-frota",   label: "Frota BI",     icon: "truck",       title: "Analise de Frota", section: "direcao" },
+  { id: "clientes",        label: "Análise",      icon: "user",        title: "Análise de Clientes", group: "clientes", section: "direcao" },
+  { id: "clientes-lucro",  label: "Lucro",        icon: "chart",       title: "Rentabilidade Clientes", group: "clientes", section: "direcao" },
+  { id: "custos-veiculos", label: "Custos",       icon: "truck",       title: "Custos por Veiculo", group: "manutencoes", section: "direcao" },
+  { id: "manutencoes-veiculos", label: "Lançamentos", icon: "wrench", title: "Manutenções e Custos por Veículo", group: "manutencoes", section: "direcao" },
+  { id: "simulador",       label: "Calculadora",  icon: "calculator",  title: "Calculadora de Frete ANTT", section: "operacao" },
+  { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações", section: "operacao" },
+  { id: "pneus",           label: "Pneus",        icon: "truck",       title: "Movimentação de Pneus", section: "operacao" },
+  { id: "manutencao",      label: "Automações",   icon: "wrench",      title: "Automação de Manutenção", section: "operacao" },
   { id: "settings",        label: "Configurações", icon: "settings",   title: "Configurações",    sistema: true },
   { id: "usuarios",        label: "Usuários",     icon: "user",        title: "Gerenciar Usuários", sistema: true, adminOnly: true },
 ];
 
-// Telas sem implementaÃ§Ã£o funcional — nunca exibidas independente de permissÃµes
-const REMOVED_SCREENS = new Set([
-  "map", "vehicles", "vehicle", "alerts", "dashboard", "reports", "integration",
-]);
+const BASE_NAV = NAV;
+const DEFAULT_SCREEN = "diretoria";
 
+const NAV_SECTION_LABELS = {
+  direcao: "Direção",
+  operacao: "Operação",
+};
 
-const BASE_NAV = NAV.filter(n => !REMOVED_SCREENS.has(n.id));
-const DEFAULT_SCREEN = "simulador";
+const NAV_GROUPS = {
+  clientes: {
+    label: "Clientes",
+    icon: "user",
+    screens: ["clientes", "clientes-lucro"],
+  },
+  manutencoes: {
+    label: "Manutenções",
+    icon: "wrench",
+    screens: ["custos-veiculos", "manutencoes-veiculos"],
+  },
+};
+
+function getSidebarNav(visibleNav) {
+  const seenGroups = new Set();
+  return visibleNav.flatMap((n) => {
+    if (!n.group) return [n];
+    if (seenGroups.has(n.group)) return [];
+    const group = NAV_GROUPS[n.group];
+    const firstAvailable = group?.screens
+      .map((id) => visibleNav.find((item) => item.id === id))
+      .find(Boolean);
+    if (!group || !firstAvailable) return [];
+    seenGroups.add(n.group);
+    return [{
+      ...firstAvailable,
+      id: firstAvailable.id,
+      label: group.label,
+      icon: group.icon,
+      group: n.group,
+    }];
+  });
+}
+
+function isNavActive(item, currentScreen) {
+  if (item.group) return NAV_GROUPS[item.group]?.screens.includes(currentScreen);
+  return currentScreen === item.id;
+}
+
+const ScreenGroup = ({ tabs, active, onChange, children }) => {
+  const availableTabs = tabs.filter((tab) => tab.available !== false);
+  return (
+    <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div style={{ padding: "16px 24px 0", flexShrink: 0 }}>
+        <Tabs tabs={availableTabs} active={active} onChange={onChange}/>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        {children}
+      </div>
+    </div>
+  );
+};
 
 function getNavForUser(user) {
   const permissions = user?.permissions || {};
@@ -190,6 +239,7 @@ const App = () => {
 
   // â”€â”€ App autenticado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const visibleNav = getNavForUser(auth.user);
+  const sidebarNav = getSidebarNav(visibleNav);
 
   // Se a tela atual nÃ£o estÃ¡ acessÃ­vel ao usuÃ¡rio, cair na primeira disponÃ­vel
   const currentScreen = visibleNav.some(n => n.id === route.screen)
@@ -200,9 +250,26 @@ const App = () => {
   const onNavigate = (screen) => {
     if (visibleNav.some(n => n.id === screen)) go(screen);
   };
+  const hasScreen = (screen) => visibleNav.some(n => n.id === screen);
+  const renderNavItems = (items) => items.map(n => (
+    <button
+      key={n.id}
+      className={`nav-item ${isNavActive(n, currentScreen) ? "active" : ""}`}
+      data-tip={n.label}
+      data-has-badge={n.badge != null ? "true" : "false"}
+      onClick={() => go(n.id)}
+    >
+      <Icon name={n.icon}/>
+      <span className="lbl">{n.label}</span>
+      {n.badge != null && <span className="badge-count">{n.badge}</span>}
+    </button>
+  ));
 
   let body = null;
   switch (currentScreen) {
+    case "diretoria":
+      body = <Diretoria onNavigate={onNavigate}/>;
+      break;
     case "simulador":
       body = <SimuladorFrete onNavigate={onNavigate}/>;
       break;
@@ -216,16 +283,60 @@ const App = () => {
       body = <AnaliseFrota onNavigate={onNavigate}/>;
       break;
     case "custos-veiculos":
-      body = <CustosVeiculos onNavigate={onNavigate}/>;
+      body = (
+        <ScreenGroup
+          tabs={[
+            { id: "custos-veiculos", label: "Custos", available: hasScreen("custos-veiculos") },
+            { id: "manutencoes-veiculos", label: "Lançamentos", available: hasScreen("manutencoes-veiculos") },
+          ]}
+          active={currentScreen}
+          onChange={onNavigate}
+        >
+          <CustosVeiculos onNavigate={onNavigate}/>
+        </ScreenGroup>
+      );
       break;
     case "manutencoes-veiculos":
-      body = <ManutencoesVeiculos onNavigate={onNavigate}/>;
+      body = (
+        <ScreenGroup
+          tabs={[
+            { id: "custos-veiculos", label: "Custos", available: hasScreen("custos-veiculos") },
+            { id: "manutencoes-veiculos", label: "Lançamentos", available: hasScreen("manutencoes-veiculos") },
+          ]}
+          active={currentScreen}
+          onChange={onNavigate}
+        >
+          <ManutencoesVeiculos onNavigate={onNavigate}/>
+        </ScreenGroup>
+      );
       break;
     case "clientes":
-      body = <AnaliseClientes onNavigate={onNavigate}/>;
+      body = (
+        <ScreenGroup
+          tabs={[
+            { id: "clientes", label: "Análise", available: hasScreen("clientes") },
+            { id: "clientes-lucro", label: "Lucro", available: hasScreen("clientes-lucro") },
+          ]}
+          active={currentScreen}
+          onChange={onNavigate}
+        >
+          <AnaliseClientes onNavigate={onNavigate}/>
+        </ScreenGroup>
+      );
       break;
     case "clientes-lucro":
-      body = <RentabilidadeClientes onNavigate={onNavigate}/>;
+      body = (
+        <ScreenGroup
+          tabs={[
+            { id: "clientes", label: "Análise", available: hasScreen("clientes") },
+            { id: "clientes-lucro", label: "Lucro", available: hasScreen("clientes-lucro") },
+          ]}
+          active={currentScreen}
+          onChange={onNavigate}
+        >
+          <RentabilidadeClientes onNavigate={onNavigate}/>
+        </ScreenGroup>
+      );
       break;
     case "manutencao":
       body = <ManutencaoMensagens onNavigate={onNavigate}/>;
@@ -237,7 +348,7 @@ const App = () => {
       body = <Pneus onNavigate={onNavigate}/>;
       break;
     case "settings":
-      body = <SettingsScreen theme={t.theme} setTheme={(v) => setTweak("theme", v)} density={t.density} setDensity={(v) => setTweak("density", v)}/>;
+      body = <SettingsScreen theme={t.theme} setTheme={(v) => setTweak("theme", v)} density={t.density} setDensity={(v) => setTweak("density", v)} onNavigate={onNavigate} canManageUsers={hasScreen("usuarios")}/>;
       break;
     default:
       body = <SimuladorFrete onNavigate={onNavigate}/>;
@@ -258,35 +369,20 @@ const App = () => {
           />
         </div>
 
-        <div className="nav-section">
-          {visibleNav.filter(n => !n.sistema).map(n => (
-            <button
-              key={n.id}
-              className={`nav-item ${currentScreen === n.id ? "active" : ""}`}
-              data-tip={n.label}
-              data-has-badge={n.badge != null ? "true" : "false"}
-              onClick={() => go(n.id)}
-            >
-              <Icon name={n.icon}/>
-              <span className="lbl">{n.label}</span>
-              {n.badge != null && <span className="badge-count">{n.badge}</span>}
-            </button>
-          ))}
-        </div>
+        {Object.entries(NAV_SECTION_LABELS).map(([section, label]) => {
+          const items = sidebarNav.filter(n => !n.sistema && (n.section || "direcao") === section);
+          if (!items.length) return null;
+          return (
+            <div className="nav-section" key={section}>
+              <div className="nav-label">{label}</div>
+              {renderNavItems(items)}
+            </div>
+          );
+        })}
 
         <div className="nav-section">
           <div className="nav-label">Sistema</div>
-          {visibleNav.filter(n => n.sistema).map(n => (
-            <button
-              key={n.id}
-              className={`nav-item ${currentScreen === n.id ? "active" : ""}`}
-              data-tip={n.label}
-              onClick={() => go(n.id)}
-            >
-              <Icon name={n.icon}/>
-              <span className="lbl">{n.label}</span>
-            </button>
-          ))}
+          {renderNavItems(sidebarNav.filter(n => n.sistema))}
         </div>
 
         <div className="sidebar-footer">
@@ -362,7 +458,7 @@ function formatPhone(raw) {
 }
 
 // Settings — with theme + density switchers
-const SettingsScreen = ({ theme, setTheme, density, setDensity }) => {
+const SettingsScreen = ({ theme, setTheme, density, setDensity, onNavigate, canManageUsers }) => {
   const [showWaModal, setShowWaModal] = React.useState(false);
   const [waState, setWaState] = React.useState({ loading: false, qrcode: null, connected: false, phone: null, profileName: null, error: null });
 const pollRef = React.useRef(null);
@@ -603,13 +699,13 @@ const pollRef = React.useRef(null);
       <div className="grid cols-3">
         {[
           { t: "Conta da empresa", d: "Norte Logística · CNPJ 32.480.591/0001-04", i: "user" },
-          { t: "Usuários e permissões", d: "8 usuários · 3 perfis", i: "user" },
+          { t: "Usuários e permissões", d: "Gerenciar acessos e telas liberadas", i: "user", action: canManageUsers ? () => onNavigate("usuarios") : null },
           { t: "Perfis de alerta", d: "Velocidade · RPM · Cerca virtual · Sirene", i: "bell" },
           { t: "Integração Trucks", d: "API v3.4 · token expira em 142 dias", i: "plug" },
           { t: "Webhooks e notificações", d: "2 webhooks ativos", i: "external" },
           { t: "Exportação e BI", d: "PowerBI · Looker Studio · CSV", i: "download" },
         ].map((c, i) => (
-          <div key={i} className="card" style={{cursor: "pointer"}}>
+          <div key={i} className="card" style={{cursor: c.action ? "pointer" : "default", opacity: c.action === null ? 0.72 : 1}} onClick={c.action || undefined}>
             <div className="row between">
               <div className="row" style={{gap: 10}}>
                 <div style={{

@@ -96,13 +96,6 @@ window.RB_API = {
   listAntt: () => apiRequest("/frete/antt"),
 
   // ── Diárias ──────────────────────────────────────────────────────────────
-  listDiarias: () => apiRequest("/motoristas/diarias"),
-
-  calcularDiarias: (payload) => apiRequest("/motoristas/diarias/calcular", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  }),
-
   // ── Frete ─────────────────────────────────────────────────────────────────
   calcularFrete: (payload) => apiRequest("/frete/calcular", {
     method: "POST",
@@ -133,43 +126,18 @@ window.RB_API = {
   }),
 
   // ── Financeiro ────────────────────────────────────────────────────────────
-  getFinanceiroResumo: (period) => {
-    const query = period ? `?period=${encodeURIComponent(period)}` : "";
-    return apiRequest(`/financeiro/resumo${query}`);
-  },
-  getReceitasResumo: (filters) => {
-    const params = typeof filters === "object" ? filters : { period: filters };
-    return apiRequest(`/financeiro/receitas${buildQuery(params)}`);
-  },
-  getCustosResumo: (filters) => {
-    const params = typeof filters === "object" ? filters : { period: filters };
-    return apiRequest(`/financeiro/custos${buildQuery(params)}`);
-  },
-  getFinanceiroPorPlaca: (filters) => {
-    const params = typeof filters === "object" ? filters : { period: filters };
-    return apiRequest(`/financeiro/por-placa${buildQuery(params)}`);
-  },
   getAnaliseFrota: (filters = {}) => apiRequest(`/frota/analise${buildQuery(filters || {})}`),
   getCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos${buildQuery(filters || {})}`),
+  getAuditoriaCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos/auditoria${buildQuery(filters || {})}`),
   getCustosVeiculosFiltros: () => apiRequest("/financeiro/custos-veiculos/filtros"),
   getCustosVeiculoDetalhe: (placa, filters = {}) => apiRequest(`/financeiro/custos-veiculos/${encodeURIComponent(placa)}${buildQuery(filters || {})}`),
   getManutencoesVeiculos: (filters = {}) => apiRequest(`/financeiro/manutencoes-veiculos${buildQuery(filters || {})}`),
   getManutencoesVeiculosFiltros: () => apiRequest("/financeiro/manutencoes-veiculos/filtros"),
   getManutencaoVeiculoDetalhe: (placa, filters = {}) => apiRequest(`/financeiro/manutencoes-veiculos/${encodeURIComponent(placa)}${buildQuery(filters || {})}`),
-  getDemonstrativoFinanceiro: (filters) => {
-    const params = typeof filters === "object" ? filters : { period: filters };
-    return apiRequest(`/financeiro/demonstrativo${buildQuery(params)}`);
-  },
   getDreEmpresarial: (filters) => {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/dre-empresarial${buildQuery(params)}`);
   },
-  getDreEmpresarialResumo: (filters) => apiRequest(`/financeiro/dre-empresarial/resumo${buildQuery(filters || {})}`),
-  getDreEmpresarialEvolucao: (filters) => apiRequest(`/financeiro/dre-empresarial/evolucao${buildQuery(filters || {})}`),
-  getDreEmpresarialRankings: (filters) => apiRequest(`/financeiro/dre-empresarial/rankings${buildQuery(filters || {})}`),
-  getDreEmpresarialCentros: (filters) => apiRequest(`/financeiro/dre-empresarial/centros${buildQuery(filters || {})}`),
-  getDreEmpresarialPlacas: (filters) => apiRequest(`/financeiro/dre-empresarial/placas${buildQuery(filters || {})}`),
-  getDreEmpresarialLancamentos: (filters) => apiRequest(`/financeiro/dre-empresarial/lancamentos${buildQuery(filters || {})}`),
   getAnaliseClientes: (filters) => {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/analise-clientes${buildQuery(params)}`);
@@ -212,9 +180,9 @@ window.RB_API = {
   // ── Pneus ─────────────────────────────────────────────────────────────────
   searchPneusVeiculos: (q = "") => apiRequest(`/pneus/veiculos${buildQuery({ q })}`),
 
-  getPneusPosicoes: () => apiRequest("/pneus/posicoes"),
-
   getEstadoPneus: (veiculo) => apiRequest(`/pneus/veiculo/${encodeURIComponent(veiculo)}`),
+
+  getOdometroPneusVeiculo: (veiculo) => apiRequest(`/pneus/veiculo/${encodeURIComponent(veiculo)}/odometro`),
 
   getPneusEstoque: () => apiRequest("/pneus/estoque"),
 
