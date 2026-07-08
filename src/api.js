@@ -143,6 +143,8 @@ window.RB_API = {
     return apiRequest(`/financeiro/analise-clientes${buildQuery(params)}`);
   },
   getRentabilidadeClientes: (filters = {}) => apiRequest(`/clientes/rentabilidade${buildQuery(filters || {})}`),
+  getLucroViagens: (filters = {}) => apiRequest(`/financeiro/lucro-viagens${buildQuery(filters || {})}`),
+  getFaturamentoDiario: (filters = {}) => apiRequest(`/financeiro/faturamento-diario${buildQuery(filters || {})}`),
 
   // ── Manutenção ────────────────────────────────────────────────────────────
   listVeiculosManutencao: () => apiRequest("/manutencao/veiculos"),

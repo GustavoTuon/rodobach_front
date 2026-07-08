@@ -215,39 +215,64 @@ const Diretoria = ({ onNavigate }) => {
       dataInicio: range.start,
       dataFim: range.end,
     };
-    setState({ loading: true, loadingFrota: true, error: "", dre: null, frota: null, clientes: null, rentabilidade: null, auditoria: null });
+    setState({ loading: true, loadingFrota: false, error: "", dre: null, frota: null, clientes: null, rentabilidade: null, auditoria: null });
 
-    Promise.allSettled([
-      window.RB_API.getDreEmpresarial(filters),
-      window.RB_API.getAnaliseClientes({ ...filters, incluirVencidosAntigos: includeOldOverdue ? "1" : "" }),
-      window.RB_API.getRentabilidadeClientes({ dataInicial: range.start, dataFinal: range.end }),
-      window.RB_API.getAuditoriaCustosVeiculos({ dataInicio: range.start, dataFim: range.end }),
-    ]).then((results) => {
+    (async () => {
+      const errors = [];
+      const addError = (prefix, error) => {
+        const message = error?.message || "erro desconhecido";
+        errors.push(prefix ? `${prefix}: ${message}` : message);
+      };
+      const publishError = () => {
+        if (!active || requestSeq.current !== requestId) return;
+        setState((current) => ({
+          ...current,
+          error: errors.length ? `Alguns dados nao carregaram: ${errors.slice(0, 2).join(" | ")}` : "",
+        }));
+      };
+
+      const [dre, clientes] = await Promise.allSettled([
+        window.RB_API.getDreEmpresarial(filters),
+        window.RB_API.getAnaliseClientes({ ...filters, incluirVencidosAntigos: includeOldOverdue ? "1" : "" }),
+      ]);
       if (!active || requestSeq.current !== requestId) return;
-      const [dre, clientes, rentabilidade, auditoria] = results;
-      const errors = results.filter((r) => r.status === "rejected").map((r) => r.reason?.message).filter(Boolean);
+      if (dre.status === "rejected") addError("DRE", dre.reason);
+      if (clientes.status === "rejected") addError("Clientes", clientes.reason);
       setState((current) => ({
         ...current,
         loading: false,
-        error: errors.length ? `Alguns dados nao carregaram: ${errors.slice(0, 2).join(" | ")}` : "",
         dre: dre.status === "fulfilled" ? dre.value : null,
         clientes: clientes.status === "fulfilled" ? clientes.value : null,
-        rentabilidade: rentabilidade.status === "fulfilled" ? rentabilidade.value : null,
-        auditoria: auditoria.status === "fulfilled" ? auditoria.value : null,
+        error: errors.length ? `Alguns dados nao carregaram: ${errors.slice(0, 2).join(" | ")}` : "",
       }));
-    });
 
-    window.RB_API.getAnaliseFrota({ ...filters, proprietario: "todos", limit: 60 }).then((frota) => {
-      if (!active || requestSeq.current !== requestId) return;
-      setState((current) => ({ ...current, loadingFrota: false, frota }));
-    }).catch((error) => {
-      if (!active || requestSeq.current !== requestId) return;
-      setState((current) => ({
-        ...current,
-        loadingFrota: false,
-        error: current.error || `Frota BI nao carregou: ${error.message || "erro desconhecido"}`,
-      }));
-    });
+      try {
+        const lucroViagens = await window.RB_API.getLucroViagens({ dataInicial: range.start, dataFinal: range.end, tipoVeiculo: "todos" });
+        if (!active || requestSeq.current !== requestId) return;
+        setState((current) => ({
+          ...current,
+          rentabilidade: {
+            resumo: {
+              lucroTotal: lucroViagens?.resumo?.lucroTotal || 0,
+              margemMedia: lucroViagens?.resumo?.margemMedia || 0,
+            },
+            rankings: { lucro: [], prejuizo: [] },
+          },
+        }));
+      } catch (error) {
+        addError("Lucro viagens", error);
+        publishError();
+      }
+
+      try {
+        const auditoria = await window.RB_API.getAuditoriaCustosVeiculos({ dataInicio: range.start, dataFim: range.end });
+        if (!active || requestSeq.current !== requestId) return;
+        setState((current) => ({ ...current, auditoria }));
+      } catch (error) {
+        addError("Auditoria", error);
+        publishError();
+      }
+    })();
 
     return () => { active = false; };
   }, [period, appliedCustomRange.start, appliedCustomRange.end, includeOldOverdue, refreshKey]);
