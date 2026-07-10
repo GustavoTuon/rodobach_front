@@ -13,6 +13,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/rentabilidade-clientes.jsx",
   "src/screens/lucro-viagens.jsx",
   "src/screens/faturamento-diario.jsx",
+  "src/screens/comparativo-faturamento.jsx",
   "src/screens/manutencao.jsx",
   "src/screens/pneus.jsx?v=20260603-historico-pneu",
 ];
@@ -20,7 +21,7 @@ const SCREEN_SCRIPTS = [
 const SCREEN_GLOBALS = [
   "Diretoria", "SimuladorFrete", "Viagens",
   "DreEmpresarial", "AnaliseClientes",
-  "RentabilidadeClientes", "LucroViagens", "FaturamentoDiario", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota",
+  "RentabilidadeClientes", "LucroViagens", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota",
 ];
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -31,9 +32,11 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 const NAV = [
   { id: "diretoria",       label: "Diretoria",    icon: "dashboard",   title: "Resumo executivo", section: "direcao" },
   { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial", section: "direcao" },
+  { id: "faturamento-diario", label: "Fat. Diário", icon: "chart",     title: "Faturamento Diário", section: "direcao" },
+  { id: "comparativo-faturamento", label: "Comp. Mensal", icon: "chart", title: "Comparativo Mensal", section: "direcao" },
   { id: "analise-frota",   label: "Frota BI",     icon: "truck",       title: "Analise de Frota", section: "direcao" },
-  { id: "lucro-viagens",   label: "Viagens",      icon: "route",       title: "Lucro por Viagem", group: "resultados", section: "direcao" },
-  { id: "faturamento-diario", label: "Diario",    icon: "chart",       title: "Faturamento Diario", group: "resultados", section: "direcao" },
+  { id: "abastecimentos",  label: "Abastecimentos", icon: "fuel",       title: "Análise de Abastecimentos", section: "direcao" },
+  { id: "lucro-viagens",   label: "Res. Viagem",  icon: "route",       title: "Resultado por Viagem", group: "resultados", section: "direcao" },
   { id: "clientes",        label: "Análise",      icon: "user",        title: "Análise de Clientes", group: "clientes", section: "direcao" },
   { id: "clientes-lucro",  label: "Lucro",        icon: "chart",       title: "Rentabilidade Clientes", group: "clientes", section: "direcao" },
   { id: "custos-veiculos", label: "Custos",       icon: "truck",       title: "Custos por Veiculo", group: "manutencoes", section: "direcao" },
@@ -66,9 +69,9 @@ const NAV_GROUPS = {
     screens: ["custos-veiculos", "manutencoes-veiculos"],
   },
   resultados: {
-    label: "Resultados",
+    label: "Resultado por viagem",
     icon: "chart",
-    screens: ["lucro-viagens", "faturamento-diario"],
+    screens: ["lucro-viagens"],
   },
 };
 
@@ -289,14 +292,16 @@ const App = () => {
       body = <DreEmpresarial onNavigate={onNavigate}/>;
       break;
     case "analise-frota":
-      body = <AnaliseFrota onNavigate={onNavigate}/>;
+      body = <AnaliseFrota key="frota-bi" onNavigate={onNavigate}/>;
+      break;
+    case "abastecimentos":
+      body = <AnaliseFrota key="abastecimentos" onNavigate={onNavigate} modoAbastecimento/>;
       break;
     case "lucro-viagens":
       body = (
         <ScreenGroup
           tabs={[
-            { id: "lucro-viagens", label: "Lucro por viagem", available: hasScreen("lucro-viagens") },
-            { id: "faturamento-diario", label: "Faturamento diario", available: hasScreen("faturamento-diario") },
+            { id: "lucro-viagens", label: "Resultado por viagem", available: hasScreen("lucro-viagens") },
           ]}
           active={currentScreen}
           onChange={onNavigate}
@@ -306,18 +311,10 @@ const App = () => {
       );
       break;
     case "faturamento-diario":
-      body = (
-        <ScreenGroup
-          tabs={[
-            { id: "lucro-viagens", label: "Lucro por viagem", available: hasScreen("lucro-viagens") },
-            { id: "faturamento-diario", label: "Faturamento diario", available: hasScreen("faturamento-diario") },
-          ]}
-          active={currentScreen}
-          onChange={onNavigate}
-        >
-          <FaturamentoDiario onNavigate={onNavigate}/>
-        </ScreenGroup>
-      );
+      body = <FaturamentoDiario onNavigate={onNavigate}/>;
+      break;
+    case "comparativo-faturamento":
+      body = <ComparativoFaturamento onNavigate={onNavigate}/>;
       break;
     case "custos-veiculos":
       body = (

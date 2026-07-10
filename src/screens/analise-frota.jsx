@@ -9,6 +9,14 @@ function afDaysAgoISO(days) {
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
 }
 
+function afPreviousMonthRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const end = new Date(now.getFullYear(), now.getMonth(), 0);
+  const iso = (d) => [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+  return { start:iso(start), end:iso(end) };
+}
+
 function afNum(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -115,6 +123,10 @@ function afInjectStyles() {
     .fb-panel .meta { color:var(--muted); font-size:11px; margin-top:2px; }
     .fb-span-2 { grid-column:span 2; }
     .fb-line { width:100%; height:100%; min-height:160px; display:block; overflow:visible; }
+    .fb-line-label { font-family:var(--font-mono); font-size:9.5px; font-weight:800; paint-order:stroke; stroke:rgba(5,7,12,.92); stroke-width:3px; stroke-linejoin:round; }
+    .fb-line-tip-title { fill:#fff; font-size:11px; font-weight:800; }
+    .fb-line-tip-text { fill:var(--text-2); font-size:10px; }
+    .fb-line-tip-value { fill:#fff; font-family:var(--font-mono); font-size:10px; font-weight:800; }
     .fb-legend { display:flex; flex-wrap:wrap; gap:13px; color:var(--text-2); font-size:11px; }
     .fb-legend i { display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:5px; vertical-align:middle; }
     .fb-hbars, .fb-columns, .fb-alerts, .fb-list { min-height:0; overflow:auto; display:grid; gap:9px; align-content:start; }
@@ -160,6 +172,20 @@ function afInjectStyles() {
     .fb-grouped-bar .bar.custo { background:#e74b4b; }
     .fb-badge { display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:2px 9px; font-size:10.5px; font-weight:700; }
     .fb-badge.warn { background:color-mix(in oklab, #f0c84b 22%, transparent); color:#f0c84b; border:1px solid color-mix(in oklab, #f0c84b 45%, transparent); }
+    .fb-view-toggle { display:flex; justify-content:flex-end; gap:6px; }
+    .fb-fuel-table-view { min-height:430px; }
+    .fb-rank { display:inline-grid; place-items:center; min-width:24px; height:22px; padding:0 6px; border-radius:6px; background:var(--surface-3); color:var(--text-2); font-family:var(--font-mono); font-size:10.5px; }
+    .fb-method-note { display:flex; align-items:flex-start; gap:9px; border:1px solid color-mix(in oklab, #4d8fe8 36%, var(--border)); border-left:4px solid #4d8fe8; border-radius:9px; background:color-mix(in oklab, #4d8fe8 7%, var(--surface)); padding:9px 12px; color:var(--text-2); font-size:11.5px; line-height:1.45; }
+    .fb-method-note strong { color:var(--text); }
+    .fb-matrix { min-height:0; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .fb-matrix-card { min-height:210px; max-height:330px; border:1px solid var(--border); border-top:3px solid var(--matrix-tone); border-radius:10px; background:var(--surface); padding:13px; display:flex; flex-direction:column; overflow:hidden; }
+    .fb-matrix-head { display:flex; justify-content:space-between; gap:12px; margin-bottom:10px; }
+    .fb-matrix-head h3 { margin:0; font-size:14px; }
+    .fb-matrix-head p { margin:3px 0 0; color:var(--muted); font-size:10.5px; }
+    .fb-matrix-list { min-height:0; overflow:auto; display:grid; align-content:start; }
+    .fb-matrix-row { display:grid; grid-template-columns:minmax(150px,1fr) 76px 90px 30px; gap:9px; align-items:center; padding:8px 4px; border-top:1px solid var(--divider); font-size:11.5px; }
+    .fb-matrix-row .station { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .fb-matrix-row strong { text-align:right; font-family:var(--font-mono); }
     .fb-empty { height:100%; min-height:80px; display:grid; place-items:center; color:var(--muted); font-size:12px; text-align:center; padding:16px; }
     .fb-modal-backdrop { position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,.56); display:grid; place-items:center; padding:18px; }
     .fb-modal { width:min(1040px, calc(100vw - 32px)); max-height:82vh; min-height:360px; }
@@ -170,6 +196,7 @@ function afInjectStyles() {
       .fb-view, .fb-shell { overflow:auto; height:auto; }
       .fb-filters-row, .fb-filters-advanced { grid-template-columns:repeat(2, minmax(0, 1fr)); }
       .fb-top { grid-template-columns:1fr; }
+      .fb-matrix { grid-template-columns:1fr; }
       .fb-tabs { justify-content:flex-start; }
     }
   `;
@@ -288,9 +315,10 @@ const BIGauge = ({ value, max = 4, label, sub, color }) => {
 };
 
 const BILine = ({ data, series, format = afShort, emptyMessage }) => {
+  const [hover, setHover] = React.useState(null);
   const rows = afRows(data);
   if (!rows.length) return <div className="fb-empty">{emptyMessage || "Sem evolução no período."}</div>;
-  const w = 760, h = 230, p = { l: 14, r: 16, t: 14, b: 18 };
+  const w = 760, h = 230, p = { l: 22, r: 22, t: 26, b: 20 };
   const values = rows.flatMap((row) => series.map((s) => afNum(row[s.key])));
   const min = Math.min(0, ...values);
   const max = Math.max(1, ...values);
@@ -300,6 +328,16 @@ const BILine = ({ data, series, format = afShort, emptyMessage }) => {
   const points = (key) => rows.map((row, i) => `${xFor(i).toFixed(1)},${yFor(row[key]).toFixed(1)}`).join(" ");
   const zeroY = yFor(0);
   const step = Math.max(1, Math.ceil(rows.length / 6));
+  const shouldLabel = (s, row, index) => {
+    const value = afNum(row[s.key]);
+    if (!value) return false;
+    if (rows.length <= 4) return true;
+    const seriesMax = Math.max(1, ...rows.map((r) => Math.abs(afNum(r[s.key]))));
+    const lastWithValue = rows.map((r, i) => [r, i]).filter(([r]) => afNum(r[s.key]) !== 0).at(-1)?.[1];
+    return Math.abs(value) >= seriesMax * 0.45 || index === lastWithValue;
+  };
+  const hoverX = hover ? Math.max(8, Math.min(w - 188, xFor(hover.index) - 92)) : 0;
+  const hoverY = hover ? Math.max(8, Math.min(h - 86, yFor(max) + 2)) : 0;
   return (
     <>
       <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="fb-line">
@@ -308,7 +346,46 @@ const BILine = ({ data, series, format = afShort, emptyMessage }) => {
         {series.map((s) => (
           <polyline key={s.key} points={points(s.key)} fill="none" stroke={s.color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
         ))}
-        {series.slice(0, 1).map((s) => rows.map((row, i) => <circle key={`${s.key}-${i}`} cx={xFor(i)} cy={yFor(row[s.key])} r="3.2" fill={s.color}/>))}
+        {series.map((s) => rows.map((row, i) => (
+          <g key={`${s.key}-${i}`}>
+            <circle cx={xFor(i)} cy={yFor(row[s.key])} r="3.4" fill={s.color} stroke="var(--surface)" strokeWidth="1.4"/>
+            {shouldLabel(s, row, i) && (
+              <text
+                x={xFor(i)}
+                y={yFor(row[s.key]) + (afNum(row[s.key]) < 0 ? 15 : -8)}
+                textAnchor="middle"
+                className="fb-line-label"
+                fill={s.color}
+              >
+                {format(row[s.key])}
+              </text>
+            )}
+          </g>
+        )))}
+        {rows.map((row, i) => (
+          <g key={`hit-${row.mes || i}`} onMouseEnter={() => setHover({ row, index:i })} onMouseLeave={() => setHover(null)}>
+            <line x1={xFor(i)} x2={xFor(i)} y1={p.t} y2={h - p.b} stroke="transparent" strokeWidth={Math.max(18, (w - p.l - p.r) / Math.max(1, rows.length * 1.8))}/>
+            {series.map((s) => (
+              <circle key={`${s.key}-hit-${i}`} cx={xFor(i)} cy={yFor(row[s.key])} r="8" fill="transparent">
+                <title>{`${row.label || row.mes}\n${series.map((item) => `${item.label}: ${format(row[item.key])}`).join("\n")}`}</title>
+              </circle>
+            ))}
+          </g>
+        ))}
+        {hover && (
+          <g className="fb-line-tip" pointerEvents="none">
+            <line x1={xFor(hover.index)} x2={xFor(hover.index)} y1={p.t} y2={h - p.b} stroke="rgba(255,255,255,.18)" strokeDasharray="3 4"/>
+            <rect x={hoverX} y={hoverY} width="180" height={26 + series.length * 18} rx="8" fill="rgba(14,17,22,.96)" stroke="rgba(255,255,255,.18)"/>
+            <text x={hoverX + 10} y={hoverY + 17} className="fb-line-tip-title">{hover.row.label || hover.row.mes}</text>
+            {series.map((s, idx) => (
+              <g key={s.key}>
+                <circle cx={hoverX + 11} cy={hoverY + 34 + idx * 18} r="3.2" fill={s.color}/>
+                <text x={hoverX + 20} y={hoverY + 38 + idx * 18} className="fb-line-tip-text">{s.label}</text>
+                <text x={hoverX + 170} y={hoverY + 38 + idx * 18} textAnchor="end" className="fb-line-tip-value">{format(hover.row[s.key])}</text>
+              </g>
+            ))}
+          </g>
+        )}
       </svg>
       <div className="fb-legend">
         {series.map((s) => {
@@ -387,13 +464,88 @@ const BITinyTable = ({ columns, rows, limit = 6, emptyMessage }) => {
   );
 };
 
-const AnaliseFrota = () => {
-  const [tab, setTab] = React.useState("geral");
-  const [dataInicio, setDataInicio] = React.useState(afDaysAgoISO(120));
-  const [dataFim, setDataFim] = React.useState(afTodayISO());
+const BIFuelReviewTable = ({ rows }) => {
+  const [sort, setSort] = React.useState({ key:"data", dir:"desc" });
+  const items = React.useMemo(() => {
+    const direction = sort.dir === "asc" ? 1 : -1;
+    return [...afRows(rows)].sort((a, b) => {
+      const av = a[sort.key], bv = b[sort.key];
+      if (["litros", "valorLitro", "total", "km", "media"].includes(sort.key)) return direction * (afNum(av) - afNum(bv));
+      return direction * String(av || "").localeCompare(String(bv || ""), "pt-BR", { numeric:true });
+    });
+  }, [rows, sort.key, sort.dir]);
+  const changeSort = (key) => setSort((current) => ({ key, dir:current.key === key && current.dir === "desc" ? "asc" : "desc" }));
+  const head = (key, label, numeric = false) => (
+    <th className={numeric ? "num" : ""}>
+      <button type="button" onClick={() => changeSort(key)} style={{ all:"unset", cursor:"pointer", display:"inline-flex", alignItems:"center", gap:5, color:"inherit" }}>
+        {label}<span style={{ opacity:sort.key === key ? 1 : .35 }}>{sort.key === key && sort.dir === "asc" ? "▲" : "▼"}</span>
+      </button>
+    </th>
+  );
+  return (
+    <div className="fb-table-wrap">
+      <table className="fb-table">
+        <thead><tr>
+          {head("data", "Data")}{head("placa", "Placa")}{head("postoNome", "Posto")}{head("postoUf", "UF")}
+          {head("valorLitro", "R$/litro", true)}{head("litros", "Litros", true)}{head("total", "Total", true)}
+          {head("km", "Km rodado", true)}{head("media", "Km/l", true)}
+        </tr></thead>
+        <tbody>{items.map((row, index) => <tr key={`${row.data}-${row.placa}-${row.posto}-${index}`}>
+          <td>{afDate(row.data)}</td><td>{row.placa}</td><td>{row.postoNome || `Posto ${row.posto}`}</td><td>{row.postoUf || "-"}</td>
+          <td className="num">{afBRL(row.valorLitro)}</td><td className="num">{afPlain(row.litros, 1)}</td><td className="num">{afBRL(row.total)}</td>
+          <td className="num">{afPlain(row.km)}</td><td className="num">{afPlain(row.media, 2)}</td>
+        </tr>)}</tbody>
+      </table>
+    </div>
+  );
+};
+
+const BIPostosTable = ({ rows, initialOrder = "gasto", onMore }) => {
+  const initialKey = initialOrder === "preco" ? "precoMedio" : initialOrder === "diferenca" ? "diferencaPreco" : "total";
+  const [sort, setSort] = React.useState({ key:initialKey, dir:"desc" });
+  const items = React.useMemo(() => {
+    const direction = sort.dir === "asc" ? 1 : -1;
+    return [...afRows(rows)].sort((a, b) => {
+      const av = a[sort.key], bv = b[sort.key];
+      if (["precoMedio", "maiorPreco", "total", "litros", "abastecimentos", "participacao", "diferencaPreco", "gastoAcimaMedia"].includes(sort.key)) return direction * (afNum(av) - afNum(bv));
+      return direction * String(av || "").localeCompare(String(bv || ""), "pt-BR", { numeric:true });
+    });
+  }, [rows, sort.key, sort.dir]);
+  const changeSort = (key) => setSort((current) => ({ key, dir:current.key === key && current.dir === "desc" ? "asc" : "desc" }));
+  const head = (key, label, numeric = false) => (
+    <th className={numeric ? "num" : ""}>
+      <button type="button" onClick={() => changeSort(key)} style={{ all:"unset", cursor:"pointer", display:"inline-flex", alignItems:"center", gap:5, color:"inherit" }}>
+        {label}<span style={{ opacity:sort.key === key ? 1 : .3 }}>{sort.key === key && sort.dir === "asc" ? "▲" : "▼"}</span>
+      </button>
+    </th>
+  );
+  return (
+    <div className="fb-table-wrap">
+      <table className="fb-table">
+        <thead><tr>
+          <th className="num">#</th>{head("fornecedor", "Posto")}{head("cidade", "Cidade")}{head("uf", "UF")}
+          {head("precoMedio", "Preço/litro", true)}{head("maiorPreco", "Maior preço", true)}{head("total", "Gasto total", true)}
+          {head("litros", "Litros", true)}{head("abastecimentos", "Abastecimentos", true)}{head("participacao", "% do gasto", true)}
+          {head("diferencaPreco", "Dif. da média", true)}{head("gastoAcimaMedia", "Valor pago a mais", true)}<th></th>
+        </tr></thead>
+        <tbody>{items.map((row, index) => <tr key={row.codigo || `${row.fornecedor}-${index}`}>
+          <td className="num"><span className="fb-rank">{index + 1}</span></td><td>{row.fornecedor}</td><td>{row.cidade || "-"}</td><td>{row.uf || "-"}</td>
+          <td className="num">{afBRL(row.precoMedio)}</td><td className="num">{afBRL(row.maiorPreco)}</td><td className="num">{afBRL(row.total)}</td>
+          <td className="num">{afPlain(row.litros, 1)}</td><td className="num">{afPlain(row.abastecimentos)}</td><td className="num">{afPct(row.participacao)}</td>
+          <td className="num">{afPct(row.diferencaPreco)}</td><td className="num">{afBRL(row.gastoAcimaMedia)}</td><td><button className="btn" onClick={() => onMore(row)}>Ver mais</button></td>
+        </tr>)}</tbody>
+      </table>
+    </div>
+  );
+};
+
+const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
+  const [tab, setTab] = React.useState(modoAbastecimento ? "abastecimento" : "geral");
+  const defaultPeriod = modoAbastecimento ? afPreviousMonthRange() : { start:afDaysAgoISO(120), end:afTodayISO() };
+  const [dataInicio, setDataInicio] = React.useState(defaultPeriod.start);
+  const [dataFim, setDataFim] = React.useState(defaultPeriod.end);
   const [placa, setPlaca] = React.useState("");
   const [centro, setCentro] = React.useState("");
-  const [proprietario, setProprietario] = React.useState("frota");
   const [fornecedor, setFornecedor] = React.useState("");
   const [modelo, setModelo] = React.useState("");
   const [marca, setMarca] = React.useState("");
@@ -401,30 +553,53 @@ const AnaliseFrota = () => {
   const [tipoCusto, setTipoCusto] = React.useState("");
   const [situacao, setSituacao] = React.useState("");
   const [showAdvanced, setShowAdvanced] = React.useState(false);
-  const [filters, setFilters] = React.useState({ dataInicio: afDaysAgoISO(120), dataFim: afTodayISO(), proprietario: "frota" });
+  const [filters, setFilters] = React.useState({ dataInicio:defaultPeriod.start, dataFim:defaultPeriod.end, proprietario:"frota" });
   const [data, setData] = React.useState(null);
+  const [filterOptions, setFilterOptions] = React.useState({ placas: [], centros: [], tipos: [], situacoes: [], fornecedores: [] });
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [detail, setDetail] = React.useState(null);
+  const [fuelView, setFuelView] = React.useState("graficos");
+  const [postoOrder, setPostoOrder] = React.useState("diferenca");
 
   React.useEffect(() => { afInjectStyles(); }, []);
+
+  React.useEffect(() => {
+    if (modoAbastecimento) return undefined;
+    let active = true;
+    window.RB_API.getCustosVeiculosFiltros()
+      .then((payload) => {
+        if (!active || !payload) return;
+        setFilterOptions({
+          placas: afRows(payload.placas),
+          centros: afRows(payload.centros),
+          tipos: afRows(payload.tipos),
+          situacoes: afRows(payload.situacoes),
+          fornecedores: afRows(payload.fornecedores),
+        });
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [modoAbastecimento]);
 
   React.useEffect(() => {
     let active = true;
     setLoading(true);
     setError("");
-    window.RB_API.getAnaliseFrota({ ...filters, limit: 260 })
+    const request = modoAbastecimento ? window.RB_API.getAnaliseAbastecimentos : window.RB_API.getAnaliseFrota;
+    request({ ...filters, limit: 260 })
       .then((payload) => { if (active) setData(payload); })
       .catch((err) => { if (active) { setData(null); setError(err?.message || "Não foi possível carregar a análise de frota."); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [JSON.stringify(filters)]);
+  }, [JSON.stringify(filters), modoAbastecimento]);
 
-  const applyFilters = () => setFilters({ dataInicio, dataFim, placa, centro, proprietario, fornecedor, modelo, marca, ano, tipoCusto, situacao });
+  const applyFilters = () => setFilters({ dataInicio, dataFim, placa, centro, proprietario:"frota", fornecedor, modelo, marca, ano, tipoCusto, situacao });
   const clearFilters = () => {
-    const start = afDaysAgoISO(120);
-    const end = afTodayISO();
-    setDataInicio(start); setDataFim(end); setPlaca(""); setCentro(""); setProprietario("frota"); setFornecedor("");
+    const range = modoAbastecimento ? afPreviousMonthRange() : { start:afDaysAgoISO(120), end:afTodayISO() };
+    const start = range.start;
+    const end = range.end;
+    setDataInicio(start); setDataFim(end); setPlaca(""); setCentro(""); setFornecedor("");
     setModelo(""); setMarca(""); setAno(""); setTipoCusto(""); setSituacao("");
     setFilters({ dataInicio:start, dataFim:end, proprietario:"frota" });
   };
@@ -439,8 +614,8 @@ const AnaliseFrota = () => {
   const monthly = afRows(custos.monthly);
   const fuel = abastecimento.summary || {};
   const maint = manutBi.resumo || {};
-  const tipoOptions = afRows(custos.types).map((row) => row.tipo).filter(Boolean);
-  const situacaoOptions = afRows(custos.status).map((row) => row.situacao).filter(Boolean);
+  const tipoOptions = filterOptions.tipos.length ? filterOptions.tipos : afRows(custos.types).map((row) => row.tipo).filter(Boolean);
+  const situacaoOptions = filterOptions.situacoes.length ? filterOptions.situacoes : afRows(custos.status).map((row) => row.situacao).filter(Boolean);
   const costByCenter = afGroup(custos.launches, "centroCusto", "valor").slice(0, 5);
 
   const placasCriticas = (() => {
@@ -516,46 +691,112 @@ const AnaliseFrota = () => {
 
   const renderAbastecimento = () => {
     const worst = [...afRows(abastecimento.ranking)].filter((r) => afNum(r.media) > 0).sort((a, b) => afNum(a.media) - afNum(b.media)).slice(0, 5);
+    const postos = afRows(abastecimento.fornecedores);
+    const precoReferenciaFrota = afNum(fuel.precoMedioPonderado) || afNum(fuel.precoMedio);
+    const estados = [...postos.reduce((map, posto) => {
+      const uf = posto.uf || "Não informado";
+      const atual = map.get(uf) || { label:uf, value:0, litros:0, postos:0 };
+      atual.value += afNum(posto.total); atual.litros += afNum(posto.litros); atual.postos += 1;
+      map.set(uf, atual); return map;
+    }, new Map()).values()].sort((a, b) => b.value - a.value);
+    const postosAcimaMedia = postos.filter((r) => afNum(r.precoMedio) > precoReferenciaFrota);
+    const sobreprecoTotal = postosAcimaMedia.reduce((sum, r) => sum + afNum(r.gastoAcimaMedia), 0);
+    const abastecimentosAcima = postosAcimaMedia.reduce((sum, r) => sum + afNum(r.abastecimentos), 0);
+    const litrosAcima = postosAcimaMedia.reduce((sum, r) => sum + afNum(r.litros), 0);
+    const percentualSobrepreco = precoReferenciaFrota > 0 && litrosAcima > 0 ? sobreprecoTotal / (precoReferenciaFrota * litrosAcima) * 100 : 0;
+    const medioExtraAbastecimento = abastecimentosAcima > 0 ? sobreprecoTotal / abastecimentosAcima : 0;
+    const gastosOrdenados = postos.map((r) => afNum(r.total)).sort((a, b) => a - b);
+    const medianaGasto = gastosOrdenados.length ? gastosOrdenados[Math.floor(gastosOrdenados.length / 2)] : 0;
+    const matrixGroups = [
+      { id:"alto-impacto", title:"Alto impacto", sub:"Preço acima da média e gasto elevado", tone:"#e74b4b", rows:postos.filter((r) => afNum(r.precoMedio) > precoReferenciaFrota && afNum(r.total) >= medianaGasto).sort((a,b) => afNum(b.gastoAcimaMedia) - afNum(a.gastoAcimaMedia)) },
+      { id:"preco-alto", title:"Preço alto", sub:"Preço acima da média, mas menor concentração", tone:"#f0c84b", rows:postos.filter((r) => afNum(r.precoMedio) > precoReferenciaFrota && afNum(r.total) < medianaGasto).sort((a,b) => afNum(b.precoMedio) - afNum(a.precoMedio)) },
+      { id:"alto-volume", title:"Alto volume controlado", sub:"Gasto elevado com preço na média ou abaixo", tone:"#4d8fe8", rows:postos.filter((r) => afNum(r.precoMedio) <= precoReferenciaFrota && afNum(r.total) >= medianaGasto).sort((a,b) => afNum(b.total) - afNum(a.total)) },
+      { id:"economicos", title:"Econômicos", sub:"Preço e gasto abaixo dos cortes da matriz", tone:"#2f8f5b", rows:postos.filter((r) => afNum(r.precoMedio) <= precoReferenciaFrota && afNum(r.total) < medianaGasto).sort((a,b) => afNum(a.precoMedio) - afNum(b.precoMedio)) },
+    ];
+    const localPosto = (r) => [r.cidade, r.uf].filter(Boolean).join("/") || "Não informado";
+    const maiorPosto = postos[0];
+    const postoCritico = [...postos].sort((a, b) => afNum(b.gastoAcimaMedia) - afNum(a.gastoAcimaMedia))[0];
     const summaryText = data
-      ? <>Frota consumindo em média <strong>{afPlain(fuel.mediaFrota, 2)} km/l</strong>, com custo de <strong>{afBRL(fuel.reaisKm)}</strong> por km no período.</>
+      ? postoCritico?.gastoAcimaMedia > 0
+        ? <>Atenção: <strong>{postoCritico.fornecedor}</strong> está {afPct(postoCritico.diferencaPreco)} acima do preço médio, gerando cerca de <strong>{afBRL(postoCritico.gastoAcimaMedia)}</strong> em custo excedente.</>
+        : <>Frota consumindo em média <strong>{afPlain(fuel.mediaFrota, 2)} km/l</strong>, sem posto com gasto relevante acima da média no período.</>
       : "Carregando resumo executivo...";
     return (
       <div className="fb-screen">
         {renderExecSummary(summaryText)}
         {renderKpis([
-          { label:"Veículos abastecidos", value:afPlain(fuel.veiculos), hint:`${afPlain(fuel.abastecimentos)} abastecimentos`, icon:"truck", tone:"#4d8fe8" },
-          { label:"Km rodado", value:afPlain(fuel.km), hint:"diferença de odômetro", icon:"route", tone:"#9d7bea" },
+          { label:"Gasto total", value:afBRL(fuel.valor), hint:`${afPlain(fuel.abastecimentos)} abastecimentos`, icon:"money", tone:"#e74b4b" },
+          { label:"Maior concentração", value:maiorPosto ? afPct(maiorPosto.participacao) : "0,0%", hint:maiorPosto?.fornecedor || "Sem posto", icon:"fuel", tone:"#d68a31" },
           { label:"Litros", value:afPlain(fuel.litros, 0), hint:"diesel abastecido", icon:"fuel", tone:"#f0c84b" },
-          { label:"Valor abastecido", value:afBRL(fuel.valor), hint:"total operacional", icon:"money", tone:"#e74b4b" },
-          { label:"Preço médio", value:afBRL(fuel.precoMedio), hint:"por litro", icon:"chart", tone:"#4d8fe8" },
+          { label:"Preço médio ponderado", value:afBRL(precoReferenciaFrota), hint:`média simples ${afBRL(fuel.precoMedio)}/l`, icon:"chart", tone:"#4d8fe8" },
           { label:"R$/km", value:afBRL(fuel.reaisKm), hint:"valor / km", icon:"speedometer", tone:"#2f8f5b" },
+          { label:"Pago acima da média", value:afBRL(sobreprecoTotal), hint:`${afPct(percentualSobrepreco)} · média ${afBRL(medioExtraAbastecimento)}/abast.`, icon:"trending-up", tone:"#e74b4b" },
         ])}
-        <div className="fb-grid fuel">
+        <div className="fb-method-note"><Icon name="alert" size={15}/><span><strong>Por que usamos a média ponderada?</strong> Ela divide o gasto total pelos litros comprados, dando o peso correto aos abastecimentos maiores. A média simples trata um abastecimento pequeno e um grande como se tivessem a mesma importância. Referência dos cálculos: <strong>{afBRL(precoReferenciaFrota)}/l ponderada</strong>; comparação: <strong>{afBRL(fuel.precoMedio)}/l simples</strong>.</span></div>
+        <div className="fb-view-toggle">
+          <button className={`btn${fuelView === "graficos" ? " primary" : ""}`} onClick={() => setFuelView("graficos")}><Icon name="chart" size={13}/> Gráficos</button>
+          <button className={`btn${fuelView === "tabela" ? " primary" : ""}`} onClick={() => setFuelView("tabela")}><Icon name="file" size={13}/> Tabela de postos</button>
+          <button className={`btn${fuelView === "matriz" ? " primary" : ""}`} onClick={() => setFuelView("matriz")}><Icon name="dashboard" size={13}/> Matriz</button>
+        </div>
+        {fuelView === "tabela" ? (
+          <BIPanel title="Comparativo completo dos postos" meta={`${postos.length} postos no período · clique nos títulos para ordenar`} className="fb-fuel-table-view" action={
+            <div className="fb-view-toggle">
+              <button className={`btn${postoOrder === "gasto" ? " primary" : ""}`} onClick={() => setPostoOrder("gasto")}>Maior gasto</button>
+              <button className={`btn${postoOrder === "preco" ? " primary" : ""}`} onClick={() => setPostoOrder("preco")}>Combustível mais caro</button>
+              <button className={`btn${postoOrder === "diferenca" ? " primary" : ""}`} onClick={() => setPostoOrder("diferenca")}>Maior diferença %</button>
+            </div>
+          }>
+            <BIPostosTable key={postoOrder} rows={postos} initialOrder={postoOrder} onMore={(r) => setDetail({ type:"posto", codigo:r.codigo })}/>
+          </BIPanel>
+        ) : fuelView === "matriz" ? (
+          <div className="fb-matrix">
+            {matrixGroups.map((group) => (
+              <section key={group.id} className="fb-matrix-card" style={{ "--matrix-tone":group.tone }}>
+                <div className="fb-matrix-head"><div><h3>{group.title}</h3><p>{group.sub}</p></div><span className="fb-badge warn">{group.rows.length} postos</span></div>
+                <div className="fb-matrix-list">
+                  {group.rows.length ? group.rows.map((posto) => (
+                    <div className="fb-matrix-row" key={posto.codigo || posto.fornecedor}>
+                      <span className="station" title={`${posto.fornecedor} · ${posto.cidade || ""}/${posto.uf || ""}`}>{posto.fornecedor}<br/><small>{[posto.cidade, posto.uf].filter(Boolean).join("/")}</small></span>
+                      <strong>{afBRL(posto.precoMedio)}/l</strong><strong>{afBRL(posto.total)}</strong>
+                      <button className="icon-btn" title="Ver detalhes" onClick={() => setDetail({ type:"posto", codigo:posto.codigo })}><Icon name="external" size={12}/></button>
+                    </div>
+                  )) : <div className="fb-empty">Nenhum posto neste grupo.</div>}
+                </div>
+              </section>
+            ))}
+          </div>
+        ) : <div className="fb-grid fuel">
           <BIPanel title="Média geral da frota" meta="km/l em destaque" className="hero">
             <BIGauge value={fuel.mediaFrota} max={4} label="km/l médio" sub="Meta visual: quanto maior, melhor" color="#2f8f5b"/>
           </BIPanel>
           <BIPanel title="Preço diesel por mês" className="fb-span-2">
             <BILine data={abastecimento.monthly} series={[{ key:"precoMedio", label:"Preço médio/litro", color:"#4d8fe8" }]} format={(v) => afBRL(v)} emptyMessage="Sem histórico de preço no período."/>
           </BIPanel>
-          <BIPanel title="Média por tipo">
-            <BIColumns rows={afRows(abastecimento.modelos).slice(0, 5).map((r, i) => ({ label:r.modelo, value:r.media, color:i < 2 ? "#2f8f5b" : "#f0c84b" }))} valueKey="value" format={(v) => `${afPlain(v, 2)} km/l`}/>
+          <BIPanel title="Gasto por posto" meta="onde o desembolso está concentrado">
+            <BIHBar rows={postos.map((r) => ({ label:r.fornecedor, value:r.total }))} color="#e74b4b" limit={6}/>
           </BIPanel>
-          <BIPanel title="Média por marca">
-            <BIDonut rows={afRows(abastecimento.marcas).map((r, i) => ({ label:r.marca, value:r.total || r.media, media:r.media, color:AF_COLORS[i] }))} center={`${afPlain(fuel.mediaFrota, 2)} km/l`} format={(v, r) => `${afPlain(r.media, 2)} km/l`}/>
+          <BIPanel title="Gasto por estado" meta="onde a frota mais abasteceu em valor">
+            <BIHBar rows={estados} color="#4d8fe8" limit={8} format={(v, r) => `${afBRL(v)} · ${afPlain(r.postos)} postos`}/>
           </BIPanel>
-          <BIPanel title="Média por modelo">
-            <BIHBar rows={afRows(abastecimento.modelos).map((r) => ({ label:r.modelo, value:r.media }))} format={(v) => `${afPlain(v, 2)} km/l`} color="#2f8f5b" limit={5}/>
+          <BIPanel title="Análise comparativa dos postos" meta="preço, volume, participação e excesso estimado">
+            <BITinyTable columns={[
+              { key:"fornecedor", label:"Posto" },
+              { key:"localizacao", label:"Cidade/UF", render:(r) => localPosto(r) },
+              { key:"precoMedio", label:"R$/litro", num:true, render:(r) => afBRL(r.precoMedio) },
+              { key:"participacao", label:"% gasto", num:true, render:(r) => afPct(r.participacao) },
+              { key:"acoes", label:"", render:(r) => <button className="btn" onClick={() => setDetail({ type:"posto", codigo:r.codigo })}>Ver mais</button> },
+            ]} rows={postos} limit={7}/>
           </BIPanel>
           <BIPanel title="Pior consumo">
             <BIHBar rows={worst.map((r) => ({ label:r.placa, value:r.media }))} format={(v) => `${afPlain(v, 2)} km/l`} color="#e74b4b" limit={5} emptyMessage="Nenhum veículo com consumo abaixo da média."/>
           </BIPanel>
-          <BIPanel title="Postos mais caros">
+          <BIPanel title="Preço por litro mais alto">
             <BIHBar rows={afRows(abastecimento.postosCaros).map((r) => ({ label:r.fornecedor, value:r.precoMedio }))} format={(v) => afBRL(v)} color="#d68a31" limit={5} emptyMessage="Sem postos com preço acima da média no período."/>
           </BIPanel>
-          <BIPanel title="Alertas de consumo">
+          <BIPanel title="Alertas e desvios" action={<button className="btn" onClick={() => setDetail("abastecimento")}><Icon name="file" size={13}/> Ver abastecimentos</button>}>
             <BIAlertList rows={alerts.filter((a) => /Consumo|Posto/.test(a.label))} emptyMessage="Nenhum alerta de consumo no período."/>
           </BIPanel>
-        </div>
+        </div>}
       </div>
     );
   };
@@ -759,6 +1000,49 @@ const AnaliseFrota = () => {
   };
 
   const modalData = (() => {
+    if (detail?.type === "posto") {
+      const posto = afRows(abastecimento.fornecedores).find((r) => String(r.codigo) === String(detail.codigo));
+      if (!posto) return null;
+      const localizacao = [posto.cidade, posto.uf].filter(Boolean).join("/") || "Localização não informada";
+      return {
+        title:posto.fornecedor,
+        meta:`Código ${posto.codigo} · ${localizacao}${posto.endereco ? ` · ${posto.endereco}` : ""}`,
+        summary:[
+          { label:"Maior preço registrado", value:afBRL(posto.maiorPreco), hint:"maior R$/litro no período", icon:"trending-up", tone:"#e74b4b" },
+          { label:"Preço médio do posto", value:afBRL(posto.precoMedio), hint:`média ponderada da frota ${afBRL(fuel.precoMedioPonderado || fuel.precoMedio)}`, icon:"fuel", tone:"#d68a31" },
+          { label:"Pago acima da média", value:afPct(posto.diferencaPreco), hint:"diferença do preço médio", icon:"chart", tone:afNum(posto.diferencaPreco) > 0 ? "#e74b4b" : "#2f8f5b" },
+          { label:"Custo excedente", value:afBRL(posto.gastoAcimaMedia), hint:"estimativa versus média da frota", icon:"money", tone:"#e74b4b" },
+          { label:"Gasto no posto", value:afBRL(posto.total), hint:`${afPlain(posto.abastecimentos)} abastecimentos`, icon:"money", tone:"#4d8fe8" },
+          { label:"Volume abastecido", value:`${afPlain(posto.litros, 1)} l`, hint:localizacao, icon:"fuel", tone:"#f0c84b" },
+        ],
+        columns:[
+          { key:"data", label:"Data", render:(r) => afDate(r.data) },
+          { key:"placa", label:"Placa" },
+          { key:"valorLitro", label:"R$/litro", num:true, render:(r) => afBRL(r.valorLitro) },
+          { key:"litros", label:"Litros", num:true, render:(r) => afPlain(r.litros, 1) },
+          { key:"total", label:"Total", num:true, render:(r) => afBRL(r.total) },
+          { key:"km", label:"Km rodado", num:true, render:(r) => afPlain(r.km) },
+          { key:"media", label:"Km/l", num:true, render:(r) => afPlain(r.media, 2) },
+        ],
+        rows:afRows(abastecimento.lancamentos).filter((r) => String(r.posto) === String(posto.codigo)),
+      };
+    }
+    if (detail === "abastecimento") return {
+      title:"Conferência de abastecimentos",
+      meta:`Somente Diesel · ${afPlain(abastecimento.lancamentos?.length)} registros no período`,
+      interactiveFuel:true,
+      columns:[
+        { key:"data", label:"Data", render:(r) => afDate(r.data) },
+        { key:"placa", label:"Placa" },
+        { key:"posto", label:"Posto" },
+        { key:"litros", label:"Litros", num:true, render:(r) => afPlain(r.litros, 1) },
+        { key:"valorLitro", label:"R$/litro", num:true, render:(r) => afBRL(r.valorLitro) },
+        { key:"total", label:"Total", num:true, render:(r) => afBRL(r.total) },
+        { key:"km", label:"Km rodado", num:true, render:(r) => afPlain(r.km) },
+        { key:"media", label:"Km/l", num:true, render:(r) => afPlain(r.media, 2) },
+      ],
+      rows: abastecimento.lancamentos,
+    };
     if (detail === "custos") return {
       title:"Detalhamento de custos",
       columns:[
@@ -812,24 +1096,30 @@ const AnaliseFrota = () => {
       <div className="fb-shell">
         <div className="fb-top">
           <div className="fb-title">
-            <h1>Frota BI</h1>
-            <div className="sub">Dashboard executivo de custos, abastecimento, manutenção, lucro e auditoria</div>
+            <h1>{modoAbastecimento ? "Análise de Abastecimentos" : "Frota BI"}</h1>
+            <div className="sub">{modoAbastecimento ? "Conferência de consumo, preços, veículos e gastos por posto" : "Dashboard executivo de custos, abastecimento, manutenção, lucro e auditoria"}</div>
           </div>
-          <div className="fb-tabs">
-            {AF_TABS.map((item) => (
-              <button key={item.id} className={`fb-tab ${tab === item.id ? "active" : ""}`} onClick={() => setTab(item.id)}>
-                <Icon name={item.icon} size={14}/><span>{item.label}</span>
-              </button>
-            ))}
-          </div>
+          {!modoAbastecimento && (
+            <div className="fb-tabs">
+              {AF_TABS.map((item) => (
+                <button key={item.id} className={`fb-tab ${tab === item.id ? "active" : ""}`} onClick={() => setTab(item.id)}>
+                  <Icon name={item.icon} size={14}/><span>{item.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {modoAbastecimento && (
+            <button className="btn primary" style={{ height:38, padding:"0 16px", fontWeight:700 }} onClick={() => setDetail("abastecimento")}>
+              <Icon name="file" size={15}/> Revisar todos os abastecimentos
+            </button>
+          )}
         </div>
 
         <div className="fb-filters-bar">
           <div className="fb-filters-row">
             <div className="fb-field"><label>Início</label><input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></div>
             <div className="fb-field"><label>Fim</label><input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)}/></div>
-            <div className="fb-field"><label>Placa</label><input value={placa} onChange={(e) => setPlaca(e.target.value.toUpperCase())} placeholder="Todas"/></div>
-            <div className="fb-field"><label>Proprietário</label><select value={proprietario} onChange={(e) => setProprietario(e.target.value)}><option value="frota">Frota</option><option value="todos">Todos</option><option value="terceiro">Terceiros</option></select></div>
+            <div className="fb-field"><label>Placa</label><input list="af-placas" value={placa} onChange={(e) => setPlaca(e.target.value.toUpperCase())} placeholder="Todas"/></div>
             <button type="button" className="fb-filters-toggle" onClick={() => setShowAdvanced((v) => !v)}>
               <Icon name="filter" size={13}/> Filtros avançados {showAdvanced ? "▲" : "▼"}
             </button>
@@ -838,8 +1128,8 @@ const AnaliseFrota = () => {
           </div>
           {showAdvanced && (
             <div className="fb-filters-advanced">
-              <div className="fb-field"><label>Centro</label><input value={centro} onChange={(e) => setCentro(e.target.value)} placeholder="Todos"/></div>
-              <div className="fb-field"><label>Fornecedor</label><input value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder="Todos"/></div>
+              <div className="fb-field"><label>Centro</label><input list="af-centros" value={centro} onChange={(e) => setCentro(e.target.value)} placeholder="Todos"/></div>
+              <div className="fb-field"><label>Fornecedor</label><input list="af-fornecedores" value={fornecedor} onChange={(e) => setFornecedor(e.target.value)} placeholder="Todos"/></div>
               <div className="fb-field"><label>Modelo</label><input value={modelo} onChange={(e) => setModelo(e.target.value)} placeholder="Todos"/></div>
               <div className="fb-field"><label>Marca</label><input value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Todas"/></div>
               <div className="fb-field"><label>Ano</label><input value={ano} onChange={(e) => setAno(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="Todos"/></div>
@@ -847,6 +1137,9 @@ const AnaliseFrota = () => {
               <div className="fb-field"><label>Status</label><select value={situacao} onChange={(e) => setSituacao(e.target.value)}><option value="">Todos</option>{situacaoOptions.map((s) => <option key={s} value={s}>{AF_STATUS_LABEL[s] || s}</option>)}</select></div>
             </div>
           )}
+          <datalist id="af-placas">{filterOptions.placas.map((p) => <option key={p} value={p}/>)}</datalist>
+          <datalist id="af-centros">{filterOptions.centros.map((c) => <option key={c.codigo || c.nome} value={c.codigo || c.nome}>{c.nome}</option>)}</datalist>
+          <datalist id="af-fornecedores">{filterOptions.fornecedores.map((f) => <option key={f.codigo || f.nome} value={f.codigo || f.nome}>{f.nome}</option>)}</datalist>
         </div>
 
         <div className="fb-stage">{renderScreen()}</div>
@@ -856,10 +1149,14 @@ const AnaliseFrota = () => {
         <div className="fb-modal-backdrop" onMouseDown={() => setDetail(null)}>
           <section className="fb-panel fb-modal" onMouseDown={(e) => e.stopPropagation()}>
             <div className="fb-panel-head">
-              <div><h2>{modalData.title}</h2><div className="meta">Tabela de apoio fora da tela principal do BI</div></div>
+              <div><h2>{modalData.title}</h2><div className="meta">{modalData.meta || "Tabela de apoio fora da tela principal do BI"}</div></div>
               <button className="icon-btn" onClick={() => setDetail(null)} title="Fechar"><Icon name="x"/></button>
             </div>
-            <BITinyTable columns={modalData.columns} rows={modalData.rows} limit={120}/>
+            {modalData.summary && <div style={{ marginBottom:12 }}>{renderKpis(modalData.summary)}</div>}
+            {modalData.interactiveFuel
+              ? <BIFuelReviewTable rows={modalData.rows}/>
+              : <BITinyTable columns={modalData.columns} rows={modalData.rows} limit={300}/>
+            }
           </section>
         </div>
       )}

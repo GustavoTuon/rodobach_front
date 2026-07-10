@@ -25,6 +25,14 @@ function acBRL(v) {
 }
 function acNum(v) { const n=Number(v); return Number.isFinite(n)?n:0; }
 function acPct(v) { return `${acNum(v).toFixed(1)}%`; }
+function acShortBRL(v) {
+  const raw = acNum(v);
+  const n = Math.abs(raw);
+  const sign = raw < 0 ? "-" : "";
+  if (n >= 1000000) return `${sign}R$ ${(n / 1000000).toFixed(1).replace(".", ",")} Mi`;
+  if (n >= 1000) return `${sign}R$ ${Math.round(n / 1000).toLocaleString("pt-BR")}k`;
+  return `${sign}R$ ${Math.round(n).toLocaleString("pt-BR")}`;
+}
 
 // ── Períodos disponíveis ──────────────────────────────────────────────────────
 const AC_PERIODS = [
@@ -478,6 +486,7 @@ const AnaliseClientes = () => {
   const [dataInicio,   setDataInicio]   = React.useState(defaultRange.start);
   const [dataFim,      setDataFim]      = React.useState(defaultRange.end);
   const [manualFilter, setManualFilter] = React.useState(null);
+  const [empresa,      setEmpresa]      = React.useState("todas");
   const [clienteSearch,setClienteSearch]= React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("todos");
 
@@ -503,28 +512,37 @@ const AnaliseClientes = () => {
     let active = true;
     setLoading(true); setError(""); setTablePage(0);
     const filters = manualFilter
-      ? { dataInicio: manualFilter.dataInicio, dataFim: manualFilter.dataFim }
+      ? { dataInicio: manualFilter.dataInicio, dataFim: manualFilter.dataFim, startDate: manualFilter.dataInicio, endDate: manualFilter.dataFim }
       : { period: periodo };
+    filters.empresa = empresa;
     if (statusFilter !== "todos") filters.status = statusFilter;
     window.RB_API.getAnaliseClientes(filters)
       .then(d => { if (active) { setData(d); setChartKey(k=>k+1); } })
       .catch(e => { if (active) { setData(null); setError(e?.message || "Não foi possível carregar dados."); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [periodo, manualFilter, statusFilter]);
+  }, [periodo, manualFilter, statusFilter, empresa]);
 
   const periodLabel = manualFilter
     ? `${acDateFmt(manualFilter.dataInicio)} a ${acDateFmt(manualFilter.dataFim)}`
     : AC_PERIODS.find(p=>p.key===periodo)?.label || "12 meses";
 
   const applyManualFilter = () => {
-    if (!dataInicio && !dataFim) return;
+    if (!dataInicio || !dataFim) {
+      setError("Informe data inicial e data final para aplicar o período personalizado.");
+      return;
+    }
+    if (dataInicio > dataFim) {
+      setError("A data inicial não pode ser maior que a data final.");
+      return;
+    }
     setPeriodo("custom"); setManualFilter({ dataInicio, dataFim });
   };
   const clearFilter = () => {
     const r = AC_PERIODS[3].getRange();
     setDataInicio(r.start); setDataFim(r.end);
     setManualFilter(null); setPeriodo("12m"); setStatusFilter("todos");
+    setEmpresa("todas");
     setClienteSearch("");
   };
   const selectShortcut = (key) => {
@@ -706,6 +724,14 @@ const AnaliseClientes = () => {
           <input type="date" value={dataFim} onChange={e=>setDataFim(e.target.value)}/>
         </label>
         <select
+          value={empresa}
+          onChange={e=>setEmpresa(e.target.value)}
+          style={{height:30,border:"1px solid var(--border)",borderRadius:"var(--r)",background:"var(--surface-2)",fontSize:12.5,padding:"0 8px",color:"var(--text)"}}>
+          <option value="todas">Todas as empresas</option>
+          <option value="2">RB Transportes</option>
+          <option value="1">Empresa 1</option>
+        </select>
+        <select
           value={statusFilter}
           onChange={e=>setStatusFilter(e.target.value)}
           style={{height:30,border:"1px solid var(--border)",borderRadius:"var(--r)",background:"var(--surface-2)",fontSize:12.5,padding:"0 8px",color:"var(--text)"}}>
@@ -716,7 +742,7 @@ const AnaliseClientes = () => {
         <button className="btn primary" onClick={applyManualFilter}>Aplicar</button>
         <button className="btn" onClick={clearFilter}><Icon name="x" size={12}/> Limpar</button>
         {manualFilter && <span className="badge info">Filtro personalizado ativo</span>}
-        <span className="muted" style={{marginLeft:"auto",fontSize:11.5}}>Base: dataemissaorec · financeiro.receber</span>
+        <span className="muted" style={{marginLeft:"auto",fontSize:11.5}}>Base: dataemissaorec · financeiro.receber · {empresa==="todas"?"todas as empresas":empresa==="2"?"RB Transportes":"empresa "+empresa}</span>
       </div>
 
       {/* ── Banner de status ── */}
@@ -813,11 +839,11 @@ const AnaliseClientes = () => {
               <div key={chartKey} className="chart-plot" style={{
                 display:"grid",
                 gridTemplateColumns:`repeat(${monthly.length}, minmax(24px, 1fr))`,
-                gap:5,height:170,alignItems:"flex-end",
+                gap:7,height:205,alignItems:"flex-end",
               }}>
                 {monthly.map((item,idx)=>{
                   const val=acNum(item.valorTotal);
-                  const barH=val>0?Math.max(Math.round((val/maxMonthly)*148),6):2;
+                  const barH=val>0?Math.max(Math.round((val/maxMonthly)*142),8):2;
                   const isHov=hoveredBar===idx;
                   return (
                     <div key={`${item.mes}-${chartKey}`}
@@ -839,11 +865,27 @@ const AnaliseClientes = () => {
                           </div>
                         </div>
                       )}
+                      <span
+                        title={acBRL(val)}
+                        style={{
+                          fontFamily:"var(--font-mono)",
+                          fontSize:10,
+                          fontWeight:700,
+                          color:isHov?"#dbeafe":"#9cc7ee",
+                          lineHeight:1,
+                          whiteSpace:"nowrap",
+                          marginBottom:2,
+                          textShadow:"0 1px 2px rgba(0,0,0,.55)",
+                        }}
+                      >
+                        {acShortBRL(val)}
+                      </span>
                       <div style={{
                         width:"100%",height:barH,borderRadius:4,
-                        background:isHov?AC_COLORS.barHov:AC_COLORS.bar,
-                        transition:"background 0.15s, opacity 0.15s",
-                        opacity:isHov?1:0.85,
+                        background:isHov?"linear-gradient(180deg,#7fb0dc,#4f7fab)":"linear-gradient(180deg,#5b8fbc,#416f99)",
+                        boxShadow:isHov?"0 -8px 20px rgba(79,127,171,.25)":"none",
+                        transition:"background 0.15s, opacity 0.15s, box-shadow 0.15s",
+                        opacity:isHov?1:0.92,
                       }}/>
                       <span style={{fontSize:9.5,color:"var(--text-3)",textAlign:"center",lineHeight:1.2}}>{item.label}</span>
                     </div>
