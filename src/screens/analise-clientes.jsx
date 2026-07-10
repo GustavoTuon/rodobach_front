@@ -20,6 +20,12 @@ function acDateFmt(v) {
   const [y, m, d] = String(v).slice(0,10).split("-");
   return y && m && d ? `${d}/${m}/${y}` : "—";
 }
+function acMonthRange(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})/);
+  if (!match) return null;
+  const lastDay = new Date(Number(match[1]), Number(match[2]), 0).getDate();
+  return { start:`${match[1]}-${match[2]}-01`, end:`${match[1]}-${match[2]}-${String(lastDay).padStart(2,"0")}` };
+}
 function acBRL(v) {
   return new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(Number(v)||0);
 }
@@ -503,6 +509,8 @@ const AnaliseClientes = () => {
   const [tablePage,    setTablePage]    = React.useState(0);
   const [chartKey,     setChartKey]     = React.useState(0);
   const [rankTab,      setRankTab]      = React.useState("top");
+  const [selectedMonth,setSelectedMonth]= React.useState("");
+  const [drillOrigin,  setDrillOrigin]  = React.useState(null);
   const PAGE_SIZE = 20;
 
   React.useEffect(() => { acInjectStyles(); }, []);
@@ -537,6 +545,7 @@ const AnaliseClientes = () => {
       return;
     }
     setPeriodo("custom"); setManualFilter({ dataInicio, dataFim });
+    setSelectedMonth(""); setDrillOrigin(null);
   };
   const clearFilter = () => {
     const r = AC_PERIODS[3].getRange();
@@ -544,11 +553,32 @@ const AnaliseClientes = () => {
     setManualFilter(null); setPeriodo("12m"); setStatusFilter("todos");
     setEmpresa("todas");
     setClienteSearch("");
+    setSelectedMonth(""); setDrillOrigin(null);
   };
   const selectShortcut = (key) => {
     const p = AC_PERIODS.find(x=>x.key===key);
     if (p) { const r=p.getRange(); setDataInicio(r.start); setDataFim(r.end); }
     setManualFilter(null); setPeriodo(key);
+    setSelectedMonth(""); setDrillOrigin(null);
+  };
+  const selectChartMonth = (item) => {
+    const range = acMonthRange(item?.mes);
+    if (!range) return;
+    if (!drillOrigin) setDrillOrigin({ periodo, manualFilter, dataInicio, dataFim });
+    setSelectedMonth(String(item.mes).slice(0,7));
+    setDataInicio(range.start); setDataFim(range.end);
+    setPeriodo("custom"); setManualFilter({ dataInicio:range.start, dataFim:range.end });
+  };
+  const clearChartMonth = () => {
+    const origin = drillOrigin;
+    setSelectedMonth(""); setDrillOrigin(null);
+    if (origin) {
+      setPeriodo(origin.periodo); setManualFilter(origin.manualFilter);
+      setDataInicio(origin.dataInicio); setDataFim(origin.dataFim);
+      return;
+    }
+    const r = AC_PERIODS[3].getRange();
+    setPeriodo("12m"); setManualFilter(null); setDataInicio(r.start); setDataFim(r.end);
   };
 
   // ── Dados derivados ─────────────────────────────────────────────────────────
@@ -828,6 +858,7 @@ const AnaliseClientes = () => {
           <div className="card-header">
             <h3>Faturamento por mês</h3>
             <div className="row" style={{gap:8,fontSize:11.5}}>
+              {selectedMonth && <button className="btn sm" onClick={clearChartMonth}><Icon name="x" size={11}/> Voltar ao período anterior</button>}
               <span className="muted">{monthly.length} meses</span>
             </div>
           </div>
@@ -845,10 +876,14 @@ const AnaliseClientes = () => {
                   const val=acNum(item.valorTotal);
                   const barH=val>0?Math.max(Math.round((val/maxMonthly)*142),8):2;
                   const isHov=hoveredBar===idx;
+                  const isSelected=selectedMonth===String(item.mes).slice(0,7);
                   return (
                     <div key={`${item.mes}-${chartKey}`}
                          className="ac-bar-in"
-                         style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,justifyContent:"flex-end",height:"100%",position:"relative",cursor:"default",animationDelay:`${idx*25}ms`}}
+                         role="button" tabIndex={0} aria-label={`Filtrar pelo mês ${item.label}`}
+                         style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4,justifyContent:"flex-end",height:"100%",position:"relative",cursor:"pointer",animationDelay:`${idx*25}ms`,outline:isSelected?"2px solid var(--brand-blue)":"none",outlineOffset:3,borderRadius:5}}
+                         onClick={()=>selectChartMonth(item)}
+                         onKeyDown={(e)=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();selectChartMonth(item);}}}
                          onMouseEnter={()=>setHoveredBar(idx)}
                          onMouseLeave={()=>setHoveredBar(null)}>
                       {/* Tooltip */}
@@ -882,8 +917,8 @@ const AnaliseClientes = () => {
                       </span>
                       <div style={{
                         width:"100%",height:barH,borderRadius:4,
-                        background:isHov?"linear-gradient(180deg,#7fb0dc,#4f7fab)":"linear-gradient(180deg,#5b8fbc,#416f99)",
-                        boxShadow:isHov?"0 -8px 20px rgba(79,127,171,.25)":"none",
+                        background:isSelected?"linear-gradient(180deg,#38bdf8,#2563eb)":isHov?"linear-gradient(180deg,#7fb0dc,#4f7fab)":"linear-gradient(180deg,#5b8fbc,#416f99)",
+                        boxShadow:isSelected?"0 -8px 22px rgba(56,189,248,.32)":isHov?"0 -8px 20px rgba(79,127,171,.25)":"none",
                         transition:"background 0.15s, opacity 0.15s, box-shadow 0.15s",
                         opacity:isHov?1:0.92,
                       }}/>

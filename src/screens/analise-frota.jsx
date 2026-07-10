@@ -470,7 +470,7 @@ const BIFuelReviewTable = ({ rows }) => {
     const direction = sort.dir === "asc" ? 1 : -1;
     return [...afRows(rows)].sort((a, b) => {
       const av = a[sort.key], bv = b[sort.key];
-      if (["litros", "valorLitro", "total", "km", "media"].includes(sort.key)) return direction * (afNum(av) - afNum(bv));
+      if (["litros", "valorLitroTabela", "desconto", "valorLitro", "total", "km", "media"].includes(sort.key)) return direction * (afNum(av) - afNum(bv));
       return direction * String(av || "").localeCompare(String(bv || ""), "pt-BR", { numeric:true });
     });
   }, [rows, sort.key, sort.dir]);
@@ -487,12 +487,12 @@ const BIFuelReviewTable = ({ rows }) => {
       <table className="fb-table">
         <thead><tr>
           {head("data", "Data")}{head("placa", "Placa")}{head("postoNome", "Posto")}{head("postoUf", "UF")}
-          {head("valorLitro", "R$/litro", true)}{head("litros", "Litros", true)}{head("total", "Total", true)}
+          {head("valorLitroTabela", "Preço tabela", true)}{head("desconto", "Desconto", true)}{head("valorLitro", "Preço líquido", true)}{head("litros", "Litros", true)}{head("total", "Total pago", true)}
           {head("km", "Km rodado", true)}{head("media", "Km/l", true)}
         </tr></thead>
         <tbody>{items.map((row, index) => <tr key={`${row.data}-${row.placa}-${row.posto}-${index}`}>
           <td>{afDate(row.data)}</td><td>{row.placa}</td><td>{row.postoNome || `Posto ${row.posto}`}</td><td>{row.postoUf || "-"}</td>
-          <td className="num">{afBRL(row.valorLitro)}</td><td className="num">{afPlain(row.litros, 1)}</td><td className="num">{afBRL(row.total)}</td>
+          <td className="num">{afBRL(row.valorLitroTabela)}</td><td className="num">{afBRL(row.desconto)}</td><td className="num">{afBRL(row.valorLitro)}</td><td className="num">{afPlain(row.litros, 1)}</td><td className="num">{afBRL(row.total)}</td>
           <td className="num">{afPlain(row.km)}</td><td className="num">{afPlain(row.media, 2)}</td>
         </tr>)}</tbody>
       </table>
@@ -507,7 +507,7 @@ const BIPostosTable = ({ rows, initialOrder = "gasto", onMore }) => {
     const direction = sort.dir === "asc" ? 1 : -1;
     return [...afRows(rows)].sort((a, b) => {
       const av = a[sort.key], bv = b[sort.key];
-      if (["precoMedio", "maiorPreco", "total", "litros", "abastecimentos", "participacao", "diferencaPreco", "gastoAcimaMedia"].includes(sort.key)) return direction * (afNum(av) - afNum(bv));
+      if (["precoTabelaMedio", "precoMedio", "maiorPreco", "desconto", "total", "litros", "abastecimentos", "participacao", "diferencaPreco", "gastoAcimaMedia"].includes(sort.key)) return direction * (afNum(av) - afNum(bv));
       return direction * String(av || "").localeCompare(String(bv || ""), "pt-BR", { numeric:true });
     });
   }, [rows, sort.key, sort.dir]);
@@ -524,13 +524,13 @@ const BIPostosTable = ({ rows, initialOrder = "gasto", onMore }) => {
       <table className="fb-table">
         <thead><tr>
           <th className="num">#</th>{head("fornecedor", "Posto")}{head("cidade", "Cidade")}{head("uf", "UF")}
-          {head("precoMedio", "Preço/litro", true)}{head("maiorPreco", "Maior preço", true)}{head("total", "Gasto total", true)}
+          {head("precoTabelaMedio", "Preço tabela", true)}{head("desconto", "Descontos", true)}{head("precoMedio", "Preço líquido", true)}{head("maiorPreco", "Maior líquido", true)}{head("total", "Total pago", true)}
           {head("litros", "Litros", true)}{head("abastecimentos", "Abastecimentos", true)}{head("participacao", "% do gasto", true)}
           {head("diferencaPreco", "Dif. da média", true)}{head("gastoAcimaMedia", "Valor pago a mais", true)}<th></th>
         </tr></thead>
         <tbody>{items.map((row, index) => <tr key={row.codigo || `${row.fornecedor}-${index}`}>
           <td className="num"><span className="fb-rank">{index + 1}</span></td><td>{row.fornecedor}</td><td>{row.cidade || "-"}</td><td>{row.uf || "-"}</td>
-          <td className="num">{afBRL(row.precoMedio)}</td><td className="num">{afBRL(row.maiorPreco)}</td><td className="num">{afBRL(row.total)}</td>
+          <td className="num">{afBRL(row.precoTabelaMedio)}</td><td className="num">{afBRL(row.desconto)}</td><td className="num">{afBRL(row.precoMedio)}</td><td className="num">{afBRL(row.maiorPreco)}</td><td className="num">{afBRL(row.total)}</td>
           <td className="num">{afPlain(row.litros, 1)}</td><td className="num">{afPlain(row.abastecimentos)}</td><td className="num">{afPct(row.participacao)}</td>
           <td className="num">{afPct(row.diferencaPreco)}</td><td className="num">{afBRL(row.gastoAcimaMedia)}</td><td><button className="btn" onClick={() => onMore(row)}>Ver mais</button></td>
         </tr>)}</tbody>
@@ -725,14 +725,14 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
       <div className="fb-screen">
         {renderExecSummary(summaryText)}
         {renderKpis([
-          { label:"Gasto total", value:afBRL(fuel.valor), hint:`${afPlain(fuel.abastecimentos)} abastecimentos`, icon:"money", tone:"#e74b4b" },
+          { label:"Total pago", value:afBRL(fuel.valor), hint:`${afPlain(fuel.abastecimentos)} abastecimentos · ${afBRL(fuel.desconto)} em descontos`, icon:"money", tone:"#e74b4b" },
           { label:"Maior concentração", value:maiorPosto ? afPct(maiorPosto.participacao) : "0,0%", hint:maiorPosto?.fornecedor || "Sem posto", icon:"fuel", tone:"#d68a31" },
           { label:"Litros", value:afPlain(fuel.litros, 0), hint:"diesel abastecido", icon:"fuel", tone:"#f0c84b" },
           { label:"Preço médio ponderado", value:afBRL(precoReferenciaFrota), hint:`média simples ${afBRL(fuel.precoMedio)}/l`, icon:"chart", tone:"#4d8fe8" },
           { label:"R$/km", value:afBRL(fuel.reaisKm), hint:"valor / km", icon:"speedometer", tone:"#2f8f5b" },
           { label:"Pago acima da média", value:afBRL(sobreprecoTotal), hint:`${afPct(percentualSobrepreco)} · média ${afBRL(medioExtraAbastecimento)}/abast.`, icon:"trending-up", tone:"#e74b4b" },
         ])}
-        <div className="fb-method-note"><Icon name="alert" size={15}/><span><strong>Por que usamos a média ponderada?</strong> Ela divide o gasto total pelos litros comprados, dando o peso correto aos abastecimentos maiores. A média simples trata um abastecimento pequeno e um grande como se tivessem a mesma importância. Referência dos cálculos: <strong>{afBRL(precoReferenciaFrota)}/l ponderada</strong>; comparação: <strong>{afBRL(fuel.precoMedio)}/l simples</strong>.</span></div>
+        <div className="fb-method-note"><Icon name="alert" size={15}/><span><strong>Preços líquidos após descontos.</strong> O preço efetivo é calculado por <strong>total pago ÷ litros</strong>; o campo de desconto não é subtraído novamente porque já está incorporado no total. A média ponderada dá o peso correto aos abastecimentos maiores. Referência: <strong>{afBRL(precoReferenciaFrota)}/l ponderada</strong>; comparação: <strong>{afBRL(fuel.precoMedio)}/l simples</strong>.</span></div>
         <div className="fb-view-toggle">
           <button className={`btn${fuelView === "graficos" ? " primary" : ""}`} onClick={() => setFuelView("graficos")}><Icon name="chart" size={13}/> Gráficos</button>
           <button className={`btn${fuelView === "tabela" ? " primary" : ""}`} onClick={() => setFuelView("tabela")}><Icon name="file" size={13}/> Tabela de postos</button>
@@ -782,7 +782,7 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
             <BITinyTable columns={[
               { key:"fornecedor", label:"Posto" },
               { key:"localizacao", label:"Cidade/UF", render:(r) => localPosto(r) },
-              { key:"precoMedio", label:"R$/litro", num:true, render:(r) => afBRL(r.precoMedio) },
+              { key:"precoMedio", label:"R$/litro líquido", num:true, render:(r) => afBRL(r.precoMedio) },
               { key:"participacao", label:"% gasto", num:true, render:(r) => afPct(r.participacao) },
               { key:"acoes", label:"", render:(r) => <button className="btn" onClick={() => setDetail({ type:"posto", codigo:r.codigo })}>Ver mais</button> },
             ]} rows={postos} limit={7}/>
@@ -1008,8 +1008,8 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
         title:posto.fornecedor,
         meta:`Código ${posto.codigo} · ${localizacao}${posto.endereco ? ` · ${posto.endereco}` : ""}`,
         summary:[
-          { label:"Maior preço registrado", value:afBRL(posto.maiorPreco), hint:"maior R$/litro no período", icon:"trending-up", tone:"#e74b4b" },
-          { label:"Preço médio do posto", value:afBRL(posto.precoMedio), hint:`média ponderada da frota ${afBRL(fuel.precoMedioPonderado || fuel.precoMedio)}`, icon:"fuel", tone:"#d68a31" },
+          { label:"Preço líquido médio", value:afBRL(posto.precoMedio), hint:`preço de tabela médio ${afBRL(posto.precoTabelaMedio)}`, icon:"fuel", tone:"#d68a31" },
+          { label:"Descontos recebidos", value:afBRL(posto.desconto), hint:"já deduzidos do total pago", icon:"trending-up", tone:"#2f8f5b" },
           { label:"Pago acima da média", value:afPct(posto.diferencaPreco), hint:"diferença do preço médio", icon:"chart", tone:afNum(posto.diferencaPreco) > 0 ? "#e74b4b" : "#2f8f5b" },
           { label:"Custo excedente", value:afBRL(posto.gastoAcimaMedia), hint:"estimativa versus média da frota", icon:"money", tone:"#e74b4b" },
           { label:"Gasto no posto", value:afBRL(posto.total), hint:`${afPlain(posto.abastecimentos)} abastecimentos`, icon:"money", tone:"#4d8fe8" },
@@ -1018,7 +1018,9 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
         columns:[
           { key:"data", label:"Data", render:(r) => afDate(r.data) },
           { key:"placa", label:"Placa" },
-          { key:"valorLitro", label:"R$/litro", num:true, render:(r) => afBRL(r.valorLitro) },
+          { key:"valorLitroTabela", label:"Preço tabela", num:true, render:(r) => afBRL(r.valorLitroTabela) },
+          { key:"desconto", label:"Desconto", num:true, render:(r) => afBRL(r.desconto) },
+          { key:"valorLitro", label:"Preço líquido", num:true, render:(r) => afBRL(r.valorLitro) },
           { key:"litros", label:"Litros", num:true, render:(r) => afPlain(r.litros, 1) },
           { key:"total", label:"Total", num:true, render:(r) => afBRL(r.total) },
           { key:"km", label:"Km rodado", num:true, render:(r) => afPlain(r.km) },
@@ -1034,9 +1036,12 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
       columns:[
         { key:"data", label:"Data", render:(r) => afDate(r.data) },
         { key:"placa", label:"Placa" },
-        { key:"posto", label:"Posto" },
+        { key:"postoNome", label:"Posto" },
+        { key:"postoUf", label:"UF" },
         { key:"litros", label:"Litros", num:true, render:(r) => afPlain(r.litros, 1) },
-        { key:"valorLitro", label:"R$/litro", num:true, render:(r) => afBRL(r.valorLitro) },
+        { key:"valorLitroTabela", label:"Preço tabela", num:true, render:(r) => afBRL(r.valorLitroTabela) },
+        { key:"desconto", label:"Desconto", num:true, render:(r) => afBRL(r.desconto) },
+        { key:"valorLitro", label:"Preço líquido", num:true, render:(r) => afBRL(r.valorLitro) },
         { key:"total", label:"Total", num:true, render:(r) => afBRL(r.total) },
         { key:"km", label:"Km rodado", num:true, render:(r) => afPlain(r.km) },
         { key:"media", label:"Km/l", num:true, render:(r) => afPlain(r.media, 2) },
