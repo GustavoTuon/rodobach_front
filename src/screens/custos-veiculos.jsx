@@ -214,7 +214,6 @@ const CustosVeiculos = () => {
   const [situacao, setSituacao] = React.useState("todos");
   const [fornecedor, setFornecedor] = React.useState("");
   const [empresa, setEmpresa] = React.useState("");
-  const [proprietario, setProprietario] = React.useState("frota");
   const [valorMin, setValorMin] = React.useState("");
   const [valorMax, setValorMax] = React.useState("");
   const [search, setSearch] = React.useState("");
@@ -250,13 +249,13 @@ const CustosVeiculos = () => {
     const r = p.range();
     setDataInicio(r.start);
     setDataFim(r.end);
-    setFilters({ dataInicio: r.start, dataFim: r.end, placa, centro, tipoCusto, situacao, fornecedor, empresa, proprietario, valorMin, valorMax, search });
+    setFilters({ dataInicio: r.start, dataFim: r.end, placa, centro, tipoCusto, situacao, fornecedor, empresa, proprietario:"frota", valorMin, valorMax, search });
   };
 
-  const applyFilters = () => setFilters({ dataInicio, dataFim, placa, centro, tipoCusto, situacao, fornecedor, empresa, proprietario, valorMin, valorMax, search });
+  const applyFilters = () => setFilters({ dataInicio, dataFim, placa, centro, tipoCusto, situacao, fornecedor, empresa, proprietario:"frota", valorMin, valorMax, search });
   const clearFilters = () => {
     const r = CV_PERIODS[1].range();
-    setDataInicio(r.start); setDataFim(r.end); setPlaca(""); setCentro(""); setTipoCusto("todos"); setSituacao("todos"); setFornecedor(""); setEmpresa(""); setProprietario("frota"); setValorMin(""); setValorMax(""); setSearch("");
+    setDataInicio(r.start); setDataFim(r.end); setPlaca(""); setCentro(""); setTipoCusto("todos"); setSituacao("todos"); setFornecedor(""); setEmpresa(""); setValorMin(""); setValorMax(""); setSearch("");
     setFilters({ dataInicio: r.start, dataFim: r.end, proprietario: "frota" });
   };
 
@@ -297,7 +296,6 @@ const CustosVeiculos = () => {
         <label>Situação<select value={situacao} onChange={(e) => setSituacao(e.target.value)}><option value="todos">Todas</option>{(options.situacoes || []).map((st) => <option key={st} value={st}>{CV_STATUS[st]?.label || st}</option>)}</select></label>
         <label>Fornecedor<RBCombobox value={fornecedor} onChange={setFornecedor} options={options.fornecedores || []} placeholder="Todos" getLabel={(f) => f.codigo ? `${f.codigo} - ${f.nome}` : f.nome} getValue={(f) => f.codigo ? `${f.codigo} - ${f.nome}` : f.nome} tag={() => "Fornecedor"}/></label>
         <label>Empresa<select value={empresa} onChange={(e) => setEmpresa(e.target.value)}><option value="">Todas</option>{(options.empresas || []).map((e) => <option key={e} value={e}>{e}</option>)}</select></label>
-        <label>Proprietário<select value={proprietario} onChange={(e) => setProprietario(e.target.value)}><option value="frota">Frota</option><option value="terceiro">Terceiros</option><option value="todos">Todos</option></select></label>
         <label>Valor mínimo<input type="number" value={valorMin} placeholder="0,00" onChange={(e) => setValorMin(e.target.value)}/></label>
         <label>Valor máximo<input type="number" value={valorMax} placeholder="Sem limite" onChange={(e) => setValorMax(e.target.value)}/></label>
         <label>Busca livre<input value={search} placeholder="Descrição, documento, origem..." onChange={(e) => setSearch(e.target.value)}/></label>

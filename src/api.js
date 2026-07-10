@@ -127,6 +127,7 @@ window.RB_API = {
 
   // ── Financeiro ────────────────────────────────────────────────────────────
   getAnaliseFrota: (filters = {}) => apiRequest(`/frota/analise${buildQuery(filters || {})}`),
+  getAnaliseAbastecimentos: (filters = {}) => apiRequest(`/frota/abastecimentos${buildQuery(filters || {})}`),
   getCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos${buildQuery(filters || {})}`),
   getAuditoriaCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos/auditoria${buildQuery(filters || {})}`),
   getCustosVeiculosFiltros: () => apiRequest("/financeiro/custos-veiculos/filtros"),
@@ -145,6 +146,7 @@ window.RB_API = {
   getRentabilidadeClientes: (filters = {}) => apiRequest(`/clientes/rentabilidade${buildQuery(filters || {})}`),
   getLucroViagens: (filters = {}) => apiRequest(`/financeiro/lucro-viagens${buildQuery(filters || {})}`),
   getFaturamentoDiario: (filters = {}) => apiRequest(`/financeiro/faturamento-diario${buildQuery(filters || {})}`),
+  getFaturamentoMensalComparativo: (filters = {}) => apiRequest(`/financeiro/faturamento-mensal-comparativo${buildQuery(filters || {})}`),
 
   // ── Manutenção ────────────────────────────────────────────────────────────
   listVeiculosManutencao: () => apiRequest("/manutencao/veiculos"),

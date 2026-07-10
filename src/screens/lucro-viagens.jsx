@@ -140,7 +140,7 @@ const LucroViagens = () => {
     <div className="view">
       <div className="page-head">
         <div>
-          <h1>Lucro por Viagem</h1>
+          <h1>Resultado por Viagem</h1>
           <div className="sub">Receita, custos e margem por viagem ou CT-e sem viagem vinculada</div>
         </div>
         <div className="actions">

@@ -1,12 +1,43 @@
 function fdTodayISO() {
-  const d = new Date();
-  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (type) => parts.find((part) => part.type === type)?.value;
+  return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
 function fdDaysAgoISO(days) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+  return fdAddDaysISO(fdTodayISO(), -days);
+}
+
+function fdAddDaysISO(base, days) {
+  const d = new Date(`${base}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function fdMonthStartISO(base = fdTodayISO()) {
+  return `${String(base).slice(0, 7)}-01`;
+}
+
+function fdPresetRange(key) {
+  const today = fdTodayISO();
+  if (key === "hoje") return { start: today, end: today };
+  if (key === "ontem") {
+    const y = fdAddDaysISO(today, -1);
+    return { start: y, end: y };
+  }
+  if (key === "7d") return { start: fdAddDaysISO(today, -6), end: today };
+  if (key === "mes-atual") return { start: fdMonthStartISO(today), end: today };
+  if (key === "mes-anterior") {
+    const firstCurrent = fdMonthStartISO(today);
+    const end = fdAddDaysISO(firstCurrent, -1);
+    return { start: fdMonthStartISO(end), end };
+  }
+  return { start: fdAddDaysISO(today, -29), end: today };
 }
 
 function fdNum(value) {
@@ -18,6 +49,14 @@ function fdBRL(value) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(fdNum(value));
 }
 
+function fdShortBRL(value) {
+  const n = Math.abs(fdNum(value));
+  const sign = fdNum(value) < 0 ? "-" : "";
+  if (n >= 1000000) return `${sign}R$ ${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `${sign}R$ ${Math.round(n / 1000)}k`;
+  return `${sign}R$ ${Math.round(n)}`;
+}
+
 function fdPct(value) {
   return value === null || value === undefined ? "-" : `${fdNum(value).toFixed(1)}%`;
 }
@@ -26,6 +65,12 @@ function fdDate(value) {
   if (!value) return "-";
   const [y, m, d] = String(value).slice(0, 10).split("-");
   return y && m && d ? `${d}/${m}/${y}` : "-";
+}
+
+function fdDayMonth(value) {
+  if (!value) return "-";
+  const [, m, d] = String(value).slice(0, 10).split("-");
+  return m && d ? `${d}/${m}` : "-";
 }
 
 function fdNormalize(payload) {
@@ -55,18 +100,28 @@ const FdKpi = ({ label, value, sub, icon, tone }) => (
   </div>
 );
 
-const FdChart = ({ rows }) => {
+const FD_METRICS = {
+  faturamento: { label: "Faturamento", field: "faturamento", tone: "#22c55e" },
+  lucro: { label: "Lucro diario", field: "lucro", tone: "#38bdf8" },
+};
+
+const FdChart = ({ rows, metric = "faturamento" }) => {
   if (!rows.length) return <div className="muted">Sem dados diarios no periodo.</div>;
-  const max = Math.max(1, ...rows.map((r) => Math.max(fdNum(r.faturamento), fdNum(r.custo), Math.abs(fdNum(r.lucro)))));
+  const config = FD_METRICS[metric] || FD_METRICS.faturamento;
+  const max = Math.max(1, ...rows.map((r) => Math.abs(fdNum(r[config.field]))));
   return (
     <div className="fd-chart">
       {rows.map((row) => {
-        const h = Math.max(4, fdNum(row.faturamento) / max * 100);
-        const lucroColor = fdNum(row.lucro) >= 0 ? "#22c55e" : "#ef4444";
+        const value = fdNum(row[config.field]);
+        const h = Math.max(4, Math.abs(value) / max * 100);
+        const color = metric === "lucro"
+          ? (value >= 0 ? "#22c55e" : "#ef4444")
+          : config.tone;
         return (
-          <div key={row.data} className="fd-day" title={`${fdDate(row.data)} - ${fdBRL(row.faturamento)}`}>
-            <div className="fd-col"><i style={{ height: `${h}%`, background: lucroColor }}/></div>
-            <span>{String(row.data).slice(5)}</span>
+          <div key={row.data} className="fd-day" title={`${fdDayMonth(row.data)} - ${config.label}: ${fdBRL(value)}`}>
+            <strong className="fd-value" style={{ color }}>{fdShortBRL(value)}</strong>
+            <div className="fd-col"><i style={{ height: `${h}%`, background: color }}/></div>
+            <span>{fdDayMonth(row.data)}</span>
           </div>
         );
       })}
@@ -86,6 +141,7 @@ const FaturamentoDiario = () => {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [search, setSearch] = React.useState("");
+  const [metric, setMetric] = React.useState("faturamento");
 
   React.useEffect(() => {
     let active = true;
@@ -99,7 +155,10 @@ const FaturamentoDiario = () => {
   }, [JSON.stringify(filters)]);
 
   const applyPreset = (key) => {
+    const range = fdPresetRange(key);
     setPeriodo(key);
+    setDataInicial(range.start);
+    setDataFinal(range.end);
     setFilters({ periodo: key, cliente, placa, tipoVeiculo });
   };
 
@@ -108,13 +167,19 @@ const FaturamentoDiario = () => {
     setFilters({ dataInicial, dataFinal, cliente, placa, tipoVeiculo });
   };
 
+  const applyTipoVeiculo = (next) => {
+    setTipoVeiculo(next);
+    if (periodo === "custom") setFilters({ dataInicial, dataFinal, cliente, placa, tipoVeiculo: next });
+    else setFilters({ periodo, cliente, placa, tipoVeiculo: next });
+  };
+
   const rows = React.useMemo(() => {
     let list = data.dias;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter((row) => [row.data, row.faturamento, row.documentos, row.clientes].join(" ").toLowerCase().includes(q));
     }
-    return [...list].sort((a, b) => String(b.data || "").localeCompare(String(a.data || "")));
+    return [...list].sort((a, b) => String(a.data || "").localeCompare(String(b.data || "")));
   }, [data.dias, search]);
 
   const exportCsv = () => {
@@ -137,9 +202,11 @@ const FaturamentoDiario = () => {
       <style>{`
         .fd-chart{height:230px;display:grid;grid-template-columns:repeat(auto-fit,minmax(26px,1fr));gap:6px;align-items:end}
         .fd-day{height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px;min-width:0}
-        .fd-col{height:190px;width:100%;display:flex;align-items:flex-end;justify-content:center;background:var(--surface-2);border-radius:4px;overflow:hidden}
+        .fd-value{font-family:var(--font-mono);font-size:10px;line-height:1;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+        .fd-col{height:174px;width:100%;display:flex;align-items:flex-end;justify-content:center;background:var(--surface-2);border-radius:4px;overflow:hidden}
         .fd-col i{width:100%;min-height:4px;border-radius:4px 4px 0 0}
         .fd-day span{font-size:10px;color:var(--text-3);white-space:nowrap}
+        .fd-segment{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
         @media (max-width:760px){.fd-chart{grid-template-columns:repeat(14,minmax(24px,1fr));overflow-x:auto}}
       `}</style>
 
@@ -159,7 +226,13 @@ const FaturamentoDiario = () => {
         <label>Data final<input type="date" value={dataFinal} onChange={(e) => setDataFinal(e.target.value)}/></label>
         <label>Cliente<RBCombobox value={cliente} onChange={setCliente} options={data.filtros?.clientes || []} placeholder="Cliente pagador" tag={() => "Cliente"}/></label>
         <label>Placa<RBCombobox value={placa} onChange={setPlaca} options={data.filtros?.placas || []} placeholder="Placa" transform={(v) => v.toUpperCase()} tag={() => "Placa"}/></label>
-        <label>Tipo de veiculo<select value={tipoVeiculo} onChange={(e) => setTipoVeiculo(e.target.value)}><option value="todos">Todos</option><option value="frota">Frota</option><option value="terceiro">Terceiro</option></select></label>
+        <label>Operacao
+          <div className="fd-segment">
+            <button type="button" className={`btn sm ${tipoVeiculo === "todos" ? "primary" : ""}`} onClick={() => applyTipoVeiculo("todos")}>Todos</button>
+            <button type="button" className={`btn sm ${tipoVeiculo === "frota" ? "primary" : ""}`} onClick={() => applyTipoVeiculo("frota")}>Frota</button>
+            <button type="button" className={`btn sm ${tipoVeiculo === "terceiro" ? "primary" : ""}`} onClick={() => applyTipoVeiculo("terceiro")}>Terceiro</button>
+          </div>
+        </label>
         <button className="btn primary" onClick={applyCustom}>Aplicar periodo</button>
       </div>
 
@@ -180,8 +253,15 @@ const FaturamentoDiario = () => {
       </div>
 
       <div className="card card-flush" style={{ marginBottom: 16 }}>
-        <div className="card-header"><h3>Evolucao diaria</h3><span className="meta muted">{data.periodo?.startDate} a {data.periodo?.endDate}</span></div>
-        <div className="card-body"><FdChart rows={[...data.dias].sort((a, b) => String(a.data).localeCompare(String(b.data)))}/></div>
+        <div className="card-header">
+          <h3>{metric === "lucro" ? "Lucro diario" : "Faturamento diario"}</h3>
+          <div className="row" style={{ gap: 8 }}>
+            <button className={`btn sm ${metric === "faturamento" ? "primary" : ""}`} onClick={() => setMetric("faturamento")}>Faturamento</button>
+            <button className={`btn sm ${metric === "lucro" ? "primary" : ""}`} onClick={() => setMetric("lucro")}>Lucro diario</button>
+            <span className="meta muted">{data.periodo?.startDate} a {data.periodo?.endDate}</span>
+          </div>
+        </div>
+        <div className="card-body"><FdChart rows={[...data.dias].sort((a, b) => String(a.data).localeCompare(String(b.data)))} metric={metric}/></div>
       </div>
 
       <div className="card card-flush">

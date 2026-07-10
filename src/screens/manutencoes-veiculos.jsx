@@ -138,10 +138,9 @@ const ManutencoesVeiculos = () => {
   const [fornecedor, setFornecedor] = React.useState("");
   const [centro,     setCentro]     = React.useState("");
   const [produto,    setProduto]    = React.useState("");
-  const [proprietario, setProprietario] = React.useState("todos");
 
   // Filtros aplicados (trigger de fetch)
-  const [filters,    setFilters]    = React.useState({ dataInicio: defaultRange.start, dataFim: defaultRange.end });
+  const [filters,    setFilters]    = React.useState({ dataInicio: defaultRange.start, dataFim: defaultRange.end, proprietario:"frota" });
 
   // ── Opções de autocomplete ────────────────────────────────────────────────────
   const [opcoes,   setOpcoes]   = React.useState({ placas:[], categorias:[], fornecedores:[], centrosCusto:[], produtos:[] });
@@ -255,7 +254,7 @@ const ManutencoesVeiculos = () => {
   const totalPages = Math.max(1, Math.ceil(sortedLancamentos.length / PAGE_SIZE));
   const pageRows   = sortedLancamentos.slice(tablePage * PAGE_SIZE, (tablePage+1) * PAGE_SIZE);
 
-  const activeFiltersCount = ["placa","categoria","fornecedor","centro","produto","proprietario"].filter(k => filters[k] && filters[k] !== "todos").length;
+  const activeFiltersCount = ["placa","categoria","fornecedor","centro","produto"].filter(k => filters[k] && filters[k] !== "todos").length;
   const periodLabel = `${mvDateFmt(filters.dataInicio)} a ${mvDateFmt(filters.dataFim)}`;
 
   // ── Ações ─────────────────────────────────────────────────────────────────────
@@ -268,13 +267,12 @@ const ManutencoesVeiculos = () => {
   };
 
   const applyFilters = () => {
-    const next = { dataInicio, dataFim };
+    const next = { dataInicio, dataFim, proprietario:"frota" };
     if (placa.trim())     next.placa     = placa.trim();
     if (categoria)        next.categoria = categoria;
     if (fornecedor.trim())next.fornecedor= fornecedor.trim();
     if (centro.trim())    next.centro    = centro.trim();
     if (produto.trim())   next.produto   = produto.trim();
-    if (proprietario && proprietario !== "todos") next.proprietario = proprietario;
     setFilters(next);
     setTablePage(0);
   };
@@ -282,9 +280,9 @@ const ManutencoesVeiculos = () => {
   const clearFilters = () => {
     const r = MV_PERIODS[0].getRange();
     setDataInicio(r.start); setDataFim(r.end); setPeriodo("30d");
-    setPlaca(""); setCategoria(""); setFornecedor(""); setCentro(""); setProduto(""); setProprietario("todos");
+    setPlaca(""); setCategoria(""); setFornecedor(""); setCentro(""); setProduto("");
     setTableSearch(""); setSelectedPlaca("");
-    setFilters({ dataInicio: r.start, dataFim: r.end });
+    setFilters({ dataInicio: r.start, dataFim: r.end, proprietario:"frota" });
   };
 
   const quickFilter = (patch) => {
@@ -376,14 +374,6 @@ const ManutencoesVeiculos = () => {
         </label>
         <label>Produto/Serviço
           <RBCombobox value={produto} onChange={setProduto} options={opcoes.produtos} placeholder="Todos" getLabel={(p) => p.nome} getValue={(p) => p.nome} tag={() => "Produto"}/>
-        </label>
-        <label>Proprietário
-          <select value={proprietario} onChange={e => setProprietario(e.target.value)}
-                  style={{height:30,minWidth:122,border:"1px solid var(--border)",borderRadius:"var(--r)",background:"var(--surface-2)",color:"var(--text)",fontSize:12.5,padding:"0 8px"}}>
-            <option value="todos">Todos</option>
-            <option value="frota">Frota</option>
-            <option value="terceiro">Terceiros</option>
-          </select>
         </label>
         <button className="btn primary" onClick={applyFilters}><Icon name="filter" size={12}/> Aplicar</button>
         <button className="btn" onClick={clearFilters}><Icon name="x" size={12}/> Limpar</button>
