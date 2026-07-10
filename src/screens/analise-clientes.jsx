@@ -447,7 +447,7 @@ const AcClienteModal = ({ row, onClose }) => {
     ["Status comercial",   <AcStatusBadge status={row.statusComercial}/>],
     ["Ação sugerida",      <AcAcaoBadge acao={row.acaoSugerida}/>],
     ["Total no período",   acBRL(row.totalPeriodo)],
-    ["Recebido",           acBRL(row.totalRecebido)],
+    ["Recebido no periodo", acBRL(row.totalRecebido)],
     ["Em aberto",          acBRL(row.totalAberto)],
     ["Vencido",            acBRL(row.totalVencido)],
     ["Inadimplente",       acBRL(row.totalInadimplente)],
@@ -703,7 +703,7 @@ const AnaliseClientes = () => {
   );
 
   const exportCsv = () => {
-    const header = ["Cliente","Documento","Último Faturamento","Total Faturado","Recebido","Em Aberto","Vencido","Inadimplente","Total Anterior","Crescimento %","Lançamentos","Ticket Médio","Dias Sem Faturar","Status","Ação"];
+    const header = ["Cliente","Documento","Último Faturamento","Total Faturado","Recebido no período (por data da baixa)","Em Aberto","Vencido","Inadimplente","Total Anterior","Crescimento %","Lançamentos","Ticket Médio","Dias Sem Faturar","Status","Ação"];
     const lines = sortedClients.map(c=>[
       c.nome||"",c.documento||"",acDateFmt(c.ultimoFaturamento),
       acNum(c.totalPeriodo).toFixed(2),acNum(c.totalRecebido).toFixed(2),
@@ -792,9 +792,9 @@ const AnaliseClientes = () => {
           <span className="kpi-delta flat" title="financeiro.receber.valorduplicatarec por data de emissão">{periodLabel}</span>
         </div>
         <div className="kpi" style={{borderLeft:"3px solid #38bdf8"}}>
-          <div className="kpi-label"><Icon name="check"/><span>Recebido</span></div>
+          <div className="kpi-label"><Icon name="check"/><span>Recebido no período</span></div>
           <div className="kpi-value">{acBRL(totalRecebido)}</div>
-          <span className="kpi-delta flat" title="financeiro.receberrecebimentos.valorrecebidorcb por data de recebimento">baixas no período</span>
+          <span className="kpi-delta flat" title="Soma das baixas pela data de recebimento; pode incluir títulos faturados antes do período selecionado">inclui faturas de períodos anteriores</span>
         </div>
         <div className="kpi" style={{borderLeft:"3px solid #818cf8"}}>
           <div className="kpi-label"><Icon name="clock"/><span>Em aberto</span></div>
@@ -1152,7 +1152,7 @@ const AnaliseClientes = () => {
             <tr>
               <th style={{cursor:"pointer"}} onClick={()=>toggleSort("nome")}>Cliente <SortArrow col="nome"/></th>
               <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalPeriodo")}>Faturado <SortArrow col="totalPeriodo"/></th>
-              <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalRecebido")}>Recebido <SortArrow col="totalRecebido"/></th>
+              <th className="num" title="Baixas realizadas no período, inclusive de faturas anteriores" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalRecebido")}>Recebido no período <SortArrow col="totalRecebido"/></th>
               <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalAberto")}>Em aberto <SortArrow col="totalAberto"/></th>
               <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalVencido")}>Vencido <SortArrow col="totalVencido"/></th>
               <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("lancamentos")}>Lançamentos <SortArrow col="lancamentos"/></th>

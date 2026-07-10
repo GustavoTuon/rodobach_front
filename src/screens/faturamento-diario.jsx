@@ -213,7 +213,7 @@ const FaturamentoDiario = () => {
       <div className="page-head">
         <div>
           <h1>Faturamento Diario</h1>
-          <div className="sub">Evolucao diaria de faturamento, ticket medio, lucro estimado e margem</div>
+          <div className="sub">Evolucao diaria da receita financeira e dos custos de viagens vinculadas</div>
         </div>
         <div className="actions">
           {FD_PERIODS.map((p) => <button key={p.key} className={`btn ${periodo === p.key ? "primary" : ""}`} onClick={() => applyPreset(p.key)}>{p.label}</button>)}
@@ -238,6 +238,10 @@ const FaturamentoDiario = () => {
 
       {(loading || error) && <div className="card" style={{ marginBottom: 16, padding: "9px 14px" }}><span className={error ? "kpi-delta down" : "muted"}>{loading ? "Carregando faturamento diario..." : error}</span></div>}
 
+      {fdNum(resumo.receitaSemCustoApurado) > 0 && <div className="card" style={{ marginBottom: 16, padding: "9px 14px", borderColor: "#facc15" }}>
+        <span className="muted"><strong style={{ color: "#facc15" }}>Custos pendentes:</strong> {fdBRL(resumo.receitaSemCustoApurado)} do faturamento ({resumo.documentosSemCustoApurado || 0} documentos) nao possui viagem vinculada. Essa receita entra no total, mas ainda nao tem custo operacional apurado.</span>
+      </div>}
+
       <div className="grid cols-4" style={{ marginBottom: 14 }}>
         <FdKpi label="Hoje" value={fdBRL(resumo.faturamentoHoje)} sub={`Ontem: ${fdBRL(resumo.faturamentoOntem)} (${fdPct(resumo.variacaoOntem)})`} tone="#38bdf8" icon="money"/>
         <FdKpi label="Media 7 dias" value={fdBRL(resumo.media7)} sub={`Hoje x media: ${fdPct(resumo.variacaoMedia7)}`} tone="#a78bfa" icon="chart"/>
@@ -246,7 +250,7 @@ const FaturamentoDiario = () => {
       </div>
 
       <div className="grid cols-4" style={{ marginBottom: 16 }}>
-        <FdKpi label="Lucro estimado" value={fdBRL(resumo.lucroTotal)} sub={`Margem ${fdPct(resumo.margem)}`} tone={fdNum(resumo.lucroTotal) >= 0 ? "#22c55e" : "#ef4444"} icon="chart"/>
+        <FdKpi label="Resultado parcial" value={fdBRL(resumo.lucroTotal)} sub={`Margem parcial ${fdPct(resumo.margem)}`} tone={fdNum(resumo.lucroTotal) >= 0 ? "#22c55e" : "#ef4444"} icon="chart"/>
         <FdKpi label="Custo estimado" value={fdBRL(resumo.custoTotal)} sub="custos vinculados e rateados" tone="#f97316" icon="money"/>
         <FdKpi label="Ticket medio" value={fdBRL(resumo.ticketMedio)} sub="faturamento / documentos" tone="var(--border-strong)" icon="gauge"/>
         <FdKpi label="Viagens" value={resumo.viagens || 0} sub={`${resumo.clientesAtendidos || 0} clientes no maior dia`} tone="#38bdf8" icon="route"/>
