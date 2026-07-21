@@ -14,8 +14,10 @@ const TELAS = [
   { id: "perm_manutencoes_veiculos", label: "Manutenções por Veículo" },
   { id: "perm_simulador",       label: "Calculadora" },
   { id: "perm_viagens",         label: "Viagens" },
+  { id: "perm_status_carga",    label: "Status Carga" },
   { id: "perm_pneus",           label: "Pneus" },
   { id: "perm_manutencao",      label: "Automações" },
+  { id: "perm_automacoes_n8n",  label: "n8n" },
   { id: "perm_settings",        label: "Configurações" },
 ];
 
@@ -28,8 +30,8 @@ const FORM_VAZIO = {
   perm_faturamento_diario: true, perm_comparativo_faturamento: true,
   perm_lucro_viagens: true,
   perm_custos_veiculos: true, perm_manutencoes_veiculos: true,
-  perm_clientes: true, perm_clientes_lucro: true, perm_pneus: true,
-  perm_manutencao: true, perm_settings: true,
+  perm_clientes: true, perm_clientes_lucro: true, perm_status_carga: true, perm_pneus: true,
+  perm_manutencao: true, perm_automacoes_n8n: true, perm_settings: true,
 };
 
 const Toggle = ({ value, onChange, label }) => (
@@ -102,9 +104,11 @@ const GerenciarUsuarios = ({ onNavigate }) => {
       perm_manutencoes_veiculos: u.perm_manutencoes_veiculos ?? true,
       perm_clientes: u.perm_clientes ?? true,
       perm_clientes_lucro: u.perm_clientes_lucro ?? true,
+      perm_status_carga: u.perm_status_carga ?? true,
       perm_pneus: u.perm_pneus ?? true,
       perm_settings: u.perm_settings ?? true,
       perm_manutencao: u.perm_manutencao ?? true,
+      perm_automacoes_n8n: u.perm_automacoes_n8n ?? true,
     });
     setErro("");
     setModal(u);

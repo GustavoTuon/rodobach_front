@@ -5,6 +5,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/diretoria.jsx",
   "src/screens/simulador.jsx",
   "src/screens/viagens.jsx",
+  "src/screens/status-carga.jsx",
   "src/screens/dre-empresarial.jsx",
   "src/screens/analise-frota.jsx",
   "src/screens/custos-veiculos.jsx",
@@ -16,12 +17,14 @@ const SCREEN_SCRIPTS = [
   "src/screens/comparativo-faturamento.jsx",
   "src/screens/manutencao.jsx",
   "src/screens/pneus.jsx?v=20260603-historico-pneu",
+  "src/screens/automacoes.jsx",
 ];
 
 const SCREEN_GLOBALS = [
   "Diretoria", "SimuladorFrete", "Viagens",
+  "StatusCargaFrota",
   "DreEmpresarial", "AnaliseClientes",
-  "RentabilidadeClientes", "LucroViagens", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota",
+  "RentabilidadeClientes", "LucroViagens", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "AutomacoesN8n",
 ];
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -43,8 +46,10 @@ const NAV = [
   { id: "manutencoes-veiculos", label: "Lançamentos", icon: "wrench", title: "Manutenções e Custos por Veículo", group: "manutencoes", section: "direcao" },
   { id: "simulador",       label: "Calculadora",  icon: "calculator",  title: "Calculadora de Frete ANTT", section: "operacao" },
   { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações", section: "operacao" },
+  { id: "status-carga",    label: "Status Carga", icon: "package",     title: "Status de Carga da Frota", section: "operacao" },
   { id: "pneus",           label: "Pneus",        icon: "truck",       title: "Movimentação de Pneus", section: "operacao" },
   { id: "manutencao",      label: "Automações",   icon: "wrench",      title: "Automação de Manutenção", section: "operacao" },
+  { id: "automacoes-n8n",  label: "n8n",          icon: "plug",        title: "Automações n8n", section: "operacao" },
   { id: "settings",        label: "Configurações", icon: "settings",   title: "Configurações",    sistema: true },
   { id: "usuarios",        label: "Usuários",     icon: "user",        title: "Gerenciar Usuários", sistema: true, adminOnly: true },
 ];
@@ -288,6 +293,9 @@ const App = () => {
     case "viagens":
       body = <Viagens onNavigate={onNavigate}/>;
       break;
+    case "status-carga":
+      body = <StatusCargaFrota onNavigate={onNavigate}/>;
+      break;
     case "dre-empresarial":
       body = <DreEmpresarial onNavigate={onNavigate}/>;
       break;
@@ -374,6 +382,9 @@ const App = () => {
       break;
     case "manutencao":
       body = <ManutencaoMensagens onNavigate={onNavigate}/>;
+      break;
+    case "automacoes-n8n":
+      body = <AutomacoesN8n onNavigate={onNavigate}/>;
       break;
     case "usuarios":
       body = <GerenciarUsuarios onNavigate={onNavigate}/>;

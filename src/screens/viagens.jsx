@@ -1272,6 +1272,43 @@ const Viagens = ({ onNavigate }) => {
             Rota da viagem
           </div>
 
+          <div style={{
+            display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 10, alignItems: "center",
+            background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8,
+            padding: "10px 12px", marginBottom: 14,
+          }}>
+            <div style={{minWidth: 0}}>
+              <div className="muted" style={{fontSize: 10.5, textTransform: "uppercase", fontWeight: 700}}>Origem</div>
+              <strong style={{display: "block", fontSize: 12.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>
+                {[form.origem, form.ufOrigem].filter(Boolean).join("/") || "Nao informada"}
+              </strong>
+            </div>
+            <div style={{display: "flex", flexDirection: "column", alignItems: "center", gap: 4, color: "var(--brand-blue)"}}>
+              <Icon name="arrow-right" size={16}/>
+              <span style={{fontSize: 10.5, fontWeight: 700}}>{Math.max(routePoints.length - 2, 0)} par.</span>
+            </div>
+            <div style={{minWidth: 0, textAlign: "right"}}>
+              <div className="muted" style={{fontSize: 10.5, textTransform: "uppercase", fontWeight: 700}}>Destino</div>
+              <strong style={{display: "block", fontSize: 12.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis"}}>
+                {[form.destino, form.ufDestino].filter(Boolean).join("/") || "Nao informado"}
+              </strong>
+            </div>
+            <div style={{gridColumn: "1 / -1", display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", paddingTop: 8, borderTop: "1px solid var(--divider)"}}>
+              <span className="muted" style={{fontSize: 11.5}}>
+                {routePoints.length >= 2 ? `${routePoints.length} pontos na rota` : "Informe origem e destino para montar a rota"}
+              </span>
+              <button
+                type="button"
+                className="btn"
+                disabled={!routeMapsUrl}
+                onClick={() => routeMapsUrl && window.open(routeMapsUrl, "_blank", "noopener,noreferrer")}
+                style={{padding: "4px 9px", fontSize: 12}}
+              >
+                <Icon name="map" size={12}/> Mapa
+              </button>
+            </div>
+          </div>
+
           <Fg label="Cidade de Origem">
             <div className="row" style={{gap: 8}}>
                             <AutoField
@@ -1351,6 +1388,7 @@ const Viagens = ({ onNavigate }) => {
               Nenhuma parada adicionada. A rota vai direto origem → destino.
             </div>
           )}
+          <div style={{maxHeight: 360, overflowY: form.paradas.length > 3 ? "auto" : "visible", paddingRight: form.paradas.length > 3 ? 4 : 0}}>
           {form.paradas.map((p, i) => (
             <div key={p.id} style={{
               border: "1px solid var(--border)", borderRadius: "var(--r)",
@@ -1430,6 +1468,7 @@ const Viagens = ({ onNavigate }) => {
               </div>
             </div>
           ))}
+          </div>
         </div>
       </div>
     </div>

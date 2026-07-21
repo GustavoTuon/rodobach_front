@@ -1,5 +1,3 @@
-const { useState, useEffect, useCallback, useRef } = React;
-
 const EMPTY_FORM = {
   selecionadas: [], // [{ placa, km_atual }]
   titulo: "",
@@ -11,6 +9,32 @@ const EMPTY_FORM = {
 function fmtKm(v) {
   if (v == null || v === "") return "—";
   return Number(v).toLocaleString("pt-BR") + " km";
+}
+
+function kmInfo(item) {
+  const atual = Number(item?.km_atual);
+  const proximo = Number(item?.km_proximo_envio);
+  if (!Number.isFinite(atual) || !Number.isFinite(proximo) || proximo <= 0) {
+    return { status: "sem_km", label: "Sem KM confiavel", tone: "var(--text-3)", bg: "var(--surface-2)", faltam: null };
+  }
+  const faltam = proximo - atual;
+  if (faltam <= 0) {
+    return { status: "vencido", label: `Vencido ${fmtKm(Math.abs(faltam))}`, tone: "#dc2626", bg: "rgba(220,38,38,.10)", faltam };
+  }
+  if (faltam <= Math.max(Number(item?.intervalo_km) * 0.1, 500)) {
+    return { status: "perto", label: `Faltam ${fmtKm(faltam)}`, tone: "#d97706", bg: "rgba(217,119,6,.11)", faltam };
+  }
+  return { status: "ok", label: `Faltam ${fmtKm(faltam)}`, tone: "#16a34a", bg: "rgba(22,163,74,.10)", faltam };
+}
+
+function resumoKmGrupo(automacao) {
+  const itens = automacao?.itens || [automacao];
+  const infos = itens.map(kmInfo);
+  if (infos.some(i => i.status === "vencido")) return { ...infos.find(i => i.status === "vencido"), label: `${infos.filter(i => i.status === "vencido").length} vencido(s)` };
+  if (infos.some(i => i.status === "perto")) return { ...infos.find(i => i.status === "perto"), label: `${infos.filter(i => i.status === "perto").length} perto(s)` };
+  if (infos.some(i => i.status === "sem_km")) return infos.find(i => i.status === "sem_km");
+  const menor = infos.sort((a, b) => a.faltam - b.faltam)[0];
+  return { ...menor, label: itens.length > 1 ? `Menor prazo: ${menor.label.toLowerCase()}` : menor.label };
 }
 
 function normalizarPlaca(placa) {
@@ -80,11 +104,11 @@ function agruparAutomacoes(automacoes) {
 
 // ── Multi-select de placas com odômetro ──────────────────────────────────────
 function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
-  const [open, setOpen] = useState(false);
-  const [busca, setBusca] = useState("");
-  const containerRef = useRef(null);
+  const [open, setOpen] = React.useState(false);
+  const [busca, setBusca] = React.useState("");
+  const containerRef = React.useRef(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     function onClickFora(e) {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
         setOpen(false);
@@ -313,7 +337,7 @@ function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
 
 // ── Input de números de destino (chips) ─────────────────────────────────────
 function InputNumeros({ numeros, onChange }) {
-  const [valor, setValor] = useState("");
+  const [valor, setValor] = React.useState("");
 
   function adicionar(texto) {
     const limpos = String(texto)
@@ -407,9 +431,9 @@ function InputNumeros({ numeros, onChange }) {
 }
 
 function ContatoEnvio({ contatos, carregando, form, onToggle, onAdd, onManualNumbers, onCreate }) {
-  const [novo, setNovo] = useState({ nome: "", numero: "" });
-  const [criando, setCriando] = useState(false);
-  const [erro, setErro] = useState(null);
+  const [novo, setNovo] = React.useState({ nome: "", numero: "" });
+  const [criando, setCriando] = React.useState(false);
+  const [erro, setErro] = React.useState(null);
   const numerosSelecionados = new Set((form.numeros || []).map(normalizarNumero).filter(Boolean));
 
   async function salvarContato() {
@@ -561,30 +585,30 @@ function CheckBox({ checked, indeterminate }) {
 
 // ── Tela principal ────────────────────────────────────────────────────────────
 function ManutencaoMensagens() {
-  const [automacoes, setAutomacoes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [erro, setErro] = useState(null);
+  const [automacoes, setAutomacoes] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [erro, setErro] = React.useState(null);
 
-  const [veiculos, setVeiculos] = useState([]);
-  const [veiculosCarregando, setVeiculosCarregando] = useState(false);
-  const [contatos, setContatos] = useState([]);
-  const [contatosCarregando, setContatosCarregando] = useState(false);
+  const [veiculos, setVeiculos] = React.useState([]);
+  const [veiculosCarregando, setVeiculosCarregando] = React.useState(false);
+  const [contatos, setContatos] = React.useState([]);
+  const [contatosCarregando, setContatosCarregando] = React.useState(false);
 
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editando, setEditando] = useState(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [salvando, setSalvando] = useState(false);
-  const [formErro, setFormErro] = useState(null);
+  const [modalOpen, setModalOpen] = React.useState(false);
+  const [editando, setEditando] = React.useState(null);
+  const [form, setForm] = React.useState(EMPTY_FORM);
+  const [salvando, setSalvando] = React.useState(false);
+  const [formErro, setFormErro] = React.useState(null);
 
-  const [deletandoId, setDeletandoId] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deletandoId, setDeletandoId] = React.useState(null);
+  const [confirmDelete, setConfirmDelete] = React.useState(null);
 
-  const [kmModal, setKmModal] = useState(null);
-  const [kmValor, setKmValor] = useState("");
-  const [kmSalvando, setKmSalvando] = useState(false);
+  const [kmModal, setKmModal] = React.useState(null);
+  const [kmValor, setKmValor] = React.useState("");
+  const [kmSalvando, setKmSalvando] = React.useState(false);
   const automacoesAgrupadas = agruparAutomacoes(automacoes);
 
-  const carregar = useCallback(async () => {
+  const carregar = React.useCallback(async () => {
     setLoading(true);
     setErro(null);
     try {
@@ -671,8 +695,8 @@ function ManutencaoMensagens() {
     return contatos.find(c => normalizarNumero(c.numero) === limpo)?.nome || "";
   }
 
-  useEffect(() => { carregar(); }, [carregar]);
-  useEffect(() => { carregarContatos(); }, []);
+  React.useEffect(() => { carregar(); }, [carregar]);
+  React.useEffect(() => { carregarContatos(); }, []);
 
   function abrirNovo() {
     setEditando(null);
@@ -838,7 +862,11 @@ function ManutencaoMensagens() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {automacoesAgrupadas.map(a => (
+          {automacoesAgrupadas.map(a => {
+            const kmResumo = resumoKmGrupo(a);
+            const primeiraPlaca = (a.placas || [a.placa]).filter(Boolean)[0] || "PLACA";
+            const previewMensagem = `*${a.titulo} - ${primeiraPlaca}*\n\n${a.mensagem || ""}`;
+            return (
             <div key={(a.ids || [a.id]).join("-")} className="card" style={{
               opacity: a.ativo ? 1 : 0.55,
               borderLeft: `3px solid ${a.ativo ? "var(--brand-blue)" : "var(--border)"}`,
@@ -861,6 +889,15 @@ function ManutencaoMensagens() {
                       }}>{placa}</span>
                     ))}
                     <span style={{ fontWeight: 600, fontSize: 14 }}>{a.titulo}</span>
+                    <span style={{
+                      background: kmResumo.bg,
+                      color: kmResumo.tone,
+                      border: `1px solid ${kmResumo.tone}`,
+                      borderRadius: 999,
+                      padding: "2px 8px",
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}>{kmResumo.label}</span>
                     {!a.ativo && (
                       <span style={{
                         background: "var(--surface-alt, #f4f4f5)",
@@ -874,6 +911,21 @@ function ManutencaoMensagens() {
                   </div>
                   <div className="muted" style={{ fontSize: 12.5, marginBottom: 8, lineHeight: 1.5 }}>
                     {a.mensagem}
+                  </div>
+                  <div style={{
+                    background: "var(--bg)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 6,
+                    padding: "8px 10px",
+                    marginBottom: 8,
+                    maxWidth: 620,
+                  }}>
+                    <div className="muted" style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>
+                      Previa WhatsApp
+                    </div>
+                    <div style={{ whiteSpace: "pre-line", fontSize: 12, lineHeight: 1.4, color: "var(--text)" }}>
+                      {previewMensagem}
+                    </div>
                   </div>
                   {a.numeros && (
                     <div className="row" style={{ gap: 5, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
@@ -985,7 +1037,7 @@ function ManutencaoMensagens() {
                 </div>
               </div>
             </div>
-          ))}
+          );})}
         </div>
       )}
 

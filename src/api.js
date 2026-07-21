@@ -128,6 +128,7 @@ window.RB_API = {
   // ── Financeiro ────────────────────────────────────────────────────────────
   getAnaliseFrota: (filters = {}) => apiRequest(`/frota/analise${buildQuery(filters || {})}`),
   getAnaliseAbastecimentos: (filters = {}) => apiRequest(`/frota/abastecimentos${buildQuery(filters || {})}`),
+  getStatusCargaFrota: (filters = {}) => apiRequest(`/frota/status-carga${buildQuery(filters || {})}`),
   getCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos${buildQuery(filters || {})}`),
   getAuditoriaCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos/auditoria${buildQuery(filters || {})}`),
   getCustosVeiculosFiltros: () => apiRequest("/financeiro/custos-veiculos/filtros"),
@@ -171,6 +172,10 @@ window.RB_API = {
   whatsappConnect: () => apiRequest("/whatsapp/connect", { method: "POST" }),
 
   // ── Gerenciamento de usuários (admin) ─────────────────────────────────────
+  getAutomacaoVencimentoClientes: () => apiRequest("/automacoes/vencimento-clientes"),
+  ativarAutomacaoVencimentoClientes: () => apiRequest("/automacoes/vencimento-clientes/ativar", { method: "POST" }),
+  desativarAutomacaoVencimentoClientes: () => apiRequest("/automacoes/vencimento-clientes/desativar", { method: "POST" }),
+
   listUsuarios: () => apiRequest("/usuarios"),
   createUsuario: (payload) => apiRequest("/usuarios", {
     method: "POST",

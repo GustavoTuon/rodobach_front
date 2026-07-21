@@ -61,6 +61,12 @@ function fdPct(value) {
   return value === null || value === undefined ? "-" : `${fdNum(value).toFixed(1)}%`;
 }
 
+function fdSignedPct(value) {
+  if (value === null || value === undefined) return "-";
+  const n = fdNum(value);
+  return `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
+}
+
 function fdDate(value) {
   if (!value) return "-";
   const [y, m, d] = String(value).slice(0, 10).split("-");
@@ -79,6 +85,7 @@ function fdNormalize(payload) {
     periodo: base.periodo || {},
     resumo: base.resumo || {},
     dias: Array.isArray(base.dias) ? base.dias : [],
+    comparativoAnoAnterior: base.comparativoAnoAnterior || { periodo: {}, resumo: {}, variacao: {}, dias: [] },
     filtros: base.filtros || { clientes: [], placas: [] },
   };
 }
@@ -183,9 +190,13 @@ const FaturamentoDiario = () => {
   }, [data.dias, search]);
 
   const exportCsv = () => {
-    const header = ["Data","Faturamento","Custo","Lucro","Margem","Documentos","Viagens","Clientes","Ticket medio"];
-    const body = rows.map((r) => [r.data, r.faturamento, r.custo, r.lucro, r.margem, r.documentos, r.viagens, r.clientes, r.ticketMedio]
-      .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";"));
+    const compMap = new Map((data.comparativoAnoAnterior?.dias || []).map((row) => [row.data, row]));
+    const header = ["Data","Faturamento","Faturamento Ano Anterior","Variacao Ano Anterior %","Custo","Lucro","Margem","Documentos","Documentos Ano Anterior","Viagens","Clientes","Ticket medio"];
+    const body = rows.map((r) => {
+      const comp = compMap.get(r.data) || {};
+      return [r.data, r.faturamento, comp.faturamentoAnoAnterior, comp.variacaoFaturamento, r.custo, r.lucro, r.margem, r.documentos, comp.documentosAnoAnterior, r.viagens, r.clientes, r.ticketMedio]
+      .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";");
+    });
     const blob = new Blob([[header.join(";"), ...body].join("\n")], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -196,6 +207,10 @@ const FaturamentoDiario = () => {
   };
 
   const resumo = data.resumo || {};
+  const comparativo = data.comparativoAnoAnterior || {};
+  const compResumo = comparativo.resumo || {};
+  const compVariacao = comparativo.variacao || {};
+  const compDias = React.useMemo(() => new Map((comparativo.dias || []).map((row) => [row.data, row])), [comparativo.dias]);
 
   return (
     <div className="view">
@@ -256,6 +271,13 @@ const FaturamentoDiario = () => {
         <FdKpi label="Viagens" value={resumo.viagens || 0} sub={`${resumo.clientesAtendidos || 0} clientes no maior dia`} tone="#38bdf8" icon="route"/>
       </div>
 
+      <div className="grid cols-4" style={{ marginBottom: 16 }}>
+        <FdKpi label="Fat. ano anterior" value={fdBRL(compResumo.faturamentoTotal)} sub={`Atual x AA: ${fdSignedPct(compVariacao.faturamento)}`} tone={fdNum(compVariacao.faturamento) >= 0 ? "#22c55e" : "#ef4444"} icon="chart"/>
+        <FdKpi label="Docs ano anterior" value={compResumo.documentos || 0} sub={`Atual x AA: ${fdSignedPct(compVariacao.documentos)}`} tone={fdNum(compVariacao.documentos) >= 0 ? "#38bdf8" : "#f97316"} icon="file"/>
+        <FdKpi label="Lucro ano anterior" value={fdBRL(compResumo.lucroTotal)} sub={`Atual x AA: ${fdSignedPct(compVariacao.lucro)}`} tone={fdNum(compVariacao.lucro) >= 0 ? "#22c55e" : "#ef4444"} icon="trending-up"/>
+        <FdKpi label="Ticket ano anterior" value={fdBRL(compResumo.ticketMedio)} sub={`Atual x AA: ${fdSignedPct(compVariacao.ticketMedio)}`} tone="#a78bfa" icon="gauge"/>
+      </div>
+
       <div className="card card-flush" style={{ marginBottom: 16 }}>
         <div className="card-header">
           <h3>{metric === "lucro" ? "Lucro diario" : "Faturamento diario"}</h3>
@@ -280,24 +302,30 @@ const FaturamentoDiario = () => {
           <table className="data-table tbl">
             <thead>
               <tr>
-                <th>Data</th><th className="num">Faturamento</th><th className="num">Custo</th><th className="num">Lucro</th><th className="num">Margem</th><th className="num">Docs</th><th className="num">Viagens</th><th className="num">Clientes</th><th className="num">Ticket medio</th>
+                <th>Data</th><th className="num">Faturamento</th><th className="num">Fat. AA</th><th className="num">Var. AA</th><th className="num">Custo</th><th className="num">Lucro</th><th className="num">Margem</th><th className="num">Docs</th><th className="num">Docs AA</th><th className="num">Viagens</th><th className="num">Clientes</th><th className="num">Ticket medio</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.data}>
-                  <td>{fdDate(row.data)}</td>
-                  <td className="num">{fdBRL(row.faturamento)}</td>
-                  <td className="num">{fdBRL(row.custo)}</td>
-                  <td className="num" style={{ color: fdNum(row.lucro) >= 0 ? "#22c55e" : "#ef4444" }}>{fdBRL(row.lucro)}</td>
-                  <td className="num">{fdPct(row.margem)}</td>
-                  <td className="num">{row.documentos}</td>
-                  <td className="num">{row.viagens}</td>
-                  <td className="num">{row.clientes}</td>
-                  <td className="num">{fdBRL(row.ticketMedio)}</td>
-                </tr>
-              ))}
-              {!rows.length && <tr><td colSpan="9" className="muted">Nenhum faturamento encontrado.</td></tr>}
+              {rows.map((row) => {
+                const comp = compDias.get(row.data) || {};
+                return (
+                  <tr key={row.data}>
+                    <td>{fdDate(row.data)}</td>
+                    <td className="num">{fdBRL(row.faturamento)}</td>
+                    <td className="num">{fdBRL(comp.faturamentoAnoAnterior)}</td>
+                    <td className="num" style={{ color: fdNum(comp.variacaoFaturamento) >= 0 ? "#22c55e" : "#ef4444" }}>{fdSignedPct(comp.variacaoFaturamento)}</td>
+                    <td className="num">{fdBRL(row.custo)}</td>
+                    <td className="num" style={{ color: fdNum(row.lucro) >= 0 ? "#22c55e" : "#ef4444" }}>{fdBRL(row.lucro)}</td>
+                    <td className="num">{fdPct(row.margem)}</td>
+                    <td className="num">{row.documentos}</td>
+                    <td className="num">{comp.documentosAnoAnterior || 0}</td>
+                    <td className="num">{row.viagens}</td>
+                    <td className="num">{row.clientes}</td>
+                    <td className="num">{fdBRL(row.ticketMedio)}</td>
+                  </tr>
+                );
+              })}
+              {!rows.length && <tr><td colSpan="12" className="muted">Nenhum faturamento encontrado.</td></tr>}
             </tbody>
           </table>
         </div>
