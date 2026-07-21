@@ -31,6 +31,11 @@ function acBRL(v) {
 }
 function acNum(v) { const n=Number(v); return Number.isFinite(n)?n:0; }
 function acPct(v) { return `${acNum(v).toFixed(1)}%`; }
+function acSignedPct(v) {
+  if (v === null || v === undefined) return "—";
+  const n = acNum(v);
+  return `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
+}
 function acShortBRL(v) {
   const raw = acNum(v);
   const n = Math.abs(raw);
@@ -592,6 +597,9 @@ const AnaliseClientes = () => {
   const totalAberto     = acNum(summary.totalAberto);
   const totalVencido    = acNum(summary.totalVencido);
   const totalInadimplente = acNum(summary.totalInadimplente);
+  const totalAnoAnterior = acNum(summary.totalAnoAnterior);
+  const documentosPeriodo = acNum(summary.documentosPeriodo);
+  const documentosAnoAnterior = acNum(summary.documentosAnoAnterior);
   const clientesAtivos  = acNum(summary.clientesAtivos);
   const ticketMedio     = acNum(summary.ticketMedio);
   const inativo30       = acNum(summary.inativo30);
@@ -622,15 +630,20 @@ const AnaliseClientes = () => {
     [...clients].filter(c=>c.crescimento!==null&&acNum(c.crescimento)<0&&acNum(c.totalAnterior)>0)
       .sort((a,b)=>acNum(a.crescimento)-acNum(b.crescimento)).slice(0,8),
     [clients]);
+  const rankLow = React.useMemo(()=>
+    [...clients].filter(c=>acNum(c.totalPeriodo)>0)
+      .sort((a,b)=>acNum(a.totalPeriodo)-acNum(b.totalPeriodo)).slice(0,8),
+    [clients]);
   const rankInactive = React.useMemo(()=>
     [...clients].filter(c=>acNum(c.diasSemFaturar)>30)
       .sort((a,b)=>acNum(b.diasSemFaturar)-acNum(a.diasSemFaturar)).slice(0,8),
     [clients]);
 
   // Dados do ranking ativo
-  const rankData = { top:rankTop, crescimento:rankGrowth, queda:rankDecline, parados:rankInactive };
+  const rankData = { top:rankTop, baixo:rankLow, crescimento:rankGrowth, queda:rankDecline, parados:rankInactive };
   const rankTabs = [
     { key:"top",        label:"Top faturamento" },
+    { key:"baixo",      label:"Menor faturamento" },
     { key:"crescimento",label:"Maior crescimento" },
     { key:"queda",      label:"Maior queda" },
     { key:"parados",    label:"Mais tempo parado" },
@@ -677,12 +690,15 @@ const AnaliseClientes = () => {
     return [...list].sort((a,b)=>{
       if (sortCol==="nome")           return dir*((a.nome||"")<(b.nome||"")?-1:1);
       if (sortCol==="totalPeriodo")   return dir*(acNum(a.totalPeriodo)-acNum(b.totalPeriodo));
+      if (sortCol==="totalAnoAnterior")return dir*(acNum(a.totalAnoAnterior)-acNum(b.totalAnoAnterior));
       if (sortCol==="totalRecebido")   return dir*(acNum(a.totalRecebido)-acNum(b.totalRecebido));
       if (sortCol==="totalAberto")     return dir*(acNum(a.totalAberto)-acNum(b.totalAberto));
       if (sortCol==="totalVencido")    return dir*(acNum(a.totalVencido)-acNum(b.totalVencido));
       if (sortCol==="diasSemFaturar") return dir*(acNum(a.diasSemFaturar)-acNum(b.diasSemFaturar));
       if (sortCol==="ticketMedio")    return dir*(acNum(a.ticketMedio)-acNum(b.ticketMedio));
       if (sortCol==="lancamentos")    return dir*(acNum(a.lancamentos)-acNum(b.lancamentos));
+      if (sortCol==="documentosAnoAnterior")return dir*(acNum(a.documentosAnoAnterior)-acNum(b.documentosAnoAnterior));
+      if (sortCol==="crescimentoAnoAnterior")return dir*(acNum(a.crescimentoAnoAnterior)-acNum(b.crescimentoAnoAnterior));
       if (sortCol==="statusComercial")return dir*((a.statusComercial||"")<(b.statusComercial||"")?-1:1);
       return 0;
     });
@@ -703,14 +719,18 @@ const AnaliseClientes = () => {
   );
 
   const exportCsv = () => {
-    const header = ["Cliente","Documento","Último Faturamento","Total Faturado","Recebido no período (por data da baixa)","Em Aberto","Vencido","Inadimplente","Total Anterior","Crescimento %","Lançamentos","Ticket Médio","Dias Sem Faturar","Status","Ação"];
+    const header = ["Cliente","Documento","Último Faturamento","Total Faturado","Total Ano Anterior","Variação Ano Anterior %","Recebido no período (por data da baixa)","Em Aberto","Vencido","Inadimplente","Total Anterior","Crescimento %","Lançamentos","Docs Ano Anterior","Variação Docs Ano Anterior %","Ticket Médio","Dias Sem Faturar","Status","Ação"];
     const lines = sortedClients.map(c=>[
       c.nome||"",c.documento||"",acDateFmt(c.ultimoFaturamento),
-      acNum(c.totalPeriodo).toFixed(2),acNum(c.totalRecebido).toFixed(2),
+      acNum(c.totalPeriodo).toFixed(2),acNum(c.totalAnoAnterior).toFixed(2),
+      c.crescimentoAnoAnterior!==null?acNum(c.crescimentoAnoAnterior).toFixed(1):"",
+      acNum(c.totalRecebido).toFixed(2),
       acNum(c.totalAberto).toFixed(2),acNum(c.totalVencido).toFixed(2),
       acNum(c.totalInadimplente).toFixed(2),acNum(c.totalAnterior).toFixed(2),
       c.crescimento!==null?acNum(c.crescimento).toFixed(1):"",
-      c.lancamentos,acNum(c.ticketMedio).toFixed(2),
+      c.lancamentos,c.documentosAnoAnterior,
+      c.variacaoDocumentosAnoAnterior!==null?acNum(c.variacaoDocumentosAnoAnterior).toFixed(1):"",
+      acNum(c.ticketMedio).toFixed(2),
       c.diasSemFaturar,
       STATUS_LABELS[c.statusComercial]||c.statusComercial,
       ACAO_LABELS[c.acaoSugerida]||c.acaoSugerida,
@@ -831,6 +851,32 @@ const AnaliseClientes = () => {
           <div className="kpi-label"><Icon name="alert"/><span>Risco financeiro</span></div>
           <div className="kpi-value">{acBRL(totalInadimplente)}</div>
           <span className="kpi-delta down">vencido há mais de 5 dias</span>
+        </div>
+      </div>
+
+      {/* ── KPIs — Comparativo ano anterior ── */}
+      <div className="grid cols-4" style={{marginBottom:16}}>
+        <div className="kpi" style={{borderLeft:`3px solid ${acNum(summary.variacaoAnoAnterior)>=0?"#22c55e":"#ef4444"}`}}>
+          <div className="kpi-label"><Icon name="chart"/><span>Fat. ano anterior</span></div>
+          <div className="kpi-value">{acBRL(totalAnoAnterior)}</div>
+          <span className={acNum(summary.variacaoAnoAnterior)>=0?"kpi-delta up":"kpi-delta down"}>Atual x AA: {acSignedPct(summary.variacaoAnoAnterior)}</span>
+        </div>
+        <div className="kpi" style={{borderLeft:"3px solid #38bdf8"}}>
+          <div className="kpi-label"><Icon name="file"/><span>Documentos</span></div>
+          <div className="kpi-value">{documentosPeriodo}</div>
+          <span className="kpi-delta flat">AA: {documentosAnoAnterior} · {acSignedPct(summary.variacaoDocumentosAnoAnterior)}</span>
+        </div>
+        <div className="kpi" style={{borderLeft:"3px solid #818cf8"}}>
+          <div className="kpi-label"><Icon name="gauge"/><span>Ticket por doc.</span></div>
+          <div className="kpi-value">{acBRL(documentosPeriodo>0?totalFaturado/documentosPeriodo:0)}</div>
+          <span className="kpi-delta flat">por documento emitido</span>
+        </div>
+        <div className="kpi" style={{borderLeft:"3px solid #f97316"}}>
+          <div className="kpi-label"><Icon name="arrow-down"/><span>Menor faturamento</span></div>
+          <div className="kpi-value" style={{fontSize:14,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+            {rankLow[0]?.nome || "—"}
+          </div>
+          <span className="kpi-delta flat">{rankLow[0]?acBRL(rankLow[0].totalPeriodo):"sem dados"}</span>
         </div>
       </div>
 
@@ -1098,10 +1144,12 @@ const AnaliseClientes = () => {
           )}
           {(rankData[rankTab]||[]).map((c,i)=>{
             const maxVal=rankTab==="top"?acNum(rankTop[0]?.totalPeriodo)||1
+              :rankTab==="baixo"?Math.max(1,...rankLow.map(x=>acNum(x.totalPeriodo)))
               :rankTab==="crescimento"?Math.max(1,...rankGrowth.map(x=>acNum(x.crescimento)))
               :rankTab==="queda"?Math.abs(Math.min(-1,...rankDecline.map(x=>acNum(x.crescimento))))
               :acNum(rankInactive[0]?.diasSemFaturar)||1;
             const rawVal=rankTab==="top"?acNum(c.totalPeriodo)
+              :rankTab==="baixo"?acNum(c.totalPeriodo)
               :rankTab==="crescimento"?acNum(c.crescimento)
               :rankTab==="queda"?Math.abs(acNum(c.crescimento))
               :acNum(c.diasSemFaturar);
@@ -1109,6 +1157,7 @@ const AnaliseClientes = () => {
             const barColor=rankTab==="crescimento"?AC_COLORS.estrategico
               :rankTab==="queda"?AC_COLORS.parado
               :rankTab==="parados"?AC_COLORS.parado
+              :rankTab==="baixo"?"#f97316"
               :AC_COLORS.bar;
             return (
               <div key={c.codigo||i} style={{marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
@@ -1120,6 +1169,7 @@ const AnaliseClientes = () => {
                   </div>
                   <span style={{fontFamily:"var(--font-mono)",fontSize:11.5,flexShrink:0,width:96,textAlign:"right",color:"var(--text-2)"}}>
                     {rankTab==="top"?acBRL(c.totalPeriodo)
+                    :rankTab==="baixo"?acBRL(c.totalPeriodo)
                     :rankTab==="crescimento"?`+${acNum(c.crescimento).toFixed(1)}%`
                     :rankTab==="queda"?`${acNum(c.crescimento).toFixed(1)}%`
                     :`${acNum(c.diasSemFaturar)}d`}
@@ -1152,10 +1202,13 @@ const AnaliseClientes = () => {
             <tr>
               <th style={{cursor:"pointer"}} onClick={()=>toggleSort("nome")}>Cliente <SortArrow col="nome"/></th>
               <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalPeriodo")}>Faturado <SortArrow col="totalPeriodo"/></th>
+              <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalAnoAnterior")}>Fat. ano ant. <SortArrow col="totalAnoAnterior"/></th>
+              <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("crescimentoAnoAnterior")}>Var. AA <SortArrow col="crescimentoAnoAnterior"/></th>
               <th className="num" title="Baixas realizadas no período, inclusive de faturas anteriores" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalRecebido")}>Recebido no período <SortArrow col="totalRecebido"/></th>
               <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalAberto")}>Em aberto <SortArrow col="totalAberto"/></th>
               <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("totalVencido")}>Vencido <SortArrow col="totalVencido"/></th>
               <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("lancamentos")}>Lançamentos <SortArrow col="lancamentos"/></th>
+              <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("documentosAnoAnterior")}>Docs AA <SortArrow col="documentosAnoAnterior"/></th>
               <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("ticketMedio")}>Ticket médio <SortArrow col="ticketMedio"/></th>
               <th>Último fat.</th>
               <th className="num" style={{cursor:"pointer"}} onClick={()=>toggleSort("diasSemFaturar")}>Dias sem fat. <SortArrow col="diasSemFaturar"/></th>
@@ -1165,7 +1218,7 @@ const AnaliseClientes = () => {
           </thead>
           <tbody>
             {pageRows.length===0&&(
-              <tr><td colSpan="11" className="muted" style={{padding:20,textAlign:"center",fontSize:12.5}}>
+              <tr><td colSpan="14" className="muted" style={{padding:20,textAlign:"center",fontSize:12.5}}>
                 {tableSearch?"Nenhum resultado para a busca.":"Nenhum cliente encontrado."}
               </td></tr>
             )}
@@ -1176,10 +1229,15 @@ const AnaliseClientes = () => {
                 <td style={{maxWidth:200,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}
                     title={row.nome}>{row.nome}</td>
                 <td className="num">{acBRL(row.totalPeriodo)}</td>
+                <td className="num">{acBRL(row.totalAnoAnterior)}</td>
+                <td className="num" style={{color:row.crescimentoAnoAnterior==null?"inherit":acNum(row.crescimentoAnoAnterior)>=0?"#22c55e":"#ef4444"}}>
+                  {acSignedPct(row.crescimentoAnoAnterior)}
+                </td>
                 <td className="num">{acBRL(row.totalRecebido)}</td>
                 <td className="num">{acBRL(row.totalAberto)}</td>
                 <td className="num" style={{color:acNum(row.totalVencido)>0?"#ef4444":"inherit"}}>{acBRL(row.totalVencido)}</td>
                 <td className="num">{row.lancamentos}</td>
+                <td className="num">{row.documentosAnoAnterior || 0}</td>
                 <td className="num">{acBRL(row.ticketMedio)}</td>
                 <td className="date">{acDateFmt(row.ultimoFaturamento)}</td>
                 <td className="num" style={{
