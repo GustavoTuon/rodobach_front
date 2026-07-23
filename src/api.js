@@ -5,6 +5,7 @@ const API_BASE = window.RB_API_BASE
   || (["localhost", "127.0.0.1"].includes(window.location.hostname)
     ? LOCAL_API_BASE
     : PRODUCTION_API_BASE);
+window.RB_API_BASE_URL = API_BASE;
 
 const TOKEN_KEY = "rodobach_token";
 const USER_KEY  = "rodobach_user";
@@ -128,6 +129,15 @@ window.RB_API = {
   // ── Financeiro ────────────────────────────────────────────────────────────
   getAnaliseFrota: (filters = {}) => apiRequest(`/frota/analise${buildQuery(filters || {})}`),
   getAnaliseAbastecimentos: (filters = {}) => apiRequest(`/frota/abastecimentos${buildQuery(filters || {})}`),
+  listAbastecimentoAcordos: (filters = {}) => apiRequest(`/abastecimentos/acordos${buildQuery(filters || {})}`),
+  saveAbastecimentoAcordo: (payload) => apiRequest(payload?.id ? `/abastecimentos/acordos/${encodeURIComponent(payload.id)}` : "/abastecimentos/acordos", {
+    method: payload?.id ? "PUT" : "POST",
+    body: JSON.stringify(payload),
+  }),
+  deleteAbastecimentoAcordo: (id) => apiRequest(`/abastecimentos/acordos/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  listPostosAbastecimento: (q = "") => apiRequest(`/abastecimentos/acordos/postos${buildQuery({ q })}`),
+  listGruposClientes: () => apiRequest("/abastecimentos/acordos/grupos-clientes"),
+  getDivergenciasAbastecimento: (filters = {}) => apiRequest(`/abastecimentos/acordos/divergencias${buildQuery(filters || {})}`),
   getStatusCargaFrota: (filters = {}) => apiRequest(`/frota/status-carga${buildQuery(filters || {})}`),
   getCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos${buildQuery(filters || {})}`),
   getAuditoriaCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos/auditoria${buildQuery(filters || {})}`),
