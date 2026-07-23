@@ -3,6 +3,7 @@ const EMPTY_FORM = {
   titulo: "",
   mensagem: "",
   intervalo_km: "",
+  antecedencia_km: "1000",
   numeros: [], // ["5546999990000", ...]
 };
 
@@ -11,27 +12,46 @@ function fmtKm(v) {
   return Number(v).toLocaleString("pt-BR") + " km";
 }
 
+function previewAvisoPreventivo(item) {
+  const atual = Number(item?.km_atual || 0);
+  const manutencao = Number(item?.km_manutencao_prevista || item?.km_proximo_envio || 0);
+  const faltam = Math.max(0, manutencao - atual);
+  return [
+    "⚠️ *Manutenção preventiva próxima*",
+    "",
+    `*Veículo:* ${item?.placa || "PLACA"}`,
+    `*Serviço:* ${item?.titulo || "Manutenção"}`,
+    "",
+    item?.mensagem || "",
+    "",
+    `*KM atual:* ${fmtKm(atual)}`,
+    `*Manutenção prevista:* ${fmtKm(manutencao)}`,
+    `*Faltam aproximadamente:* ${fmtKm(faltam)}`,
+  ].join("\n");
+}
+
 function kmInfo(item) {
   const atual = Number(item?.km_atual);
-  const proximo = Number(item?.km_proximo_envio);
-  if (!Number.isFinite(atual) || !Number.isFinite(proximo) || proximo <= 0) {
+  const manutencao = Number(item?.km_manutencao_prevista || item?.km_proximo_envio);
+  const aviso = Number(item?.km_proximo_aviso || Math.max(0, manutencao - Number(item?.antecedencia_km || 0)));
+  if (!Number.isFinite(atual) || !Number.isFinite(manutencao) || manutencao <= 0) {
     return { status: "sem_km", label: "Sem KM confiavel", tone: "var(--text-3)", bg: "var(--surface-2)", faltam: null };
   }
-  const faltam = proximo - atual;
+  const faltam = manutencao - atual;
   if (faltam <= 0) {
     return { status: "vencido", label: `Vencido ${fmtKm(Math.abs(faltam))}`, tone: "#dc2626", bg: "rgba(220,38,38,.10)", faltam };
   }
-  if (faltam <= Math.max(Number(item?.intervalo_km) * 0.1, 500)) {
-    return { status: "perto", label: `Faltam ${fmtKm(faltam)}`, tone: "#d97706", bg: "rgba(217,119,6,.11)", faltam };
+  if (atual >= aviso) {
+    return { status: "proximo", label: `Próxima · ${fmtKm(faltam)}`, tone: "#d97706", bg: "rgba(217,119,6,.11)", faltam };
   }
-  return { status: "ok", label: `Faltam ${fmtKm(faltam)}`, tone: "#16a34a", bg: "rgba(22,163,74,.10)", faltam };
+  return { status: "programado", label: `Programada · ${fmtKm(faltam)}`, tone: "#16a34a", bg: "rgba(22,163,74,.10)", faltam };
 }
 
 function resumoKmGrupo(automacao) {
   const itens = automacao?.itens || [automacao];
   const infos = itens.map(kmInfo);
   if (infos.some(i => i.status === "vencido")) return { ...infos.find(i => i.status === "vencido"), label: `${infos.filter(i => i.status === "vencido").length} vencido(s)` };
-  if (infos.some(i => i.status === "perto")) return { ...infos.find(i => i.status === "perto"), label: `${infos.filter(i => i.status === "perto").length} perto(s)` };
+  if (infos.some(i => i.status === "proximo")) return { ...infos.find(i => i.status === "proximo"), label: `${infos.filter(i => i.status === "proximo").length} próxima(s)` };
   if (infos.some(i => i.status === "sem_km")) return infos.find(i => i.status === "sem_km");
   const menor = infos.sort((a, b) => a.faltam - b.faltam)[0];
   return { ...menor, label: itens.length > 1 ? `Menor prazo: ${menor.label.toLowerCase()}` : menor.label };
@@ -76,6 +96,7 @@ function agruparAutomacoes(automacoes) {
       String(item.titulo || "").trim().toLowerCase(),
       String(item.mensagem || "").trim().toLowerCase(),
       Number(item.intervalo_km) || 0,
+      Number(item.antecedencia_km) || 0,
       Boolean(item.ativo),
       String(item.numeros || "").trim().toLowerCase(),
     ].join("|");
@@ -606,7 +627,19 @@ function ManutencaoMensagens() {
   const [kmModal, setKmModal] = React.useState(null);
   const [kmValor, setKmValor] = React.useState("");
   const [kmSalvando, setKmSalvando] = React.useState(false);
-  const automacoesAgrupadas = agruparAutomacoes(automacoes);
+  const [filtro, setFiltro] = React.useState("todas");
+  const [busca, setBusca] = React.useState("");
+  const resumo = automacoes.reduce((acc, item) => {
+    const status = item.ativo ? kmInfo(item).status : "inativo";
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {});
+  const automacoesFiltradas = automacoes.filter(item => {
+    const status = item.ativo ? kmInfo(item).status : "inativo";
+    const texto = `${item.placa || ""} ${item.titulo || ""}`.toLowerCase();
+    return (filtro === "todas" || filtro === status) && texto.includes(busca.trim().toLowerCase());
+  });
+  const automacoesAgrupadas = agruparAutomacoes(automacoesFiltradas);
 
   const carregar = React.useCallback(async () => {
     setLoading(true);
@@ -715,6 +748,7 @@ function ManutencaoMensagens() {
       titulo: a.titulo,
       mensagem: a.mensagem,
       intervalo_km: String(a.intervalo_km),
+      antecedencia_km: String(a.antecedencia_km ?? 1000),
       numeros: String(a.numeros || "").split(",").filter(Boolean),
     });
     setFormErro(null);
@@ -737,12 +771,16 @@ function ManutencaoMensagens() {
       setFormErro("Selecione ao menos um veículo.");
       return;
     }
-    if (!form.titulo.trim() || !form.mensagem.trim() || !form.intervalo_km) {
+    if (!form.titulo.trim() || !form.mensagem.trim() || !form.intervalo_km || form.antecedencia_km === "") {
       setFormErro("Preencha todos os campos obrigatórios.");
       return;
     }
     if (Number(form.intervalo_km) <= 0) {
       setFormErro("O intervalo de KM deve ser maior que zero.");
+      return;
+    }
+    if (Number(form.antecedencia_km) < 0 || Number(form.antecedencia_km) >= Number(form.intervalo_km)) {
+      setFormErro("A antecedência deve ser positiva e menor que o intervalo.");
       return;
     }
     if (form.numeros.length === 0) {
@@ -765,6 +803,7 @@ function ManutencaoMensagens() {
           titulo: form.titulo.trim(),
           mensagem: form.mensagem.trim(),
           intervalo_km: Number(form.intervalo_km),
+          antecedencia_km: Number(form.antecedencia_km),
           ...contatoPayload,
         };
         if (ids.length === 1) {
@@ -778,6 +817,7 @@ function ManutencaoMensagens() {
           titulo: form.titulo.trim(),
           mensagem: form.mensagem.trim(),
           intervalo_km: Number(form.intervalo_km),
+          antecedencia_km: Number(form.antecedencia_km),
           ...contatoPayload,
         });
       }
@@ -847,6 +887,34 @@ function ManutencaoMensagens() {
         </div>
       )}
 
+      {!loading && automacoes.length > 0 && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 12 }}>
+            {[
+              ["vencido", "Vencidas", resumo.vencido || 0, "#dc2626"],
+              ["proximo", "Próximas", resumo.proximo || 0, "#d97706"],
+              ["programado", "Programadas", resumo.programado || 0, "#16a34a"],
+              ["inativo", "Inativas", resumo.inativo || 0, "var(--muted)"],
+            ].map(([id, label, value, color]) => (
+              <button key={id} type="button" onClick={() => setFiltro(filtro === id ? "todas" : id)} className="card" style={{
+                padding: "12px 14px", textAlign: "left", cursor: "pointer", color: "var(--text)",
+                borderColor: filtro === id ? color : "var(--border)", background: "var(--surface)",
+              }}>
+                <div className="muted" style={{ fontSize: 11.5, marginBottom: 5 }}>{label}</div>
+                <div style={{ fontSize: 24, lineHeight: 1, fontWeight: 700, color }}>{value}</div>
+              </button>
+            ))}
+          </div>
+          <div className="card" style={{ padding: 10, marginBottom: 12, display: "flex", gap: 8, alignItems: "center" }}>
+            <Icon name="search" size={14}/>
+            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por placa ou manutenção..." style={{
+              flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--text)", fontSize: 13,
+            }}/>
+            {filtro !== "todas" && <button className="btn" onClick={() => setFiltro("todas")} style={{ padding: "4px 8px" }}>Limpar filtro</button>}
+          </div>
+        </>
+      )}
+
       {loading ? (
         <div className="card" style={{ color: "var(--muted)", fontSize: 13 }}>Carregando…</div>
       ) : automacoes.length === 0 ? (
@@ -860,12 +928,15 @@ function ManutencaoMensagens() {
             <Icon name="plus" size={14}/> Criar primeira automação
           </button>
         </div>
+      ) : automacoesAgrupadas.length === 0 ? (
+        <div className="card" style={{ textAlign: "center", padding: 28, color: "var(--muted)" }}>
+          Nenhuma automação encontrada para este filtro.
+        </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {automacoesAgrupadas.map(a => {
             const kmResumo = resumoKmGrupo(a);
-            const primeiraPlaca = (a.placas || [a.placa]).filter(Boolean)[0] || "PLACA";
-            const previewMensagem = `*${a.titulo} - ${primeiraPlaca}*\n\n${a.mensagem || ""}`;
+            const previewMensagem = previewAvisoPreventivo((a.itens || [a])[0]);
             return (
             <div key={(a.ids || [a.id]).join("-")} className="card" style={{
               opacity: a.ativo ? 1 : 0.55,
@@ -909,10 +980,7 @@ function ManutencaoMensagens() {
                       }}>Inativa</span>
                     )}
                   </div>
-                  <div className="muted" style={{ fontSize: 12.5, marginBottom: 8, lineHeight: 1.5 }}>
-                    {a.mensagem}
-                  </div>
-                  <div style={{
+                  <details style={{
                     background: "var(--bg)",
                     border: "1px solid var(--border)",
                     borderRadius: 6,
@@ -920,13 +988,11 @@ function ManutencaoMensagens() {
                     marginBottom: 8,
                     maxWidth: 620,
                   }}>
-                    <div className="muted" style={{ fontSize: 10.5, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 }}>
-                      Previa WhatsApp
-                    </div>
+                    <summary className="muted" style={{ fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>Ver prévia do WhatsApp</summary>
                     <div style={{ whiteSpace: "pre-line", fontSize: 12, lineHeight: 1.4, color: "var(--text)" }}>
                       {previewMensagem}
                     </div>
-                  </div>
+                  </details>
                   {a.numeros && (
                     <div className="row" style={{ gap: 5, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
                       <span className="muted" style={{ fontSize: 12 }}>Enviar para:</span>
@@ -954,11 +1020,15 @@ function ManutencaoMensagens() {
                       <strong>a cada {fmtKm(a.intervalo_km)}</strong>
                     </div>
                     <div style={{ fontSize: 12 }}>
+                      <span className="muted">Antecedência: </span>
+                      <strong>{fmtKm(a.antecedencia_km)}</strong>
+                    </div>
+                    <div style={{ fontSize: 12 }}>
                       <span className="muted">KM atual: </span>
                       <strong>{(a.itens || [a]).length > 1 ? "por placa" : fmtKm(a.km_atual)}</strong>
                     </div>
                     <div style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
-                      <span className="muted">Enviar no KM: </span>
+                      <span className="muted">Manutenção prevista: </span>
                       <strong style={{
                         color: "var(--brand-blue)",
                         background: "var(--accent-soft)",
@@ -968,9 +1038,15 @@ function ManutencaoMensagens() {
                         fontFamily: "var(--font-mono, monospace)",
                         fontSize: 12,
                       }}>
-                        {(a.itens || [a]).length > 1 ? "por placa" : fmtKm(a.km_proximo_envio)}
+                        {(a.itens || [a]).length > 1 ? "por placa" : fmtKm(a.km_manutencao_prevista)}
                       </strong>
                     </div>
+                    {a.ultimo_envio_em && (
+                      <div style={{ fontSize: 12 }}>
+                        <span className="muted">Último aviso: </span>
+                        <strong>{new Date(a.ultimo_envio_em).toLocaleString("pt-BR")}</strong>
+                      </div>
+                    )}
                   </div>
                   {(a.itens || []).length > 1 && (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
@@ -981,7 +1057,7 @@ function ManutencaoMensagens() {
                           padding: "2px 7px",
                           fontSize: 11,
                         }}>
-                          {item.placa}: {fmtKm(item.km_atual)} -> {fmtKm(item.km_proximo_envio)}
+                          {item.placa}: {fmtKm(item.km_atual)} → {fmtKm(item.km_manutencao_prevista)}
                         </span>
                       ))}
                     </div>
@@ -1107,20 +1183,23 @@ function ManutencaoMensagens() {
                     <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 7, color: "var(--brand-blue)" }}>
                       Resumo por veículo
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr", gap: "4px 12px", alignItems: "center" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr 1fr", gap: "4px 12px", alignItems: "center" }}>
                       <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>Placa</span>
                       <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>KM atual</span>
-                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>Enviar no KM</span>
+                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>Avisar no KM</span>
+                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>Manutenção</span>
                       {form.selecionadas.map(s => {
                         const kmAtual = Number(s.km_atual) || 0;
                         const intervalo = Number(form.intervalo_km) || 0;
+                        const antecedencia = Number(form.antecedencia_km) || 0;
                         return (
                           <React.Fragment key={s.placa}>
                             <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 700, fontSize: 12, color: "var(--brand-blue)" }}>{s.placa}</span>
                             <span style={{ fontSize: 12 }}>{fmtKm(kmAtual)}</span>
                             <span style={{ fontSize: 12, fontWeight: 600, color: intervalo ? "var(--text)" : "var(--muted)" }}>
-                              {intervalo ? fmtKm(kmAtual + intervalo) : "—"}
+                              {intervalo ? fmtKm(kmAtual + intervalo - antecedencia) : "—"}
                             </span>
+                            <span style={{ fontSize: 12 }}>{intervalo ? fmtKm(kmAtual + intervalo) : "—"}</span>
                           </React.Fragment>
                         );
                       })}
@@ -1191,6 +1270,28 @@ function ManutencaoMensagens() {
                     }}
                     required
                   />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: 12.5, fontWeight: 500, display: "block", marginBottom: 5 }}>
+                    Avisar com antecedência de (KM) *
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={form.antecedencia_km}
+                    onChange={e => setForm(f => ({ ...f, antecedencia_km: e.target.value }))}
+                    placeholder="Ex: 1000"
+                    style={{
+                      width: "100%", padding: "8px 10px", border: "1px solid var(--border)",
+                      borderRadius: 6, background: "var(--bg)", color: "var(--text)",
+                      fontSize: 13, boxSizing: "border-box",
+                    }}
+                    required
+                  />
+                  <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+                    Com intervalo de 30.000 km e antecedência de 1.000 km, o aviso sai aos 29.000 km do ciclo.
+                  </div>
                 </div>
 
                 {formErro && (
