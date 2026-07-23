@@ -182,6 +182,11 @@ window.RB_API = {
   whatsappConnect: () => apiRequest("/whatsapp/connect", { method: "POST" }),
 
   // ── Gerenciamento de usuários (admin) ─────────────────────────────────────
+  listAutomacoesN8n: () => apiRequest("/automacoes/n8n"),
+  getAutomacaoN8n: (id) => apiRequest(`/automacoes/n8n/${encodeURIComponent(id)}`),
+  ativarAutomacaoN8n: (id) => apiRequest(`/automacoes/n8n/${encodeURIComponent(id)}/ativar`, { method: "POST" }),
+  desativarAutomacaoN8n: (id) => apiRequest(`/automacoes/n8n/${encodeURIComponent(id)}/desativar`, { method: "POST" }),
+  executarNovamenteAutomacaoN8n: (id) => apiRequest(`/automacoes/n8n/${encodeURIComponent(id)}/executar-novamente`, { method: "POST" }),
   getAutomacaoVencimentoClientes: () => apiRequest("/automacoes/vencimento-clientes"),
   ativarAutomacaoVencimentoClientes: () => apiRequest("/automacoes/vencimento-clientes/ativar", { method: "POST" }),
   desativarAutomacaoVencimentoClientes: () => apiRequest("/automacoes/vencimento-clientes/desativar", { method: "POST" }),

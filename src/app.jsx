@@ -51,7 +51,7 @@ const NAV = [
   { id: "status-carga",    label: "Status Carga", icon: "package",     title: "Status de Carga da Frota", section: "operacao" },
   { id: "pneus",           label: "Pneus",        icon: "truck",       title: "Movimentação de Pneus", section: "operacao" },
   { id: "manutencao",      label: "Automações",   icon: "wrench",      title: "Automação de Manutenção", section: "operacao" },
-  { id: "automacoes-n8n",  label: "n8n",          icon: "plug",        title: "Automações n8n", section: "operacao" },
+  { id: "automacoes-n8n",  label: "n8n",          icon: "plug",        title: "Automações n8n", sistema: true },
   { id: "settings",        label: "Configurações", icon: "settings",   title: "Configurações",    sistema: true },
   { id: "usuarios",        label: "Usuários",     icon: "user",        title: "Gerenciar Usuários", sistema: true, adminOnly: true },
 ];
