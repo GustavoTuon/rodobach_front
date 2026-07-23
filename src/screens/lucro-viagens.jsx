@@ -28,35 +28,23 @@ function lvDate(value) {
   return y && m && d ? `${d}/${m}/${y}` : "-";
 }
 
-function lvShortMoney(value) {
-  const n = Math.abs(lvNum(value));
-  const sign = lvNum(value) < 0 ? "-" : "";
-  if (n >= 1000000) return `${sign}R$ ${(n / 1000000).toFixed(1)}M`;
-  if (n >= 1000) return `${sign}R$ ${Math.round(n / 1000)}k`;
-  return `${sign}R$ ${Math.round(n)}`;
-}
-
 function lvNormalize(payload) {
   const base = payload && typeof payload === "object" ? payload : {};
   return {
     periodo: base.periodo || {},
     resumo: base.resumo || {},
     viagens: Array.isArray(base.viagens) ? base.viagens : [],
-    mensal: Array.isArray(base.mensal) ? base.mensal : [],
-    rankings: base.rankings || { lucro: [], prejuizo: [] },
-    distribuicao: Array.isArray(base.distribuicao) ? base.distribuicao : [],
+    veiculos: Array.isArray(base.veiculos) ? base.veiculos : [],
     semViagemVinculada: base.semViagemVinculada || { quantidade: 0, receita: 0, registros: [] },
     filtros: base.filtros || { clientes: [], placas: [] },
     audit: base.audit || {},
   };
 }
 
-const LV_STATUS = {
-  lucrativo: { label: "Lucrativo", cls: "ok", color: "#22c55e" },
-  atencao: { label: "Atencao", cls: "warn", color: "#facc15" },
-  "margem-baixa": { label: "Margem baixa", cls: "info", color: "#fb923c" },
-  prejuizo: { label: "Prejuízo", cls: "crit", color: "#ef4444" },
-};
+function lvShortText(value, fallback = "-") {
+  const text = String(value || "").trim();
+  return text || fallback;
+}
 
 const LV_PERIODS = [
   { key: "7d", label: "7 dias", range: () => ({ start: lvDaysAgoISO(6), end: lvTodayISO() }) },
@@ -75,105 +63,68 @@ const LvKpi = ({ label, value, sub, icon, tone }) => (
   </div>
 );
 
-const LvStatusBadge = ({ status }) => {
-  const s = LV_STATUS[status] || { label: status || "-", cls: "" };
-  return (
-    <span
-      className={`badge ${s.cls}`}
-      style={{
-        borderColor: s.color ? `color-mix(in oklab, ${s.color} 45%, transparent)` : undefined,
-        color: s.color || undefined,
-        background: s.color ? `color-mix(in oklab, ${s.color} 10%, transparent)` : undefined,
-      }}
-    >
-      <span className="dot" style={{ background: s.color || undefined }}/>
-      {s.label}
-    </span>
-  );
+const LvStatus = ({ lucro, margem }) => {
+  const loss = lvNum(lucro) < 0;
+  const low = !loss && lvNum(margem) < 10;
+  const cls = loss ? "crit" : low ? "warn" : "ok";
+  const label = loss ? "Prejuizo" : low ? "Margem baixa" : "Lucro";
+  return <span className={`badge ${cls}`}><span className="dot"/>{label}</span>;
 };
 
-const LvBar = ({ label, value, max, tone, meta }) => {
-  const pct = max > 0 ? Math.min(100, Math.max(3, Math.abs(lvNum(value)) / max * 100)) : 0;
-  return (
-    <div className="lv-bar" title={`${label}: ${lvBRL(value)}`}>
-      <div className="lv-bar-head">
-        <span>{label}</span>
-        <strong style={{ color: tone || "var(--text)" }}>{lvShortMoney(value)}</strong>
-      </div>
-      <div className="lv-bar-track"><div style={{ width: `${pct.toFixed(1)}%`, background: tone || "var(--brand-blue)" }}/></div>
-      {meta && <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>{meta}</div>}
-    </div>
-  );
-};
+const LvCostPill = ({ label, value, hint, tone }) => (
+  <div className="lv-cost-pill" title={hint || label} style={tone ? { borderColor: tone } : null}>
+    <span>{label}</span>
+    <strong>{lvBRL(value)}</strong>
+    {hint && <small>{hint}</small>}
+  </div>
+);
 
-const LvMonthlyChart = ({ rows }) => {
-  if (!rows.length) return <div className="muted">Sem dados mensais no periodo.</div>;
-  const max = Math.max(1, ...rows.map((r) => Math.max(lvNum(r.receita), lvNum(r.custo), Math.abs(lvNum(r.lucro)))));
-  return (
-    <div className="lv-monthly">
-      {rows.map((row) => {
-        const recH = Math.max(4, lvNum(row.receita) / max * 100);
-        const cusH = Math.max(4, lvNum(row.custo) / max * 100);
-        const lucH = Math.max(4, Math.abs(lvNum(row.lucro)) / max * 100);
-        const lucroColor = lvNum(row.lucro) >= 0 ? "#22c55e" : "#ef4444";
-        return (
-          <div key={row.mes} className="lv-month">
-            <div className="lv-month-bars">
-              <i style={{ height: `${recH}%`, background: "#38bdf8" }} title={`Receita ${lvBRL(row.receita)}`}/>
-              <i style={{ height: `${cusH}%`, background: "#f97316" }} title={`Custo ${lvBRL(row.custo)}`}/>
-              <i style={{ height: `${lucH}%`, background: lucroColor }} title={`Lucro ${lvBRL(row.lucro)}`}/>
-            </div>
-            <span>{row.label}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
-const LvDetailModal = ({ viagem, onClose }) => {
+const LvTripDetail = ({ viagem, onClose }) => {
   if (!viagem) return null;
   const custos = viagem.custos || {};
-  const rows = [
-    ["Motorista", custos.motorista],
-    ["Abastecimentos", custos.abastecimentos],
-    ["Pedagio", custos.pedagio],
-    ["Diarias", custos.diarias],
-    ["Despesas", custos.despesas],
-    ["Outros", custos.outros],
-  ];
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="card lv-modal" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="row between" style={{ marginBottom: 14, gap: 12 }}>
+        <div className="row between" style={{ gap: 12, marginBottom: 14 }}>
           <div style={{ minWidth: 0 }}>
-            <h2 style={{ margin: 0, fontSize: 18, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Viagem {viagem.viagem}</h2>
-            <div className="muted" style={{ fontSize: 12 }}>{viagem.cliente} · {lvDate(viagem.data)} · {[viagem.origem, viagem.destino].filter(Boolean).join(" / ") || "Rota nao informada"}</div>
+            <h2 style={{ margin: 0, fontSize: 18 }}>Viagem {viagem.viagem || viagem.id}</h2>
+            <div className="muted" style={{ fontSize: 12 }}>
+              {lvDate(viagem.data)} · {lvShortText(viagem.placa, "Sem placa")} · {lvShortText(viagem.motorista)}
+            </div>
           </div>
           <button className="icon-btn" onClick={onClose} title="Fechar"><Icon name="x"/></button>
         </div>
 
         <div className="grid cols-4" style={{ marginBottom: 14 }}>
-          <LvKpi label="Receita" value={lvBRL(viagem.receita)} tone="#38bdf8" icon="trending-up"/>
-          <LvKpi label="Custo" value={lvBRL(viagem.custo)} tone="#f97316" icon="money"/>
+          <LvKpi label="Faturamento" value={lvBRL(viagem.receita)} tone="#38bdf8" icon="trending-up"/>
+          <LvKpi label="Custo viagem" value={lvBRL(viagem.custo)} tone="#f97316" icon="money"/>
           <LvKpi label="Lucro" value={lvBRL(viagem.lucro)} tone={lvNum(viagem.lucro) >= 0 ? "#22c55e" : "#ef4444"} icon="chart"/>
-          <LvKpi label="Margem" value={lvPct(viagem.margem)} tone={LV_STATUS[viagem.statusDetalhado]?.color} icon="gauge"/>
+          <LvKpi label="Margem" value={lvPct(viagem.margem)} tone="#8b5cf6" icon="gauge"/>
         </div>
 
-        <div className="card-header" style={{ padding: "0 0 8px" }}><h3 style={{ fontSize: 13 }}>Composicao do custo</h3></div>
-        <div className="card-body" style={{ marginBottom: 10 }}>
-          {rows.map(([label, value]) => (
-            <LvBar key={label} label={label} value={value} max={Math.max(1, lvNum(viagem.custo))} tone="#f97316"/>
-          ))}
+        <div className="card" style={{ padding: 12, marginBottom: 12, background: "var(--surface-2)" }}>
+          <strong style={{ fontSize: 12.5 }}>Composicao do custo da viagem</strong>
+          <div className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>
+            O custo considera apenas lancamentos ligados diretamente ao acerto da viagem. O item motorista e a comissao/frete do motorista ou agregado, quando existir.
+          </div>
         </div>
 
-        <div className="table-wrap">
+        <div className="lv-cost-grid">
+          <LvCostPill label="Comissao/frete motorista" value={custos.motorista} hint="Comissao ou frete do motorista/agregado ligado ao CT-e ou acerto" tone="rgba(56,189,248,.55)"/>
+          <LvCostPill label="Abastecimento" value={custos.abastecimentos} hint="Abastecimentos vinculados a viagem"/>
+          <LvCostPill label="Pedagio" value={custos.pedagio} hint="Pedagios do acerto/carta-frete"/>
+          <LvCostPill label="Diarias" value={custos.diarias} hint="Diarias lancadas na viagem"/>
+          <LvCostPill label="Despesas avulsas" value={custos.despesas} hint="Despesas operacionais da viagem"/>
+          <LvCostPill label="Outros" value={custos.outros} hint="Outros custos operacionais vinculados"/>
+        </div>
+
+        <div className="table-wrap" style={{ marginTop: 14 }}>
           <table className="data-table compact">
             <tbody>
-              <tr><td className="muted">Placa</td><td>{viagem.placa || "-"}</td><td className="muted">Tipo</td><td>{viagem.tipoVeiculo}</td></tr>
-              <tr><td className="muted">Motorista</td><td>{viagem.motorista || "-"}</td><td className="muted">Status</td><td><LvStatusBadge status={viagem.statusDetalhado}/></td></tr>
-              <tr><td className="muted">CT-e</td><td>{viagem.documentos || 0}</td><td className="muted">MDF-e</td><td>{viagem.manifestos || 0}</td></tr>
-              <tr><td className="muted">Total acerto</td><td>{lvBRL(viagem.totalAcerto)}</td><td className="muted">Saldo motorista</td><td>{lvBRL(viagem.saldoMotorista)}</td></tr>
+              <tr><td className="muted">Cliente</td><td colSpan="3">{lvShortText(viagem.cliente)}</td></tr>
+              <tr><td className="muted">Rota</td><td colSpan="3">{[viagem.origem, viagem.destino].filter(Boolean).join(" / ") || "-"}</td></tr>
+              <tr><td className="muted">CT-e</td><td>{viagem.documentos || 0}</td><td className="muted">Fretes</td><td>{viagem.fretes || 0}</td></tr>
+              <tr><td className="muted">Total no acerto</td><td>{lvBRL(viagem.totalAcerto)}</td><td className="muted">Saldo do acerto</td><td>{lvBRL(viagem.saldoMotorista)}</td></tr>
             </tbody>
           </table>
         </div>
@@ -194,35 +145,35 @@ const LucroViagens = () => {
   const [data, setData] = React.useState(() => lvNormalize(null));
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
+  const [selectedVehicle, setSelectedVehicle] = React.useState("");
+  const [selectedTrip, setSelectedTrip] = React.useState(null);
+  const [showUnlinked, setShowUnlinked] = React.useState(false);
   const [search, setSearch] = React.useState("");
-  const [sortCol, setSortCol] = React.useState("lucro");
-  const [sortDir, setSortDir] = React.useState("desc");
-  const [selected, setSelected] = React.useState(null);
-  const [showSemViagem, setShowSemViagem] = React.useState(false);
 
   React.useEffect(() => {
-    const id = "rb-lucro-viagens-style";
-    if (!document.getElementById(id)) {
-      const s = document.createElement("style");
-      s.id = id;
-      s.textContent = `
-        .lv-bar{display:block;margin-bottom:11px}
-        .lv-bar-head{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;margin-bottom:4px}
-        .lv-bar-head span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-        .lv-bar-head strong{font-family:var(--font-mono);font-size:11.5px;flex-shrink:0}
-        .lv-bar-track{height:5px;background:var(--surface-3);border-radius:3px;overflow:hidden}
-        .lv-bar-track div{height:100%;border-radius:3px}
-        .lv-monthly{height:210px;display:grid;grid-template-columns:repeat(auto-fit,minmax(42px,1fr));gap:8px;align-items:end}
-        .lv-month{height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px;min-width:0}
-        .lv-month-bars{height:165px;width:100%;display:flex;align-items:flex-end;justify-content:center;gap:3px}
-        .lv-month-bars i{width:9px;border-radius:3px 3px 0 0;min-height:4px}
-        .lv-month span{font-size:10.5px;color:var(--text-3);white-space:nowrap}
-        .lv-modal{width:min(760px,96vw);max-height:88vh;overflow:auto}
-        .tbl tbody tr.clickable:hover td{background:var(--hover);cursor:pointer}
-        @media (max-width:760px){.lv-monthly{grid-template-columns:repeat(6,minmax(34px,1fr));overflow-x:auto}.lv-modal{padding:12px}.lv-modal .grid.cols-4{grid-template-columns:1fr 1fr}}
-      `;
-      document.head.appendChild(s);
-    }
+    const id = "rb-lucro-viagens-v2-style";
+    if (document.getElementById(id)) return;
+    const s = document.createElement("style");
+    s.id = id;
+    s.textContent = `
+      .lv-layout{display:grid;grid-template-columns:minmax(320px,420px) minmax(0,1fr);gap:14px;align-items:start}
+      .lv-vehicle-list{display:grid;gap:8px;padding:10px;max-height:620px;overflow:auto}
+      .lv-vehicle{border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:7px;padding:10px;text-align:left;cursor:pointer}
+      .lv-vehicle.active{border-color:var(--brand-blue);background:var(--accent-soft)}
+      .lv-vehicle-top{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:8px}
+      .lv-vehicle-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;color:var(--text-3);font-size:11.5px}
+      .lv-vehicle-grid strong{display:block;color:var(--text);font-size:12px;font-family:var(--font-mono)}
+      .lv-cost-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
+      .lv-cost-pill{border:1px solid var(--border);border-radius:7px;padding:10px;background:var(--surface);min-height:76px}
+      .lv-cost-pill span{display:block;color:var(--text-3);font-size:11px;margin-bottom:3px}
+      .lv-cost-pill strong{font-family:var(--font-mono);font-size:13px}
+      .lv-cost-pill small{display:block;color:var(--text-3);font-size:10.5px;line-height:1.35;margin-top:7px}
+      .lv-modal{width:min(820px,96vw);max-height:88vh;overflow:auto}
+      .tbl tbody tr.clickable:hover td{background:var(--hover);cursor:pointer}
+      @media (max-width:960px){.lv-layout{grid-template-columns:1fr}.period-filter{grid-template-columns:1fr 1fr}.lv-vehicle-list{max-height:none}}
+      @media (max-width:620px){.period-filter{grid-template-columns:1fr}.lv-modal .grid.cols-4{grid-template-columns:1fr 1fr}}
+    `;
+    document.head.appendChild(s);
   }, []);
 
   React.useEffect(() => {
@@ -230,8 +181,17 @@ const LucroViagens = () => {
     setLoading(true);
     setError("");
     window.RB_API.getLucroViagens(filters)
-      .then((payload) => { if (active) setData(lvNormalize(payload)); })
-      .catch((err) => { if (active) { setData(lvNormalize(null)); setError(err?.message || "Nao foi possivel carregar lucro por viagem."); } })
+      .then((payload) => {
+        if (!active) return;
+        const normalized = lvNormalize(payload);
+        setData(normalized);
+        setSelectedVehicle((current) => current && normalized.veiculos.some((v) => v.placa === current) ? current : normalized.veiculos[0]?.placa || "");
+      })
+      .catch((err) => {
+        if (!active) return;
+        setData(lvNormalize(null));
+        setError(err?.message || "Nao foi possivel carregar resultado por viagem.");
+      })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [JSON.stringify(filters)]);
@@ -239,64 +199,63 @@ const LucroViagens = () => {
   const applyFilters = () => setFilters({ dataInicial, dataFinal, cliente, placa, tipoVeiculo, status });
   const clearFilters = () => {
     const r = LV_PERIODS[1].range();
-    setDataInicial(r.start); setDataFinal(r.end); setCliente(""); setPlaca(""); setTipoVeiculo("todos"); setStatus("todos");
+    setDataInicial(r.start);
+    setDataFinal(r.end);
+    setCliente("");
+    setPlaca("");
+    setTipoVeiculo("todos");
+    setStatus("todos");
+    setSearch("");
     setFilters({ dataInicial: r.start, dataFinal: r.end, tipoVeiculo: "todos", status: "todos" });
   };
   const applyShortcut = (key) => {
     const p = LV_PERIODS.find((item) => item.key === key);
     if (!p) return;
     const r = p.range();
-    setDataInicial(r.start); setDataFinal(r.end);
+    setDataInicial(r.start);
+    setDataFinal(r.end);
     setFilters({ dataInicial: r.start, dataFinal: r.end, cliente, placa, tipoVeiculo, status });
   };
 
-  const rows = React.useMemo(() => {
-    let list = data.viagens;
+  const selectedVehicleData = data.veiculos.find((item) => item.placa === selectedVehicle) || data.veiculos[0] || null;
+  const trips = React.useMemo(() => {
+    let rows = data.viagens;
+    if (selectedVehicleData) rows = rows.filter((item) => (item.placa || "Sem placa") === selectedVehicleData.placa);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
-      list = list.filter((v) => [v.viagem, v.cliente, v.placa, v.motorista, v.origem, v.destino, v.tipoVeiculo].filter(Boolean).join(" ").toLowerCase().includes(q));
+      rows = rows.filter((item) => [item.viagem, item.cliente, item.placa, item.motorista, item.origem, item.destino].filter(Boolean).join(" ").toLowerCase().includes(q));
     }
-    const dir = sortDir === "asc" ? 1 : -1;
-    return [...list].sort((a, b) => {
-      if (["data", "cliente", "placa", "tipoVeiculo", "status"].includes(sortCol)) return dir * String(a[sortCol] || "").localeCompare(String(b[sortCol] || ""));
-      return dir * (lvNum(a[sortCol]) - lvNum(b[sortCol]));
-    });
-  }, [data.viagens, search, sortCol, sortDir]);
+    return rows.sort((a, b) => String(b.data || "").localeCompare(String(a.data || "")) || lvNum(b.lucro) - lvNum(a.lucro));
+  }, [data.viagens, selectedVehicleData?.placa, search]);
 
-  const toggleSort = (col) => {
-    if (sortCol === col) setSortDir((d) => d === "asc" ? "desc" : "asc");
-    else { setSortCol(col); setSortDir("desc"); }
-  };
-  const SortArrow = ({ col }) => <span style={{ marginLeft: 4, opacity: sortCol === col ? 1 : 0.35 }}>{sortCol === col ? (sortDir === "asc" ? "↑" : "↓") : "↕"}</span>;
+  const viagensSemCusto = data.viagens.filter((item) => lvNum(item.custo) === 0);
+  const resumo = data.resumo || {};
+  const semViagem = data.semViagemVinculada || { quantidade: 0, receita: 0, registros: [] };
 
   const exportCsv = () => {
-    const header = ["Viagem","Data","Cliente","Placa","Motorista","Tipo","CT-e","MDF-e","Fretes","Origem","Destino","Receita","Custo","Lucro","Margem","Status"];
-    const body = rows.map((r) => [r.viagem || r.id, r.data, r.cliente, r.placa, r.motorista, r.tipoVeiculo, r.documentos, r.manifestos, r.fretes, r.origem, r.destino, r.receita, r.custo, r.lucro, r.margem, r.statusDetalhadoLabel || r.status]
-      .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";"));
+    const header = ["Viagem","Data","Cliente","Placa","Motorista","Origem","Destino","Receita","Custo","Lucro","Margem","Motorista","Abastecimento","Pedagio","Diarias","Despesas","Outros"];
+    const body = data.viagens.map((r) => {
+      const c = r.custos || {};
+      return [r.viagem || r.id, r.data, r.cliente, r.placa, r.motorista, r.origem, r.destino, r.receita, r.custo, r.lucro, r.margem, c.motorista, c.abastecimentos, c.pedagio, c.diarias, c.despesas, c.outros]
+        .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(";");
+    });
     const blob = new Blob([[header.join(";"), ...body].join("\n")], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `lucro-viagens-${dataInicial}-${dataFinal}.csv`;
+    a.download = `resultado-viagens-${dataInicial}-${dataFinal}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  const resumo = data.resumo || {};
-  const rankingLucro = data.rankings?.lucro || [];
-  const rankingPrejuizo = data.rankings?.prejuizo || [];
-  const maxLucro = Math.max(1, ...rankingLucro.map((item) => Math.abs(lvNum(item.lucro))));
-  const maxPrejuizo = Math.max(1, ...rankingPrejuizo.map((item) => Math.abs(lvNum(item.lucro))));
-  const semViagem = data.semViagemVinculada || { quantidade: 0, receita: 0, registros: [] };
-
   return (
     <div className="view">
-      <LvDetailModal viagem={selected} onClose={() => setSelected(null)}/>
+      <LvTripDetail viagem={selectedTrip} onClose={() => setSelectedTrip(null)}/>
 
       <div className="page-head">
         <div>
           <h1>Resultado por Viagem</h1>
-          <div className="sub">Lucro real por viagem: apenas registros com custo operacional vinculado (combustivel, pedagio, diarias, motorista, despesas) — financiamento, seguro e demais custos fixos ficam fora</div>
+          <div className="sub">Faturamento por veiculo e lucro por viagem usando os documentos do DRE. Custos fixos, financiamento e seguro ficam fora.</div>
         </div>
         <div className="actions">
           {LV_PERIODS.map((p) => <button key={p.key} className="btn" onClick={() => applyShortcut(p.key)}>{p.label}</button>)}
@@ -309,52 +268,46 @@ const LucroViagens = () => {
         <label>Data final<input type="date" value={dataFinal} onChange={(e) => setDataFinal(e.target.value)}/></label>
         <label>Cliente<RBCombobox value={cliente} onChange={setCliente} options={data.filtros?.clientes || []} placeholder="Cliente pagador" tag={() => "Cliente"}/></label>
         <label>Placa<RBCombobox value={placa} onChange={setPlaca} options={data.filtros?.placas || []} placeholder="Placa" transform={(v) => v.toUpperCase()} tag={() => "Placa"}/></label>
-        <label>Tipo de veiculo<select value={tipoVeiculo} onChange={(e) => setTipoVeiculo(e.target.value)}><option value="todos">Todos</option><option value="frota">Frota</option><option value="terceiro">Terceiro</option></select></label>
+        <label>Tipo<select value={tipoVeiculo} onChange={(e) => setTipoVeiculo(e.target.value)}><option value="todos">Todos</option><option value="frota">Frota</option><option value="terceiro">Terceiro</option></select></label>
         <label>Status<select value={status} onChange={(e) => setStatus(e.target.value)}><option value="todos">Todos</option><option value="lucro">Lucro</option><option value="prejuizo">Prejuizo</option></select></label>
         <button className="btn primary" onClick={applyFilters}>Aplicar</button>
         <button className="btn" onClick={clearFilters}>Limpar</button>
       </div>
 
       {(loading || error) && (
-        <div className="card" style={{ marginBottom: 16, padding: "9px 14px", borderColor: error ? "var(--crit-border)" : "var(--border)" }}>
-          <span className={error ? "kpi-delta down" : "muted"} style={{ fontSize: 12.5 }}>
-            {loading ? "Carregando resultado por viagem..." : error}
-          </span>
+        <div className="card" style={{ marginBottom: 14, borderColor: error ? "var(--crit-border)" : "var(--border)" }}>
+          <span className={error ? "kpi-delta down" : "muted"}>{loading ? "Carregando resultado..." : error}</span>
         </div>
       )}
 
-      {!loading && !error && rows.length === 0 && (
-        <div className="card" style={{ marginBottom: 16 }}>Nenhuma viagem com custo operacional identificado para os filtros selecionados.</div>
-      )}
-
       <div className="grid cols-4" style={{ marginBottom: 14 }}>
-        <LvKpi label="Faturamento total" value={lvBRL(resumo.faturamentoTotal)} sub={`${resumo.quantidadeViagens || 0} viagens com custo identificado`} tone="#38bdf8" icon="trending-up"/>
-        <LvKpi label="Custo total" value={lvBRL(resumo.custoTotal)} sub="combustivel, pedagio, diarias, motorista, despesas" tone="#f97316" icon="money"/>
-        <LvKpi label="Lucro total" value={lvBRL(resumo.lucroTotal)} sub={`Margem ${lvPct(resumo.margemMedia)}`} tone={lvNum(resumo.lucroTotal) >= 0 ? "#22c55e" : "#ef4444"} icon="chart"/>
-        <LvKpi label="Viagens com lucro" value={resumo.quantidadeLucro || 0} sub={`${resumo.quantidadePrejuizo || 0} com prejuizo`} tone="#22c55e" icon="route"/>
+        <LvKpi label="Faturamento com viagem" value={lvBRL(resumo.faturamentoTotal)} sub={`${resumo.quantidadeViagens || 0} viagens vinculadas`} tone="#38bdf8" icon="trending-up"/>
+        <LvKpi label="Custo de viagem" value={lvBRL(resumo.custoTotal)} sub="somente custos vinculados" tone="#f97316" icon="money"/>
+        <LvKpi label="Lucro operacional" value={lvBRL(resumo.lucroTotal)} sub={`Margem ${lvPct(resumo.margemMedia)}`} tone={lvNum(resumo.lucroTotal) >= 0 ? "#22c55e" : "#ef4444"} icon="chart"/>
+        <LvKpi label="Veiculos" value={data.veiculos.length || 0} sub={`${resumo.quantidadePrejuizo || 0} viagens com prejuizo`} tone="#8b5cf6" icon="truck"/>
       </div>
 
-      {semViagem.quantidade > 0 && (
-        <div className="card" style={{ marginBottom: 16, borderColor: "var(--warn-border, #facc15)" }}>
-          <div className="row between" style={{ cursor: "pointer", alignItems: "flex-start" }} onClick={() => setShowSemViagem((v) => !v)}>
-            <div className="row" style={{ gap: 10, alignItems: "flex-start" }}>
-              <Icon name="alert" size={16}/>
-              <div>
-                <strong style={{ fontSize: 13 }}>Faturamento sem viagem vinculada: {lvBRL(semViagem.receita)}</strong>
-                <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-                  {semViagem.quantidade} recebiveis/CT-e no periodo sem registro correspondente em logistica.controleviagens — sem base para calcular custo operacional real, por isso ficam fora do lucro por viagem acima.
-                </div>
+      {(semViagem.quantidade > 0 || viagensSemCusto.length > 0) && (
+        <div className="card" style={{ marginBottom: 14, borderColor: "var(--warn-border, #facc15)" }}>
+          <div className="row between" style={{ gap: 12, alignItems: "flex-start" }}>
+            <div>
+              <strong>Conferencia necessaria</strong>
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                {semViagem.quantidade} documento(s) do DRE sem viagem vinculada somam {lvBRL(semViagem.receita)}. {viagensSemCusto.length} viagem(ns) vinculada(s) estao sem custo operacional lancado.
               </div>
             </div>
-            <button className="btn" style={{ flexShrink: 0 }}>{showSemViagem ? "Ocultar" : "Ver registros"}</button>
+            <button className="btn" onClick={() => setShowUnlinked((v) => !v)}>{showUnlinked ? "Ocultar" : "Ver pendencias"}</button>
           </div>
-          {showSemViagem && (
+          {showUnlinked && (
             <div className="table-wrap" style={{ marginTop: 10 }}>
               <table className="data-table compact">
-                <thead><tr><th>Data</th><th>Referencia</th><th>Cliente</th><th className="num">Receita</th></tr></thead>
+                <thead><tr><th>Tipo</th><th>Data</th><th>Referencia</th><th>Cliente</th><th className="num">Valor</th></tr></thead>
                 <tbody>
-                  {semViagem.registros.map((r) => (
-                    <tr key={r.id}><td>{lvDate(r.data)}</td><td>{r.viagem}</td><td>{r.cliente}</td><td className="num">{lvBRL(r.receita)}</td></tr>
+                  {viagensSemCusto.slice(0, 80).map((r) => (
+                    <tr key={`sem-custo-${r.id}`}><td>Sem custo</td><td>{lvDate(r.data)}</td><td>{r.viagem}</td><td>{r.cliente}</td><td className="num">{lvBRL(r.receita)}</td></tr>
+                  ))}
+                  {(semViagem.registros || []).slice(0, 80).map((r) => (
+                    <tr key={`sem-viagem-${r.id}`}><td>Sem viagem</td><td>{lvDate(r.data)}</td><td>{r.viagem}</td><td>{r.cliente}</td><td className="num">{lvBRL(r.receita)}</td></tr>
                   ))}
                 </tbody>
               </table>
@@ -363,90 +316,83 @@ const LucroViagens = () => {
         </div>
       )}
 
-      <div className="grid cols-2" style={{ marginBottom: 16 }}>
-        <div className="card card-flush">
-          <div className="card-header"><h3>Ranking por lucro</h3><span className="meta muted">top viagens</span></div>
-          <div className="card-body">{rankingLucro.length ? rankingLucro.map((item) => <LvBar key={item.id} label={`${item.viagem} · ${item.cliente}`} value={item.lucro} max={maxLucro} tone="#22c55e" meta={`Margem ${lvPct(item.margem)}`}/>) : <div className="muted">Sem lucro no periodo.</div>}</div>
-        </div>
-        <div className="card card-flush">
-          <div className="card-header"><h3>Ranking por prejuízo</h3><span className="meta muted">maiores perdas</span></div>
-          <div className="card-body">{rankingPrejuizo.length ? rankingPrejuizo.map((item) => <LvBar key={item.id} label={`${item.viagem} · ${item.cliente}`} value={item.lucro} max={maxPrejuizo} tone="#ef4444" meta={`Margem ${lvPct(item.margem)}`}/>) : <div className="muted">Nenhuma viagem com prejuízo.</div>}</div>
-        </div>
-      </div>
-
-      <div className="grid cols-2" style={{ marginBottom: 16 }}>
+      <div className="lv-layout">
         <div className="card card-flush">
           <div className="card-header">
-            <h3>Receita x custo x lucro por mes</h3>
-            <div className="row" style={{ gap: 10, fontSize: 11.5 }}>
-              <span><span style={{ color: "#38bdf8" }}>■</span> Receita</span>
-              <span><span style={{ color: "#f97316" }}>■</span> Custo</span>
-              <span><span style={{ color: "#22c55e" }}>■</span> Lucro</span>
+            <div>
+              <h3>Faturamento por veiculo</h3>
+              <div className="meta">Placa, custo operacional e lucro</div>
             </div>
           </div>
-          <div className="card-body"><LvMonthlyChart rows={data.mensal}/></div>
-        </div>
-        <div className="card card-flush">
-          <div className="card-header"><h3>Distribuicao de lucro</h3><span className="meta muted">viagens por status</span></div>
-          <div className="card-body">
-            {(data.distribuicao || []).map((item) => (
-              <LvBar key={item.id} label={LV_STATUS[item.id]?.label || item.label} value={item.quantidade} max={Math.max(1, rows.length)} tone={LV_STATUS[item.id]?.color} meta={`${item.quantidade} viagem${item.quantidade === 1 ? "" : "ns"} · ${lvBRL(item.receita)}`}/>
+          <div className="lv-vehicle-list">
+            {data.veiculos.map((item) => (
+              <button key={item.placa} type="button" className={`lv-vehicle ${selectedVehicleData?.placa === item.placa ? "active" : ""}`} onClick={() => setSelectedVehicle(item.placa)}>
+                <div className="lv-vehicle-top">
+                  <strong>{item.placa}</strong>
+                  <LvStatus lucro={item.lucro} margem={item.margem}/>
+                </div>
+                <div className="lv-vehicle-grid">
+                  <span>Faturamento<strong>{lvBRL(item.faturamento)}</strong></span>
+                  <span>Lucro<strong style={{ color: lvNum(item.lucro) >= 0 ? "#22c55e" : "#ef4444" }}>{lvBRL(item.lucro)}</strong></span>
+                  <span>Custo<strong>{lvBRL(item.custo)}</strong></span>
+                  <span>Margem<strong>{lvPct(item.margem)}</strong></span>
+                  <span>Viagens<strong>{item.viagens}</strong></span>
+                  <span>Ultima<strong>{lvDate(item.ultimaData)}</strong></span>
+                </div>
+              </button>
             ))}
+            {!loading && !data.veiculos.length && <div className="muted" style={{ padding: 20, textAlign: "center" }}>Nenhum veiculo encontrado.</div>}
           </div>
         </div>
-      </div>
 
-      <div className="card card-flush">
-        <div className="card-header">
-          <h3>Viagens</h3>
-          <div className="row" style={{ gap: 8 }}>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar viagem, cliente, placa ou rota..." style={{ minWidth: 260 }}/>
-            <span className="meta muted">{rows.length} registros</span>
+        <div className="card card-flush">
+          <div className="card-header">
+            <div>
+              <h3>{selectedVehicleData ? `Viagens ${selectedVehicleData.placa}` : "Viagens"}</h3>
+              <div className="meta">{trips.length} registro(s) com documentos do DRE vinculados a viagem</div>
+            </div>
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar viagem, cliente ou rota..." style={{ minWidth: 260 }}/>
           </div>
-        </div>
-        <div className="table-wrap">
-          <table className="data-table tbl">
-            <thead>
-              <tr>
-                <th onClick={() => toggleSort("data")}>Data <SortArrow col="data"/></th>
-                <th>Viagem</th>
-                <th onClick={() => toggleSort("cliente")}>Cliente <SortArrow col="cliente"/></th>
-                <th onClick={() => toggleSort("placa")}>Placa <SortArrow col="placa"/></th>
-                <th>Motorista</th>
-                <th>Tipo</th>
-                <th>Origem/Destino</th>
-                <th className="num" onClick={() => toggleSort("receita")}>Receita <SortArrow col="receita"/></th>
-                <th className="num" onClick={() => toggleSort("custo")}>Custo <SortArrow col="custo"/></th>
-                <th className="num" onClick={() => toggleSort("lucro")}>Lucro <SortArrow col="lucro"/></th>
-                <th className="num" onClick={() => toggleSort("margem")}>Margem <SortArrow col="margem"/></th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className="clickable" onClick={() => setSelected(row)}>
-                  <td>{lvDate(row.data)}</td>
-                  <td>{row.viagem || row.id}</td>
-                  <td style={{ maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row.cliente}>{row.cliente}</td>
-                  <td>{row.placa || "-"}</td>
-                  <td>{row.motorista || "-"}</td>
-                  <td>{row.tipoVeiculo}</td>
-                  <td>{[row.origem, row.destino].filter(Boolean).join(" / ") || "-"}</td>
-                  <td className="num">{lvBRL(row.receita)}</td>
-                  <td className="num">{lvBRL(row.custo)}</td>
-                  <td className="num" style={{ color: lvNum(row.lucro) >= 0 ? "#22c55e" : "#ef4444" }}>{lvBRL(row.lucro)}</td>
-                  <td className="num">{lvPct(row.margem)}</td>
-                  <td><LvStatusBadge status={row.statusDetalhado}/></td>
+          <div className="table-wrap">
+            <table className="data-table tbl">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Viagem</th>
+                  <th>Cliente</th>
+                  <th>Motorista</th>
+                  <th>Rota</th>
+                  <th className="num">Faturamento</th>
+                  <th className="num">Custo</th>
+                  <th className="num">Lucro</th>
+                  <th className="num">Margem</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-              {!rows.length && <tr><td colSpan="12" className="muted">Nenhuma viagem encontrada.</td></tr>}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {trips.map((row) => (
+                  <tr key={row.id} className="clickable" onClick={() => setSelectedTrip(row)}>
+                    <td>{lvDate(row.data)}</td>
+                    <td>{row.viagem || row.id}</td>
+                    <td style={{ maxWidth: 230, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row.cliente}>{row.cliente}</td>
+                    <td>{lvShortText(row.motorista)}</td>
+                    <td style={{ maxWidth: 250, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{[row.origem, row.destino].filter(Boolean).join(" / ") || "-"}</td>
+                    <td className="num">{lvBRL(row.receita)}</td>
+                    <td className="num">{lvBRL(row.custo)}</td>
+                    <td className="num" style={{ color: lvNum(row.lucro) >= 0 ? "#22c55e" : "#ef4444" }}>{lvBRL(row.lucro)}</td>
+                    <td className="num">{lvPct(row.margem)}</td>
+                    <td><LvStatus lucro={row.lucro} margem={row.margem}/></td>
+                  </tr>
+                ))}
+                {!trips.length && <tr><td colSpan="10" className="muted">Nenhuma viagem para o veiculo selecionado.</td></tr>}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       <div className="muted" style={{ fontSize: 11.5, marginTop: 10 }}>
-        Base: {data.audit?.campos?.receita || "financeiro.valorliquidorateiosreceber"}. {data.audit?.campos?.semViagemVinculada || ""}
+        Receita: {data.audit?.campos?.receita || "mesma base de receita bruta do DRE"}. Custos: {data.audit?.campos?.custos || "somente custos operacionais vinculados a viagem"}.
       </div>
     </div>
   );
