@@ -253,10 +253,6 @@ const FaturamentoDiario = () => {
 
       {(loading || error) && <div className="card" style={{ marginBottom: 16, padding: "9px 14px" }}><span className={error ? "kpi-delta down" : "muted"}>{loading ? "Carregando faturamento diario..." : error}</span></div>}
 
-      {fdNum(resumo.receitaSemCustoApurado) > 0 && <div className="card" style={{ marginBottom: 16, padding: "9px 14px", borderColor: "#facc15" }}>
-        <span className="muted"><strong style={{ color: "#facc15" }}>Custos pendentes:</strong> {fdBRL(resumo.receitaSemCustoApurado)} do faturamento ({resumo.documentosSemCustoApurado || 0} documentos) nao possui viagem vinculada. Essa receita entra no total, mas ainda nao tem custo operacional apurado.</span>
-      </div>}
-
       <div className="grid cols-4" style={{ marginBottom: 14 }}>
         <FdKpi label="Hoje" value={fdBRL(resumo.faturamentoHoje)} sub={`Ontem: ${fdBRL(resumo.faturamentoOntem)} (${fdPct(resumo.variacaoOntem)})`} tone="#38bdf8" icon="money"/>
         <FdKpi label="Media 7 dias" value={fdBRL(resumo.media7)} sub={`Hoje x media: ${fdPct(resumo.variacaoMedia7)}`} tone="#a78bfa" icon="chart"/>

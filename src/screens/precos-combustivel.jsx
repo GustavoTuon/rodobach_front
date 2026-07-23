@@ -9,6 +9,7 @@ function PrecosCombustivel() {
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState("");
   const [search, setSearch] = React.useState("");
+  const [sort, setSort] = React.useState({ key: "posto", dir: "asc" });
   const [filters, setFilters] = React.useState(() => ({
     startDate: pcDaysAgo(6),
     endDate: pcToday(),
@@ -117,8 +118,15 @@ function PrecosCombustivel() {
   }
 
   const resumo = divergencias?.summary || {};
-  const acordosAgrupados = React.useMemo(() => pcGroupAcordos(acordos), [acordos]);
+  const acordosAgrupados = React.useMemo(() => pcSortGroups(pcGroupAcordos(acordos), sort), [acordos, sort]);
   const webhookUrl = `${window.RB_API_BASE_URL || ""}/abastecimentos/acordos/divergencias?startDate=${filters.startDate}&endDate=${filters.endDate}`;
+
+  function toggleSort(key) {
+    setSort((current) => ({
+      key,
+      dir: current.key === key && current.dir === "asc" ? "desc" : "asc",
+    }));
+  }
 
   return (
     <div className="view pc-view">
@@ -280,13 +288,28 @@ function PrecosCombustivel() {
           <div className="card-header">
             <div>
               <h3>Tabela de precos combinados</h3>
-              <div className="meta">{acordos.length} precos em {acordosAgrupados.length} linhas agrupadas</div>
+              <div className="meta">
+                {acordos.length} precos em {acordosAgrupados.length} linhas agrupadas
+                {sort.key !== "posto" ? ` - ordenado por ${sort.key} ${sort.dir === "asc" ? "menor para maior" : "maior para menor"}` : ""}
+              </div>
             </div>
             <button className="btn primary" onClick={() => { setForm(pcBlankForm()); setTab("novo"); }}><Icon name="plus"/> Novo acordo</button>
           </div>
           <div className="table-wrap pc-table-wrap">
             <table className="pc-table">
-              <thead><tr><th>Status</th><th>Posto</th><th>Grupo cliente</th><th>ARLA</th><th>S-10</th><th>S-500</th><th>Vigencia</th><th>Contato</th><th></th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th><PcSortButton label="Posto" active={sort.key === "posto"} dir={sort.dir} onClick={() => toggleSort("posto")}/></th>
+                  <th>Grupo cliente</th>
+                  <th><PcSortButton label="ARLA" active={sort.key === "ARLA"} dir={sort.dir} onClick={() => toggleSort("ARLA")}/></th>
+                  <th><PcSortButton label="S-10" active={sort.key === "S-10"} dir={sort.dir} onClick={() => toggleSort("S-10")}/></th>
+                  <th><PcSortButton label="S-500" active={sort.key === "S-500"} dir={sort.dir} onClick={() => toggleSort("S-500")}/></th>
+                  <th>Vigencia</th>
+                  <th>Contato</th>
+                  <th></th>
+                </tr>
+              </thead>
               <tbody>
                 {acordosAgrupados.map((group) => (
                   <tr key={group.key}>
@@ -380,6 +403,33 @@ function PcPriceCell({ acordo }) {
   );
 }
 
+function PcSortButton({ label, active, dir, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`Ordenar por ${label}`}
+      style={{
+        background: "transparent",
+        border: 0,
+        color: active ? "var(--text)" : "inherit",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        font: "inherit",
+        fontWeight: active ? 800 : 700,
+        padding: 0,
+      }}
+    >
+      <span>{label}</span>
+      <span style={{ color: active ? "var(--brand-blue)" : "var(--muted)", fontSize: 10 }}>
+        {active ? (dir === "asc" ? "▲" : "▼") : "↕"}
+      </span>
+    </button>
+  );
+}
+
 function pcProductKey(value) {
   const text = String(value || "")
     .normalize("NFD")
@@ -432,6 +482,34 @@ function pcGroupAcordos(acordos = []) {
     const groupCompare = String(a.grupoCliente || "").localeCompare(String(b.grupoCliente || ""));
     if (groupCompare) return groupCompare;
     return String(a.postoNome || a.postoCodigo || "").localeCompare(String(b.postoNome || b.postoCodigo || ""));
+  });
+}
+
+function pcPriceValue(group, productKey) {
+  const value = Number(group?.products?.[productKey]?.valorMaximo);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function pcDefaultGroupCompare(a, b) {
+  const groupCompare = String(a.grupoCliente || "").localeCompare(String(b.grupoCliente || ""));
+  if (groupCompare) return groupCompare;
+  return String(a.postoNome || a.postoCodigo || "").localeCompare(String(b.postoNome || b.postoCodigo || ""));
+}
+
+function pcSortGroups(groups = [], sort = { key: "posto", dir: "asc" }) {
+  const dir = sort.dir === "desc" ? -1 : 1;
+  return [...groups].sort((a, b) => {
+    if (!["ARLA", "S-10", "S-500"].includes(sort.key)) {
+      return dir * pcDefaultGroupCompare(a, b);
+    }
+
+    const av = pcPriceValue(a, sort.key);
+    const bv = pcPriceValue(b, sort.key);
+    if (av == null && bv == null) return pcDefaultGroupCompare(a, b);
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (av !== bv) return dir * (av - bv);
+    return pcDefaultGroupCompare(a, b);
   });
 }
 

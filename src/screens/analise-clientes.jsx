@@ -500,6 +500,7 @@ const AnaliseClientes = () => {
   const [empresa,      setEmpresa]      = React.useState("todas");
   const [clienteSearch,setClienteSearch]= React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("todos");
+  const [inactiveRange,setInactiveRange]= React.useState("todos");
 
   const [data,         setData]         = React.useState(null);
   const [loading,      setLoading]      = React.useState(false);
@@ -529,12 +530,17 @@ const AnaliseClientes = () => {
       : { period: periodo };
     filters.empresa = empresa;
     if (statusFilter !== "todos") filters.status = statusFilter;
+    if (statusFilter === "sem-faturamento" && inactiveRange !== "todos") {
+      const [min, max] = inactiveRange.split("-").map((value) => value === "plus" ? "" : value);
+      if (min) filters.inativoMin = min;
+      if (max) filters.inativoMax = max;
+    }
     window.RB_API.getAnaliseClientes(filters)
       .then(d => { if (active) { setData(d); setChartKey(k=>k+1); } })
       .catch(e => { if (active) { setData(null); setError(e?.message || "Não foi possível carregar dados."); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [periodo, manualFilter, statusFilter, empresa]);
+  }, [periodo, manualFilter, statusFilter, inactiveRange, empresa]);
 
   const periodLabel = manualFilter
     ? `${acDateFmt(manualFilter.dataInicio)} a ${acDateFmt(manualFilter.dataFim)}`
@@ -555,7 +561,7 @@ const AnaliseClientes = () => {
   const clearFilter = () => {
     const r = AC_PERIODS[3].getRange();
     setDataInicio(r.start); setDataFim(r.end);
-    setManualFilter(null); setPeriodo("12m"); setStatusFilter("todos");
+    setManualFilter(null); setPeriodo("12m"); setStatusFilter("todos"); setInactiveRange("todos");
     setEmpresa("todas");
     setClienteSearch("");
     setSelectedMonth(""); setDrillOrigin(null);
@@ -584,6 +590,13 @@ const AnaliseClientes = () => {
     }
     const r = AC_PERIODS[3].getRange();
     setPeriodo("12m"); setManualFilter(null); setDataInicio(r.start); setDataFim(r.end);
+  };
+  const showInactiveClients = (range = "todos") => {
+    setStatusFilter("sem-faturamento");
+    setInactiveRange(range);
+    setSortCol("diasSemFaturar");
+    setSortDir("desc");
+    setTablePage(0);
   };
 
   // ── Dados derivados ─────────────────────────────────────────────────────────
@@ -773,22 +786,40 @@ const AnaliseClientes = () => {
         <label>Data final
           <input type="date" value={dataFim} onChange={e=>setDataFim(e.target.value)}/>
         </label>
-        <select
-          value={empresa}
-          onChange={e=>setEmpresa(e.target.value)}
-          style={{height:30,border:"1px solid var(--border)",borderRadius:"var(--r)",background:"var(--surface-2)",fontSize:12.5,padding:"0 8px",color:"var(--text)"}}>
-          <option value="todas">Todas as empresas</option>
-          <option value="2">RB Transportes</option>
-          <option value="1">Empresa 1</option>
-        </select>
-        <select
-          value={statusFilter}
-          onChange={e=>setStatusFilter(e.target.value)}
-          style={{height:30,border:"1px solid var(--border)",borderRadius:"var(--r)",background:"var(--surface-2)",fontSize:12.5,padding:"0 8px",color:"var(--text)"}}>
-          <option value="todos">Todos os clientes</option>
-          <option value="ativo">Faturando ativamente</option>
-          <option value="sem-faturamento">Sem faturamento recente</option>
-        </select>
+        <label>Empresa
+          <select
+            value={empresa}
+            onChange={e=>setEmpresa(e.target.value)}
+            style={{height:30,border:"1px solid var(--border)",borderRadius:"var(--r)",background:"var(--surface-2)",fontSize:12.5,padding:"0 8px",color:"var(--text)"}}>
+            <option value="todas">Todas as empresas</option>
+            <option value="2">RB Transportes</option>
+            <option value="1">Empresa 1</option>
+          </select>
+        </label>
+        <label>Status de faturamento
+          <select
+            value={statusFilter}
+            onChange={e=>{setStatusFilter(e.target.value);if(e.target.value!=="sem-faturamento")setInactiveRange("todos");}}
+            style={{height:30,border:"1px solid var(--border)",borderRadius:"var(--r)",background:"var(--surface-2)",fontSize:12.5,padding:"0 8px",color:"var(--text)",minWidth:210}}>
+            <option value="todos">Clientes faturados no periodo</option>
+            <option value="ativo">Faturando ativamente</option>
+            <option value="sem-faturamento">Clientes nao faturados</option>
+          </select>
+        </label>
+        {statusFilter==="sem-faturamento" && (
+          <label>Dias sem faturar
+            <select
+              value={inactiveRange}
+              onChange={e=>setInactiveRange(e.target.value)}
+              style={{height:30,border:"1px solid var(--border)",borderRadius:"var(--r)",background:"var(--surface-2)",fontSize:12.5,padding:"0 8px",color:"var(--text)",minWidth:150}}>
+              <option value="todos">Todas as faixas</option>
+              <option value="30-60">30 a 60 dias</option>
+              <option value="60-90">60 a 90 dias</option>
+              <option value="90-120">90 a 120 dias</option>
+              <option value="120-plus">Mais de 120 dias</option>
+            </select>
+          </label>
+        )}
         <button className="btn primary" onClick={applyManualFilter}>Aplicar</button>
         <button className="btn" onClick={clearFilter}><Icon name="x" size={12}/> Limpar</button>
         {manualFilter && <span className="badge info">Filtro personalizado ativo</span>}
@@ -883,12 +914,17 @@ const AnaliseClientes = () => {
       {/* ── KPIs — Linha 3 (inativos) ── */}
       <div className="grid cols-4" style={{marginBottom:16}}>
         {[
-          { label:"Sem faturar 30–60d", val:inativo30,  color:"#fbbf24", desc:"atenção comercial" },
-          { label:"Sem faturar 60–90d", val:inativo60,  color:"#f97316", desc:"contato urgente" },
-          { label:"Sem faturar 90–120d",val:inativo90,  color:"#ef4444", desc:"cliente parado" },
-          { label:"Sem faturar 120d+",  val:inativo120, color:"#b91c1c", desc:"recuperar" },
-        ].map(({label,val,color,desc})=>(
-          <div key={label} className="kpi" style={{borderLeft:`3px solid ${color}`}}>
+          { label:"Sem faturar 30–60d", val:inativo30,  color:"#fbbf24", desc:"atenção comercial", range:"30-60" },
+          { label:"Sem faturar 60–90d", val:inativo60,  color:"#f97316", desc:"contato urgente", range:"60-90" },
+          { label:"Sem faturar 90–120d",val:inativo90,  color:"#ef4444", desc:"cliente parado", range:"90-120" },
+          { label:"Sem faturar 120d+",  val:inativo120, color:"#b91c1c", desc:"recuperar", range:"120-plus" },
+        ].map(({label,val,color,desc,range})=>(
+          <div
+            key={label}
+            className="kpi clickable"
+            style={{borderLeft:`3px solid ${color}`}}
+            onClick={()=>showInactiveClients(range)}
+            title="Clique para listar clientes que nao faturam mais">
             <div className="kpi-label"><Icon name="clock"/><span>{label}</span></div>
             <div className="kpi-value" style={{color:val>0?color:"inherit"}}>{val}</div>
             <span className="kpi-delta flat" style={{color:val>0?color:"var(--text-4)"}}>{desc}</span>
@@ -1186,6 +1222,11 @@ const AnaliseClientes = () => {
         <div className="card-header">
           <h3>Clientes</h3>
           <div className="row" style={{gap:8}}>
+            <button
+              className={`btn sm ${statusFilter==="sem-faturamento"?"primary":""}`}
+              onClick={()=>statusFilter==="sem-faturamento"?setStatusFilter("todos"):showInactiveClients("todos")}>
+              <Icon name="clock" size={12}/> Nao faturados
+            </button>
             <div style={{position:"relative"}}>
               <Icon name="search" size={13} style={{position:"absolute",left:8,top:"50%",transform:"translateY(-50%)",color:"var(--text-4)",pointerEvents:"none"}}/>
               <input type="text" placeholder="Buscar cliente…"
