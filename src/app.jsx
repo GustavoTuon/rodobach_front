@@ -8,6 +8,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/status-carga.jsx",
   "src/screens/dre-empresarial.jsx",
   "src/screens/analise-frota.jsx",
+  "src/screens/precos-combustivel.jsx",
   "src/screens/custos-veiculos.jsx",
   "src/screens/manutencoes-veiculos.jsx",
   "src/screens/analise-clientes.jsx",
@@ -24,7 +25,7 @@ const SCREEN_GLOBALS = [
   "Diretoria", "SimuladorFrete", "Viagens",
   "StatusCargaFrota",
   "DreEmpresarial", "AnaliseClientes",
-  "RentabilidadeClientes", "LucroViagens", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "AutomacoesN8n",
+  "RentabilidadeClientes", "LucroViagens", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n",
 ];
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -39,6 +40,7 @@ const NAV = [
   { id: "comparativo-faturamento", label: "Comp. Mensal", icon: "chart", title: "Comparativo Mensal", section: "direcao" },
   { id: "analise-frota",   label: "Frota BI",     icon: "truck",       title: "Analise de Frota", section: "direcao" },
   { id: "abastecimentos",  label: "Abastecimentos", icon: "fuel",       title: "Análise de Abastecimentos", section: "direcao" },
+  { id: "precos-combustivel", label: "Preços Postos", icon: "money",     title: "Preços combinados de combustível", section: "direcao" },
   { id: "lucro-viagens",   label: "Res. Viagem",  icon: "route",       title: "Resultado por Viagem", group: "resultados", section: "direcao" },
   { id: "clientes",        label: "Análise",      icon: "user",        title: "Análise de Clientes", group: "clientes", section: "direcao" },
   { id: "clientes-lucro",  label: "Lucro",        icon: "chart",       title: "Rentabilidade Clientes", group: "clientes", section: "direcao" },
@@ -304,6 +306,9 @@ const App = () => {
       break;
     case "abastecimentos":
       body = <AnaliseFrota key="abastecimentos" onNavigate={onNavigate} modoAbastecimento/>;
+      break;
+    case "precos-combustivel":
+      body = <PrecosCombustivel onNavigate={onNavigate}/>;
       break;
     case "lucro-viagens":
       body = (
