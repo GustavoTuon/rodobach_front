@@ -238,7 +238,7 @@ const StatusCargaFrota = () => {
       <div className="page-head">
         <div>
           <h1>Status de Carga</h1>
-          <div className="sub">Frota própria classificada por CT-e, saída da coleta/viagem e entrega registrada</div>
+          <div className="sub">Frota própria classificada pelo cruzamento de CT-e, viagem, telemetria e SM do Trafegus</div>
         </div>
         <div className="actions">
           <button className="btn" onClick={() => setFilters({ ...filters })}><Icon name="refresh"/> Atualizar</button>
@@ -329,6 +329,13 @@ const StatusCargaFrota = () => {
                   <td>
                     <div className="sc-doc">{row.documento || "-"}</div>
                     <div className="muted" style={{ fontSize: 11.5, marginTop: 3, maxWidth: 210, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.cliente || "-"}</div>
+                    {row.trafegusSm && (
+                      <div className="sc-pef">
+                        <div><b>SM Trafegus:</b> {row.trafegusSm.id}</div>
+                        <div><b>Status:</b> {row.trafegusSm.status || "Em viagem"}</div>
+                        <div><b>Motorista:</b> {row.trafegusSm.motorista || row.motorista || "-"}</div>
+                      </div>
+                    )}
                     {row.statusFonte === "pef_terceiro" && (
                       <div className="sc-pef">
                         <div><b>CIOT:</b> {row.ciot || "-"}</div>

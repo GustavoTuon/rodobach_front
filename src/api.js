@@ -150,12 +150,39 @@ window.RB_API = {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/dre-empresarial${buildQuery(params)}`);
   },
+  getDreLancamentoDetalhe: (detailKey = {}) =>
+    apiRequest(`/financeiro/dre-empresarial/lancamento-detalhe${buildQuery(detailKey)}`),
+  getTrafegusDashboard: () => apiRequest("/trafegus/dashboard"),
+  refreshTrafegus: () => apiRequest("/trafegus/atualizar", { method: "POST" }),
+  getTrafegusGoogleRoute: (smId) => apiRequest(`/trafegus/sms/${encodeURIComponent(smId)}/rota-google`),
+  getOportunidadesRetorno: () => apiRequest("/oportunidades-retorno"),
+  importOportunidadesClientes: (payload) => apiRequest("/oportunidades-retorno/importar", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
+  analyzeOportunidadesRetorno: (payload) => apiRequest("/oportunidades-retorno/analisar", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
+  sendOportunidadesN8n: (payload) => apiRequest("/oportunidades-retorno/enviar-n8n", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
+  downloadOportunidadesModelo: async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const response = await fetch(`${API_BASE}/oportunidades-retorno/modelo.xlsx`, {
+      headers: token ? { "Authorization": `Bearer ${token}` } : {},
+    });
+    if (!response.ok) throw new Error("Nao foi possivel baixar o modelo da planilha.");
+    return response.blob();
+  },
   getAnaliseClientes: (filters) => {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/analise-clientes${buildQuery(params)}`);
   },
   getRentabilidadeClientes: (filters = {}) => apiRequest(`/clientes/rentabilidade${buildQuery(filters || {})}`),
   getLucroViagens: (filters = {}) => apiRequest(`/financeiro/lucro-viagens${buildQuery(filters || {})}`),
+  getResultadoFretes: (filters = {}) => apiRequest(`/financeiro/resultado-fretes${buildQuery(filters || {})}`),
   getFaturamentoDiario: (filters = {}) => apiRequest(`/financeiro/faturamento-diario${buildQuery(filters || {})}`),
   getFaturamentoMensalComparativo: (filters = {}) => apiRequest(`/financeiro/faturamento-mensal-comparativo${buildQuery(filters || {})}`),
 
