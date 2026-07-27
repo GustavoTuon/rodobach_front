@@ -109,8 +109,7 @@ const FdKpi = ({ label, value, sub, icon, tone }) => (
 
 const FD_METRICS = {
   faturamento: { label: "Faturamento", field: "faturamento", tone: "#22c55e" },
-  custo: { label: "Custo", field: "custo", tone: "#f97316" },
-  lucro: { label: "Lucro", field: "lucro", tone: "#38bdf8" },
+  lucro: { label: "Lucro diario", field: "lucro", tone: "#38bdf8" },
 };
 
 const FdChart = ({ rows, metric = "faturamento" }) => {
@@ -119,16 +118,15 @@ const FdChart = ({ rows, metric = "faturamento" }) => {
   const max = Math.max(1, ...rows.map((r) => Math.abs(fdNum(r[config.field]))));
   return (
     <div className="fd-chart">
-      {rows.map((row, index) => {
+      {rows.map((row) => {
         const value = fdNum(row[config.field]);
         const h = Math.max(4, Math.abs(value) / max * 100);
-        const showValue = value !== 0 && (rows.length <= 14 || Math.abs(value) === max || index % 5 === 0);
         const color = metric === "lucro"
           ? (value >= 0 ? "#22c55e" : "#ef4444")
           : config.tone;
         return (
           <div key={row.data} className="fd-day" title={`${fdDayMonth(row.data)} - ${config.label}: ${fdBRL(value)}`}>
-            <strong className="fd-value" style={{ color, visibility: showValue ? "visible" : "hidden" }}>{fdShortBRL(value)}</strong>
+            <strong className="fd-value" style={{ color }}>{fdShortBRL(value)}</strong>
             <div className="fd-col"><i style={{ height: `${h}%`, background: color }}/></div>
             <span>{fdDayMonth(row.data)}</span>
           </div>
@@ -224,15 +222,6 @@ const FaturamentoDiario = () => {
         .fd-col i{width:100%;min-height:4px;border-radius:4px 4px 0 0}
         .fd-day span{font-size:10px;color:var(--text-3);white-space:nowrap}
         .fd-segment{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-        .fd-ops{display:grid;grid-template-columns:repeat(6,minmax(120px,1fr));gap:0;margin-bottom:16px;overflow:hidden}
-        .fd-op{padding:12px 14px;border-right:1px solid var(--border);min-width:0}
-        .fd-op:last-child{border-right:0}
-        .fd-op-label{display:block;color:var(--text-3);font-size:10.5px;margin-bottom:5px}
-        .fd-op-value{display:block;color:var(--text);font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .fd-op-sub{display:block;color:var(--text-3);font-size:10.5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .fd-comparison td:first-child{font-weight:600;color:var(--text)}
-        .fd-comparison .positive{color:#22c55e}.fd-comparison .negative{color:#ef4444}
-        @media (max-width:1100px){.fd-ops{grid-template-columns:repeat(3,1fr)}.fd-op:nth-child(3){border-right:0}.fd-op:nth-child(-n+3){border-bottom:1px solid var(--border)}}
         @media (max-width:760px){.fd-chart{grid-template-columns:repeat(14,minmax(24px,1fr));overflow-x:auto}}
       `}</style>
 
@@ -264,57 +253,37 @@ const FaturamentoDiario = () => {
 
       {(loading || error) && <div className="card" style={{ marginBottom: 16, padding: "9px 14px" }}><span className={error ? "kpi-delta down" : "muted"}>{loading ? "Carregando faturamento diario..." : error}</span></div>}
 
-      {fdNum(resumo.receitaSemCustoApurado) > 0 && <div className="card" style={{ marginBottom: 16, padding: "11px 14px", borderColor: "#facc15", display: "flex", alignItems: "center", gap: 12 }}>
-        <Icon name="alarm" style={{ color: "#facc15", flexShrink: 0 }}/>
-        <span className="muted"><strong style={{ color: "#facc15" }}>{resumo.documentosSemCustoApurado || 0} documentos sem custos vinculados</strong><br/>{fdBRL(resumo.receitaSemCustoApurado)} do faturamento ainda possui resultado parcial.</span>
-      </div>}
-
       <div className="grid cols-4" style={{ marginBottom: 14 }}>
-        <FdKpi label="Faturamento do período" value={fdBRL(resumo.faturamentoTotal)} sub={`${resumo.documentos || 0} documentos`} tone="#22c55e" icon="trending-up"/>
-        <FdKpi label="Custos estimados" value={fdBRL(resumo.custoTotal)} sub="custos vinculados e rateados" tone="#f97316" icon="money"/>
-        <FdKpi label="Resultado parcial" value={fdBRL(resumo.lucroTotal)} sub="receita menos custos apurados" tone={fdNum(resumo.lucroTotal) >= 0 ? "#22c55e" : "#ef4444"} icon="chart"/>
-        <FdKpi label="Margem parcial" value={fdPct(resumo.margem)} sub="pode variar com custos pendentes" tone="#38bdf8" icon="gauge"/>
+        <FdKpi label="Hoje" value={fdBRL(resumo.faturamentoHoje)} sub={`Ontem: ${fdBRL(resumo.faturamentoOntem)} (${fdPct(resumo.variacaoOntem)})`} tone="#38bdf8" icon="money"/>
+        <FdKpi label="Media 7 dias" value={fdBRL(resumo.media7)} sub={`Hoje x media: ${fdPct(resumo.variacaoMedia7)}`} tone="#a78bfa" icon="chart"/>
+        <FdKpi label="Media 30 dias" value={fdBRL(resumo.media30)} sub={`Hoje x media: ${fdPct(resumo.variacaoMedia30)}`} tone="#facc15" icon="gauge"/>
+        <FdKpi label="Total periodo" value={fdBRL(resumo.faturamentoTotal)} sub={`${resumo.documentos || 0} documentos`} tone="#22c55e" icon="trending-up"/>
       </div>
 
-      <div className="card fd-ops">
-        {[
-          ["Hoje", fdBRL(resumo.faturamentoHoje), `vs. ontem ${fdSignedPct(resumo.variacaoOntem)}`],
-          ["Ontem", fdBRL(resumo.faturamentoOntem), "faturamento diário"],
-          ["Média 7 dias", fdBRL(resumo.media7), `hoje ${fdSignedPct(resumo.variacaoMedia7)}`],
-          ["Média 30 dias", fdBRL(resumo.media30), `hoje ${fdSignedPct(resumo.variacaoMedia30)}`],
-          ["Ticket médio", fdBRL(resumo.ticketMedio), "por documento"],
-          ["Viagens", resumo.viagens || 0, `${resumo.clientesAtendidos || 0} clientes no maior dia`],
-        ].map(([label, value, sub]) => <div className="fd-op" key={label}><span className="fd-op-label">{label}</span><strong className="fd-op-value">{value}</strong><span className="fd-op-sub">{sub}</span></div>)}
+      <div className="grid cols-4" style={{ marginBottom: 16 }}>
+        <FdKpi label="Resultado parcial" value={fdBRL(resumo.lucroTotal)} sub={`Margem parcial ${fdPct(resumo.margem)}`} tone={fdNum(resumo.lucroTotal) >= 0 ? "#22c55e" : "#ef4444"} icon="chart"/>
+        <FdKpi label="Custo estimado" value={fdBRL(resumo.custoTotal)} sub="custos vinculados e rateados" tone="#f97316" icon="money"/>
+        <FdKpi label="Ticket medio" value={fdBRL(resumo.ticketMedio)} sub="faturamento / documentos" tone="var(--border-strong)" icon="gauge"/>
+        <FdKpi label="Viagens" value={resumo.viagens || 0} sub={`${resumo.clientesAtendidos || 0} clientes no maior dia`} tone="#38bdf8" icon="route"/>
+      </div>
+
+      <div className="grid cols-4" style={{ marginBottom: 16 }}>
+        <FdKpi label="Fat. ano anterior" value={fdBRL(compResumo.faturamentoTotal)} sub={`Atual x AA: ${fdSignedPct(compVariacao.faturamento)}`} tone={fdNum(compVariacao.faturamento) >= 0 ? "#22c55e" : "#ef4444"} icon="chart"/>
+        <FdKpi label="Docs ano anterior" value={compResumo.documentos || 0} sub={`Atual x AA: ${fdSignedPct(compVariacao.documentos)}`} tone={fdNum(compVariacao.documentos) >= 0 ? "#38bdf8" : "#f97316"} icon="file"/>
+        <FdKpi label="Lucro ano anterior" value={fdBRL(compResumo.lucroTotal)} sub={`Atual x AA: ${fdSignedPct(compVariacao.lucro)}`} tone={fdNum(compVariacao.lucro) >= 0 ? "#22c55e" : "#ef4444"} icon="trending-up"/>
+        <FdKpi label="Ticket ano anterior" value={fdBRL(compResumo.ticketMedio)} sub={`Atual x AA: ${fdSignedPct(compVariacao.ticketMedio)}`} tone="#a78bfa" icon="gauge"/>
       </div>
 
       <div className="card card-flush" style={{ marginBottom: 16 }}>
         <div className="card-header">
-          <h3>{`${(FD_METRICS[metric] || FD_METRICS.faturamento).label} diário`}</h3>
+          <h3>{metric === "lucro" ? "Lucro diario" : "Faturamento diario"}</h3>
           <div className="row" style={{ gap: 8 }}>
             <button className={`btn sm ${metric === "faturamento" ? "primary" : ""}`} onClick={() => setMetric("faturamento")}>Faturamento</button>
-            <button className={`btn sm ${metric === "custo" ? "primary" : ""}`} onClick={() => setMetric("custo")}>Custos</button>
             <button className={`btn sm ${metric === "lucro" ? "primary" : ""}`} onClick={() => setMetric("lucro")}>Lucro diario</button>
             <span className="meta muted">{data.periodo?.startDate} a {data.periodo?.endDate}</span>
           </div>
         </div>
         <div className="card-body"><FdChart rows={[...data.dias].sort((a, b) => String(a.data).localeCompare(String(b.data)))} metric={metric}/></div>
-      </div>
-
-      <div className="card card-flush" style={{ marginBottom: 16 }}>
-        <div className="card-header"><h3>Comparação com o ano anterior</h3><span className="meta muted">Mesmo período</span></div>
-        <div className="table-wrap">
-          <table className="data-table tbl fd-comparison">
-            <thead><tr><th>Indicador</th><th className="num">Período atual</th><th className="num">Ano anterior</th><th className="num">Variação</th></tr></thead>
-            <tbody>
-              {[
-                ["Faturamento", fdBRL(resumo.faturamentoTotal), fdBRL(compResumo.faturamentoTotal), compVariacao.faturamento],
-                ["Documentos", resumo.documentos || 0, compResumo.documentos || 0, compVariacao.documentos],
-                ["Resultado", fdBRL(resumo.lucroTotal), fdBRL(compResumo.lucroTotal), compVariacao.lucro],
-                ["Ticket médio", fdBRL(resumo.ticketMedio), fdBRL(compResumo.ticketMedio), compVariacao.ticketMedio],
-              ].map(([label, current, previous, variation]) => <tr key={label}><td>{label}</td><td className="num">{current}</td><td className="num">{previous}</td><td className={`num ${fdNum(variation) >= 0 ? "positive" : "negative"}`}>{fdSignedPct(variation)}</td></tr>)}
-            </tbody>
-          </table>
-        </div>
       </div>
 
       <div className="card card-flush">

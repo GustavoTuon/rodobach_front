@@ -2042,6 +2042,323 @@ input, select, textarea { font: inherit; color: inherit; }
   margin-left: 4px;
 }
 
+/* Precos combinados de combustivel */
+.pc-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 44px;
+}
+.pc-head {
+  margin-bottom: 0;
+}
+.pc-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.pc-kpis .kpi {
+  min-height: 86px;
+}
+.pc-check-card {
+  padding: 0;
+  overflow: hidden;
+}
+.pc-check-head {
+  align-items: center;
+  gap: 16px;
+}
+.pc-date-row,
+.pc-search-row {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pc-search-row .pc-input {
+  flex: 1 1 260px;
+  max-width: 420px;
+}
+.pc-search-row .btn {
+  flex-shrink: 0;
+}
+.pc-check-body {
+  display: grid;
+  grid-template-columns: minmax(260px, 420px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+.pc-input,
+.pc-field input,
+.pc-field select,
+.pc-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.pc-input,
+.pc-field input {
+  height: 34px;
+  padding: 0 10px;
+}
+.pc-field select {
+  height: 34px;
+  padding: 0 32px 0 10px;
+}
+.pc-field textarea {
+  min-height: 72px;
+  resize: vertical;
+  padding: 9px 10px;
+}
+.pc-input:focus,
+.pc-field input:focus,
+.pc-field select:focus,
+.pc-field textarea:focus {
+  border-color: var(--brand-blue);
+  background: var(--surface);
+}
+.pc-field input::placeholder,
+.pc-input::placeholder,
+.pc-field textarea::placeholder {
+  color: var(--text-4);
+}
+.pc-field {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+}
+.pc-field span {
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.pc-field.compact {
+  width: 132px;
+}
+.pc-field.uf {
+  max-width: 92px;
+}
+.pc-field.wide {
+  grid-column: span 2;
+}
+.pc-field input[type="date"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] .pc-field input[type="date"] {
+  color-scheme: dark;
+}
+.pc-webhook {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  background: var(--bg);
+}
+.pc-webhook span {
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.pc-webhook code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+.pc-tabs {
+  margin-top: -4px;
+}
+.pc-tabs .tabs {
+  margin-bottom: 0;
+}
+.pc-edit-layout {
+  display: grid;
+  grid-template-columns: minmax(520px, 1.05fr) minmax(420px, 0.95fr);
+  gap: 16px;
+  align-items: start;
+}
+.pc-form-card,
+.pc-recent-card,
+.pc-list-card {
+  overflow: hidden;
+}
+.pc-list-card {
+  margin-top: 0;
+}
+.pc-form-body {
+  display: grid;
+  gap: 16px;
+}
+.pc-form-section {
+  display: grid;
+  gap: 10px;
+}
+.pc-form-section h4 {
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--divider);
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+.pc-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.pc-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.pc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--ok-border);
+  border-radius: 999px;
+  background: var(--ok-bg);
+  color: var(--ok);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pc-toggle input {
+  width: 13px;
+  height: 13px;
+  accent-color: var(--ok);
+}
+.pc-table-wrap {
+  width: 100%;
+  max-height: 520px;
+  overflow: auto;
+}
+.pc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.pc-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  height: 34px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+.pc-table tbody td {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--divider);
+  color: var(--text);
+  vertical-align: middle;
+}
+.pc-table tbody tr:hover td {
+  background: var(--surface-2);
+}
+.pc-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.pc-table .btn {
+  height: 26px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+.pc-price-cell {
+  display: grid;
+  gap: 2px;
+  min-width: 78px;
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum";
+}
+.pc-price-cell strong {
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.pc-price-cell span {
+  color: var(--text-3);
+  font-size: 10.5px;
+  line-height: 1.1;
+}
+.pc-price-empty {
+  color: var(--text-4);
+  font-family: var(--font-mono);
+}
+.pc-empty {
+  display: grid;
+  place-items: center;
+  min-height: 88px;
+  color: var(--text-3);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+@media (max-width: 1180px) {
+  .pc-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pc-check-body,
+  .pc-edit-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .pc-head {
+    align-items: stretch;
+  }
+  .pc-head,
+  .pc-head .actions,
+  .pc-date-row,
+  .pc-search-row {
+    flex-direction: column;
+  }
+  .pc-kpis,
+  .pc-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .pc-field.wide {
+    grid-column: auto;
+  }
+  .pc-field.compact,
+  .pc-search-row .pc-input,
+  .pc-search-row .btn {
+    width: 100%;
+  }
+  .pc-webhook {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Dividers, dots */
 .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 .dot.ok { background: var(--ok); }

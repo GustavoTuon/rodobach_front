@@ -3,55 +3,163 @@ const EMPTY_FORM = {
   titulo: "",
   mensagem: "",
   intervalo_km: "",
-  antecedencia_km: "1000",
   numeros: [], // ["5546999990000", ...]
 };
+
+const PLANOS_MANUTENCAO = [
+  { id: "volvo-fh-oleo-motor", fabricante: "Volvo", match: /VOLVO\/FH|FH 460|FH/i, titulo: "Volvo FH 460 - Oleo motor e filtros", intervalo: 150000, criticidade: "Plano fabricante", fonte: "Volvo FH D13: ate 150.000 km ou 1 ano com oleo VDS4.", mensagem: "O veiculo atingiu o marco programado para troca de oleo do motor e filtros. Confira aplicacao, oleo VDS4 e historico antes de liberar a viagem." },
+  { id: "volvo-vm-oleo-motor", fabricante: "Volvo", match: /VOLVO\/VM|VM 290|VM 330/i, titulo: "Volvo VM - Oleo motor e filtros", intervalo: 80000, criticidade: "Sugestao conservadora", fonte: "Intervalo ajustavel; confirmar no manual do modelo/operacao.", mensagem: "O veiculo atingiu o marco programado para troca de oleo do motor e filtros. Confira aplicacao, especificacao do oleo e historico." },
+  { id: "vw-constellation-oleo", fabricante: "VW", match: /VW\/(24|30)\.|CONSTELLATION|CRM|CRC/i, titulo: "VW Constellation - Oleo motor e filtros", intervalo: 40000, criticidade: "Operacao severa", fonte: "Planos Constellation variam por grupo de manutencao; use 40.000 km como base conservadora.", mensagem: "O veiculo atingiu o marco programado para troca de oleo do motor e filtros. Confirmar grupo de manutencao VW antes da execucao." },
+  { id: "scania-r460-oleo", fabricante: "Scania", match: /SCANIA|R460|R 460/i, titulo: "Scania R460 - Oleo motor e filtros", intervalo: 60000, criticidade: "Sugestao conservadora", fonte: "Scania define intervalos por aplicacao, oleo e dados operacionais; acima de 30.000 km pode exigir manutencoes intermediarias.", mensagem: "O veiculo atingiu o marco programado para troca de oleo do motor e filtros. Conferir plano Scania por aplicacao e qualidade do oleo." },
+  { id: "filtro-combustivel", fabricante: "Geral", match: /.*/i, titulo: "Filtro combustivel", intervalo: 30000, criticidade: "Preventiva", fonte: "Padrao operacional editavel.", mensagem: "O veiculo atingiu o marco programado para troca do filtro de combustivel. Verifique e programe a manutencao." },
+  { id: "filtro-ar", fabricante: "Geral", match: /.*/i, titulo: "Filtro de ar", intervalo: 30000, criticidade: "Preventiva", fonte: "Padrao operacional editavel.", mensagem: "O veiculo atingiu o marco programado para inspecao ou troca do filtro de ar. Verifique e programe a manutencao." },
+  { id: "oleo-diferencial", fabricante: "Geral", match: /.*/i, titulo: "Oleo diferencial", intervalo: 120000, criticidade: "Preventiva", fonte: "Padrao operacional editavel.", mensagem: "O veiculo atingiu o marco programado para troca do oleo do diferencial. Verifique e programe a manutencao." },
+  { id: "oleo-cambio", fabricante: "Geral", match: /.*/i, titulo: "Oleo cambio", intervalo: 240000, criticidade: "Preventiva", fonte: "Padrao operacional editavel.", mensagem: "O veiculo atingiu o marco programado para troca do oleo do cambio. Verifique e programe a manutencao." },
+];
 
 function fmtKm(v) {
   if (v == null || v === "") return "—";
   return Number(v).toLocaleString("pt-BR") + " km";
 }
 
-function previewAvisoPreventivo(item) {
-  const atual = Number(item?.km_atual || 0);
-  const manutencao = Number(item?.km_manutencao_prevista || item?.km_proximo_envio || 0);
-  const faltam = Math.max(0, manutencao - atual);
+function proximoKmProgramado(kmAtual, intervaloKm) {
+  const km = Number(kmAtual || 0);
+  const intervalo = Number(intervaloKm || 0);
+  if (!Number.isFinite(km) || !Number.isFinite(intervalo) || intervalo <= 0) return 0;
+  if (km <= 0) return intervalo;
+  return Math.ceil(km / intervalo) * intervalo;
+}
+
+function kmProximoDoItem(item) {
+  return proximoKmProgramado(item?.km_atual, item?.intervalo_km) || Number(item?.km_proximo_envio) || 0;
+}
+
+function textoVeiculo(veiculo) {
+  return [veiculo?.placa, veiculo?.modelo || veiculo?.nome || ""].filter(Boolean).join(" ");
+}
+
+function planosParaSelecao(selecionadas, veiculos) {
+  const placas = new Set((selecionadas || []).map(s => normalizarPlaca(s.placa)));
+  const modelos = (veiculos || [])
+    .filter(v => placas.has(normalizarPlaca(v.placa)))
+    .map(textoVeiculo)
+    .join(" ");
+  const especificos = PLANOS_MANUTENCAO.filter(p => p.fabricante !== "Geral" && p.match.test(modelos));
+  const gerais = PLANOS_MANUTENCAO.filter(p => p.fabricante === "Geral");
+  return [...especificos, ...gerais];
+}
+
+function resumoAutomacoes(automacoes) {
+  const itens = automacoes || [];
+  return {
+    total: itens.length,
+    ativos: itens.filter(a => a.ativo).length,
+    vencidos: itens.filter(a => kmInfo(a).status === "vencido").length,
+    perto: itens.filter(a => kmInfo(a).status === "perto").length,
+  };
+}
+
+function dataBR(value) {
+  if (!value) return "-";
+  const raw = String(value).slice(0, 10);
+  const [ano, mes, dia] = raw.split("-");
+  return ano && mes && dia ? `${dia}/${mes}/${ano}` : "-";
+}
+
+function modeloPeloTitulo(titulo) {
+  const texto = String(titulo || "").trim();
+  const [modelo] = texto.split(" - ");
+  return modelo && modelo !== texto ? modelo : "";
+}
+
+function modeloDoItem(item) {
+  return item?.modelo || item?.veiculoModelo || modeloPeloTitulo(item?.titulo);
+}
+
+function agruparPorVeiculo(automacoes) {
+  const map = new Map();
+  for (const item of automacoes || []) {
+    const placa = normalizarPlaca(item.placa) || "SEM PLACA";
+    const modelo = modeloDoItem(item);
+    if (!map.has(placa)) {
+      map.set(placa, {
+        placa,
+        modelo,
+        kmAtual: Number(item.km_atual) || 0,
+        ultimaManutencao: item.ultimaManutencao || null,
+        planoAutorizado: item.planoAutorizado || null,
+        itens: [],
+      });
+    }
+    const grupo = map.get(placa);
+    if (!grupo.modelo && modelo) grupo.modelo = modelo;
+    if (!grupo.ultimaManutencao && item.ultimaManutencao) grupo.ultimaManutencao = item.ultimaManutencao;
+    if (!grupo.planoAutorizado && item.planoAutorizado) grupo.planoAutorizado = item.planoAutorizado;
+    if ((Number(item.km_atual) || 0) > grupo.kmAtual) grupo.kmAtual = Number(item.km_atual) || 0;
+    grupo.itens.push(item);
+  }
+
+  return [...map.values()]
+    .map(grupo => ({
+      ...grupo,
+      itens: grupo.itens.sort((a, b) => (kmInfo(a).faltam ?? 999999999) - (kmInfo(b).faltam ?? 999999999)),
+      resumo: resumoKmGrupo({ itens: grupo.itens }),
+    }))
+    .sort((a, b) => {
+      const prio = { vencido: 0, perto: 1, ok: 2, sem_km: 3 };
+      return (prio[a.resumo.status] ?? 9) - (prio[b.resumo.status] ?? 9) || a.placa.localeCompare(b.placa);
+    });
+}
+
+function mensagemPreview(item) {
+  const placa = normalizarPlaca(item.placa);
+  const titulo = item.titulo || "Manutencao programada";
+  const info = kmInfo(item);
+  const kmAtual = fmtKm(item.km_atual);
+  const kmProgramado = fmtKm(kmProximoDoItem(item));
+  const ultima = item.ultimaManutencao;
+  const ultimoRegistro = ultima
+    ? `${dataBR(ultima.data)} - ${fmtKm(ultima.km)} - ${ultima.descricao || "Manutencao"}${ultima.fornecedor ? ` (${ultima.fornecedor})` : ""}`
+    : item.planoAutorizado
+      ? `Plano autorizado em ${dataBR(item.planoAutorizado.data)} - ${item.planoAutorizado.fornecedor || "fornecedor nao informado"} - sem KM de execucao`
+      : "Sem manutencao com KM encontrada para este servico.";
   return [
-    "⚠️ *Manutenção preventiva próxima*",
+    "*ALERTA DE MANUTENCAO POR KM*",
     "",
-    `*Veículo:* ${item?.placa || "PLACA"}`,
-    `*Serviço:* ${item?.titulo || "Manutenção"}`,
+    `Placa: ${placa}`,
+    item.modelo ? `Veiculo: ${item.modelo}` : null,
+    `Servico: ${titulo}`,
+    `Status: ${info.label}`,
     "",
-    item?.mensagem || "",
+    `KM atual: ${kmAtual}`,
+    `Enviar no KM: ${kmProgramado}`,
+    `Ultimo registro: ${ultimoRegistro}`,
     "",
-    `*KM atual:* ${fmtKm(atual)}`,
-    `*Manutenção prevista:* ${fmtKm(manutencao)}`,
-    `*Faltam aproximadamente:* ${fmtKm(faltam)}`,
-  ].join("\n");
+    `Acao: ${item.mensagem || "Verifique e programe a manutencao."}`,
+  ].filter(Boolean).join("\n");
 }
 
 function kmInfo(item) {
   const atual = Number(item?.km_atual);
-  const manutencao = Number(item?.km_manutencao_prevista || item?.km_proximo_envio);
-  const aviso = Number(item?.km_proximo_aviso || Math.max(0, manutencao - Number(item?.antecedencia_km || 0)));
-  if (!Number.isFinite(atual) || !Number.isFinite(manutencao) || manutencao <= 0) {
+  const proximo = kmProximoDoItem(item);
+  if (!Number.isFinite(atual) || !Number.isFinite(proximo) || proximo <= 0) {
     return { status: "sem_km", label: "Sem KM confiavel", tone: "var(--text-3)", bg: "var(--surface-2)", faltam: null };
   }
-  const faltam = manutencao - atual;
+  const faltam = proximo - atual;
   if (faltam <= 0) {
     return { status: "vencido", label: `Vencido ${fmtKm(Math.abs(faltam))}`, tone: "#dc2626", bg: "rgba(220,38,38,.10)", faltam };
   }
-  if (atual >= aviso) {
-    return { status: "proximo", label: `Próxima · ${fmtKm(faltam)}`, tone: "#d97706", bg: "rgba(217,119,6,.11)", faltam };
+  if (faltam <= Math.max(Number(item?.intervalo_km) * 0.1, 500)) {
+    return { status: "perto", label: `Faltam ${fmtKm(faltam)}`, tone: "#d97706", bg: "rgba(217,119,6,.11)", faltam };
   }
-  return { status: "programado", label: `Programada · ${fmtKm(faltam)}`, tone: "#16a34a", bg: "rgba(22,163,74,.10)", faltam };
+  return { status: "ok", label: `Faltam ${fmtKm(faltam)}`, tone: "#16a34a", bg: "rgba(22,163,74,.10)", faltam };
 }
 
 function resumoKmGrupo(automacao) {
   const itens = automacao?.itens || [automacao];
   const infos = itens.map(kmInfo);
   if (infos.some(i => i.status === "vencido")) return { ...infos.find(i => i.status === "vencido"), label: `${infos.filter(i => i.status === "vencido").length} vencido(s)` };
-  if (infos.some(i => i.status === "proximo")) return { ...infos.find(i => i.status === "proximo"), label: `${infos.filter(i => i.status === "proximo").length} próxima(s)` };
+  if (infos.some(i => i.status === "perto")) return { ...infos.find(i => i.status === "perto"), label: `${infos.filter(i => i.status === "perto").length} perto(s)` };
   if (infos.some(i => i.status === "sem_km")) return infos.find(i => i.status === "sem_km");
   const menor = infos.sort((a, b) => a.faltam - b.faltam)[0];
   return { ...menor, label: itens.length > 1 ? `Menor prazo: ${menor.label.toLowerCase()}` : menor.label };
@@ -96,7 +204,6 @@ function agruparAutomacoes(automacoes) {
       String(item.titulo || "").trim().toLowerCase(),
       String(item.mensagem || "").trim().toLowerCase(),
       Number(item.intervalo_km) || 0,
-      Number(item.antecedencia_km) || 0,
       Boolean(item.ativo),
       String(item.numeros || "").trim().toLowerCase(),
     ].join("|");
@@ -145,7 +252,7 @@ function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
   const placasSelecionadas = selecionadasUnicas.map(s => s.placa);
 
   const filtrados = veiculosUnicos.filter(v =>
-    v.placa.toLowerCase().includes(busca.toLowerCase())
+    textoVeiculo(v).toLowerCase().includes(busca.toLowerCase())
   );
 
   function toggle(veiculo) {
@@ -153,7 +260,7 @@ function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
     if (jaEsta) {
       onChange(selecionadas.filter(s => s.placa !== veiculo.placa));
     } else {
-      onChange(dedupeSelecionadas([...selecionadas, { placa: veiculo.placa, km_atual: Number(veiculo.odometro) || 0 }]));
+      onChange(dedupeSelecionadas([...selecionadas, { placa: veiculo.placa, km_atual: Number(veiculo.odometro) || 0, modelo: veiculo.modelo || "" }]));
     }
   }
 
@@ -161,7 +268,7 @@ function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
     if (selecionadasUnicas.length === veiculosUnicos.length) {
       onChange([]);
     } else {
-      onChange(veiculosUnicos.map(v => ({ placa: v.placa, km_atual: Number(v.odometro) || 0 })));
+      onChange(veiculosUnicos.map(v => ({ placa: v.placa, km_atual: Number(v.odometro) || 0, modelo: v.modelo || "" })));
     }
   }
 
@@ -308,16 +415,17 @@ function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
                   onMouseOver={e => { if (!marcado) e.currentTarget.style.background = "var(--hover, #f4f4f5)"; }}
                   onMouseOut={e => { if (!marcado) e.currentTarget.style.background = "transparent"; }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
                     <CheckBox checked={marcado}/>
-                    <span style={{
-                      fontSize: 13,
-                      fontFamily: "var(--font-mono, monospace)",
-                      fontWeight: marcado ? 600 : 400,
-                      color: marcado ? "var(--brand-blue)" : "var(--text)",
-                      letterSpacing: "0.03em",
-                    }}>
-                      {v.placa}
+                    <span style={{ display: "grid", gap: 1, minWidth: 0 }}>
+                      <span style={{
+                        fontSize: 13,
+                        fontFamily: "var(--font-mono, monospace)",
+                        fontWeight: marcado ? 600 : 400,
+                        color: marcado ? "var(--brand-blue)" : "var(--text)",
+                        letterSpacing: "0.03em",
+                      }}>{v.placa}</span>
+                      {v.modelo && <span className="muted" style={{ fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.modelo}</span>}
                     </span>
                   </div>
                   {v.odometro != null && (
@@ -486,9 +594,17 @@ function ContatoEnvio({ contatos, carregando, form, onToggle, onAdd, onManualNum
       overflow: "hidden",
     }}>
       <div style={{ padding: 12, borderBottom: "1px solid var(--border)" }}>
-        <label style={{ fontSize: 12.5, fontWeight: 600, display: "block", marginBottom: 6 }}>
-          Contatos de envio *
-        </label>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 6 }}>
+          <label style={{ fontSize: 12.5, fontWeight: 600 }}>
+            Contatos de envio *
+          </label>
+          <span className="muted" style={{ fontSize: 11 }}>
+            {(form.numeros || []).length} selecionado{(form.numeros || []).length !== 1 ? "s" : ""}
+          </span>
+        </div>
+        <div className="muted" style={{ fontSize: 11.5, marginBottom: 8 }}>
+          Marque para incluir no envio ou desmarque para remover deste alerta.
+        </div>
         {carregando ? (
           <div className="muted" style={{ fontSize: 12 }}>Carregando contatos...</div>
         ) : contatos.length === 0 ? (
@@ -529,8 +645,26 @@ function ContatoEnvio({ contatos, carregando, form, onToggle, onAdd, onManualNum
       </div>
 
       <div style={{ padding: 12 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 8 }}>
-          Cadastrar contato
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 8 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 600 }}>
+            Cadastrar contato
+          </div>
+          {(form.numeros || []).length > 0 && (
+            <button
+              type="button"
+              onClick={() => onManualNumbers([])}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--muted)",
+                cursor: "pointer",
+                fontSize: 12,
+                padding: 0,
+              }}
+            >
+              Limpar destinos
+            </button>
+          )}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr auto", gap: 8, alignItems: "center" }}>
           <input
@@ -553,7 +687,7 @@ function ContatoEnvio({ contatos, carregando, form, onToggle, onAdd, onManualNum
             inputMode="tel"
             value={novo.numero}
             onChange={e => setNovo(n => ({ ...n, numero: e.target.value }))}
-            placeholder="5548996523702"
+            placeholder="554899503759"
             style={{
               minWidth: 0,
               padding: "8px 10px",
@@ -627,19 +761,9 @@ function ManutencaoMensagens() {
   const [kmModal, setKmModal] = React.useState(null);
   const [kmValor, setKmValor] = React.useState("");
   const [kmSalvando, setKmSalvando] = React.useState(false);
-  const [filtro, setFiltro] = React.useState("todas");
-  const [busca, setBusca] = React.useState("");
-  const resumo = automacoes.reduce((acc, item) => {
-    const status = item.ativo ? kmInfo(item).status : "inativo";
-    acc[status] = (acc[status] || 0) + 1;
-    return acc;
-  }, {});
-  const automacoesFiltradas = automacoes.filter(item => {
-    const status = item.ativo ? kmInfo(item).status : "inativo";
-    const texto = `${item.placa || ""} ${item.titulo || ""}`.toLowerCase();
-    return (filtro === "todas" || filtro === status) && texto.includes(busca.trim().toLowerCase());
-  });
-  const automacoesAgrupadas = agruparAutomacoes(automacoesFiltradas);
+  const veiculosAgrupados = agruparPorVeiculo(automacoes);
+  const resumo = resumoAutomacoes(automacoes);
+  const planosSugeridos = planosParaSelecao(form.selecionadas, veiculos);
 
   const carregar = React.useCallback(async () => {
     setLoading(true);
@@ -748,13 +872,21 @@ function ManutencaoMensagens() {
       titulo: a.titulo,
       mensagem: a.mensagem,
       intervalo_km: String(a.intervalo_km),
-      antecedencia_km: String(a.antecedencia_km ?? 1000),
       numeros: String(a.numeros || "").split(",").filter(Boolean),
     });
     setFormErro(null);
     setModalOpen(true);
     if (veiculos.length === 0) carregarVeiculos();
     if (contatos.length === 0) carregarContatos();
+  }
+
+  function aplicarPlano(plano) {
+    setForm(f => ({
+      ...f,
+      titulo: plano.titulo,
+      mensagem: plano.mensagem,
+      intervalo_km: String(plano.intervalo),
+    }));
   }
 
   function fecharModal() {
@@ -771,16 +903,12 @@ function ManutencaoMensagens() {
       setFormErro("Selecione ao menos um veículo.");
       return;
     }
-    if (!form.titulo.trim() || !form.mensagem.trim() || !form.intervalo_km || form.antecedencia_km === "") {
+    if (!form.titulo.trim() || !form.mensagem.trim() || !form.intervalo_km) {
       setFormErro("Preencha todos os campos obrigatórios.");
       return;
     }
     if (Number(form.intervalo_km) <= 0) {
       setFormErro("O intervalo de KM deve ser maior que zero.");
-      return;
-    }
-    if (Number(form.antecedencia_km) < 0 || Number(form.antecedencia_km) >= Number(form.intervalo_km)) {
-      setFormErro("A antecedência deve ser positiva e menor que o intervalo.");
       return;
     }
     if (form.numeros.length === 0) {
@@ -803,7 +931,6 @@ function ManutencaoMensagens() {
           titulo: form.titulo.trim(),
           mensagem: form.mensagem.trim(),
           intervalo_km: Number(form.intervalo_km),
-          antecedencia_km: Number(form.antecedencia_km),
           ...contatoPayload,
         };
         if (ids.length === 1) {
@@ -817,7 +944,6 @@ function ManutencaoMensagens() {
           titulo: form.titulo.trim(),
           mensagem: form.mensagem.trim(),
           intervalo_km: Number(form.intervalo_km),
-          antecedencia_km: Number(form.antecedencia_km),
           ...contatoPayload,
         });
       }
@@ -881,38 +1007,36 @@ function ManutencaoMensagens() {
         </button>
       </div>
 
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 12 }}>
+        {[
+          { label: "Automacoes", value: resumo.total, sub: `${resumo.ativos} ativas`, icon: "wrench", tone: "var(--brand-blue)" },
+          { label: "Vencidas", value: resumo.vencidos, sub: "pedem acao", icon: "alert", tone: "#dc2626" },
+          { label: "Proximas", value: resumo.perto, sub: "janela de alerta", icon: "bell", tone: "#d97706" },
+          { label: "Planos", value: PLANOS_MANUTENCAO.length, sub: "sugestoes editaveis", icon: "file", tone: "#16a34a" },
+        ].map(kpi => (
+          <div key={kpi.label} className="card" style={{ padding: "12px 14px", borderLeft: `3px solid ${kpi.tone}` }}>
+            <div className="row" style={{ gap: 7, color: "var(--muted)", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>
+              <Icon name={kpi.icon} size={13}/>{kpi.label}
+            </div>
+            <div style={{ fontSize: 24, fontWeight: 800, marginTop: 5, color: "var(--text)" }}>{kpi.value}</div>
+            <div className="muted" style={{ fontSize: 12 }}>{kpi.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card" style={{ padding: "10px 14px", marginBottom: 12 }}>
+        <div className="row" style={{ gap: 8, alignItems: "flex-start" }}>
+          <Icon name="info" size={15} style={{ color: "var(--brand-blue)", marginTop: 1 }}/>
+          <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.45 }}>
+            Os planos sugeridos usam referencias de fabricante quando disponiveis e continuam editaveis. Volvo FH D13 aceita ate 150.000 km/ano com VDS4; Scania e VW dependem do grupo de operacao, oleo e aplicacao severa.
+          </div>
+        </div>
+      </div>
+
       {erro && (
         <div className="card" style={{ color: "var(--danger)", marginBottom: 16, fontSize: 13 }}>
           Erro ao carregar: {erro}
         </div>
-      )}
-
-      {!loading && automacoes.length > 0 && (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 12 }}>
-            {[
-              ["vencido", "Vencidas", resumo.vencido || 0, "#dc2626"],
-              ["proximo", "Próximas", resumo.proximo || 0, "#d97706"],
-              ["programado", "Programadas", resumo.programado || 0, "#16a34a"],
-              ["inativo", "Inativas", resumo.inativo || 0, "var(--muted)"],
-            ].map(([id, label, value, color]) => (
-              <button key={id} type="button" onClick={() => setFiltro(filtro === id ? "todas" : id)} className="card" style={{
-                padding: "12px 14px", textAlign: "left", cursor: "pointer", color: "var(--text)",
-                borderColor: filtro === id ? color : "var(--border)", background: "var(--surface)",
-              }}>
-                <div className="muted" style={{ fontSize: 11.5, marginBottom: 5 }}>{label}</div>
-                <div style={{ fontSize: 24, lineHeight: 1, fontWeight: 700, color }}>{value}</div>
-              </button>
-            ))}
-          </div>
-          <div className="card" style={{ padding: 10, marginBottom: 12, display: "flex", gap: 8, alignItems: "center" }}>
-            <Icon name="search" size={14}/>
-            <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por placa ou manutenção..." style={{
-              flex: 1, border: "none", outline: "none", background: "transparent", color: "var(--text)", fontSize: 13,
-            }}/>
-            {filtro !== "todas" && <button className="btn" onClick={() => setFiltro("todas")} style={{ padding: "4px 8px" }}>Limpar filtro</button>}
-          </div>
-        </>
       )}
 
       {loading ? (
@@ -928,77 +1052,141 @@ function ManutencaoMensagens() {
             <Icon name="plus" size={14}/> Criar primeira automação
           </button>
         </div>
-      ) : automacoesAgrupadas.length === 0 ? (
-        <div className="card" style={{ textAlign: "center", padding: 28, color: "var(--muted)" }}>
-          Nenhuma automação encontrada para este filtro.
-        </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {automacoesAgrupadas.map(a => {
-            const kmResumo = resumoKmGrupo(a);
-            const previewMensagem = previewAvisoPreventivo((a.itens || [a])[0]);
+          {veiculosAgrupados.map(veiculo => {
+            const ultima = veiculo.ultimaManutencao;
+            const planoAutorizado = veiculo.planoAutorizado;
             return (
-            <div key={(a.ids || [a.id]).join("-")} className="card" style={{
-              opacity: a.ativo ? 1 : 0.55,
-              borderLeft: `3px solid ${a.ativo ? "var(--brand-blue)" : "var(--border)"}`,
+            <div key={veiculo.placa} className="card" style={{
+              borderLeft: `3px solid ${veiculo.resumo.tone}`,
               padding: "12px 16px",
             }}>
-              <div className="row between" style={{ alignItems: "flex-start", gap: 12 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="row" style={{ gap: 8, alignItems: "center", marginBottom: 5, flexWrap: "wrap" }}>
-                    {(a.placas || [a.placa]).map(placa => (
-                      <span key={placa} style={{
-                        background: "var(--accent-soft)",
-                        color: "var(--brand-blue)",
-                        border: "1px solid var(--accent-border)",
-                        borderRadius: 5,
-                        padding: "2px 9px",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        fontFamily: "var(--font-mono, monospace)",
-                        letterSpacing: "0.05em",
-                      }}>{placa}</span>
-                    ))}
-                    <span style={{ fontWeight: 600, fontSize: 14 }}>{a.titulo}</span>
+              <div className="row between" style={{ alignItems: "flex-start", gap: 12, marginBottom: 10 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{
-                      background: kmResumo.bg,
-                      color: kmResumo.tone,
-                      border: `1px solid ${kmResumo.tone}`,
+                      background: "var(--accent-soft)",
+                      color: "var(--brand-blue)",
+                      border: "1px solid var(--accent-border)",
+                      borderRadius: 5,
+                      padding: "2px 9px",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      fontFamily: "var(--font-mono, monospace)",
+                    }}>{veiculo.placa}</span>
+                    <span style={{ fontWeight: 700, fontSize: 15 }}>{veiculo.modelo || "Veiculo sem modelo cadastrado"}</span>
+                    <span style={{
+                      background: veiculo.resumo.bg,
+                      color: veiculo.resumo.tone,
+                      border: `1px solid ${veiculo.resumo.tone}`,
                       borderRadius: 999,
                       padding: "2px 8px",
                       fontSize: 11,
                       fontWeight: 700,
-                    }}>{kmResumo.label}</span>
-                    {!a.ativo && (
-                      <span style={{
-                        background: "var(--surface-alt, #f4f4f5)",
-                        color: "var(--muted)",
-                        borderRadius: 4,
-                        padding: "1px 7px",
-                        fontSize: 11,
-                        border: "1px solid var(--border)",
-                      }}>Inativa</span>
-                    )}
+                    }}>{veiculo.resumo.label}</span>
                   </div>
-                  <details style={{
+                  <div className="muted" style={{ fontSize: 12, marginTop: 5 }}>
+                    KM atual: <strong style={{ color: "var(--text)" }}>{fmtKm(veiculo.kmAtual)}</strong>
+                    {" "} | {veiculo.itens.length} plano(s) ativo(s)
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", minWidth: 180 }}>
+                  <div className="muted" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Ultima manutencao com KM</div>
+                  {ultima ? (
+                    <div style={{ fontSize: 12, lineHeight: 1.45, marginTop: 3 }}>
+                      <strong>{dataBR(ultima.data)} - {fmtKm(ultima.km)}</strong>
+                      <div className="muted">{ultima.descricao || "Sem descricao"}{ultima.fornecedor ? ` | ${ultima.fornecedor}` : ""}</div>
+                      <div className="muted">{ultima.tipoDocumento} {ultima.numeroDocumento}</div>
+                    </div>
+                  ) : (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 3 }}>Sem manutencao com KM para esta placa</div>
+                  )}
+                  {planoAutorizado && (
+                    <div style={{ fontSize: 12, lineHeight: 1.45, marginTop: 7 }}>
+                      <div className="muted" style={{ fontWeight: 700, textTransform: "uppercase", fontSize: 11 }}>Plano autorizado</div>
+                      <strong>{dataBR(planoAutorizado.data)} - {planoAutorizado.item}</strong>
+                      <div className="muted">{planoAutorizado.fornecedor} | NF {planoAutorizado.documento}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gap: 8 }}>
+                {veiculo.itens.map(a => {
+                  const kmResumo = kmInfo(a);
+                  const ultimaPlano = a.ultimaManutencao;
+                  return (
+                  <div key={a.id} style={{
+                    opacity: a.ativo ? 1 : 0.55,
                     background: "var(--bg)",
                     border: "1px solid var(--border)",
-                    borderRadius: 6,
-                    padding: "8px 10px",
-                    marginBottom: 8,
-                    maxWidth: 620,
+                    borderRadius: 7,
+                    padding: "10px 12px",
                   }}>
-                    <summary className="muted" style={{ fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>Ver prévia do WhatsApp</summary>
-                    <div style={{ whiteSpace: "pre-line", fontSize: 12, lineHeight: 1.4, color: "var(--text)" }}>
-                      {previewMensagem}
-                    </div>
-                  </details>
-                  {a.numeros && (
-                    <div className="row" style={{ gap: 5, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
-                      <span className="muted" style={{ fontSize: 12 }}>Enviar para:</span>
-                      {String(a.numeros).split(",").filter(Boolean).map(n => {
-                        const nome = nomeDoContato(n);
-                        return (
+                    <div className="row between" style={{ gap: 12, alignItems: "flex-start" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 7 }}>
+                          <span style={{ fontWeight: 700, fontSize: 13.5 }}>{a.titulo}</span>
+                          <span style={{
+                            background: kmResumo.bg,
+                            color: kmResumo.tone,
+                            border: `1px solid ${kmResumo.tone}`,
+                            borderRadius: 999,
+                            padding: "2px 8px",
+                            fontSize: 11,
+                            fontWeight: 700,
+                          }}>{kmResumo.label}</span>
+                          {!a.ativo && (
+                            <span style={{
+                              background: "var(--surface-alt, #f4f4f5)",
+                              color: "var(--muted)",
+                              borderRadius: 4,
+                              padding: "1px 7px",
+                              fontSize: 11,
+                              border: "1px solid var(--border)",
+                            }}>Inativa</span>
+                          )}
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: 8, marginBottom: 8 }}>
+                          <div style={{ fontSize: 12 }}><span className="muted">Intervalo</span><br/><strong>{fmtKm(a.intervalo_km)}</strong></div>
+                          <div style={{ fontSize: 12 }}><span className="muted">KM atual</span><br/><strong>{fmtKm(a.km_atual)}</strong></div>
+                          <div style={{ fontSize: 12 }}><span className="muted">Enviar no KM</span><br/><strong style={{ color: "var(--brand-blue)" }}>{fmtKm(kmProximoDoItem(a))}</strong></div>
+                        </div>
+
+                        <div style={{
+                          border: "1px solid var(--border)",
+                          borderRadius: 6,
+                          padding: "7px 9px",
+                          marginBottom: 8,
+                          background: "var(--surface)",
+                          fontSize: 12,
+                          lineHeight: 1.45,
+                        }}>
+                          <span className="muted" style={{ fontWeight: 700 }}>Ultimo registro: </span>
+                          {ultimaPlano ? (
+                            <>
+                              <strong>{dataBR(ultimaPlano.data)} - {fmtKm(ultimaPlano.km)}</strong>
+                              <span className="muted"> | {ultimaPlano.descricao || "Sem descricao"}</span>
+                              {ultimaPlano.tipoDocumento && <span className="muted"> | {ultimaPlano.tipoDocumento} {ultimaPlano.numeroDocumento || ""}</span>}
+                              {ultimaPlano.fornecedor && <span className="muted"> | {ultimaPlano.fornecedor}</span>}
+                            </>
+                          ) : (
+                            <span className="muted">
+                              {a.planoAutorizado
+                                ? `plano autorizado encontrado em ${dataBR(a.planoAutorizado.data)} (${a.planoAutorizado.fornecedor}, NF ${a.planoAutorizado.documento}), sem KM informado.`
+                                : "nao encontrei manutencao com KM para este tipo."}
+                            </span>
+                          )}
+                        </div>
+
+                        {a.numeros && (
+                          <div className="row" style={{ gap: 5, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
+                            <span className="muted" style={{ fontSize: 12 }}>Destinos:</span>
+                            {String(a.numeros).split(",").filter(Boolean).map(n => {
+                              const nome = nomeDoContato(n);
+                              return (
                         <span key={n} style={{
                           background: "var(--accent-soft)",
                           border: "1px solid var(--accent-border)",
@@ -1010,107 +1198,95 @@ function ManutencaoMensagens() {
                         }}>
                           {nome ? `${nome} - ${normalizarNumero(n)}` : normalizarNumero(n)}
                         </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                  <div className="row" style={{ gap: 20, flexWrap: "wrap" }}>
-                    <div style={{ fontSize: 12 }}>
-                      <span className="muted">Intervalo: </span>
-                      <strong>a cada {fmtKm(a.intervalo_km)}</strong>
-                    </div>
-                    <div style={{ fontSize: 12 }}>
-                      <span className="muted">Antecedência: </span>
-                      <strong>{fmtKm(a.antecedencia_km)}</strong>
-                    </div>
-                    <div style={{ fontSize: 12 }}>
-                      <span className="muted">KM atual: </span>
-                      <strong>{(a.itens || [a]).length > 1 ? "por placa" : fmtKm(a.km_atual)}</strong>
-                    </div>
-                    <div style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
-                      <span className="muted">Manutenção prevista: </span>
-                      <strong style={{
-                        color: "var(--brand-blue)",
-                        background: "var(--accent-soft)",
-                        border: "1px solid var(--accent-border)",
-                        borderRadius: 4,
-                        padding: "1px 7px",
-                        fontFamily: "var(--font-mono, monospace)",
-                        fontSize: 12,
-                      }}>
-                        {(a.itens || [a]).length > 1 ? "por placa" : fmtKm(a.km_manutencao_prevista)}
-                      </strong>
-                    </div>
-                    {a.ultimo_envio_em && (
-                      <div style={{ fontSize: 12 }}>
-                        <span className="muted">Último aviso: </span>
-                        <strong>{new Date(a.ultimo_envio_em).toLocaleString("pt-BR")}</strong>
-                      </div>
-                    )}
-                  </div>
-                  {(a.itens || []).length > 1 && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                      {a.itens.map(item => (
-                        <span key={item.id} className="muted" style={{
-                          border: "1px solid var(--border)",
-                          borderRadius: 5,
-                          padding: "2px 7px",
-                          fontSize: 11,
-                        }}>
-                          {item.placa}: {fmtKm(item.km_atual)} → {fmtKm(item.km_manutencao_prevista)}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                              );
+                            })}
+                            <button
+                              type="button"
+                              onClick={() => abrirEditar(a)}
+                              style={{
+                                background: "var(--surface)",
+                                border: "1px solid var(--border)",
+                                borderRadius: 4,
+                                color: "var(--text)",
+                                cursor: "pointer",
+                                fontSize: 11.5,
+                                padding: "1px 7px",
+                              }}
+                            >
+                              Editar destinos
+                            </button>
+                          </div>
+                        )}
 
-                <div className="row" style={{ gap: 5, flexShrink: 0 }}>
-                  {(a.itens || [a]).length === 1 && (
-                    <button
-                      onClick={() => { setKmModal(a); setKmValor(String(a.km_atual)); }}
-                      title="Atualizar KM"
-                      style={{
-                        background: "var(--surface)", border: "1px solid var(--border)",
-                        borderRadius: 6, padding: "5px 10px", cursor: "pointer",
-                        fontSize: 12, color: "var(--text)", display: "flex", alignItems: "center", gap: 5,
-                      }}
-                    >
-                      <Icon name="trending-up" size={13}/> KM
-                    </button>
-                  )}
-                  <button
-                    onClick={() => toggleAtivo(a)}
-                    title={a.ativo ? "Desativar" : "Ativar"}
-                    style={{
-                      background: "var(--surface)", border: "1px solid var(--border)",
-                      borderRadius: 6, padding: "5px 8px", cursor: "pointer",
-                      color: a.ativo ? "var(--danger, #e54d2e)" : "var(--muted)",
-                    }}
-                  >
-                    <Icon name={a.ativo ? "x" : "check"} size={14}/>
-                  </button>
-                  <button
-                    onClick={() => abrirEditar(a)}
-                    title="Editar"
-                    style={{
-                      background: "var(--surface)", border: "1px solid var(--border)",
-                      borderRadius: 6, padding: "5px 8px", cursor: "pointer", color: "var(--muted)",
-                    }}
-                  >
-                    <Icon name="edit" size={14}/>
-                  </button>
-                  <button
-                    onClick={() => setConfirmDelete(a)}
-                    title="Excluir"
-                    style={{
-                      background: "var(--surface)", border: "1px solid var(--border)",
-                      borderRadius: 6, padding: "5px 8px", cursor: "pointer",
-                      color: "var(--danger, #e54d2e)",
-                    }}
-                  >
-                    <Icon name="trash" size={14}/>
-                  </button>
-                </div>
+                        <details>
+                          <summary style={{ cursor: "pointer", color: "var(--brand-blue)", fontSize: 12, fontWeight: 700 }}>
+                            Ver mensagem
+                          </summary>
+                          <div style={{
+                            background: "var(--surface)",
+                            border: "1px solid var(--border)",
+                            borderRadius: 6,
+                            padding: "8px 10px",
+                            marginTop: 7,
+                            maxWidth: 680,
+                            whiteSpace: "pre-line",
+                            fontSize: 12,
+                            lineHeight: 1.45,
+                            color: "var(--text)",
+                          }}>
+                            {mensagemPreview(a)}
+                          </div>
+                        </details>
+                      </div>
+
+                      <div className="row" style={{ gap: 5, flexShrink: 0 }}>
+                        <button
+                          onClick={() => { setKmModal(a); setKmValor(String(a.km_atual)); }}
+                          title="Atualizar KM"
+                          style={{
+                            background: "var(--surface)", border: "1px solid var(--border)",
+                            borderRadius: 6, padding: "5px 10px", cursor: "pointer",
+                            fontSize: 12, color: "var(--text)", display: "flex", alignItems: "center", gap: 5,
+                          }}
+                        >
+                          <Icon name="trending-up" size={13}/> KM
+                        </button>
+                        <button
+                          onClick={() => toggleAtivo(a)}
+                          title={a.ativo ? "Desativar" : "Ativar"}
+                          style={{
+                            background: "var(--surface)", border: "1px solid var(--border)",
+                            borderRadius: 6, padding: "5px 8px", cursor: "pointer",
+                            color: a.ativo ? "var(--danger, #e54d2e)" : "var(--muted)",
+                          }}
+                        >
+                          <Icon name={a.ativo ? "x" : "check"} size={14}/>
+                        </button>
+                        <button
+                          onClick={() => abrirEditar(a)}
+                          title="Editar"
+                          style={{
+                            background: "var(--surface)", border: "1px solid var(--border)",
+                            borderRadius: 6, padding: "5px 8px", cursor: "pointer", color: "var(--muted)",
+                          }}
+                        >
+                          <Icon name="edit" size={14}/>
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete(a)}
+                          title="Excluir"
+                          style={{
+                            background: "var(--surface)", border: "1px solid var(--border)",
+                            borderRadius: 6, padding: "5px 8px", cursor: "pointer",
+                            color: "var(--danger, #e54d2e)",
+                          }}
+                        >
+                          <Icon name="trash" size={14}/>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );})}
               </div>
             </div>
           );})}
@@ -1183,24 +1359,62 @@ function ManutencaoMensagens() {
                     <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 7, color: "var(--brand-blue)" }}>
                       Resumo por veículo
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr 1fr", gap: "4px 12px", alignItems: "center" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr", gap: "4px 12px", alignItems: "center" }}>
                       <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>Placa</span>
                       <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>KM atual</span>
-                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>Avisar no KM</span>
-                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>Manutenção</span>
+                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>Enviar no KM</span>
                       {form.selecionadas.map(s => {
                         const kmAtual = Number(s.km_atual) || 0;
                         const intervalo = Number(form.intervalo_km) || 0;
-                        const antecedencia = Number(form.antecedencia_km) || 0;
                         return (
                           <React.Fragment key={s.placa}>
                             <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 700, fontSize: 12, color: "var(--brand-blue)" }}>{s.placa}</span>
                             <span style={{ fontSize: 12 }}>{fmtKm(kmAtual)}</span>
                             <span style={{ fontSize: 12, fontWeight: 600, color: intervalo ? "var(--text)" : "var(--muted)" }}>
-                              {intervalo ? fmtKm(kmAtual + intervalo - antecedencia) : "—"}
+                              {intervalo ? fmtKm(proximoKmProgramado(kmAtual, intervalo)) : "—"}
                             </span>
-                            <span style={{ fontSize: 12 }}>{intervalo ? fmtKm(kmAtual + intervalo) : "—"}</span>
                           </React.Fragment>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {!editando && form.selecionadas.length > 0 && (
+                  <div>
+                    <label style={{ fontSize: 12.5, fontWeight: 600, display: "block", marginBottom: 7 }}>
+                      Planos sugeridos
+                    </label>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
+                      {planosSugeridos.map(plano => {
+                        const ativo = form.titulo === plano.titulo && Number(form.intervalo_km) === Number(plano.intervalo);
+                        return (
+                          <button
+                            key={plano.id}
+                            type="button"
+                            onClick={() => aplicarPlano(plano)}
+                            style={{
+                              textAlign: "left",
+                              border: `1px solid ${ativo ? "var(--brand-blue)" : "var(--border)"}`,
+                              background: ativo ? "var(--accent-soft)" : "var(--bg)",
+                              color: "var(--text)",
+                              borderRadius: 7,
+                              padding: "9px 10px",
+                              cursor: "pointer",
+                              minHeight: 84,
+                            }}
+                          >
+                            <div className="row between" style={{ gap: 8, marginBottom: 5 }}>
+                              <strong style={{ fontSize: 12.5 }}>{plano.titulo}</strong>
+                              {ativo && <Icon name="check" size={14} style={{ color: "var(--brand-blue)" }}/>}
+                            </div>
+                            <div style={{ fontSize: 12, fontWeight: 800, color: "var(--brand-blue)", marginBottom: 4 }}>
+                              a cada {fmtKm(plano.intervalo)}
+                            </div>
+                            <div className="muted" style={{ fontSize: 11.5, lineHeight: 1.35 }}>
+                              {plano.criticidade} - {plano.fonte}
+                            </div>
+                          </button>
                         );
                       })}
                     </div>
@@ -1270,28 +1484,6 @@ function ManutencaoMensagens() {
                     }}
                     required
                   />
-                </div>
-
-                <div>
-                  <label style={{ fontSize: 12.5, fontWeight: 500, display: "block", marginBottom: 5 }}>
-                    Avisar com antecedência de (KM) *
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={form.antecedencia_km}
-                    onChange={e => setForm(f => ({ ...f, antecedencia_km: e.target.value }))}
-                    placeholder="Ex: 1000"
-                    style={{
-                      width: "100%", padding: "8px 10px", border: "1px solid var(--border)",
-                      borderRadius: 6, background: "var(--bg)", color: "var(--text)",
-                      fontSize: 13, boxSizing: "border-box",
-                    }}
-                    required
-                  />
-                  <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-                    Com intervalo de 30.000 km e antecedência de 1.000 km, o aviso sai aos 29.000 km do ciclo.
-                  </div>
                 </div>
 
                 {formErro && (
