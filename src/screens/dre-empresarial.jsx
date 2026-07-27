@@ -19,7 +19,7 @@ function dreEmpDaysAgoISO(days) {
 const DRE_EMP_PERIODS = [
   { key: "7d", label: "7 dias", range: () => ({ start: dreEmpDaysAgoISO(6), end: dreEmpTodayISO() }) },
   { key: "30d", label: "30 dias", range: () => ({ start: dreEmpDaysAgoISO(29), end: dreEmpTodayISO() }) },
-  { key: "month", label: "Este mes", range: () => ({ start: dreEmpMonthStartISO(), end: dreEmpTodayISO() }) },
+  { key: "month", label: "Este mês", range: () => ({ start: dreEmpMonthStartISO(), end: dreEmpTodayISO() }) },
 ];
 
 const DRE_EMP_EMPTY = {
@@ -33,6 +33,7 @@ const DRE_EMP_EMPTY = {
   plates: [],
   management: { topDespesas: [], recorrentes: [], veiculosMaiorCusto: [], contasImpacto: [], alertas: [] },
   rows: [],
+  cteAudit: { count: 0, value: 0, rows: [] },
   sources: [],
 };
 
@@ -101,6 +102,11 @@ function dreEmpNormalize(data) {
     centers: Array.isArray(base.centers) ? base.centers : [],
     plates: Array.isArray(base.plates) ? base.plates : [],
     rows: Array.isArray(base.rows) ? base.rows : [],
+    cteAudit: {
+      count: dreEmpNum(base.cteAudit?.count),
+      value: dreEmpNum(base.cteAudit?.value),
+      rows: Array.isArray(base.cteAudit?.rows) ? base.cteAudit.rows : [],
+    },
     sources: Array.isArray(base.sources) ? base.sources : [],
   };
 }
@@ -165,6 +171,13 @@ const DreEmpresarial = () => {
   const [hoveredMonth, setHoveredMonth] = React.useState(null);
   const [showMoreFilters, setShowMoreFilters] = React.useState(false);
   const [selectedPlate, setSelectedPlate] = React.useState(null);
+  const [expandedLaunch, setExpandedLaunch] = React.useState("");
+  const [launchDetails, setLaunchDetails] = React.useState({});
+  const [launchDetailError, setLaunchDetailError] = React.useState({});
+  const [showAllFleetPlates, setShowAllFleetPlates] = React.useState(false);
+  const [showAllThirdPartyPlates, setShowAllThirdPartyPlates] = React.useState(false);
+  const [plateRanking, setPlateRanking] = React.useState("custo");
+  const [showCteAudit, setShowCteAudit] = React.useState(false);
 
   React.useEffect(() => {
     let active = true;
@@ -184,13 +197,29 @@ const DreEmpresarial = () => {
 
   const periodLabel = manualFilter
     ? (manualFilter.mesAno || `${dreEmpDate(manualFilter.dataInicio)} a ${dreEmpDate(manualFilter.dataFim)}`)
-    : DRE_EMP_PERIODS.find((item) => item.key === periodo)?.label || "Este mes";
+    : DRE_EMP_PERIODS.find((item) => item.key === periodo)?.label || "Este mês";
   const s = data.summary || {};
   const maxMonthly = Math.max(1, ...data.monthly.map((m) => Math.max(dreEmpNum(m.receita), dreEmpNum(m.custo))));
   const maxExpense = Math.max(1, ...data.accounts.map((a) => dreEmpNum(a.custo)));
-  const maxPlate = Math.max(1, ...data.plates.map((p) => dreEmpNum(p.custo)));
-  const maxCategory = Math.max(1, ...data.categories.map((c) => dreEmpNum(c.custo)));
+  const plateMetric = (plate) => {
+    if (plateRanking === "receita") return dreEmpNum(plate.receita);
+    if (plateRanking === "lucro") return dreEmpNum(plate.receita) - dreEmpNum(plate.custo);
+    return dreEmpNum(plate.custo);
+  };
+  const rankPlates = (operation) => data.plates
+    .filter((plate) => plate.operacao === operation)
+    .slice()
+    .sort((a, b) => plateMetric(b) - plateMetric(a));
+  const fleetPlates = rankPlates("frota");
+  const thirdPartyPlates = rankPlates("terceiro");
+  const maxFleetPlate = Math.max(1, ...fleetPlates.map((plate) => Math.abs(plateMetric(plate))));
+  const maxThirdPartyPlate = Math.max(1, ...thirdPartyPlates.map((plate) => Math.abs(plateMetric(plate))));
+  const plateRankingLabel = plateRanking === "receita" ? "Faturamento" : plateRanking === "lucro" ? "Lucro" : "Custo";
   const topCost = data.accounts.filter((a) => dreEmpNum(a.custo) > 0)[0];
+  const cteAuditRows = data.cteAudit.rows
+    .slice()
+    .sort(dreEmpSortByDate);
+  const cteAuditValue = dreEmpNum(data.cteAudit.value);
   const tableRows = data.rows.slice(0, 160);
   const isTerceiro = (manualFilter?.tipo || tipo) === "terceiro";
   const dreLabel = (label) => isTerceiro ? String(label).replace("CUSTOS COM FROTA", "CUSTOS") : label;
@@ -219,6 +248,24 @@ const DreEmpresarial = () => {
       tiposCusto: [...byType.values()].sort((a, b) => b.valor - a.valor),
     };
   }, [selectedPlate, data.rows]);
+
+  const toggleLaunchDetail = React.useCallback((row, index) => {
+    const key = `${row.origem}-${row.detailKey?.empresa || ""}-${row.detailKey?.documento || row.documento || ""}-${index}`;
+    if (expandedLaunch === key) {
+      setExpandedLaunch("");
+      return;
+    }
+    setExpandedLaunch(key);
+    if (launchDetails[key]) return;
+    setLaunchDetails((current) => ({ ...current, [key]: { loading: true, itens: [] } }));
+    setLaunchDetailError((current) => ({ ...current, [key]: "" }));
+    window.RB_API.getDreLancamentoDetalhe(row.detailKey || {})
+      .then((payload) => setLaunchDetails((current) => ({ ...current, [key]: { ...payload, loading: false } })))
+      .catch((err) => {
+        setLaunchDetails((current) => ({ ...current, [key]: { loading: false, itens: [] } }));
+        setLaunchDetailError((current) => ({ ...current, [key]: err?.message || "Não foi possível carregar os itens." }));
+      });
+  }, [expandedLaunch, launchDetails]);
   const pessoas = React.useMemo(() => {
     const map = new Map();
     data.rows.forEach((row) => {
@@ -280,7 +327,7 @@ const DreEmpresarial = () => {
       <div className="page-head">
         <div>
           <h1>DRE Empresarial</h1>
-          <div className="sub">Receita CT-e, impostos e custos financeiros por data de lan\u00e7amento - {periodLabel}</div>
+          <div className="sub">Receita CT-e, impostos e custos financeiros por data de lançamento - {periodLabel}</div>
         </div>
         <div className="actions">
           {DRE_EMP_PERIODS.map((p) => (
@@ -313,7 +360,7 @@ const DreEmpresarial = () => {
         <button className="btn primary" onClick={applyFilter}>Aplicar</button>
         <button className="btn" onClick={clearFilter}>Limpar</button>
         <button className="btn" type="button" onClick={() => setShowMoreFilters((v) => !v)}><Icon name="filter" size={12}/> {showMoreFilters ? "Ver menos" : "Ver mais"}</button>
-        <span className="muted" style={{marginLeft: "auto", fontSize: 11.5}}>Base: data de lan\u00e7amento</span>
+        <span className="muted" style={{marginLeft: "auto", fontSize: 11.5}}>Base: data de lançamento</span>
       </div>
 
       {(loading || error) && (
@@ -342,6 +389,23 @@ const DreEmpresarial = () => {
         <DreEmpKpi label="Desp. Operacionais" value={s.despesasOperacionais} icon="wrench" tone="#fbbf24"/>
         <DreEmpKpi label="Maior peso" value={topCost?.custo || 0} icon="alert" tone="#f87171" sub={topCost?.contaNome || "Sem dados"}/>
       </div>
+
+      {cteAuditRows.length > 0 && (
+        <div className="card" style={{marginBottom:16,padding:"12px 14px",borderColor:"rgba(245,158,11,.45)",background:"rgba(245,158,11,.07)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:16}}>
+          <div style={{display:"flex",alignItems:"center",gap:11}}>
+            <Icon name="alert" size={18}/>
+            <div>
+              <strong>{cteAuditRows.length} CT-e{cteAuditRows.length === 1 ? "" : "s"} para revisar</strong>
+              <div className="muted" style={{fontSize:11.5,marginTop:2}}>
+                {dreEmpBRL(cteAuditValue)} em documentos ativos ainda sem vínculo financeiro
+              </div>
+            </div>
+          </div>
+          <button className="btn primary" onClick={() => setShowCteAudit(true)}>
+            Ver mais
+          </button>
+        </div>
+      )}
 
       <div className="grid cols-2" style={{marginBottom: 16}}>
         <div className="card card-flush">
@@ -415,6 +479,23 @@ const DreEmpresarial = () => {
         </div>
       </div>
 
+      <div style={{display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6, marginBottom: 10}}>
+        <span className="meta muted" style={{marginRight: 4}}>Ordenar veículos por</span>
+        {[
+          { id: "receita", label: "Maior faturamento" },
+          { id: "lucro", label: "Maior lucro" },
+          { id: "custo", label: "Maior custo" },
+        ].map((option) => (
+          <button
+            key={option.id}
+            className={`btn sm${plateRanking === option.id ? " primary" : ""}`}
+            onClick={() => setPlateRanking(option.id)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+
       <div className="grid cols-3" style={{marginBottom: 16}}>
         <div className="card card-flush">
           <div className="card-header"><h3>Maiores despesas</h3><span className="meta muted">contas financeiras</span></div>
@@ -425,9 +506,19 @@ const DreEmpresarial = () => {
           </div>
         </div>
         <div className="card card-flush">
-          <div className="card-header"><h3>Custos por placa</h3><span className="meta muted">frota</span></div>
+          <div className="card-header">
+            <h3>Frota própria</h3>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span className="meta muted">{showAllFleetPlates ? fleetPlates.length : Math.min(10, fleetPlates.length)} de {fleetPlates.length} veículos</span>
+              {fleetPlates.length > 10 && (
+                <button className="btn sm" onClick={() => setShowAllFleetPlates((value) => !value)}>
+                  {showAllFleetPlates ? "Mostrar 10" : "Ver todos"}
+                </button>
+              )}
+            </div>
+          </div>
           <div className="card-body">
-            {data.plates.slice(0, 10).map((p) => (
+            {fleetPlates.slice(0, showAllFleetPlates ? fleetPlates.length : 10).map((p) => (
               <div key={p.placa} style={{display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "start"}}>
                 <div
                   role="button"
@@ -437,19 +528,43 @@ const DreEmpresarial = () => {
                   style={{background: "transparent", border: 0, padding: 0, textAlign: "left", cursor: "pointer", color: "inherit"}}
                   title="Ver detalhamento da placa"
                 >
-                  <DreEmpBar label={p.placa || "Sem placa"} value={p.custo} total={maxPlate} tone="#60a5fa" meta={`Receita ${dreEmpBRL(p.receita)} - lucro ${dreEmpBRL(p.receita - p.custo)}`}/>
+                  <DreEmpBar label={p.placa || "Sem placa"} value={plateMetric(p)} total={maxFleetPlate} tone="#60a5fa" meta={`${plateRankingLabel} · Faturamento ${dreEmpBRL(p.receita)} · Custo ${dreEmpBRL(p.custo)} · Lucro ${dreEmpBRL(p.receita - p.custo)}`}/>
                 </div>
                 <button className="btn sm" onClick={() => setSelectedPlate(p.placa)} style={{marginTop: -1}}>Ver mais</button>
               </div>
             ))}
+            {!fleetPlates.length && <div className="muted">Nenhum veículo próprio no período.</div>}
           </div>
         </div>
         <div className="card card-flush">
-          <div className="card-header"><h3>Distribuicao por categoria</h3><span className="meta muted">{data.categories.length} grupos</span></div>
+          <div className="card-header">
+            <h3>Terceiros</h3>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <span className="meta muted">{showAllThirdPartyPlates ? thirdPartyPlates.length : Math.min(10, thirdPartyPlates.length)} de {thirdPartyPlates.length} veículos</span>
+              {thirdPartyPlates.length > 10 && (
+                <button className="btn sm" onClick={() => setShowAllThirdPartyPlates((value) => !value)}>
+                  {showAllThirdPartyPlates ? "Mostrar 10" : "Ver todos"}
+                </button>
+              )}
+            </div>
+          </div>
           <div className="card-body">
-            {data.categories.filter((c) => c.custo > 0 || c.receita > 0).map((c) => (
-              <DreEmpBar key={c.categoriaDre} label={c.categoriaDre} value={c.custo || c.receita} total={maxCategory} tone={c.receita > 0 ? "#38bdf8" : "#a78bfa"} meta={`${c.lancamentos} lançamentos`}/>
+            {thirdPartyPlates.slice(0, showAllThirdPartyPlates ? thirdPartyPlates.length : 10).map((p) => (
+              <div key={p.placa} style={{display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "start"}}>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedPlate(p.placa)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setSelectedPlate(p.placa); }}
+                  style={{background: "transparent", border: 0, padding: 0, textAlign: "left", cursor: "pointer", color: "inherit"}}
+                  title="Ver detalhamento da placa"
+                >
+                  <DreEmpBar label={p.placa || "Sem placa"} value={plateMetric(p)} total={maxThirdPartyPlate} tone="#a78bfa" meta={`${plateRankingLabel} · Faturamento ${dreEmpBRL(p.receita)} · Custo ${dreEmpBRL(p.custo)} · Lucro ${dreEmpBRL(p.receita - p.custo)}`}/>
+                </div>
+                <button className="btn sm" onClick={() => setSelectedPlate(p.placa)} style={{marginTop: -1}}>Ver mais</button>
+              </div>
             ))}
+            {!thirdPartyPlates.length && <div className="muted">Nenhum veículo terceiro no período.</div>}
           </div>
         </div>
       </div>
@@ -524,6 +639,52 @@ const DreEmpresarial = () => {
           </tbody>
         </table>
       </div>
+      {showCteAudit && (
+        <div style={{position:"fixed",inset:0,zIndex:1100,background:"rgba(0,0,0,.68)",display:"grid",placeItems:"center",padding:18}} onMouseDown={() => setShowCteAudit(false)}>
+          <section className="card card-flush" style={{width:"min(1420px, calc(100vw - 36px))",maxHeight:"88vh",overflow:"hidden",display:"flex",flexDirection:"column"}} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="card-header" style={{borderBottom:"1px solid var(--divider)"}}>
+              <div>
+                <h3>CT-es para revisar</h3>
+                <span className="meta muted">{cteAuditRows.length} documentos · {dreEmpBRL(cteAuditValue)} sem vínculo financeiro</span>
+              </div>
+              <button className="icon-btn" onClick={() => setShowCteAudit(false)} title="Fechar"><Icon name="x"/></button>
+            </div>
+            <div style={{overflow:"auto"}}>
+              <table className="tbl">
+                <thead>
+                  <tr><th>Emissão</th><th>Emp./Série</th><th>CT-e</th><th>Tipo</th><th>Placa</th><th>Cliente</th><th>Rota</th><th>Motivo da revisão</th><th className="num">Valor</th></tr>
+                </thead>
+                <tbody>
+                  {cteAuditRows.map((row, index) => {
+                    const tipoCte = Number(row.tipoCte) === 1 ? "Complementar" : Number(row.tipoCte) === 3 ? "Substituição" : "Normal";
+                    const motivo = Number(row.tipoCte) === 1
+                      ? `Complementar sem título financeiro${row.detailKey?.documento ? "" : "."}`
+                      : Math.abs(dreEmpNum(row.valor)) <= 0.01
+                        ? "Valor simbólico de R$ 0,01 e sem título financeiro"
+                        : "CT-e ativo sem título financeiro";
+                    return (
+                      <tr key={`${row.chaveCte || row.documento}-${index}`}>
+                        <td>{dreEmpDate(row.data)}</td>
+                        <td>{row.detailKey?.empresa || "-"} / {row.detailKey?.serie || "-"}</td>
+                        <td>
+                          <strong>{row.documento || row.ctes || "-"}</strong>
+                          {row.chaveCte && <div className="muted" style={{fontSize:9.5,fontFamily:"var(--font-mono)",maxWidth:190,overflow:"hidden",textOverflow:"ellipsis"}} title={row.chaveCte}>{row.chaveCte}</div>}
+                        </td>
+                        <td><span className={`badge ${Number(row.tipoCte) === 1 ? "warn" : ""}`}>{tipoCte}</span></td>
+                        <td><strong>{row.placa || "-"}</strong><div className="muted" style={{fontSize:10.5}}>{row.operacao === "frota" ? "Frota própria" : "Terceiro"}</div></td>
+                        <td style={{maxWidth:210}}>{row.pessoaNome || "-"}</td>
+                        <td style={{maxWidth:270}}>{row.rota || "-"}</td>
+                        <td style={{maxWidth:220,color:"var(--warn)"}}>{motivo}</td>
+                        <td className="num" style={{color:"var(--ok)"}}>{dreEmpBRL(row.valor)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      )}
       {selectedPlateDetail && (
         <div style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,.62)",display:"grid",placeItems:"center",padding:18}} onMouseDown={() => setSelectedPlate(null)}>
           <section className="card card-flush" style={{width:"min(1180px, calc(100vw - 36px))",maxHeight:"86vh",overflow:"hidden",display:"flex",flexDirection:"column"}} onMouseDown={(e) => e.stopPropagation()}>
@@ -563,19 +724,59 @@ const DreEmpresarial = () => {
               <div className="card card-flush" style={{marginBottom:14}}>
                 <div className="card-header"><h3>Custos</h3><span className="meta muted">por data - {dreEmpBRL(selectedPlateDetail.custo)}</span></div>
                 <table className="tbl">
-                  <thead><tr><th>Data</th><th>Tipo</th><th>Fornecedor/Historico</th><th>Documento</th><th>Status</th><th className="num">Valor</th></tr></thead>
+                  <thead><tr><th>Data</th><th>Tipo</th><th>Fornecedor/Historico</th><th>Documento</th><th>Status</th><th className="num">Valor</th><th></th></tr></thead>
                   <tbody>
-                    {selectedPlateDetail.custos.map((row, index) => (
-                      <tr key={`custo-${row.documento}-${index}`}>
-                        <td>{dreEmpDate(row.data)}</td>
-                        <td><strong>{row.tipoCusto}</strong><div className="muted" style={{fontSize:10.5}}>{row.contaFinanceira || row.categoriaDre || ""}</div></td>
-                        <td style={{maxWidth:260,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={row.pessoaNome || row.historico}>{row.pessoaNome || row.historico || "-"}</td>
-                        <td>{row.documento || "-"}</td>
-                        <td>{row.status}</td>
-                        <td className="num" style={{color:"var(--crit)"}}>{dreEmpBRL(Math.abs(dreEmpNum(row.valor)))}</td>
-                      </tr>
-                    ))}
-                    {!selectedPlateDetail.custos.length && <tr><td colSpan="6" className="muted" style={{padding:14}}>Sem custos para esta placa.</td></tr>}
+                    {selectedPlateDetail.custos.map((row, index) => {
+                      const detailId = `${row.origem}-${row.detailKey?.empresa || ""}-${row.detailKey?.documento || row.documento || ""}-${index}`;
+                      const detail = launchDetails[detailId];
+                      const isOpen = expandedLaunch === detailId;
+                      return (
+                        <React.Fragment key={`custo-${row.documento}-${index}`}>
+                          <tr>
+                            <td>{dreEmpDate(row.data)}</td>
+                            <td><strong>{row.tipoCusto}</strong><div className="muted" style={{fontSize:10.5}}>{row.contaFinanceira || row.categoriaDre || ""}</div></td>
+                            <td style={{maxWidth:260,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={row.pessoaNome || row.historico}>{row.pessoaNome || row.historico || "-"}</td>
+                            <td>{row.documento || "-"}</td>
+                            <td>{row.status}</td>
+                            <td className="num" style={{color:"var(--crit)"}}>{dreEmpBRL(Math.abs(dreEmpNum(row.valor)))}</td>
+                            <td style={{textAlign:"right"}}>
+                              <button className="btn btn-ghost btn-sm" onClick={() => toggleLaunchDetail(row, index)}>
+                                {isOpen ? "Ocultar" : "Ver mais"}
+                              </button>
+                            </td>
+                          </tr>
+                          {isOpen && (
+                            <tr>
+                              <td colSpan="7" style={{padding:"10px 18px",background:"rgba(255,255,255,.018)"}}>
+                                {detail?.loading && <div className="muted">Carregando produtos e serviços...</div>}
+                                {launchDetailError[detailId] && <div style={{color:"var(--crit)"}}>{launchDetailError[detailId]}</div>}
+                                {!detail?.loading && !launchDetailError[detailId] && Boolean(detail?.itens?.length) && (
+                                  <table className="tbl" style={{margin:0}}>
+                                    <thead><tr><th>Item</th><th>Produto/Serviço</th><th>Unidade</th><th className="num">Quantidade</th><th className="num">Valor unitário</th><th className="num">Total</th></tr></thead>
+                                    <tbody>
+                                      {detail.itens.map((item, itemIndex) => (
+                                        <tr key={`${item.origem}-${item.item}-${itemIndex}`}>
+                                          <td>{item.item || itemIndex + 1}</td>
+                                          <td><strong>{item.descricao}</strong>{item.codigo && <div className="muted" style={{fontSize:10.5}}>Código {item.codigo}</div>}</td>
+                                          <td>{item.unidade || "-"}</td>
+                                          <td className="num">{dreEmpNum(item.quantidade).toLocaleString("pt-BR")}</td>
+                                          <td className="num">{dreEmpBRL(item.valorUnitario)}</td>
+                                          <td className="num">{dreEmpBRL(item.total)}</td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                                {!detail?.loading && !launchDetailError[detailId] && !detail?.itens?.length && (
+                                  <div className="muted">{detail?.observacao || "Nenhum produto ou serviço vinculado a este lançamento."}</div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                    {!selectedPlateDetail.custos.length && <tr><td colSpan="7" className="muted" style={{padding:14}}>Sem custos para esta placa.</td></tr>}
                   </tbody>
                 </table>
               </div>
