@@ -194,6 +194,11 @@ window.RB_API = {
     body: JSON.stringify(payload),
   }),
   listManutencao: () => apiRequest("/manutencao"),
+  listRegistrosManutencao: (placa = "") => apiRequest(`/manutencao/registros${buildQuery(placa ? { placa } : {})}`),
+  createRegistroManutencao: (payload) => apiRequest("/manutencao/registros", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
   createManutencao: (payload) => apiRequest("/manutencao", {
     method: "POST",
     body: JSON.stringify(payload),

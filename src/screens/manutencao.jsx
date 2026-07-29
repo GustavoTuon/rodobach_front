@@ -3,6 +3,9 @@ const EMPTY_FORM = {
   titulo: "",
   mensagem: "",
   intervalo_km: "",
+  tipo_controle: "km",
+  intervalo_dias: "",
+  data_ultimo_servico: "",
   numeros: [], // ["5546999990000", ...]
 };
 
@@ -15,6 +18,7 @@ const PLANOS_MANUTENCAO = [
   { id: "filtro-ar", fabricante: "Geral", match: /.*/i, titulo: "Filtro de ar", intervalo: 30000, criticidade: "Preventiva", fonte: "Padrao operacional editavel.", mensagem: "O veiculo atingiu o marco programado para inspecao ou troca do filtro de ar. Verifique e programe a manutencao." },
   { id: "oleo-diferencial", fabricante: "Geral", match: /.*/i, titulo: "Oleo diferencial", intervalo: 120000, criticidade: "Preventiva", fonte: "Padrao operacional editavel.", mensagem: "O veiculo atingiu o marco programado para troca do oleo do diferencial. Verifique e programe a manutencao." },
   { id: "oleo-cambio", fabricante: "Geral", match: /.*/i, titulo: "Oleo cambio", intervalo: 240000, criticidade: "Preventiva", fonte: "Padrao operacional editavel.", mensagem: "O veiculo atingiu o marco programado para troca do oleo do cambio. Verifique e programe a manutencao." },
+  { id: "afericao-tacografo", fabricante: "Geral", match: /.*/i, titulo: "Aferição de tacógrafo", tipoControle: "data", intervaloDias: 730, criticidade: "Obrigatória", fonte: "Verificação periódica do Inmetro: validade de até 2 anos.", mensagem: "A validade da aferição do tacógrafo está próxima do vencimento. Programe a verificação em posto autorizado e atualize o certificado." },
 ];
 
 function fmtKm(v) {
@@ -31,7 +35,7 @@ function proximoKmProgramado(kmAtual, intervaloKm) {
 }
 
 function kmProximoDoItem(item) {
-  return proximoKmProgramado(item?.km_atual, item?.intervalo_km) || Number(item?.km_proximo_envio) || 0;
+  return Number(item?.km_proximo_envio) || proximoKmProgramado(item?.km_atual, item?.intervalo_km) || 0;
 }
 
 function textoVeiculo(veiculo) {
@@ -140,6 +144,16 @@ function mensagemPreview(item) {
 }
 
 function kmInfo(item) {
+  if (item?.tipo_controle === "data") {
+    if (!item.data_proximo_envio) return { status: "sem_km", label: "Informe a última aferição", tone: "var(--text-3)", bg: "var(--surface-2)", faltam: null };
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(`${String(item.data_proximo_envio).slice(0, 10)}T00:00:00`);
+    const dias = Math.ceil((due - today) / 86400000);
+    if (dias < 0) return { status: "vencido", label: `Vencido há ${Math.abs(dias)} dia(s)`, tone: "#dc2626", bg: "rgba(220,38,38,.10)", faltam: dias };
+    if (dias <= 60) return { status: "perto", label: `Vence em ${dias} dia(s)`, tone: "#d97706", bg: "rgba(217,119,6,.11)", faltam: dias };
+    return { status: "ok", label: `Vence em ${dataBR(item.data_proximo_envio)}`, tone: "#16a34a", bg: "rgba(22,163,74,.10)", faltam: dias };
+  }
   const atual = Number(item?.km_atual);
   const proximo = kmProximoDoItem(item);
   if (!Number.isFinite(atual) || !Number.isFinite(proximo) || proximo <= 0) {
@@ -761,6 +775,14 @@ function ManutencaoMensagens() {
   const [kmModal, setKmModal] = React.useState(null);
   const [kmValor, setKmValor] = React.useState("");
   const [kmSalvando, setKmSalvando] = React.useState(false);
+  const [registroModal, setRegistroModal] = React.useState(false);
+  const [registroSalvando, setRegistroSalvando] = React.useState(false);
+  const [registroErro, setRegistroErro] = React.useState("");
+  const [registroForm, setRegistroForm] = React.useState({
+    placa: "", automacao_id: "", tipo_movimento: "troca_oleo_motor",
+    descricao: "Troca de óleo do motor", data_servico: new Date().toISOString().slice(0, 10),
+    km_servico: "", fornecedor: "", documento: "", observacao: "",
+  });
   const veiculosAgrupados = agruparPorVeiculo(automacoes);
   const resumo = resumoAutomacoes(automacoes);
   const planosSugeridos = planosParaSelecao(form.selecionadas, veiculos);
@@ -871,7 +893,10 @@ function ManutencaoMensagens() {
       selecionadas: dedupeSelecionadas(itens.map(item => ({ placa: item.placa, km_atual: item.km_atual }))),
       titulo: a.titulo,
       mensagem: a.mensagem,
-      intervalo_km: String(a.intervalo_km),
+      intervalo_km: a.intervalo_km ? String(a.intervalo_km) : "",
+      tipo_controle: a.tipo_controle || "km",
+      intervalo_dias: a.intervalo_dias ? String(a.intervalo_dias) : "",
+      data_ultimo_servico: a.data_ultimo_servico ? String(a.data_ultimo_servico).slice(0, 10) : "",
       numeros: String(a.numeros || "").split(",").filter(Boolean),
     });
     setFormErro(null);
@@ -885,7 +910,10 @@ function ManutencaoMensagens() {
       ...f,
       titulo: plano.titulo,
       mensagem: plano.mensagem,
-      intervalo_km: String(plano.intervalo),
+      tipo_controle: plano.tipoControle || "km",
+      intervalo_km: plano.tipoControle === "data" ? "" : String(plano.intervalo),
+      intervalo_dias: plano.tipoControle === "data" ? String(plano.intervaloDias) : "",
+      data_ultimo_servico: plano.tipoControle === "data" ? f.data_ultimo_servico : "",
     }));
   }
 
@@ -903,12 +931,16 @@ function ManutencaoMensagens() {
       setFormErro("Selecione ao menos um veículo.");
       return;
     }
-    if (!form.titulo.trim() || !form.mensagem.trim() || !form.intervalo_km) {
+    if (!form.titulo.trim() || !form.mensagem.trim() || (form.tipo_controle === "data" ? !form.intervalo_dias : !form.intervalo_km)) {
       setFormErro("Preencha todos os campos obrigatórios.");
       return;
     }
-    if (Number(form.intervalo_km) <= 0) {
+    if (form.tipo_controle === "km" && Number(form.intervalo_km) <= 0) {
       setFormErro("O intervalo de KM deve ser maior que zero.");
+      return;
+    }
+    if (form.tipo_controle === "data" && (!form.data_ultimo_servico || Number(form.intervalo_dias) <= 0)) {
+      setFormErro("Informe a data da última aferição e um intervalo em dias.");
       return;
     }
     if (form.numeros.length === 0) {
@@ -930,7 +962,10 @@ function ManutencaoMensagens() {
         const payload = {
           titulo: form.titulo.trim(),
           mensagem: form.mensagem.trim(),
-          intervalo_km: Number(form.intervalo_km),
+          tipo_controle: form.tipo_controle,
+          intervalo_km: form.tipo_controle === "km" ? Number(form.intervalo_km) : null,
+          intervalo_dias: form.tipo_controle === "data" ? Number(form.intervalo_dias) : null,
+          data_ultimo_servico: form.tipo_controle === "data" ? form.data_ultimo_servico : null,
           ...contatoPayload,
         };
         if (ids.length === 1) {
@@ -943,7 +978,10 @@ function ManutencaoMensagens() {
           placas: dedupeSelecionadas(form.selecionadas),
           titulo: form.titulo.trim(),
           mensagem: form.mensagem.trim(),
-          intervalo_km: Number(form.intervalo_km),
+          tipo_controle: form.tipo_controle,
+          intervalo_km: form.tipo_controle === "km" ? Number(form.intervalo_km) : null,
+          intervalo_dias: form.tipo_controle === "data" ? Number(form.intervalo_dias) : null,
+          data_ultimo_servico: form.tipo_controle === "data" ? form.data_ultimo_servico : null,
           ...contatoPayload,
         });
       }
@@ -985,6 +1023,37 @@ function ManutencaoMensagens() {
     }
   }
 
+  function abrirRegistro() {
+    if (veiculos.length === 0) carregarVeiculos();
+    const primeiraPlaca = veiculosAgrupados[0]?.placa || "";
+    setRegistroForm(f => ({ ...f, placa: primeiraPlaca, automacao_id: "", km_servico: "" }));
+    setRegistroErro("");
+    setRegistroModal(true);
+  }
+
+  async function salvarRegistro(e) {
+    e.preventDefault();
+    setRegistroErro("");
+    if (!registroForm.placa || !registroForm.km_servico || !registroForm.data_servico || !registroForm.descricao.trim()) {
+      setRegistroErro("Preencha placa, tipo, descrição, data e KM realizado.");
+      return;
+    }
+    setRegistroSalvando(true);
+    try {
+      await RB_API.createRegistroManutencao({
+        ...registroForm,
+        automacao_id: registroForm.automacao_id ? Number(registroForm.automacao_id) : null,
+        km_servico: Number(registroForm.km_servico),
+      });
+      setRegistroModal(false);
+      await carregar();
+    } catch (e) {
+      setRegistroErro(e.message);
+    } finally {
+      setRegistroSalvando(false);
+    }
+  }
+
   async function toggleAtivo(a) {
     try {
       const ids = a.ids || [a.id];
@@ -999,12 +1068,28 @@ function ManutencaoMensagens() {
     <div className="view">
       <div className="page-head">
         <div>
-          <h1>Automações</h1>
-          <div className="sub">Automação de mensagens de manutenção por KM rodado</div>
+          <h1>Manutenção preventiva</h1>
+          <div className="sub">Planos por quilometragem e validade, histórico de serviços e alertas</div>
         </div>
-        <button className="btn btn-primary" onClick={abrirNovo}>
-          <Icon name="plus" size={14}/> Nova Automação
-        </button>
+        <div className="row" style={{ gap: 8 }}>
+          <button className="btn" onClick={abrirRegistro}>
+            <Icon name="wrench" size={14}/> Registrar serviço
+          </button>
+          <button className="btn btn-primary" onClick={abrirNovo}>
+            <Icon name="plus" size={14}/> Nova Automação
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 10, marginBottom: 12 }}>
+        {[
+          ["1", "Cadastre o plano", "Defina o serviço e o intervalo por KM ou por data.", "#38bdf8"],
+          ["2", "Registre quando fizer", "Informe a placa, a data e o KM real da execução.", "#8b5cf6"],
+          ["3", "Acompanhe o alerta", "O sistema calcula o próximo vencimento e avisa os responsáveis.", "#22c55e"],
+        ].map(([n, title, text, color]) => <div key={n} className="card" style={{ padding: 12, display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <span style={{ width: 24, height: 24, display: "grid", placeItems: "center", borderRadius: 999, background: color, color: "#081018", fontWeight: 800, fontSize: 12, flexShrink: 0 }}>{n}</span>
+          <div><strong style={{ fontSize: 12.5 }}>{title}</strong><div className="muted" style={{ fontSize: 11.5, marginTop: 3, lineHeight: 1.4 }}>{text}</div></div>
+        </div>)}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 12 }}>
@@ -1149,11 +1234,15 @@ function ManutencaoMensagens() {
                           )}
                         </div>
 
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: 8, marginBottom: 8 }}>
+                        {a.tipo_controle === "data" ? <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 8 }}>
+                          <div style={{ fontSize: 12 }}><span className="muted">Periodicidade</span><br/><strong>2 anos</strong></div>
+                          <div style={{ fontSize: 12 }}><span className="muted">Última aferição</span><br/><strong>{dataBR(a.data_ultimo_servico)}</strong></div>
+                          <div style={{ fontSize: 12 }}><span className="muted">Validade</span><br/><strong style={{ color: "var(--brand-blue)" }}>{dataBR(a.data_proximo_envio)}</strong></div>
+                        </div> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: 8, marginBottom: 8 }}>
                           <div style={{ fontSize: 12 }}><span className="muted">Intervalo</span><br/><strong>{fmtKm(a.intervalo_km)}</strong></div>
                           <div style={{ fontSize: 12 }}><span className="muted">KM atual</span><br/><strong>{fmtKm(a.km_atual)}</strong></div>
                           <div style={{ fontSize: 12 }}><span className="muted">Enviar no KM</span><br/><strong style={{ color: "var(--brand-blue)" }}>{fmtKm(kmProximoDoItem(a))}</strong></div>
-                        </div>
+                        </div>}
 
                         <div style={{
                           border: "1px solid var(--border)",
@@ -1240,7 +1329,7 @@ function ManutencaoMensagens() {
                       </div>
 
                       <div className="row" style={{ gap: 5, flexShrink: 0 }}>
-                        <button
+                        {a.tipo_controle !== "data" && <button
                           onClick={() => { setKmModal(a); setKmValor(String(a.km_atual)); }}
                           title="Atualizar KM"
                           style={{
@@ -1250,7 +1339,7 @@ function ManutencaoMensagens() {
                           }}
                         >
                           <Icon name="trending-up" size={13}/> KM
-                        </button>
+                        </button>}
                         <button
                           onClick={() => toggleAtivo(a)}
                           title={a.ativo ? "Desativar" : "Ativar"}
@@ -1387,7 +1476,11 @@ function ManutencaoMensagens() {
                     </label>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
                       {planosSugeridos.map(plano => {
-                        const ativo = form.titulo === plano.titulo && Number(form.intervalo_km) === Number(plano.intervalo);
+                        const ativo = form.titulo === plano.titulo && (
+                          plano.tipoControle === "data"
+                            ? form.tipo_controle === "data" && Number(form.intervalo_dias) === Number(plano.intervaloDias)
+                            : form.tipo_controle === "km" && Number(form.intervalo_km) === Number(plano.intervalo)
+                        );
                         return (
                           <button
                             key={plano.id}
@@ -1409,7 +1502,7 @@ function ManutencaoMensagens() {
                               {ativo && <Icon name="check" size={14} style={{ color: "var(--brand-blue)" }}/>}
                             </div>
                             <div style={{ fontSize: 12, fontWeight: 800, color: "var(--brand-blue)", marginBottom: 4 }}>
-                              a cada {fmtKm(plano.intervalo)}
+                              {plano.tipoControle === "data" ? "a cada 2 anos" : `a cada ${fmtKm(plano.intervalo)}`}
                             </div>
                             <div className="muted" style={{ fontSize: 11.5, lineHeight: 1.35 }}>
                               {plano.criticidade} - {plano.fonte}
@@ -1467,7 +1560,7 @@ function ManutencaoMensagens() {
                   onCreate={criarContato}
                 />
 
-                <div>
+                {form.tipo_controle === "km" ? <div>
                   <label style={{ fontSize: 12.5, fontWeight: 500, display: "block", marginBottom: 5 }}>
                     Enviar a cada (KM) *
                   </label>
@@ -1484,7 +1577,16 @@ function ManutencaoMensagens() {
                     }}
                     required
                   />
-                </div>
+                </div> : <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <label style={{ fontSize: 12.5, fontWeight: 500 }}>Data da última aferição *
+                    <input type="date" value={form.data_ultimo_servico} onChange={e => setForm(f => ({ ...f, data_ultimo_servico: e.target.value }))} style={{ width: "100%", padding: "8px 10px", marginTop: 5, border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }} required/>
+                  </label>
+                  <label style={{ fontSize: 12.5, fontWeight: 500 }}>Validade *
+                    <select value={form.intervalo_dias} onChange={e => setForm(f => ({ ...f, intervalo_dias: e.target.value }))} style={{ width: "100%", padding: "8px 10px", marginTop: 5, border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text)" }}>
+                      <option value="730">2 anos</option>
+                    </select>
+                  </label>
+                </div>}
 
                 {formErro && (
                   <div style={{
@@ -1558,6 +1660,81 @@ function ManutencaoMensagens() {
                 <button type="submit" className="btn btn-primary" disabled={kmSalvando}>
                   {kmSalvando ? "Salvando…" : "Atualizar KM"}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal registrar manutenção executada ── */}
+      {registroModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 1100, padding: 16,
+        }} onClick={e => { if (e.target === e.currentTarget) setRegistroModal(false); }}>
+          <div style={{
+            background: "var(--surface)", border: "1px solid var(--border)",
+            borderRadius: 12, padding: 24, width: "100%", maxWidth: 560,
+            maxHeight: "90vh", overflowY: "auto",
+          }}>
+            <div className="row between" style={{ marginBottom: 18 }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 16 }}>Registrar troca ou revisão</h2>
+                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>Informe o KM em que o serviço foi realmente executado.</div>
+              </div>
+              <button type="button" onClick={() => setRegistroModal(false)} style={{ background: "none", border: 0, color: "var(--muted)", cursor: "pointer" }}><Icon name="x" size={18}/></button>
+            </div>
+            <form onSubmit={salvarRegistro}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <label style={{ fontSize: 12 }}>Placa *
+                  <select value={registroForm.placa} onChange={e => setRegistroForm(f => ({ ...f, placa: e.target.value, automacao_id: "" }))} style={{ width: "100%", marginTop: 5, padding: 9, background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6 }} required>
+                    <option value="">Selecione</option>
+                    {[...new Set([...veiculosAgrupados.map(v => v.placa), ...veiculos.map(v => v.placa)].filter(Boolean))].sort().map(placa => <option key={placa} value={placa}>{placa}</option>)}
+                  </select>
+                </label>
+                <label style={{ fontSize: 12 }}>Tipo de movimento *
+                  <select value={registroForm.tipo_movimento} onChange={e => {
+                    const labels = { troca_oleo_motor: "Troca de óleo do motor", revisao: "Revisão preventiva", filtro_combustivel: "Troca do filtro de combustível", filtro_ar: "Troca do filtro de ar", oleo_cambio: "Troca do óleo do câmbio", oleo_diferencial: "Troca do óleo do diferencial", lubrificacao: "Lubrificação", afericao_tacografo: "Aferição de tacógrafo", outro: "Outro serviço" };
+                    setRegistroForm(f => ({ ...f, tipo_movimento: e.target.value, descricao: labels[e.target.value] }));
+                  }} style={{ width: "100%", marginTop: 5, padding: 9, background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6 }}>
+                    <option value="troca_oleo_motor">Troca de óleo do motor</option>
+                    <option value="revisao">Revisão preventiva</option>
+                    <option value="filtro_combustivel">Filtro de combustível</option>
+                    <option value="filtro_ar">Filtro de ar</option>
+                    <option value="oleo_cambio">Óleo do câmbio</option>
+                    <option value="oleo_diferencial">Óleo do diferencial</option>
+                    <option value="lubrificacao">Lubrificação</option>
+                    <option value="afericao_tacografo">Aferição de tacógrafo</option>
+                    <option value="outro">Outro</option>
+                  </select>
+                </label>
+                <label style={{ fontSize: 12 }}>Data do serviço *
+                  <input type="date" value={registroForm.data_servico} onChange={e => setRegistroForm(f => ({ ...f, data_servico: e.target.value }))} style={{ width: "100%", marginTop: 5, padding: 9, boxSizing: "border-box", background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6 }} required/>
+                </label>
+                <label style={{ fontSize: 12 }}>KM da execução *
+                  <input type="number" min="0" value={registroForm.km_servico} onChange={e => setRegistroForm(f => ({ ...f, km_servico: e.target.value }))} placeholder="Ex.: 278180" style={{ width: "100%", marginTop: 5, padding: 9, boxSizing: "border-box", background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6 }} required/>
+                </label>
+              </div>
+              <label style={{ display: "block", fontSize: 12, marginTop: 12 }}>Plano relacionado
+                <select value={registroForm.automacao_id} onChange={e => setRegistroForm(f => ({ ...f, automacao_id: e.target.value }))} style={{ width: "100%", marginTop: 5, padding: 9, background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6 }}>
+                  <option value="">Sem vínculo automático</option>
+                  {automacoes.filter(a => a.placa === registroForm.placa).map(a => <option key={a.id} value={a.id}>{a.titulo} — intervalo {fmtKm(a.intervalo_km)}</option>)}
+                </select>
+              </label>
+              <label style={{ display: "block", fontSize: 12, marginTop: 12 }}>Descrição *
+                <input value={registroForm.descricao} onChange={e => setRegistroForm(f => ({ ...f, descricao: e.target.value }))} style={{ width: "100%", marginTop: 5, padding: 9, boxSizing: "border-box", background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6 }} required/>
+              </label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 12 }}>
+                <label style={{ fontSize: 12 }}>Fornecedor<input value={registroForm.fornecedor} onChange={e => setRegistroForm(f => ({ ...f, fornecedor: e.target.value }))} style={{ width: "100%", marginTop: 5, padding: 9, boxSizing: "border-box", background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6 }}/></label>
+                <label style={{ fontSize: 12 }}>NF/OS<input value={registroForm.documento} onChange={e => setRegistroForm(f => ({ ...f, documento: e.target.value }))} style={{ width: "100%", marginTop: 5, padding: 9, boxSizing: "border-box", background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6 }}/></label>
+              </div>
+              <label style={{ display: "block", fontSize: 12, marginTop: 12 }}>Observação<textarea rows="3" value={registroForm.observacao} onChange={e => setRegistroForm(f => ({ ...f, observacao: e.target.value }))} style={{ width: "100%", marginTop: 5, padding: 9, boxSizing: "border-box", resize: "vertical", background: "var(--bg)", color: "var(--text)", border: "1px solid var(--border)", borderRadius: 6 }}/></label>
+              {registroForm.automacao_id && registroForm.km_servico && <div style={{ marginTop: 12, padding: 10, borderRadius: 6, background: "var(--accent-soft)", color: "var(--brand-blue)", fontSize: 12 }}>Próximo vencimento: {fmtKm(Number(registroForm.km_servico) + Number(automacoes.find(a => String(a.id) === String(registroForm.automacao_id))?.intervalo_km || 0))}</div>}
+              {registroErro && <div style={{ color: "var(--danger)", marginTop: 12, fontSize: 12 }}>{registroErro}</div>}
+              <div className="row" style={{ justifyContent: "flex-end", gap: 8, marginTop: 18 }}>
+                <button type="button" className="btn" onClick={() => setRegistroModal(false)}>Cancelar</button>
+                <button type="submit" className="btn btn-primary" disabled={registroSalvando}>{registroSalvando ? "Salvando…" : "Registrar serviço"}</button>
               </div>
             </form>
           </div>
