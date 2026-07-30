@@ -46,8 +46,9 @@ const SimuladorFrete = ({ onNavigate }) => {
     if (value === null || value === undefined) return 0;
     const raw = String(value).trim();
     if (!raw) return 0;
-    const digitsOnly = raw.replace(/\D/g, "");
-    if (/^\d+$/.test(raw) && digitsOnly.length > 2) return Number(digitsOnly) / 100;
+    // Digitação simples representa reais, não centavos:
+    // "9000" => 9000; "9.000" => 9000; "9.000,50" => 9000.50.
+    if (/^\d+$/.test(raw)) return Number(raw);
     return parseBRNumber(raw);
   };
 
@@ -204,6 +205,16 @@ const SimuladorFrete = ({ onNavigate }) => {
     clientValue: simClientValue,
     marginTarget: simMargem || 30,
   }) : official;
+  const driverScenarioBase = calc ? buildCommercialCalc({
+    driverValue: simDriverValue,
+    clientValue: 0,
+    marginTarget: simMargem || 30,
+  }) : official;
+  const driverScenario = calc ? buildCommercialCalc({
+    driverValue: simDriverValue,
+    clientValue: driverScenarioBase.valorClienteNecessario,
+    marginTarget: simMargem || 30,
+  }) : official;
 
   const resumoTexto = simulation.valorCliente > 0 ? [
     simulation.status.tone === "danger" || simulation.status.tone === "warn"
@@ -292,7 +303,94 @@ const SimuladorFrete = ({ onNavigate }) => {
     simulation.status.id === "FRETE_OK" && { tone: "success", icon: "check", title: "Frete dentro da tabela ANTT e margem dentro da meta.", text: null },
   ].filter(Boolean) : [];
 
+  const SimpleQuote = () => (
+    <div className="view quote-simple">
+      <div className="page-head quote-head">
+        <div><h1>Calculadora de frete</h1><div className="sub">Informe a distância, compare com a ANTT e veja quanto sobra.</div></div>
+        <button className="btn" onClick={() => onNavigate("viagens")}><Icon name="route"/> Viagens</button>
+      </div>
+
+      <section className="card quote-start">
+        <div className="quote-intro"><b>Comece aqui</b><span>1. Escolha o caminhão</span><span>2. Informe a distância</span></div>
+        <div className="quote-vehicle-row">
+          {anttTabela.map((row) => <button key={row.eixos} type="button" onClick={() => setEixos(row.eixos)} className={`quote-vehicle ${eixos === row.eixos ? "active" : ""}`}><strong>{row.tipoVeiculo}</strong><small>{row.eixos} eixos</small></button>)}
+        </div>
+        <div className="quote-main-fields">
+          <label><span>Distância da viagem</span><div className="quote-unit"><input inputMode="numeric" value={km} onChange={integerInput(setKm)} onBlur={() => formatIntegerOnBlur(km, setKm)} placeholder="Ex.: 1.600"/><b>km</b></div></label>
+          <label><span>Pedágio</span><input inputMode="decimal" value={pedagio} onChange={moneyInput(setPedagio)} onBlur={() => formatMoneyOnBlur(pedagio, setPedagio)} placeholder="R$ 0,00"/></label>
+          <label><span>Seguro adicional</span><input inputMode="decimal" value={seguro} onChange={moneyInput(setSeguro)} onBlur={() => formatMoneyOnBlur(seguro, setSeguro)} placeholder="Automático"/></label>
+          <label><span>ICMS</span><div className="quote-unit"><input inputMode="decimal" value={icms} onChange={percentInput(setIcms)}/><b>%</b></div></label>
+          <label><span>Margem desejada</span><div className="quote-unit"><input inputMode="decimal" value={simMargem} onChange={percentInput(setSimMargem)} onBlur={() => formatPercentOnBlur(simMargem, setSimMargem)}/><b>%</b></div></label>
+        </div>
+        {calcLoading && <div className="quote-message">Calculando...</div>}
+        {calcError && <div className="quote-message danger">Não foi possível calcular. Tente novamente.</div>}
+      </section>
+
+      {!hasKm || !calc ? <div className="card quote-empty"><b>Informe a distância acima</b><span>Os três cálculos aparecerão automaticamente.</span></div> : <>
+        <div className="quote-columns">
+          <section className="quote-column official">
+            <div className="quote-column-head"><i>1</i><div><strong>Referência ANTT</strong><small>Quanto a tabela recomenda</small></div></div>
+            <div className="quote-big"><span>Mínimo para o motorista</span><b>{fmtR(official.valorMinimoAntt)}</b><small>{fmtR(official.valorMinimoKm)} por km</small></div>
+            <div className="quote-compare">
+              <div><span>Valor motorista</span><b>{fmtR(official.valorMotorista)}</b></div>
+              <div><span>Valor cliente</span><b>{fmtR(official.valorClienteSugerido)}</b></div>
+              <div><span>Pedágio</span><b>{fmtR(pedagioNum)}</b></div>
+              <div><span>Seguros</span><b>{fmtR((calc.encargos?.seguroCarga || 0) + (calc.encargos?.seguroRC || 0))}</b></div>
+              <div><span>ICMS</span><b>{fmtR(official.icmsValor)}</b></div>
+              <div className="result"><span>Resultado líquido</span><b>{fmtR(official.lucro)}</b></div>
+              <div className="result"><span>Margem</span><b>{fmtPct(official.margemReal)}</b></div>
+            </div>
+            <p>Esta é apenas a referência oficial. Os outros valores não alteram esta coluna.</p>
+          </section>
+
+          <section className="quote-column driver">
+            <div className="quote-column-head"><i>2</i><div><strong>Alterar motorista</strong><small>Simule outro pagamento</small></div></div>
+            <label className="quote-money"><span>Valor pago ao motorista</span><input inputMode="decimal" value={simMotorista} onChange={moneyInput(setSimMotorista)} onBlur={() => formatMoneyOnBlur(simMotorista, setSimMotorista)} placeholder={fmtR(official.valorMotorista)}/></label>
+            <div className={`quote-warning ${driverScenario.motoristaDiff < 0 ? "danger" : "ok"}`}>{driverScenario.motoristaDiff < 0 ? `${fmtR(Math.abs(driverScenario.motoristaDiff))} abaixo da ANTT` : "Valor igual ou acima da ANTT"}</div>
+            <div className="quote-big"><span>Cobrar do cliente para ter {fmtPct(driverScenario.margemMeta)}</span><b>{fmtR(driverScenario.valorClienteNecessario)}</b></div>
+            <div className="quote-compare">
+              <div><span>Valor motorista</span><b>{fmtR(driverScenario.valorMotorista)}</b></div>
+              <div><span>Valor cliente calculado</span><b>{fmtR(driverScenario.valorClienteNecessario)}</b></div>
+              <div><span>Pedágio</span><b>{fmtR(pedagioNum)}</b></div>
+              <div><span>Seguros</span><b>{fmtR((calc.encargos?.seguroCarga || 0) + (calc.encargos?.seguroRC || 0))}</b></div>
+              <div><span>ICMS</span><b>{fmtR(driverScenario.icmsValor)}</b></div>
+              <div className="result"><span>Resultado líquido</span><b>{fmtR(driverScenario.lucro)}</b></div>
+              <div className="result"><span>Margem</span><b>{fmtPct(driverScenario.margemReal)}</b></div>
+            </div>
+          </section>
+
+          <section className={`quote-column deal ${simulation.lucro < 0 ? "loss" : ""}`}>
+            <div className="quote-column-head"><i>3</i><div><strong>Ver quanto sobra</strong><small>Informe o valor combinado</small></div></div>
+            <div className="quote-driver-link"><span>Motorista usado nesta conta</span><b>{fmtR(simulation.valorMotorista)}</b><small>Valor informado na coluna 2</small></div>
+            <label className="quote-money"><span>Valor cobrado do cliente</span><input inputMode="decimal" value={simCliente} onChange={moneyInput(setSimCliente)} onBlur={() => formatMoneyOnBlur(simCliente, setSimCliente)} placeholder={fmtR(driverScenario.valorClienteNecessario)}/></label>
+            <div className="quote-big"><span>Valor que vai sobrar</span><b>{fmtR(simulation.lucro)}</b><small>Margem de {fmtPct(simulation.margemReal)}</small></div>
+            <div className="quote-compare">
+              <div><span>Valor motorista</span><b>{fmtR(simulation.valorMotorista)}</b></div>
+              <div><span>Valor cliente</span><b>{fmtR(simulation.valorCliente)}</b></div>
+              <div><span>Pedágio</span><b>{fmtR(pedagioNum)}</b></div>
+              <div><span>Seguros</span><b>{fmtR((calc.encargos?.seguroCarga || 0) + (calc.encargos?.seguroRC || 0))}</b></div>
+              <div><span>ICMS</span><b>{fmtR(simulation.icmsValor)}</b></div>
+              <div className="result"><span>Resultado líquido</span><b>{fmtR(simulation.lucro)}</b></div>
+              <div className="result"><span>Margem</span><b>{fmtPct(simulation.margemReal)}</b></div>
+            </div>
+            <div className={`quote-status ${simulation.status.tone}`}><Icon name={simulation.status.icon} size={16}/><div><b>{simulation.status.label}</b><span>{simulation.status.text}</span></div></div>
+            <div className="quote-actions"><button className="btn" onClick={copiarResumo} disabled={!resumoTexto}>{copied ? "Copiado!" : "Copiar resumo"}</button><button className="btn primary" onClick={usarComoCotacao} disabled={simulation.status.tone === "danger"}>Usar na viagem</button></div>
+          </section>
+        </div>
+
+        <details className="card quote-advanced">
+          <summary><span><Icon name="settings" size={15}/> Opções avançadas</span><small>Tipo de carga e operação</small></summary>
+          <div className="quote-advanced-grid">
+            <label><span>Tipo de carga</span><select value={tipoCarga} onChange={(e) => setTipoCarga(e.target.value)}><option value="normal">Normal</option><option value="alto_desempenho">Especial</option></select></label>
+            <label><span>Operação</span><select value={operacao} onChange={(e) => setOperacao(e.target.value)}><option value="etc">ETC — Empresa</option><option value="tac">TAC — Autônomo</option></select></label>
+          </div>
+        </details>
+      </>}
+    </div>
+  );
+
   // ── Render ───────────────────────────────────────────────────────────────────
+  return SimpleQuote();
   return (
     <div className="view frete-view">
 

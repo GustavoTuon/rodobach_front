@@ -9,6 +9,7 @@ const OportunidadesRetorno = () => {
   const [working, setWorking] = React.useState(false);
   const [notice, setNotice] = React.useState("");
   const [error, setError] = React.useState("");
+  const potentialClients = analysis?.potenciais || analysis?.clientes || [];
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -126,7 +127,7 @@ const OportunidadesRetorno = () => {
       <div className="page-head">
         <div>
           <h1>Oportunidades de retorno</h1>
-          <div className="sub">Clientes próximos ao destino das SMs em viagem, com mensagem pronta para o n8n</div>
+          <div className="sub">Clientes que já faturaram conosco próximos ao local onde o veículo ficará vazio</div>
         </div>
         <div className="actions">
           <button className="btn" onClick={downloadTemplate}><Icon name="download"/> Baixar modelo</button>
@@ -149,7 +150,7 @@ const OportunidadesRetorno = () => {
         <div className="kpi"><div className="kpi-label"><Icon name="user"/> Clientes importados</div><div className="kpi-value">{data.clientes?.length || 0}</div><span className="kpi-delta flat">base comercial ativa</span></div>
         <div className="kpi"><div className="kpi-label"><Icon name="truck"/> SMs em viagem</div><div className="kpi-value">{data.sms?.length || 0}</div><span className="kpi-delta flat">Trafegus</span></div>
         <div className="kpi"><div className="kpi-label"><Icon name="map"/> Raio analisado</div><div className="kpi-value">{raioKm} km</div><span className="kpi-delta flat">distancia em linha reta</span></div>
-        <div className="kpi"><div className="kpi-label"><Icon name="plug"/> n8n</div><div className="kpi-value" style={{ fontSize: 18 }}>{data.configuracao?.n8nConfigurado ? "Configurado" : "Pendente"}</div><span className={`kpi-delta ${data.configuracao?.n8nConfigurado ? "up" : "down"}`}>{data.configuracao?.destinatario || "informar webhook e destinatario"}</span></div>
+        <div className="kpi"><div className="kpi-label"><Icon name="plug"/> Envio</div><div className="kpi-value" style={{ fontSize: 18 }}>{data.configuracao?.envioHabilitado ? "Habilitado" : "Validação"}</div><span className={`kpi-delta ${data.configuracao?.envioHabilitado ? "up" : "flat"}`}>{data.configuracao?.envioHabilitado ? (data.configuracao?.destinatario || "destinatário pendente") : "nenhuma mensagem será enviada"}</span></div>
       </div>
 
       <div className="card" style={{ marginBottom: 16, padding: 16 }}>
@@ -168,23 +169,24 @@ const OportunidadesRetorno = () => {
       <div className="or-grid">
         <div className="card card-flush">
           <div className="card-header">
-            <div><h3>Clientes próximos</h3>{analysis && <span className="meta muted">{analysis.destino?.descricao}</span>}</div>
-            <span className="meta muted">{analysis?.clientes?.length || 0} encontrados</span>
+            <div><h3>Potenciais clientes próximos</h3>{analysis && <span className="meta muted">Veículo vazio em {analysis.destino?.descricao} · raio de {analysis.raioKm} km</span>}</div>
+            <span className="meta muted">Top {potentialClients.length} por proximidade</span>
           </div>
           <div style={{ padding: "0 16px" }}>
-            {(analysis?.clientes || []).map((client) => (
+            {potentialClients.map((client, index) => (
               <div className="or-client" key={client.id}>
                 <div>
-                  <strong>{client.nome}</strong>
+                  <strong>{index + 1}. {client.nome}</strong>
                   <div className="meta muted">{client.cidade}/{client.uf} · {client.endereco || "Endereco nao informado"}</div>
                   <div className="meta muted">{[client.contato, client.telefone, client.tipoCarga].filter(Boolean).join(" · ") || "Contato/carga nao informados"}</div>
+                  {client.quantidadeFretes ? <div className="meta muted">{client.quantidadeFretes} frete(s) · faturamento histórico {Number(client.faturamento || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} · último em {client.ultimoFrete ? new Date(client.ultimoFrete).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "-"}</div> : null}
                   <a href={client.mapsUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11.5 }}>Abrir localização</a>
                 </div>
                 <div className="or-distance">{client.distanciaKm.toFixed(0)} km</div>
               </div>
             ))}
             {!analysis && <div className="muted" style={{ padding: 24 }}>Selecione uma SM e clique em “Analisar região”.</div>}
-            {analysis && !analysis.clientes?.length && <div className="muted" style={{ padding: 24 }}>Nenhum cliente com coordenadas dentro do raio informado.</div>}
+            {analysis && !potentialClients.length && <div className="muted" style={{ padding: 24 }}>Nenhum cliente com faturamento histórico foi encontrado dentro do raio informado.</div>}
           </div>
         </div>
 
@@ -198,7 +200,7 @@ const OportunidadesRetorno = () => {
           <textarea className="or-message" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="A mensagem sera montada apos a analise."/>
           <div className="actions" style={{ marginTop: 12, justifyContent: "flex-end" }}>
             <button className="btn" disabled={!message} onClick={() => navigator.clipboard.writeText(message)}><Icon name="copy"/> Copiar</button>
-            <button className="btn primary" disabled={!analysis || !recipient || !data.configuracao?.n8nConfigurado || working} onClick={sendN8n}><Icon name="whatsapp"/> Enviar para mim pelo n8n</button>
+            <button className="btn primary" disabled={!data.configuracao?.envioHabilitado || !analysis || !recipient || !data.configuracao?.n8nConfigurado || working} onClick={sendN8n}><Icon name="whatsapp"/> {data.configuracao?.envioHabilitado ? "Enviar para o comercial" : "Envio bloqueado — validação"}</button>
           </div>
         </div>
       </div>
