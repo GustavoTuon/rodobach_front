@@ -783,8 +783,30 @@ function ManutencaoMensagens() {
     descricao: "Troca de óleo do motor", data_servico: new Date().toISOString().slice(0, 10),
     km_servico: "", fornecedor: "", documento: "", observacao: "",
   });
-  const veiculosAgrupados = agruparPorVeiculo(automacoes);
+  const [busca, setBusca] = React.useState("");
+  const [filtroStatus, setFiltroStatus] = React.useState("todos");
+  const [ordenacao, setOrdenacao] = React.useState("urgencia");
+  const [comoFunciona, setComoFunciona] = React.useState(false);
+  const [expandidos, setExpandidos] = React.useState(() => new Set());
+  const todosVeiculos = agruparPorVeiculo(automacoes);
+  const veiculosAgrupados = todosVeiculos
+    .filter(veiculo => {
+      const termo = busca.trim().toLowerCase();
+      const corresponde = !termo || [veiculo.placa, veiculo.modelo, ...veiculo.itens.map(item => item.titulo)]
+        .some(value => String(value || "").toLowerCase().includes(termo));
+      if (!corresponde) return false;
+      if (filtroStatus === "todos") return true;
+      if (filtroStatus === "pausado") return veiculo.itens.every(item => !item.ativo);
+      if (filtroStatus === "sem_km") return veiculo.resumo.status === "sem_km";
+      return veiculo.resumo.status === filtroStatus;
+    })
+    .sort((a, b) => {
+      if (ordenacao === "placa") return a.placa.localeCompare(b.placa);
+      if (ordenacao === "km") return Number(a.resumo.faltam ?? 999999999) - Number(b.resumo.faltam ?? 999999999);
+      return 0;
+    });
   const resumo = resumoAutomacoes(automacoes);
+  const veiculosMonitorados = todosVeiculos.length;
   const planosSugeridos = planosParaSelecao(form.selecionadas, veiculos);
 
   const carregar = React.useCallback(async () => {
@@ -876,6 +898,22 @@ function ManutencaoMensagens() {
 
   React.useEffect(() => { carregar(); }, [carregar]);
   React.useEffect(() => { carregarContatos(); }, []);
+  React.useEffect(() => {
+    if (!automacoes.length) return;
+    setExpandidos(new Set(
+      agruparPorVeiculo(automacoes)
+        .filter(veiculo => ["vencido", "perto"].includes(veiculo.resumo.status))
+        .map(veiculo => veiculo.placa)
+    ));
+  }, [automacoes]);
+
+  function toggleVeiculo(placa) {
+    setExpandidos(current => {
+      const next = new Set(current);
+      if (next.has(placa)) next.delete(placa); else next.add(placa);
+      return next;
+    });
+  }
 
   function abrirNovo() {
     setEditando(null);
@@ -1069,53 +1107,53 @@ function ManutencaoMensagens() {
       <div className="page-head">
         <div>
           <h1>Manutenção preventiva</h1>
-          <div className="sub">Planos por quilometragem e validade, histórico de serviços e alertas</div>
+          <div className="sub">Gerencie planos de manutenção, registre serviços e acompanhe os próximos vencimentos.</div>
         </div>
         <div className="row" style={{ gap: 8 }}>
           <button className="btn" onClick={abrirRegistro}>
             <Icon name="wrench" size={14}/> Registrar serviço
           </button>
           <button className="btn btn-primary" onClick={abrirNovo}>
-            <Icon name="plus" size={14}/> Nova Automação
+            <Icon name="plus" size={14}/> Novo plano
           </button>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 10, marginBottom: 12 }}>
-        {[
-          ["1", "Cadastre o plano", "Defina o serviço e o intervalo por KM ou por data.", "#38bdf8"],
-          ["2", "Registre quando fizer", "Informe a placa, a data e o KM real da execução.", "#8b5cf6"],
-          ["3", "Acompanhe o alerta", "O sistema calcula o próximo vencimento e avisa os responsáveis.", "#22c55e"],
-        ].map(([n, title, text, color]) => <div key={n} className="card" style={{ padding: 12, display: "flex", gap: 10, alignItems: "flex-start" }}>
-          <span style={{ width: 24, height: 24, display: "grid", placeItems: "center", borderRadius: 999, background: color, color: "#081018", fontWeight: 800, fontSize: 12, flexShrink: 0 }}>{n}</span>
-          <div><strong style={{ fontSize: 12.5 }}>{title}</strong><div className="muted" style={{ fontSize: 11.5, marginTop: 3, lineHeight: 1.4 }}>{text}</div></div>
-        </div>)}
+      <div className="card" style={{ padding: "9px 12px", marginBottom: 12 }}>
+        <button type="button" onClick={() => setComoFunciona(value => !value)} style={{width:"100%",display:"flex",alignItems:"center",gap:8,border:0,background:"transparent",color:"var(--text)",cursor:"pointer",padding:0,textAlign:"left"}}>
+          <Icon name="info" size={14} style={{color:"var(--brand-blue)"}}/><strong style={{fontSize:12.5}}>Como funciona?</strong>
+          <span className="muted" style={{fontSize:12}}>Cadastre o plano → registre o serviço → acompanhe os alertas</span>
+          <Icon name="chevron-down" size={14} style={{marginLeft:"auto",transform:comoFunciona?"rotate(180deg)":"none"}}/>
+        </button>
+        {comoFunciona && <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,paddingTop:10,marginTop:9,borderTop:"1px solid var(--border)"}}>
+          {["Defina o serviço e o intervalo por KM ou data.","Informe a data e o KM quando o serviço for executado.","O sistema recalcula o vencimento e alerta os responsáveis."].map((text,index)=><div key={text} style={{fontSize:12,color:"var(--muted)"}}><strong style={{color:"var(--text)"}}>{index+1}. {["Cadastre o plano","Registre quando fizer","Acompanhe o alerta"][index]}</strong><div style={{marginTop:3}}>{text}</div></div>)}
+        </div>}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 12 }}>
         {[
-          { label: "Automacoes", value: resumo.total, sub: `${resumo.ativos} ativas`, icon: "wrench", tone: "var(--brand-blue)" },
-          { label: "Vencidas", value: resumo.vencidos, sub: "pedem acao", icon: "alert", tone: "#dc2626" },
-          { label: "Proximas", value: resumo.perto, sub: "janela de alerta", icon: "bell", tone: "#d97706" },
-          { label: "Planos", value: PLANOS_MANUTENCAO.length, sub: "sugestoes editaveis", icon: "file", tone: "#16a34a" },
+          { label: "Planos ativos", value: resumo.ativos, sub: `${resumo.total} cadastrados`, icon: "wrench", tone: "var(--brand-blue)", filtro: "todos" },
+          { label: "Vencidos", value: resumo.vencidos, sub: "pedem ação", icon: "alert", tone: "#dc2626", filtro: "vencido" },
+          { label: "Próximos", value: resumo.perto, sub: "janela de alerta", icon: "bell", tone: "#d97706", filtro: "perto" },
+          { label: "Veículos monitorados", value: veiculosMonitorados, sub: "com plano cadastrado", icon: "truck", tone: "#16a34a", filtro: "todos" },
         ].map(kpi => (
-          <div key={kpi.label} className="card" style={{ padding: "12px 14px", borderLeft: `3px solid ${kpi.tone}` }}>
+          <button type="button" key={kpi.label} className="card" onClick={()=>setFiltroStatus(kpi.filtro)} style={{ padding: "12px 14px", borderLeft: `3px solid ${kpi.tone}`,textAlign:"left",cursor:"pointer",color:"inherit",outline:filtroStatus===kpi.filtro?"1px solid var(--accent-border)":"none" }}>
             <div className="row" style={{ gap: 7, color: "var(--muted)", fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>
               <Icon name={kpi.icon} size={13}/>{kpi.label}
             </div>
             <div style={{ fontSize: 24, fontWeight: 800, marginTop: 5, color: "var(--text)" }}>{kpi.value}</div>
             <div className="muted" style={{ fontSize: 12 }}>{kpi.sub}</div>
-          </div>
+          </button>
         ))}
       </div>
 
-      <div className="card" style={{ padding: "10px 14px", marginBottom: 12 }}>
-        <div className="row" style={{ gap: 8, alignItems: "flex-start" }}>
-          <Icon name="info" size={15} style={{ color: "var(--brand-blue)", marginTop: 1 }}/>
-          <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.45 }}>
-            Os planos sugeridos usam referencias de fabricante quando disponiveis e continuam editaveis. Volvo FH D13 aceita ate 150.000 km/ano com VDS4; Scania e VW dependem do grupo de operacao, oleo e aplicacao severa.
-          </div>
-        </div>
+      <div className="card manutencao-filtros" style={{padding:10,marginBottom:12,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",position:"sticky",top:0,zIndex:5}}>
+        <div style={{position:"relative",flex:"1 1 260px"}}><Icon name="search" size={14} style={{position:"absolute",left:10,top:10,color:"var(--muted)"}}/><input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar por placa, veículo ou serviço" style={{width:"100%",height:34,boxSizing:"border-box",padding:"0 10px 0 32px",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,color:"var(--text)"}}/></div>
+        <select value={filtroStatus} onChange={e=>setFiltroStatus(e.target.value)} style={{height:34,background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,color:"var(--text)",padding:"0 28px 0 9px"}}><option value="todos">Todos os status</option><option value="vencido">Vencidos</option><option value="perto">Próximos</option><option value="ok">Em dia</option><option value="sem_km">Sem histórico/KM</option><option value="pausado">Pausados</option></select>
+        <select value={ordenacao} onChange={e=>setOrdenacao(e.target.value)} style={{height:34,background:"var(--bg)",border:"1px solid var(--border)",borderRadius:6,color:"var(--text)",padding:"0 28px 0 9px"}}><option value="urgencia">Mais urgentes</option><option value="km">Menor KM restante</option><option value="placa">Placa</option></select>
+        {(busca||filtroStatus!=="todos"||ordenacao!=="urgencia")&&<button className="btn" onClick={()=>{setBusca("");setFiltroStatus("todos");setOrdenacao("urgencia")}}>Limpar filtros</button>}
+        <span className="muted" style={{fontSize:11.5,marginLeft:"auto"}}>{veiculosAgrupados.length} veículo(s) • {veiculosAgrupados.reduce((sum,v)=>sum+v.itens.length,0)} plano(s)</span>
+        <button className="btn" onClick={()=>setExpandidos(new Set(veiculosAgrupados.map(v=>v.placa)))}>Expandir todos</button><button className="btn" onClick={()=>setExpandidos(new Set())}>Recolher</button>
       </div>
 
       {erro && (
@@ -1139,6 +1177,13 @@ function ManutencaoMensagens() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {veiculosAgrupados.length === 0 && (
+            <div className="card" style={{textAlign:"center",padding:"34px 20px"}}>
+              <Icon name="search" size={24} style={{color:"var(--muted)",marginBottom:8}}/>
+              <div style={{fontWeight:650}}>Nenhum resultado corresponde aos filtros selecionados.</div>
+              <button className="btn" style={{marginTop:12}} onClick={()=>{setBusca("");setFiltroStatus("todos");setOrdenacao("urgencia")}}>Limpar filtros</button>
+            </div>
+          )}
           {veiculosAgrupados.map(veiculo => {
             const ultima = veiculo.ultimaManutencao;
             const planoAutorizado = veiculo.planoAutorizado;
@@ -1147,7 +1192,7 @@ function ManutencaoMensagens() {
               borderLeft: `3px solid ${veiculo.resumo.tone}`,
               padding: "12px 16px",
             }}>
-              <div className="row between" style={{ alignItems: "flex-start", gap: 12, marginBottom: 10 }}>
+              <div className="row between" style={{ alignItems: "flex-start", gap: 12, marginBottom: expandidos.has(veiculo.placa) ? 10 : 0 }}>
                 <div style={{ minWidth: 0 }}>
                   <div className="row" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <span style={{
@@ -1177,7 +1222,7 @@ function ManutencaoMensagens() {
                   </div>
                 </div>
                 <div style={{ textAlign: "right", minWidth: 180 }}>
-                  <div className="muted" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>Ultima manutencao com KM</div>
+                  <div className="muted" style={{ fontSize: 11, fontWeight: 600 }}>Última manutenção</div>
                   {ultima ? (
                     <div style={{ fontSize: 12, lineHeight: 1.45, marginTop: 3 }}>
                       <strong>{dataBR(ultima.data)} - {fmtKm(ultima.km)}</strong>
@@ -1189,15 +1234,18 @@ function ManutencaoMensagens() {
                   )}
                   {planoAutorizado && (
                     <div style={{ fontSize: 12, lineHeight: 1.45, marginTop: 7 }}>
-                      <div className="muted" style={{ fontWeight: 700, textTransform: "uppercase", fontSize: 11 }}>Plano autorizado</div>
+                      <div className="muted" style={{ fontWeight: 600, fontSize: 11 }}>Referência encontrada</div>
                       <strong>{dataBR(planoAutorizado.data)} - {planoAutorizado.item}</strong>
                       <div className="muted">{planoAutorizado.fornecedor} | NF {planoAutorizado.documento}</div>
                     </div>
                   )}
                 </div>
+                <button type="button" className="btn" onClick={()=>toggleVeiculo(veiculo.placa)} aria-label={expandidos.has(veiculo.placa)?"Recolher planos":"Ver planos"} style={{flexShrink:0}}>
+                  {expandidos.has(veiculo.placa)?"Recolher":"Ver planos"} <Icon name="chevron-down" size={14} style={{transform:expandidos.has(veiculo.placa)?"rotate(180deg)":"none"}}/>
+                </button>
               </div>
 
-              <div style={{ display: "grid", gap: 8 }}>
+              {expandidos.has(veiculo.placa) && <div style={{ display: "grid", gap: 8 }}>
                 {veiculo.itens.map(a => {
                   const kmResumo = kmInfo(a);
                   const ultimaPlano = a.ultimaManutencao;
@@ -1270,25 +1318,15 @@ function ManutencaoMensagens() {
                           )}
                         </div>
 
-                        {a.numeros && (
-                          <div className="row" style={{ gap: 5, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
-                            <span className="muted" style={{ fontSize: 12 }}>Destinos:</span>
-                            {String(a.numeros).split(",").filter(Boolean).map(n => {
-                              const nome = nomeDoContato(n);
-                              return (
-                        <span key={n} style={{
-                          background: "var(--accent-soft)",
-                          border: "1px solid var(--accent-border)",
-                          borderRadius: 4,
-                          padding: "1px 7px",
-                          fontSize: 11.5,
-                          fontFamily: "var(--font-mono, monospace)",
-                          color: "var(--brand-blue)",
-                        }}>
-                          {nome ? `${nome} - ${normalizarNumero(n)}` : normalizarNumero(n)}
-                        </span>
-                              );
-                            })}
+                        {a.numeros && (() => {
+                          const destinos = String(a.numeros).split(",").filter(Boolean);
+                          const primeiroNome = nomeDoContato(destinos[0]) || "Contato";
+                          return (
+                          <div className="row" style={{ gap: 6, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
+                            <span className="muted" style={{ fontSize: 12 }}>Destinatários:</span>
+                            <span title={`${destinos.length} destinatário(s) configurado(s)`} style={{background:"var(--accent-soft)",border:"1px solid var(--accent-border)",borderRadius:4,padding:"2px 7px",fontSize:11.5,color:"var(--brand-blue)"}}>
+                              {primeiroNome}{destinos.length > 1 ? ` +${destinos.length - 1}` : ""}
+                            </span>
                             <button
                               type="button"
                               onClick={() => abrirEditar(a)}
@@ -1302,10 +1340,10 @@ function ManutencaoMensagens() {
                                 padding: "1px 7px",
                               }}
                             >
-                              Editar destinos
+                              Editar
                             </button>
                           </div>
-                        )}
+                        );})()}
 
                         <details>
                           <summary style={{ cursor: "pointer", color: "var(--brand-blue)", fontSize: 12, fontWeight: 700 }}>
@@ -1338,7 +1376,7 @@ function ManutencaoMensagens() {
                             fontSize: 12, color: "var(--text)", display: "flex", alignItems: "center", gap: 5,
                           }}
                         >
-                          <Icon name="trending-up" size={13}/> KM
+                          <Icon name="trending-up" size={13}/> Informar KM
                         </button>}
                         <button
                           onClick={() => toggleAtivo(a)}
@@ -1376,7 +1414,7 @@ function ManutencaoMensagens() {
                     </div>
                   </div>
                 );})}
-              </div>
+              </div>}
             </div>
           );})}
         </div>
@@ -1396,7 +1434,7 @@ function ManutencaoMensagens() {
           }}>
             <div className="row between" style={{ marginBottom: 20 }}>
               <h2 style={{ margin: 0, fontSize: 16 }}>
-                {editando ? "Editar automação" : "Nova automação"}
+                {editando ? "Editar plano" : "Novo plano de manutenção"}
               </h2>
               <button onClick={fecharModal} style={{
                 background: "none", border: "none", cursor: "pointer", color: "var(--muted)", padding: 4,
@@ -1516,7 +1554,7 @@ function ManutencaoMensagens() {
 
                 <div>
                   <label style={{ fontSize: 12.5, fontWeight: 500, display: "block", marginBottom: 5 }}>
-                    Título da mensagem *
+                    Nome do plano / serviço *
                   </label>
                   <input
                     type="text"

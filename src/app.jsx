@@ -5,6 +5,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/diretoria.jsx",
   "src/screens/simulador.jsx",
   "src/screens/viagens.jsx",
+  "src/screens/folgas-motoristas.jsx",
   "src/screens/status-carga.jsx",
   "src/screens/trafegus.jsx",
   "src/screens/oportunidades-retorno.jsx",
@@ -25,7 +26,7 @@ const SCREEN_SCRIPTS = [
 ];
 
 const SCREEN_GLOBALS = [
-  "Diretoria", "SimuladorFrete", "Viagens",
+  "Diretoria", "SimuladorFrete", "Viagens", "FolgasMotoristas",
   "StatusCargaFrota", "Trafegus", "OportunidadesRetorno",
   "DreEmpresarial", "AnaliseClientes",
   "RentabilidadeClientes", "LucroViagens", "ResultadoFretes", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n",
@@ -51,6 +52,7 @@ const NAV = [
   { id: "manutencoes-veiculos", label: "Lançamentos", icon: "wrench", title: "Manutenções e Custos por Veículo", group: "manutencoes", section: "direcao" },
   { id: "simulador",       label: "Calculadora",  icon: "calculator",  title: "Calculadora de Frete ANTT", section: "operacao" },
   { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações", section: "operacao" },
+  { id: "folgas-motoristas", label: "Folgas",      icon: "user",        title: "Jornada e Folgas dos Motoristas", section: "operacao" },
   { id: "status-carga",    label: "Status Carga", icon: "package",     title: "Status de Carga da Frota", section: "operacao" },
   { id: "trafegus",        label: "Trafegus",     icon: "map",         title: "SMs e Rotas do Trafegus", section: "operacao" },
   { id: "oportunidades-retorno", label: "Retorno", icon: "route", title: "Clientes próximos e carga de retorno", section: "operacao" },
@@ -311,6 +313,9 @@ const App = () => {
       break;
     case "viagens":
       body = <Viagens onNavigate={onNavigate}/>;
+      break;
+    case "folgas-motoristas":
+      body = <FolgasMotoristas onNavigate={onNavigate}/>;
       break;
     case "status-carga":
       body = <StatusCargaFrota onNavigate={onNavigate}/>;

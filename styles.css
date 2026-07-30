@@ -1754,6 +1754,25 @@ input, select, textarea { font: inherit; color: inherit; }
   background: var(--brand-navy); color: #ffffff; border-color: var(--brand-navy);
 }
 .btn.primary:hover { background: var(--brand-navy-2); border-color: var(--brand-navy-2); }
+
+@media (max-width: 1180px) {
+  .fm-summary-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)) !important; }
+  .fm-table-head { display: none !important; }
+  .fm-table-row:not(.fm-table-head) {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 14px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .manutencao-filtros {
+    position: static !important;
+    align-items: stretch !important;
+  }
+  .manutencao-filtros > * {
+    flex: 1 1 100% !important;
+  }
+}
 .btn.ghost { border-color: transparent; background: transparent; color: var(--text-2); }
 .btn.ghost:hover { background: var(--hover); color: var(--text); }
 .btn.sm { height: 26px; padding: 0 8px; font-size: 12px; }

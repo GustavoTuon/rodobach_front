@@ -93,6 +93,16 @@ window.RB_AUTH = {
 
 // ── API ───────────────────────────────────────────────────────────────────────
 window.RB_API = {
+  listMotoristasFolgas: (filters = {}) => apiRequest(`/motoristas/folgas${buildQuery(filters)}`),
+  registrarSaidaMotorista: (payload) => apiRequest("/motoristas/folgas/saidas", {
+    method: "POST", body: JSON.stringify(payload),
+  }),
+  registrarRetornoMotorista: (id, payload) => apiRequest(`/motoristas/folgas/jornadas/${encodeURIComponent(id)}/retorno`, {
+    method: "PUT", body: JSON.stringify(payload),
+  }),
+  registrarMovimentoFolga: (payload) => apiRequest("/motoristas/folgas/movimentos", {
+    method: "POST", body: JSON.stringify(payload),
+  }),
   // ── Tabela ANTT ──────────────────────────────────────────────────────────
   listAntt: () => apiRequest("/frete/antt"),
 
