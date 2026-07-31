@@ -5,6 +5,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/diretoria.jsx",
   "src/screens/simulador.jsx",
   "src/screens/viagens.jsx",
+  "src/screens/folgas-motoristas.jsx",
   "src/screens/status-carga.jsx",
   "src/screens/trafegus.jsx",
   "src/screens/oportunidades-retorno.jsx",
@@ -22,13 +23,14 @@ const SCREEN_SCRIPTS = [
   "src/screens/manutencao.jsx",
   "src/screens/pneus.jsx?v=20260603-historico-pneu",
   "src/screens/automacoes.jsx",
+  "src/screens/consulta-cte.jsx",
 ];
 
 const SCREEN_GLOBALS = [
-  "Diretoria", "SimuladorFrete", "Viagens",
+  "Diretoria", "SimuladorFrete", "Viagens", "FolgasMotoristas",
   "StatusCargaFrota", "Trafegus", "OportunidadesRetorno",
   "DreEmpresarial", "AnaliseClientes",
-  "RentabilidadeClientes", "LucroViagens", "ResultadoFretes", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n",
+  "RentabilidadeClientes", "LucroViagens", "ResultadoFretes", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n", "ConsultaCte",
 ];
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -51,9 +53,11 @@ const NAV = [
   { id: "manutencoes-veiculos", label: "Lançamentos", icon: "wrench", title: "Manutenções e Custos por Veículo", group: "manutencoes", section: "direcao" },
   { id: "simulador",       label: "Calculadora",  icon: "calculator",  title: "Calculadora de Frete ANTT", section: "operacao" },
   { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações", section: "operacao" },
+  { id: "folgas-motoristas", label: "Folgas",      icon: "user",        title: "Jornada e Folgas dos Motoristas", section: "operacao" },
   { id: "status-carga",    label: "Status Carga", icon: "package",     title: "Status de Carga da Frota", section: "operacao" },
   { id: "trafegus",        label: "Trafegus",     icon: "map",         title: "SMs e Rotas do Trafegus", section: "operacao" },
   { id: "oportunidades-retorno", label: "Retorno", icon: "route", title: "Clientes próximos e carga de retorno", section: "operacao" },
+  { id: "consulta-cte", label: "Consultar NF-e", icon: "search", title: "Consulta de chave da NF-e", section: "operacao" },
   { id: "pneus",           label: "Pneus",        icon: "truck",       title: "Movimentação de Pneus", section: "operacao" },
   { id: "manutencao",      label: "Automações",   icon: "wrench",      title: "Automação de Manutenção", section: "operacao" },
   { id: "automacoes-n8n",  label: "n8n",          icon: "plug",        title: "Automações n8n", sistema: true },
@@ -312,6 +316,9 @@ const App = () => {
     case "viagens":
       body = <Viagens onNavigate={onNavigate}/>;
       break;
+    case "folgas-motoristas":
+      body = <FolgasMotoristas onNavigate={onNavigate}/>;
+      break;
     case "status-carga":
       body = <StatusCargaFrota onNavigate={onNavigate}/>;
       break;
@@ -413,6 +420,9 @@ const App = () => {
       break;
     case "oportunidades-retorno":
       body = <OportunidadesRetorno onNavigate={onNavigate}/>;
+      break;
+    case "consulta-cte":
+      body = <ConsultaCte/>;
       break;
     case "usuarios":
       body = <GerenciarUsuarios onNavigate={onNavigate}/>;
