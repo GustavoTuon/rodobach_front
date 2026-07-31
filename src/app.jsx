@@ -23,7 +23,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/manutencao.jsx",
   "src/screens/pneus.jsx?v=20260603-historico-pneu",
   "src/screens/automacoes.jsx",
-  "src/screens/consulta-cte.jsx",
+  "src/screens/consulta-cte.jsx?v=20260731-xml-nfe",
 ];
 
 const SCREEN_GLOBALS = [
@@ -156,6 +156,7 @@ const App = () => {
   const [route, setRouteState] = useState(readRoute());
   const [auth, setAuth] = useState({ checking: true, user: null });
   const [screensReady, setScreensReady] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(() => window.innerWidth > 960);
 
   // Verificar sessÃ£o existente ao carregar
   useEffect(() => {
@@ -288,7 +289,10 @@ const App = () => {
 
   const go = (screen) => setRoute({ screen });
   const onNavigate = (screen) => {
-    if (visibleNav.some(n => n.id === screen)) go(screen);
+    if (visibleNav.some(n => n.id === screen)) {
+      go(screen);
+      if (window.innerWidth <= 960) setSidebarExpanded(false);
+    }
   };
   const hasScreen = (screen) => visibleNav.some(n => n.id === screen);
   const renderNavItems = (items) => items.map(n => (
@@ -297,7 +301,7 @@ const App = () => {
       className={`nav-item ${isNavActive(n, currentScreen) ? "active" : ""}`}
       data-tip={n.label}
       data-has-badge={n.badge != null ? "true" : "false"}
-      onClick={() => go(n.id)}
+      onClick={() => onNavigate(n.id)}
     >
       <Icon name={n.icon}/>
       <span className="lbl">{n.label}</span>
@@ -442,30 +446,36 @@ const App = () => {
   const userInitials = userLogin.split(".").map(p => p[0] || "").join("").toUpperCase().slice(0, 2) || "U";
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="sidebar-brand" style={{ justifyContent: "center", padding: "14px 16px 8px" }}>
+    <div className={`app-shell ${sidebarExpanded ? "sidebar-is-expanded" : "sidebar-is-collapsed"}`}>
+      {sidebarExpanded && <button className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setSidebarExpanded(false)}/>}
+      <aside className={`sidebar ${sidebarExpanded ? "expanded" : "collapsed"}`}>
+        <div className="sidebar-brand">
           <img
             src="uploads/LOGO NORTE-03.png"
             alt="Norte"
-            style={{ width: "100%", maxHeight: 88, objectFit: "contain", display: "block" }}
+            className="sidebar-logo"
           />
+          <button className="sidebar-toggle" onClick={() => setSidebarExpanded(v => !v)} title={sidebarExpanded ? "Recolher menu" : "Expandir menu"} aria-label={sidebarExpanded ? "Recolher menu" : "Expandir menu"}>
+            <Icon name={sidebarExpanded ? "x" : "chevron-right"} size={17}/>
+          </button>
         </div>
 
-        {Object.entries(NAV_SECTION_LABELS).map(([section, label]) => {
-          const items = sidebarNav.filter(n => !n.sistema && (n.section || "direcao") === section);
-          if (!items.length) return null;
-          return (
-            <div className="nav-section" key={section}>
-              <div className="nav-label">{label}</div>
-              {renderNavItems(items)}
-            </div>
-          );
-        })}
+        <div className="sidebar-nav-scroll">
+          {Object.entries(NAV_SECTION_LABELS).map(([section, label]) => {
+            const items = sidebarNav.filter(n => !n.sistema && (n.section || "direcao") === section);
+            if (!items.length) return null;
+            return (
+              <div className="nav-section" key={section}>
+                <div className="nav-label">{label}</div>
+                {renderNavItems(items)}
+              </div>
+            );
+          })}
 
-        <div className="nav-section">
-          <div className="nav-label">Sistema</div>
-          {renderNavItems(sidebarNav.filter(n => n.sistema))}
+          <div className="nav-section">
+            <div className="nav-label">Sistema</div>
+            {renderNavItems(sidebarNav.filter(n => n.sistema))}
+          </div>
         </div>
 
         <div className="sidebar-footer">

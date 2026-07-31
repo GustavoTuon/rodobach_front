@@ -1,7 +1,8 @@
 ﻿const { useState, useEffect, useRef } = React;
 
-const TELAS = [
-  { id: "perm_diretoria",       label: "Diretoria" },
+const TELAS_GRUPOS = [
+  { id: "direcao", label: "Direção", telas: [
+  { id: "perm_diretoria", label: "Diretoria" },
   { id: "perm_dre_empresarial", label: "DRE Empresarial" },
   { id: "perm_faturamento_diario", label: "Faturamento Diário" },
   { id: "perm_comparativo_faturamento", label: "Comparativo Mensal" },
@@ -13,14 +14,24 @@ const TELAS = [
   { id: "perm_clientes_lucro",  label: "Rentabilidade de Clientes" },
   { id: "perm_custos_veiculos", label: "Custos por Veículo" },
   { id: "perm_manutencoes_veiculos", label: "Manutenções por Veículo" },
+  ]},
+  { id: "operacao", label: "Operação", telas: [
   { id: "perm_simulador",       label: "Calculadora" },
   { id: "perm_viagens",         label: "Viagens" },
+  { id: "perm_folgas_motoristas", label: "Folgas" },
   { id: "perm_status_carga",    label: "Status Carga" },
+  { id: "perm_trafegus", label: "Trafegus" },
+  { id: "perm_oportunidades_retorno", label: "Retorno" },
+  { id: "perm_consulta_nfe", label: "Consultar NF-e" },
   { id: "perm_pneus",           label: "Pneus" },
   { id: "perm_manutencao",      label: "Automações" },
+  ]},
+  { id: "sistema", label: "Sistema", telas: [
   { id: "perm_automacoes_n8n",  label: "n8n" },
   { id: "perm_settings",        label: "Configurações" },
+  ]},
 ];
+const TELAS = TELAS_GRUPOS.flatMap(grupo => grupo.telas);
 
 const FORM_VAZIO = {
   login: "", senha: "", email: "", numero: "",
@@ -33,6 +44,8 @@ const FORM_VAZIO = {
   perm_custos_veiculos: true, perm_manutencoes_veiculos: true,
   perm_clientes: true, perm_clientes_lucro: true, perm_status_carga: true, perm_pneus: true,
   perm_manutencao: true, perm_automacoes_n8n: true, perm_settings: true,
+  perm_folgas_motoristas: true, perm_trafegus: true,
+  perm_oportunidades_retorno: true, perm_consulta_nfe: true,
 };
 
 const Toggle = ({ value, onChange, label }) => (
@@ -112,6 +125,10 @@ const GerenciarUsuarios = ({ onNavigate }) => {
       perm_settings: u.perm_settings ?? true,
       perm_manutencao: u.perm_manutencao ?? true,
       perm_automacoes_n8n: u.perm_automacoes_n8n ?? true,
+      perm_folgas_motoristas: u.perm_folgas_motoristas ?? u.perm_viagens ?? true,
+      perm_trafegus: u.perm_trafegus ?? u.perm_viagens ?? true,
+      perm_oportunidades_retorno: u.perm_oportunidades_retorno ?? u.perm_viagens ?? true,
+      perm_consulta_nfe: u.perm_consulta_nfe ?? u.perm_viagens ?? true,
     });
     setErro("");
     setModal(u);
@@ -260,7 +277,7 @@ const GerenciarUsuarios = ({ onNavigate }) => {
             display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
           }}
         >
-          <div style={{
+          <div className="user-modal" style={{
             background: "var(--surface)", borderRadius: 12, width: "100%", maxWidth: 540,
             maxHeight: "92vh", overflowY: "auto",
             boxShadow: "0 24px 64px rgba(0,0,0,0.28)",
@@ -283,7 +300,7 @@ const GerenciarUsuarios = ({ onNavigate }) => {
 
             <form onSubmit={handleSalvar} style={{ padding: 20 }}>
               {/* Dados básicos */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+              <div className="user-basic-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
                 <div>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 5, color: "var(--text)" }}>Login *</label>
                   <input
@@ -338,7 +355,7 @@ const GerenciarUsuarios = ({ onNavigate }) => {
               </div>
 
               {/* Flags */}
-              <div style={{
+              <div className="user-status-flags" style={{
                 display: "flex", gap: 24, padding: "12px 14px",
                 background: "var(--bg)", borderRadius: 8, marginBottom: 16,
               }}>
@@ -351,12 +368,16 @@ const GerenciarUsuarios = ({ onNavigate }) => {
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)", marginBottom: 10 }}>
                   Permissões de telas
                 </div>
-                <div style={{
-                  display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
-                  padding: "12px 14px", background: "var(--bg)", borderRadius: 8,
-                }}>
-                  {TELAS.map(t => (
-                    <Toggle key={t.id} value={form[t.id]} onChange={v => set(t.id, v)} label={t.label}/>
+                <div className="user-permission-groups">
+                  {TELAS_GRUPOS.map(grupo => (
+                    <section className="user-permission-group" key={grupo.id}>
+                      <div className="user-permission-group-title">{grupo.label}</div>
+                      <div className="user-permission-grid">
+                        {grupo.telas.map(t => (
+                          <Toggle key={t.id} value={form[t.id]} onChange={v => set(t.id, v)} label={t.label}/>
+                        ))}
+                      </div>
+                    </section>
                   ))}
                 </div>
                 <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--muted)" }}>
