@@ -308,6 +308,12 @@ input, select, textarea { font: inherit; color: inherit; }
 }
 .view.no-pad { padding: 0; }
 
+.consulta-nfe-view { min-width: 0; overflow-x: hidden; }
+.consulta-nfe-card { max-width: 860px; margin: 24px auto; padding: 28px; }
+.consulta-nfe-content { max-width: 620px; margin: 0 auto; text-align: center; }
+.consulta-nfe-form { display: flex; gap: 10px; width: 100%; }
+.consulta-nfe-serie { width: 145px; flex: 0 0 145px; }
+
 /* ── Headings & section headers ─────────────────── */
 .page-head {
   display: flex; align-items: flex-end; justify-content: space-between;
@@ -3303,6 +3309,16 @@ tr.row-ok td:first-child { box-shadow: inset 3px 0 0 var(--ok); }
 
 /* responsive: mobile */
 @media (max-width: 640px) {
+  .consulta-nfe-view { padding: 14px 10px 80px; }
+  .consulta-nfe-view .page-head { align-items: flex-start; margin-bottom: 14px; }
+  .consulta-nfe-view .page-head h1 { font-size: 18px; line-height: 1.2; }
+  .consulta-nfe-view .page-head .sub { font-size: 11.5px; line-height: 1.35; }
+  .consulta-nfe-card { width: 100%; margin: 0; padding: 22px 14px; }
+  .consulta-nfe-content h2 { font-size: 19px; line-height: 1.3; }
+  .consulta-nfe-form { flex-direction: column; align-items: stretch; }
+  .consulta-nfe-form input,
+  .consulta-nfe-form button { width: 100% !important; min-height: 46px; flex: none !important; }
+
   .pneus-selector-row { flex-direction: column; align-items: stretch; }
   /* Slots maiores para toque */
   .pslot { min-width: 90px; }

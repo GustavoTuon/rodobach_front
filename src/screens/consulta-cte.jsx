@@ -17,7 +17,7 @@ const ConsultaCte = () => {
       setResultados(data?.resultados || []);
       setSearched(true);
     } catch (requestError) {
-      setError(requestError?.message || "Nao foi possivel consultar o CT-e.");
+      setError(requestError?.message || "Nao foi possivel consultar a NF-e.");
     } finally { setLoading(false); }
   };
 
@@ -32,7 +32,7 @@ const ConsultaCte = () => {
     : "-";
 
   return (
-    <div className="view">
+    <div className="view consulta-nfe-view">
       <div className="page-head">
         <div>
           <h1>Consultar chave da NF-e</h1>
@@ -40,14 +40,14 @@ const ConsultaCte = () => {
         </div>
       </div>
 
-      <div className="card" style={{maxWidth:860,margin:"24px auto",padding:28}}>
-        <div style={{maxWidth:620,margin:"0 auto",textAlign:"center"}}>
+      <div className="card consulta-nfe-card">
+        <div className="consulta-nfe-content">
           <div style={{width:54,height:54,borderRadius:14,background:"var(--primary-soft)",color:"var(--primary)",display:"grid",placeItems:"center",margin:"0 auto 14px"}}>
             <Icon name="search"/>
           </div>
           <h2 style={{margin:"0 0 7px"}}>Localize a chave da nota fiscal</h2>
           <p className="muted" style={{margin:"0 0 22px"}}>Digite o numero e a serie impressos na NF-e.</p>
-          <form onSubmit={consultar} style={{display:"flex",gap:10}}>
+          <form className="consulta-nfe-form" onSubmit={consultar}>
             <input
               autoFocus
               type="text"
@@ -56,7 +56,8 @@ const ConsultaCte = () => {
               onChange={(e) => setNota(e.target.value)}
               placeholder="Numero da nota (ex.: 15342)"
               style={{
-                flex:1,
+                flex:"1 1 260px",
+                minWidth:0,
                 fontSize:16,
                 padding:"12px 14px",
                 background:"var(--surface-2)",
@@ -67,7 +68,7 @@ const ConsultaCte = () => {
                 caretColor:"var(--primary)",
               }}
             />
-            <input type="text" inputMode="numeric" value={serie} onChange={(e) => setSerie(e.target.value)} placeholder="Serie (ex.: 6)" style={{width:145,fontSize:16,padding:"12px 14px",background:"var(--surface-2)",color:"var(--text)",border:"1px solid var(--border-strong)",borderRadius:8,outline:"none",caretColor:"var(--primary)"}} />
+            <input className="consulta-nfe-serie" type="text" inputMode="numeric" value={serie} onChange={(e) => setSerie(e.target.value)} placeholder="Serie (ex.: 6)" style={{fontSize:16,padding:"12px 14px",background:"var(--surface-2)",color:"var(--text)",border:"1px solid var(--border-strong)",borderRadius:8,outline:"none",caretColor:"var(--primary)"}} />
             <button className="btn primary" disabled={loading || !nota || !serie} style={{padding:"0 22px"}}>
               <Icon name="search"/>{loading ? " Consultando..." : " Consultar"}
             </button>
