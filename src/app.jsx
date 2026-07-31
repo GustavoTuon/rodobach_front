@@ -23,7 +23,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/manutencao.jsx",
   "src/screens/pneus.jsx?v=20260603-historico-pneu",
   "src/screens/automacoes.jsx",
-  "src/screens/consulta-cte.jsx",
+  "src/screens/consulta-cte.jsx?v=20260731-xml-nfe",
 ];
 
 const SCREEN_GLOBALS = [
