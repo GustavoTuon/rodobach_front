@@ -46,7 +46,7 @@ const ConsultaCte = () => {
             <Icon name="search"/>
           </div>
           <h2 style={{margin:"0 0 7px"}}>Localize a chave da nota fiscal</h2>
-          <p className="muted" style={{margin:"0 0 22px"}}>Digite o numero e a serie impressos na NF-e.</p>
+          <p className="muted" style={{margin:"0 0 22px"}}>Digite o numero e a serie. A busca inclui notas com CT-e e XMLs sem CT-e.</p>
           <form className="consulta-nfe-form" onSubmit={consultar}>
             <input
               autoFocus
@@ -82,7 +82,11 @@ const ConsultaCte = () => {
           {resultados.map((row) => <div key={`${row.empresa}-${row.serie}-${row.numeroCte}-${row.numeroNota}-${row.chaveNfe}`} style={{border:"1px solid var(--divider)",borderRadius:10,padding:16}}>
             <div style={{display:"flex",justifyContent:"space-between",gap:14,alignItems:"center",flexWrap:"wrap",marginBottom:12}}>
               <div><strong>NF-e {row.numeroNota}</strong><div className="muted" style={{fontSize:12}}>Serie {row.serieNota} · Emitida em {formatDate(row.dataEmissao)}</div></div>
-              <span className="badge ok">Chave encontrada</span>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                <span className="badge ok">Chave encontrada</span>
+                <span className="badge">{row.origem || "NF-e"}</span>
+                {row.possuiXml && <span className="badge info">XML disponível</span>}
+              </div>
             </div>
             <div style={{display:"flex",gap:10,alignItems:"center",flexWrap:"wrap"}}>
               <code style={{flex:1,minWidth:280,padding:"12px 14px",borderRadius:8,background:"var(--bg)",border:"1px solid var(--divider)",fontSize:14,wordBreak:"break-all"}}>{row.chaveNfe}</code>
