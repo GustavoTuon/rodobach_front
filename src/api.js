@@ -93,6 +93,7 @@ window.RB_AUTH = {
 
 // ── API ───────────────────────────────────────────────────────────────────────
 window.RB_API = {
+  consultarNfeIbrap: (nota, serie) => apiRequest(`/cte/esaf${buildQuery({ nota, serie })}`),
   listMotoristasFolgas: (filters = {}) => apiRequest(`/motoristas/folgas${buildQuery(filters)}`),
   registrarSaidaMotorista: (payload) => apiRequest("/motoristas/folgas/saidas", {
     method: "POST", body: JSON.stringify(payload),
