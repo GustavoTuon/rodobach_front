@@ -94,6 +94,10 @@ window.RB_AUTH = {
 // ── API ───────────────────────────────────────────────────────────────────────
 window.RB_API = {
   consultarNfeIbrap: (nota, serie) => apiRequest(`/cte/esaf${buildQuery({ nota, serie })}`),
+  listCanhotos: (filters = {}) => apiRequest(`/canhotos${buildQuery(filters)}`),
+  baixarCanhotos: (payload) => apiRequest("/canhotos/baixa", { method: "PUT", body: JSON.stringify(payload) }),
+  estornarCanhoto: (payload) => apiRequest("/canhotos/baixa", { method: "DELETE", body: JSON.stringify(payload) }),
+  estornarCanhotosLote: (documentos) => apiRequest("/canhotos/baixa/lote", { method: "DELETE", body: JSON.stringify({ documentos }) }),
   listMotoristasFolgas: (filters = {}) => apiRequest(`/motoristas/folgas${buildQuery(filters)}`),
   registrarSaidaMotorista: (payload) => apiRequest("/motoristas/folgas/saidas", {
     method: "POST", body: JSON.stringify(payload),
