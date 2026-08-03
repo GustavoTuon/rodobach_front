@@ -77,10 +77,10 @@ const FolgasMotoristas = () => {
       <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"flex-start",marginBottom:20}}>
         <div>
           <h1 style={{fontSize:22,margin:0,color:"var(--text)"}}>Jornada e folgas</h1>
-          <p style={{fontSize:13,color:"var(--muted)",margin:"6px 0 10px"}}>Acompanhe os dias fora, folgas acumuladas e disponibilidade dos motoristas.</p>
+          <p style={{fontSize:13,color:"var(--muted)",margin:"6px 0 10px"}}>Jornadas calculadas automaticamente pelas datas de saída e chegada do controle de viagens.</p>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
             <span title="Os dias completos fora são somados. A cada 6 dias, uma folga é gerada; o restante continua no próximo ciclo." style={{padding:"5px 9px",border:"1px solid var(--border)",borderRadius:999,fontSize:11.5,color:"var(--text-2)",background:"var(--surface)"}}>ⓘ 1 dia de folga a cada 6 dias fora</span>
-            <span style={{padding:"5px 9px",border:"1px solid var(--border)",borderRadius:999,fontSize:11.5,color:"var(--muted)"}}>Histórico desde 01/01/2026</span>
+            <span style={{padding:"5px 9px",border:"1px solid var(--border)",borderRadius:999,fontSize:11.5,color:"var(--muted)"}}>Data de corte 01/03/2026 · saída = chegada significa em viagem</span>
           </div>
         </div>
         <div style={{textAlign:"right"}}><button className="btn" onClick={load} disabled={loading}><Icon name="refresh" size={14}/> {loading?"Atualizando…":"Atualizar"}</button>{updatedAt&&<div style={{fontSize:10.5,color:"var(--muted)",marginTop:6}}>Atualizado às {updatedAt.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div>}</div>
@@ -108,25 +108,22 @@ const FolgasMotoristas = () => {
 
       {error && <div style={{padding:12,background:"#fef2f2",color:"#b91c1c",borderRadius:7,marginBottom:12,fontSize:13}}>{error}</div>}
       <div style={{border:"1px solid var(--border)",borderRadius:9,overflow:"hidden",background:"var(--surface)"}}>
-        <div className="fm-table-row fm-table-head" style={{display:"grid",gridTemplateColumns:"minmax(180px,2fr) 82px 100px 112px 92px 105px 140px 120px",gap:9,padding:"10px 14px",background:"var(--surface-2)",color:"var(--muted)",fontSize:11,fontWeight:600,textTransform:"uppercase"}}>
-          <span>Motorista</span><span>Veículo</span><span>Situação</span><span>Validação</span><span>Viagens</span><span>Dias fora</span><span>Saldo de folga</span><span>Ações</span>
+        <div className="fm-table-row fm-table-head" style={{display:"grid",gridTemplateColumns:"minmax(180px,1.6fr) 82px 100px minmax(190px,1.4fr) 105px 120px 145px 110px",gap:9,padding:"10px 14px",background:"var(--surface-2)",color:"var(--muted)",fontSize:11,fontWeight:600,textTransform:"uppercase"}}>
+          <span>Motorista</span><span>Veículo</span><span>Situação</span><span>Última viagem lançada</span><span>Dias da viagem</span><span>Histórico</span><span>Saldo de folga</span><span>Ações</span>
         </div>
         {loading ? <div style={{padding:32,textAlign:"center",color:"var(--muted)"}}>Carregando motoristas…</div> :
           data.itens.map(item => {
             const sit = fmStatus[item.status] || fmStatus.disponivel;
-            const val = fmValidation[item.validacao?.nivel] || fmValidation.sem_dados;
             const progresso = item.retroativo?.saldoDias || 0;
-            return <div key={`${item.empresa}-${item.codigo}`} className="fm-table-row" style={{display:"grid",gridTemplateColumns:"minmax(180px,2fr) 82px 100px 112px 92px 105px 140px 120px",gap:9,padding:"14px",alignItems:"center",borderTop:"1px solid var(--border)",fontSize:12.5}}>
+            return <div key={`${item.empresa}-${item.codigo}`} className="fm-table-row" style={{display:"grid",gridTemplateColumns:"minmax(180px,1.6fr) 82px 100px minmax(190px,1.4fr) 105px 120px 145px 110px",gap:9,padding:"14px",alignItems:"center",borderTop:"1px solid var(--border)",fontSize:12.5}}>
               <div style={{display:"flex",gap:10,alignItems:"center"}}><span style={{width:32,height:32,borderRadius:"50%",display:"grid",placeItems:"center",background:"rgba(59,130,246,.12)",color:"#60a5fa",fontWeight:700,fontSize:11}}>{item.nome.split(" ").slice(0,2).map(x=>x[0]).join("")}</span><div><strong style={{display:"block",color:"var(--text)"}}>{item.nome}</strong><span style={{color:"var(--muted)",fontSize:11.5}}>{item.telefone || `Código ${item.codigo}`}</span></div></div>
               <span style={{fontFamily:"Geist Mono",color:"var(--text-2)",padding:"4px 7px",border:"1px solid var(--border)",borderRadius:5,justifySelf:"start"}}>{item.placa || "Sem veículo"}</span>
-              <span style={{justifySelf:"start",padding:"4px 8px",borderRadius:999,color:sit.color,background:sit.bg,fontSize:11,fontWeight:600}}>{sit.label}</span>
-              <div title={`${item.validacao?.confirmadas||0} confirmadas, ${item.validacao?.parciais||0} parciais e ${item.validacao?.divergentes||0} divergentes desde 25/05/2026`}><span style={{display:"inline-block",padding:"4px 8px",borderRadius:999,color:val.color,background:val.bg,fontSize:11,fontWeight:600}}>{val.label}</span><div style={{fontSize:10,color:"var(--muted)",marginTop:4}}>{item.validacao?.confirmadas||0}/{item.validacao?.total||0} confirmadas</div></div>
-              <div><strong>{item.retroativo?.viagensCompletas || 0} completas</strong><div style={{color:item.retroativo?.viagensPendentes?"#b45309":"var(--muted)",fontSize:11}}>{item.retroativo?.viagensPendentes || 0} pendentes</div></div>
-              <div title="Soma dos dias completos fora desde a data de corte"><strong style={{fontSize:16,color:"var(--text)"}}>{item.retroativo?.diasFora || 0} dias</strong><div style={{fontSize:10.5,color:"var(--muted)",marginTop:3}}>{item.status==="fora" ? `${item.diasFora || 0} na viagem atual` : "desde 01/01/2026"}</div></div>
+              <div><span style={{display:"inline-block",padding:"4px 8px",borderRadius:999,color:sit.color,background:sit.bg,fontSize:11,fontWeight:600}}>{sit.label}</span>{item.jornada?.viagem && <div style={{fontSize:10,color:"var(--muted)",marginTop:4}}>Viagem #{item.jornada.viagem}</div>}</div>
+              <div>{item.jornada ? <><strong style={{display:"block"}}>Viagem #{item.jornada.viagem}</strong><span style={{display:"block",fontSize:10.5,color:"var(--muted)",marginTop:3}}>Saída: {fmDate(item.jornada.saidaEm)}</span><span style={{display:"block",fontSize:10.5,color:"var(--muted)",marginTop:2}}>{item.jornada.retornoEm ? `Chegada: ${fmDate(item.jornada.retornoEm)}` : "Chegada: aguardando retorno"}</span></> : <span style={{color:"var(--muted)"}}>Nenhuma viagem desde o corte</span>}</div>
+              <div title="Dias calculados pela última viagem lançada"><strong style={{fontSize:17,color:item.status==="fora"?"#60a5fa":"var(--text)"}}>{item.diasFora || 0} dias</strong><div style={{fontSize:10.5,color:"var(--muted)",marginTop:3}}>{item.status==="fora"?"fora atualmente":"última viagem"}</div></div>
+              <div title="Viagens concluídas e dias fora acumulados desde 01/03/2026"><strong>{item.retroativo?.viagensCompletas || 0} viagens</strong><div style={{color:item.retroativo?.viagensPendentes?"#b45309":"var(--muted)",fontSize:10.5,marginTop:3}}>{item.retroativo?.diasFora || 0} dias concluídos</div><div style={{color:"var(--muted)",fontSize:10}}>{item.retroativo?.viagensPendentes || 0} em andamento</div></div>
               <div title="Saldo calculado com os usos registrados nesta tela. Folgas usufruídas antes desta implantação ainda precisam ser lançadas."><strong style={{fontSize:15,color:item.retroativo?.folgasDisponiveis>0?"#a78bfa":"var(--text)"}}>{item.retroativo?.folgasDisponiveis||0} dias calculados</strong><div style={{fontSize:10.5,color:"var(--muted)",marginTop:3}}>Geradas {item.retroativo?.diasFolga||0} • usadas {item.retroativo?.folgasUtilizadas||0}</div><div style={{height:4,background:"var(--border)",borderRadius:4,marginTop:7,overflow:"hidden"}}><div style={{height:"100%",width:`${progresso/6*100}%`,background:"#60a5fa"}}/></div><div style={{fontSize:9.5,color:"var(--muted)",marginTop:3}}>Próxima folga: {progresso} de 6 dias</div></div>
-              <div style={{display:"flex",flexDirection:"column",gap:5}}>{item.status === "fora"
-                ? <button className="btn primary" onClick={()=>setModal({tipo:"retorno",item,retornoEm:fmDateTimeLocal(),observacoes:item.jornada?.observacoes||""})}>Registrar retorno</button>
-                : <button className="btn" onClick={()=>setModal({tipo:"saida",item,saidaEm:fmDateTimeLocal(),retornoPrevistoEm:"",observacoes:""})}>Registrar saída</button>}
+              <div style={{display:"flex",flexDirection:"column",gap:5}}><span style={{fontSize:10,color:"var(--muted)",textAlign:"center"}}>Jornada automática</span>
                 <button className="btn" disabled={!item.retroativo?.folgasDisponiveis} onClick={()=>setModal({tipo:"folga",item,quantidade:"1",dataMovimento:new Date().toISOString().slice(0,10),observacoes:""})}>Registrar folga</button></div>
             </div>;
           })}

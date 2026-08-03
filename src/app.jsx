@@ -5,7 +5,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/diretoria.jsx",
   "src/screens/simulador.jsx",
   "src/screens/viagens.jsx",
-  "src/screens/folgas-motoristas.jsx",
+  "src/screens/folgas-motoristas.jsx?v=20260803-corte-marco",
   "src/screens/status-carga.jsx",
   "src/screens/trafegus.jsx",
   "src/screens/oportunidades-retorno.jsx",
@@ -24,13 +24,14 @@ const SCREEN_SCRIPTS = [
   "src/screens/pneus.jsx?v=20260603-historico-pneu",
   "src/screens/automacoes.jsx",
   "src/screens/consulta-cte.jsx?v=20260731-xml-nfe",
+  "src/screens/controle-canhotos.jsx?v=20260803-3",
 ];
 
 const SCREEN_GLOBALS = [
   "Diretoria", "SimuladorFrete", "Viagens", "FolgasMotoristas",
   "StatusCargaFrota", "Trafegus", "OportunidadesRetorno",
   "DreEmpresarial", "AnaliseClientes",
-  "RentabilidadeClientes", "LucroViagens", "ResultadoFretes", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n", "ConsultaCte",
+  "RentabilidadeClientes", "LucroViagens", "ResultadoFretes", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n", "ConsultaCte", "ControleCanhotos",
 ];
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -58,6 +59,7 @@ const NAV = [
   { id: "trafegus",        label: "Trafegus",     icon: "map",         title: "SMs e Rotas do Trafegus", section: "operacao" },
   { id: "oportunidades-retorno", label: "Retorno", icon: "route", title: "Clientes próximos e carga de retorno", section: "operacao" },
   { id: "consulta-cte", label: "Consultar NF-e", icon: "search", title: "Consulta de chave da NF-e", section: "operacao" },
+  { id: "controle-canhotos", label: "Canhotos", icon: "check", title: "Controle de canhotos", section: "operacao" },
   { id: "pneus",           label: "Pneus",        icon: "truck",       title: "Movimentação de Pneus", section: "operacao" },
   { id: "manutencao",      label: "Automações",   icon: "wrench",      title: "Automação de Manutenção", section: "operacao" },
   { id: "automacoes-n8n",  label: "n8n",          icon: "plug",        title: "Automações n8n", sistema: true },
@@ -427,6 +429,9 @@ const App = () => {
       break;
     case "consulta-cte":
       body = <ConsultaCte/>;
+      break;
+    case "controle-canhotos":
+      body = <ControleCanhotos/>;
       break;
     case "usuarios":
       body = <GerenciarUsuarios onNavigate={onNavigate}/>;
