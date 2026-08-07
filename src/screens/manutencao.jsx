@@ -6,6 +6,7 @@ const EMPTY_FORM = {
   tipo_controle: "km",
   intervalo_dias: "",
   data_ultimo_servico: "",
+  datas_automaticas: false,
   numeros: [], // ["5546999990000", ...]
 };
 
@@ -119,6 +120,7 @@ function mensagemPreview(item) {
   const placa = normalizarPlaca(item.placa);
   const titulo = item.titulo || "Manutencao programada";
   const info = kmInfo(item);
+  const isDate = item.tipo_controle === "data";
   const kmAtual = fmtKm(item.km_atual);
   const kmProgramado = fmtKm(kmProximoDoItem(item));
   const ultima = item.ultimaManutencao;
@@ -128,19 +130,20 @@ function mensagemPreview(item) {
       ? `Plano autorizado em ${dataBR(item.planoAutorizado.data)} - ${item.planoAutorizado.fornecedor || "fornecedor nao informado"} - sem KM de execucao`
       : "Sem manutencao com KM encontrada para este servico.";
   return [
-    "*ALERTA DE MANUTENCAO POR KM*",
+    info.status === "vencido" ? "🔴 *MANUTENÇÃO VENCIDA*" : "🟡 *MANUTENÇÃO PRÓXIMA*",
     "",
-    `Placa: ${placa}`,
-    item.modelo ? `Veiculo: ${item.modelo}` : null,
-    `Servico: ${titulo}`,
-    `Status: ${info.label}`,
+    `🚛 *Placa:* ${placa}`,
+    item.modelo ? `🚚 *Veículo:* ${item.modelo}` : null,
+    `🔧 *Serviço:* ${titulo}`,
+    `📋 *Controle:* ${isDate ? "Validade por data" : "Quilometragem"}`,
+    `⚠️ *Status:* ${info.label}`,
     "",
-    `KM atual: ${kmAtual}`,
-    `Enviar no KM: ${kmProgramado}`,
-    `Ultimo registro: ${ultimoRegistro}`,
+    ...(isDate
+      ? [`📅 *Último serviço:* ${dataBR(item.data_ultimo_servico)}`, `⏳ *Validade:* ${dataBR(item.data_proximo_envio)}`]
+      : [`📏 *KM atual:* ${kmAtual}`, `🎯 *Próximo marco:* ${kmProgramado}`, `🧾 *Último registro:* ${ultimoRegistro}`]),
     "",
-    `Acao: ${item.mensagem || "Verifique e programe a manutencao."}`,
-  ].filter(Boolean).join("\n");
+    `✅ *Ação recomendada:* ${item.mensagem || "Verifique e programe a manutenção antes de liberar o veículo."}`,
+  ].filter(line => line !== null && line !== undefined).join("\n");
 }
 
 function kmInfo(item) {
@@ -151,10 +154,10 @@ function kmInfo(item) {
     const due = new Date(`${String(item.data_proximo_envio).slice(0, 10)}T00:00:00`);
     const dias = Math.ceil((due - today) / 86400000);
     if (dias < 0) return { status: "vencido", label: `Vencido há ${Math.abs(dias)} dia(s)`, tone: "#dc2626", bg: "rgba(220,38,38,.10)", faltam: dias };
-    if (dias <= 60) return { status: "perto", label: `Vence em ${dias} dia(s)`, tone: "#d97706", bg: "rgba(217,119,6,.11)", faltam: dias };
+    if (dias <= 30) return { status: "perto", label: `Vence em ${dias} dia(s)`, tone: "#d97706", bg: "rgba(217,119,6,.11)", faltam: dias };
     return { status: "ok", label: `Vence em ${dataBR(item.data_proximo_envio)}`, tone: "#16a34a", bg: "rgba(22,163,74,.10)", faltam: dias };
   }
-  const atual = Number(item?.km_atual);
+  const atual = item?.km_atual == null ? NaN : Number(item.km_atual);
   const proximo = kmProximoDoItem(item);
   if (!Number.isFinite(atual) || !Number.isFinite(proximo) || proximo <= 0) {
     return { status: "sem_km", label: "Sem KM confiavel", tone: "var(--text-3)", bg: "var(--surface-2)", faltam: null };
@@ -163,7 +166,7 @@ function kmInfo(item) {
   if (faltam <= 0) {
     return { status: "vencido", label: `Vencido ${fmtKm(Math.abs(faltam))}`, tone: "#dc2626", bg: "rgba(220,38,38,.10)", faltam };
   }
-  if (faltam <= Math.max(Number(item?.intervalo_km) * 0.1, 500)) {
+  if (faltam <= 1000) {
     return { status: "perto", label: `Faltam ${fmtKm(faltam)}`, tone: "#d97706", bg: "rgba(217,119,6,.11)", faltam };
   }
   return { status: "ok", label: `Faltam ${fmtKm(faltam)}`, tone: "#16a34a", bg: "rgba(22,163,74,.10)", faltam };
@@ -205,6 +208,22 @@ function dedupeSelecionadas(selecionadas) {
     porPlaca.set(placa, { ...item, placa, km_atual: Number(item.km_atual) || 0 });
   }
   return [...porPlaca.values()];
+}
+
+function selecaoVeiculo(veiculo) {
+  const afericao = veiculo?.ultimaAfericaoTacografo;
+  return {
+    placa: veiculo.placa,
+    km_atual: Number(veiculo.km_atual) > 0 ? Number(veiculo.km_atual) : null,
+    km_fonte: veiculo.km_fonte || "indisponivel",
+    km_data: veiculo.km_data || null,
+    modelo: veiculo.modelo || "",
+    data_ultimo_servico: afericao?.data ? String(afericao.data).slice(0, 10) : "",
+    afericao_origem: afericao?.origem || "",
+    afericao_documento: afericao?.documento || "",
+    km_ultimo_servico: "",
+    data_ultimo_servico_km: "",
+  };
 }
 
 function normalizarNumero(numero) {
@@ -274,7 +293,7 @@ function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
     if (jaEsta) {
       onChange(selecionadas.filter(s => s.placa !== veiculo.placa));
     } else {
-      onChange(dedupeSelecionadas([...selecionadas, { placa: veiculo.placa, km_atual: Number(veiculo.odometro) || 0, modelo: veiculo.modelo || "" }]));
+      onChange(dedupeSelecionadas([...selecionadas, selecaoVeiculo(veiculo)]));
     }
   }
 
@@ -282,7 +301,7 @@ function MultiSelectVeiculos({ selecionadas, onChange, veiculos, carregando }) {
     if (selecionadasUnicas.length === veiculosUnicos.length) {
       onChange([]);
     } else {
-      onChange(veiculosUnicos.map(v => ({ placa: v.placa, km_atual: Number(v.odometro) || 0, modelo: v.modelo || "" })));
+      onChange(veiculosUnicos.map(selecaoVeiculo));
     }
   }
 
@@ -935,6 +954,7 @@ function ManutencaoMensagens() {
       tipo_controle: a.tipo_controle || "km",
       intervalo_dias: a.intervalo_dias ? String(a.intervalo_dias) : "",
       data_ultimo_servico: a.data_ultimo_servico ? String(a.data_ultimo_servico).slice(0, 10) : "",
+      datas_automaticas: false,
       numeros: String(a.numeros || "").split(",").filter(Boolean),
     });
     setFormErro(null);
@@ -952,6 +972,7 @@ function ManutencaoMensagens() {
       intervalo_km: plano.tipoControle === "data" ? "" : String(plano.intervalo),
       intervalo_dias: plano.tipoControle === "data" ? String(plano.intervaloDias) : "",
       data_ultimo_servico: plano.tipoControle === "data" ? f.data_ultimo_servico : "",
+      datas_automaticas: plano.id === "afericao-tacografo",
     }));
   }
 
@@ -977,8 +998,20 @@ function ManutencaoMensagens() {
       setFormErro("O intervalo de KM deve ser maior que zero.");
       return;
     }
-    if (form.tipo_controle === "data" && (!form.data_ultimo_servico || Number(form.intervalo_dias) <= 0)) {
-      setFormErro("Informe a data da última aferição e um intervalo em dias.");
+    const referenciasKmIncompletas = form.selecionadas.filter(item =>
+      item.km_ultimo_servico === "" || item.km_ultimo_servico == null || !item.data_ultimo_servico_km
+    );
+    if (!editando && form.tipo_controle === "km" && referenciasKmIncompletas.length > 0) {
+      setFormErro(`Informe o KM e a data da última troca para: ${referenciasKmIncompletas.map(item => item.placa).join(", ")}.`);
+      return;
+    }
+    if (form.tipo_controle === "data" && Number(form.intervalo_dias) <= 0) {
+      setFormErro("Informe um intervalo de validade em dias.");
+      return;
+    }
+    const semDataIndividual = form.selecionadas.filter(item => !item.data_ultimo_servico);
+    if (form.tipo_controle === "data" && !form.data_ultimo_servico && semDataIndividual.length > 0) {
+      setFormErro(`Informe uma data padrão para as placas sem histórico: ${semDataIndividual.map(item => item.placa).join(", ")}.`);
       return;
     }
     if (form.numeros.length === 0) {
@@ -1013,7 +1046,12 @@ function ManutencaoMensagens() {
       } else {
         // Criação: um registro por placa selecionada
         await RB_API.createManutencao({
-          placas: dedupeSelecionadas(form.selecionadas),
+          placas: dedupeSelecionadas(form.selecionadas).map(item => ({
+            ...item,
+            data_ultimo_servico: form.tipo_controle === "data"
+              ? (item.data_ultimo_servico || form.data_ultimo_servico)
+              : null,
+          })),
           titulo: form.titulo.trim(),
           mensagem: form.mensagem.trim(),
           tipo_controle: form.tipo_controle,
@@ -1061,10 +1099,40 @@ function ManutencaoMensagens() {
     }
   }
 
+  function atualizarReferenciaPlaca(placa, campo, valor) {
+    setForm(f => ({
+      ...f,
+      selecionadas: f.selecionadas.map(item => item.placa === placa ? { ...item, [campo]: valor } : item),
+    }));
+  }
+
   function abrirRegistro() {
     if (veiculos.length === 0) carregarVeiculos();
     const primeiraPlaca = veiculosAgrupados[0]?.placa || "";
     setRegistroForm(f => ({ ...f, placa: primeiraPlaca, automacao_id: "", km_servico: "" }));
+    setRegistroErro("");
+    setRegistroModal(true);
+  }
+
+  function abrirRegistroParaPlano(automacao) {
+    const titulo = String(automacao?.titulo || "").toLowerCase();
+    const tipo = titulo.includes("filtro de ar") ? "filtro_ar"
+      : titulo.includes("filtro") ? "filtro_combustivel"
+      : titulo.includes("câmbio") || titulo.includes("cambio") ? "oleo_cambio"
+      : titulo.includes("diferencial") ? "oleo_diferencial"
+      : titulo.includes("tacógrafo") || titulo.includes("tacografo") ? "afericao_tacografo"
+      : "troca_oleo_motor";
+    setRegistroForm({
+      placa: automacao.placa,
+      automacao_id: String(automacao.id),
+      tipo_movimento: tipo,
+      descricao: automacao.titulo || "Manutenção executada",
+      data_servico: new Date().toISOString().slice(0, 10),
+      km_servico: String(automacao.km_atual || ""),
+      fornecedor: "",
+      documento: "",
+      observacao: "",
+    });
     setRegistroErro("");
     setRegistroModal(true);
   }
@@ -1283,12 +1351,12 @@ function ManutencaoMensagens() {
                         </div>
 
                         {a.tipo_controle === "data" ? <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 8 }}>
-                          <div style={{ fontSize: 12 }}><span className="muted">Periodicidade</span><br/><strong>2 anos</strong></div>
+                          <div style={{ fontSize: 12 }}><span className="muted">Periodicidade</span><br/><strong>{Number(a.intervalo_dias) === 730 ? "2 anos" : `${a.intervalo_dias} dias (certificado)`}</strong></div>
                           <div style={{ fontSize: 12 }}><span className="muted">Última aferição</span><br/><strong>{dataBR(a.data_ultimo_servico)}</strong></div>
                           <div style={{ fontSize: 12 }}><span className="muted">Validade</span><br/><strong style={{ color: "var(--brand-blue)" }}>{dataBR(a.data_proximo_envio)}</strong></div>
                         </div> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: 8, marginBottom: 8 }}>
                           <div style={{ fontSize: 12 }}><span className="muted">Intervalo</span><br/><strong>{fmtKm(a.intervalo_km)}</strong></div>
-                          <div style={{ fontSize: 12 }}><span className="muted">KM atual</span><br/><strong>{fmtKm(a.km_atual)}</strong></div>
+                          <div style={{ fontSize: 12 }}><span className="muted">KM atual</span><br/><strong>{fmtKm(a.km_atual)}</strong><br/><small className="muted">{a.km_fonte === "telemetria" ? "Telemetria" : a.km_fonte === "abastecimento" ? "Sistema · abastecimento" : a.km_fonte === "viagem" ? "Sistema · viagem" : a.km_fonte === "ordem_servico" ? "Sistema · ordem de serviço" : "Sem referência"}</small></div>
                           <div style={{ fontSize: 12 }}><span className="muted">Enviar no KM</span><br/><strong style={{ color: "var(--brand-blue)" }}>{fmtKm(kmProximoDoItem(a))}</strong></div>
                         </div>}
 
@@ -1368,15 +1436,15 @@ function ManutencaoMensagens() {
 
                       <div className="row" style={{ gap: 5, flexShrink: 0 }}>
                         {a.tipo_controle !== "data" && <button
-                          onClick={() => { setKmModal(a); setKmValor(String(a.km_atual)); }}
-                          title="Atualizar KM"
+                          onClick={() => abrirRegistroParaPlano(a)}
+                          title="Registrar troca ou serviço executado"
                           style={{
-                            background: "var(--surface)", border: "1px solid var(--border)",
+                            background: "var(--accent-soft)", border: "1px solid var(--accent-border)",
                             borderRadius: 6, padding: "5px 10px", cursor: "pointer",
-                            fontSize: 12, color: "var(--text)", display: "flex", alignItems: "center", gap: 5,
+                            fontSize: 12, color: "var(--brand-blue)", display: "flex", alignItems: "center", gap: 5,
                           }}
                         >
-                          <Icon name="trending-up" size={13}/> Informar KM
+                          <Icon name="wrench" size={13}/> Registrar troca
                         </button>}
                         <button
                           onClick={() => toggleAtivo(a)}
@@ -1429,7 +1497,7 @@ function ManutencaoMensagens() {
         }} onClick={e => { if (e.target === e.currentTarget) fecharModal(); }}>
           <div style={{
             background: "var(--surface)", border: "1px solid var(--border)",
-            borderRadius: 12, padding: 24, width: "100%", maxWidth: 520,
+            borderRadius: 12, padding: 24, width: "100%", maxWidth: 780,
             maxHeight: "90vh", overflowY: "auto",
           }}>
             <div className="row between" style={{ marginBottom: 20 }}>
@@ -1476,7 +1544,7 @@ function ManutencaoMensagens() {
                 </div>
 
                 {/* Prévia dos KMs selecionados (apenas no modo criação) */}
-                {!editando && form.selecionadas.length > 0 && (
+                {!editando && form.selecionadas.length > 0 && form.tipo_controle === "km" && (
                   <div style={{
                     background: "var(--accent-soft)",
                     border: "1px solid var(--accent-border)",
@@ -1486,23 +1554,33 @@ function ManutencaoMensagens() {
                     <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 7, color: "var(--brand-blue)" }}>
                       Resumo por veículo
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "auto 1fr 1fr", gap: "4px 12px", alignItems: "center" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "75px 100px minmax(105px,1fr) minmax(125px,1fr) 105px", gap: "6px 10px", alignItems: "center" }}>
                       <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>Placa</span>
-                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>KM atual</span>
-                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>Enviar no KM</span>
+                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>KM atual / fonte</span>
+                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>KM última troca *</span>
+                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>Data da troca *</span>
+                      <span style={{ fontSize: 11, color: "var(--muted)", fontWeight: 500 }}>Próxima troca</span>
                       {form.selecionadas.map(s => {
-                        const kmAtual = Number(s.km_atual) || 0;
+                        const kmAtual = Number(s.km_atual) > 0 ? Number(s.km_atual) : null;
+                        const kmUltimaTroca = Number(s.km_ultimo_servico) || 0;
                         const intervalo = Number(form.intervalo_km) || 0;
                         return (
                           <React.Fragment key={s.placa}>
                             <span style={{ fontFamily: "var(--font-mono, monospace)", fontWeight: 700, fontSize: 12, color: "var(--brand-blue)" }}>{s.placa}</span>
-                            <span style={{ fontSize: 12 }}>{fmtKm(kmAtual)}</span>
+                            <span style={{ fontSize: 12, color: kmAtual ? "var(--text)" : "var(--danger, #e54d2e)" }} title={s.km_data ? `Referência de ${dataBR(s.km_data)}` : "Leitura atual da telemetria"}>
+                              {kmAtual ? <>{fmtKm(kmAtual)}<br/><small className="muted">{s.km_fonte === "telemetria" ? "Telemetria" : s.km_fonte === "abastecimento" ? "Sistema · abastecimento" : s.km_fonte === "viagem" ? "Sistema · viagem" : s.km_fonte === "ordem_servico" ? "Sistema · ordem de serviço" : "Sistema"}</small></> : "KM indisponível"}
+                            </span>
+                            <input type="number" min="0" value={s.km_ultimo_servico || ""} onChange={e => atualizarReferenciaPlaca(s.placa, "km_ultimo_servico", e.target.value)} placeholder="Ex.: 405917" style={{ minWidth: 0, width: "100%", padding: "6px 7px", boxSizing: "border-box", border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: "var(--text)", fontSize: 12 }}/>
+                            <input type="date" value={s.data_ultimo_servico_km || ""} onChange={e => atualizarReferenciaPlaca(s.placa, "data_ultimo_servico_km", e.target.value)} style={{ minWidth: 0, width: "100%", padding: "6px 7px", boxSizing: "border-box", border: "1px solid var(--border)", borderRadius: 5, background: "var(--bg)", color: "var(--text)", fontSize: 12 }}/>
                             <span style={{ fontSize: 12, fontWeight: 600, color: intervalo ? "var(--text)" : "var(--muted)" }}>
-                              {intervalo ? fmtKm(proximoKmProgramado(kmAtual, intervalo)) : "—"}
+                              {intervalo && kmUltimaTroca ? fmtKm(kmUltimaTroca + intervalo) : "—"}
                             </span>
                           </React.Fragment>
                         );
                       })}
+                    </div>
+                    <div className="muted" style={{ fontSize: 11, marginTop: 8 }}>
+                      O KM atual é somente leitura: usa a telemetria e, quando ela estiver indisponível, o lançamento mais recente do sistema. A última troca será salva no histórico do veículo.
                     </div>
                   </div>
                 )}
@@ -1615,16 +1693,40 @@ function ManutencaoMensagens() {
                     }}
                     required
                   />
-                </div> : <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  <label style={{ fontSize: 12.5, fontWeight: 500 }}>Data da última aferição *
-                    <input type="date" value={form.data_ultimo_servico} onChange={e => setForm(f => ({ ...f, data_ultimo_servico: e.target.value }))} style={{ width: "100%", padding: "8px 10px", marginTop: 5, border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }} required/>
-                  </label>
-                  <label style={{ fontSize: 12.5, fontWeight: 500 }}>Validade *
-                    <select value={form.intervalo_dias} onChange={e => setForm(f => ({ ...f, intervalo_dias: e.target.value }))} style={{ width: "100%", padding: "8px 10px", marginTop: 5, border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text)" }}>
-                      <option value="730">2 anos</option>
-                    </select>
-                  </label>
-                </div>}
+                </div> : <>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <label style={{ fontSize: 12.5, fontWeight: 500 }}>
+                      {form.datas_automaticas ? "Data padrão (sem histórico)" : "Data da última aferição *"}
+                      <input type="date" value={form.data_ultimo_servico} onChange={e => setForm(f => ({ ...f, data_ultimo_servico: e.target.value }))} style={{ width: "100%", padding: "8px 10px", marginTop: 5, border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text)", boxSizing: "border-box" }}/>
+                    </label>
+                    <label style={{ fontSize: 12.5, fontWeight: 500 }}>Validade *
+                      <select value={form.intervalo_dias} onChange={e => setForm(f => ({ ...f, intervalo_dias: e.target.value }))} style={{ width: "100%", padding: "8px 10px", marginTop: 5, border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg)", color: "var(--text)" }}>
+                        {form.intervalo_dias && String(form.intervalo_dias) !== "730" && <option value={form.intervalo_dias}>{form.intervalo_dias} dias (certificado)</option>}
+                        <option value="730">2 anos</option>
+                      </select>
+                    </label>
+                  </div>
+                  {form.datas_automaticas && form.selecionadas.length > 0 && (
+                    <div style={{ border: "1px solid var(--border)", borderRadius: 6, overflow: "hidden", fontSize: 12.5 }}>
+                      <div style={{ padding: "8px 10px", background: "var(--surface-2)", fontWeight: 600 }}>
+                        Últimas aferições encontradas — produto 1046
+                      </div>
+                      {dedupeSelecionadas(form.selecionadas).map(item => (
+                        <div key={item.placa} style={{ display: "grid", gridTemplateColumns: "90px 110px 1fr", gap: 10, padding: "7px 10px", borderTop: "1px solid var(--border)", alignItems: "center" }}>
+                          <strong>{item.placa}</strong>
+                          <span style={{ color: item.data_ultimo_servico ? "var(--text)" : "var(--danger, #e54d2e)" }}>
+                            {item.data_ultimo_servico ? dataBR(item.data_ultimo_servico) : "Sem histórico"}
+                          </span>
+                          <span style={{ color: "var(--muted)" }}>
+                            {item.data_ultimo_servico
+                              ? [item.afericao_origem, item.afericao_documento].filter(Boolean).join(" · ")
+                              : "Usará a data padrão informada acima"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>}
 
                 {formErro && (
                   <div style={{

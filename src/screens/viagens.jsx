@@ -146,6 +146,10 @@ const buildGoogleMapsRouteUrl = (input = {}) => {
   if (points.length > 2) params.set("waypoints", points.slice(1, -1).join("|"));
   return `https://www.google.com/maps/dir/?${params.toString()}`;
 };
+const buildGoogleMapsSearchUrl = (cidade, uf) => {
+  const point = formatRoutePoint(cidade, uf);
+  return point ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(point)}` : "";
+};
 const normalizeMapsUrl = (value) => {
   const url = textValue(value).trim();
   if (!url) return "";
@@ -514,12 +518,19 @@ const Viagens = ({ onNavigate }) => {
     const item = (opcoes.detalhes?.clientes || []).find(c => String(c.nome || "").toLowerCase() === String(value || "").toLowerCase());
     if (!item) return;
     if (VIAGENS_FORM_DEBUG) console.debug("[Viagens][autocomplete cliente]", { campo: field, selecionado: value, preenchido: item });
-    setForm(prev => ({
-      ...prev,
-      [field]: item.nome || prev[field],
-      condicaoPagamento: item.condicaoPagamento || prev.condicaoPagamento,
-      vendedor: item.vendedor || prev.vendedor,
-    }));
+    setForm(prev => {
+      const shouldFillDestination = Boolean(item.cidade) && (
+        field === "clienteFinal" || (field === "cliente" && !prev.clienteFinal && !prev.destino)
+      );
+      return {
+        ...prev,
+        [field]: item.nome || prev[field],
+        condicaoPagamento: item.condicaoPagamento || prev.condicaoPagamento,
+        vendedor: item.vendedor || prev.vendedor,
+        destino: shouldFillDestination ? item.cidade : prev.destino,
+        ufDestino: shouldFillDestination ? String(item.uf || "").toUpperCase().slice(0, 2) : prev.ufDestino,
+      };
+    });
   };
 
   const autocompleteText = (item) => String([
@@ -1304,7 +1315,7 @@ const Viagens = ({ onNavigate }) => {
                 onClick={() => routeMapsUrl && window.open(routeMapsUrl, "_blank", "noopener,noreferrer")}
                 style={{padding: "4px 9px", fontSize: 12}}
               >
-                <Icon name="map" size={12}/> Mapa
+                <Icon name="map" size={12}/> Abrir rota Google
               </button>
             </div>
           </div>
@@ -1336,6 +1347,7 @@ const Viagens = ({ onNavigate }) => {
                 onChange={e => setF("ufOrigem", e.target.value.toUpperCase().slice(0, 2))}
                 placeholder="UF" maxLength="2"/>
             </div>
+            {form.origem && <button type="button" className="btn ghost" style={{marginTop:7,padding:"4px 8px",fontSize:11.5}} onClick={()=>window.open(buildGoogleMapsSearchUrl(form.origem,form.ufOrigem),"_blank","noopener,noreferrer")}><Icon name="map" size={11}/> Ver origem no Google Maps</button>}
           </Fg>
 
           <div style={{display: "flex", alignItems: "center", justifyContent: "center", padding: "10px 0", color: "var(--text-3)"}}>
@@ -1369,6 +1381,7 @@ const Viagens = ({ onNavigate }) => {
                 onChange={e => setF("ufDestino", e.target.value.toUpperCase().slice(0, 2))}
                 placeholder="UF" maxLength="2"/>
             </div>
+            {form.destino && <div className="row between" style={{marginTop:7,gap:8}}><span className="muted" style={{fontSize:11}}>Destino preenchido pelo cliente final quando disponível.</span><button type="button" className="btn ghost" style={{padding:"4px 8px",fontSize:11.5,flexShrink:0}} onClick={()=>window.open(buildGoogleMapsSearchUrl(form.destino,form.ufDestino),"_blank","noopener,noreferrer")}><Icon name="map" size={11}/> Ver destino</button></div>}
           </Fg>
         </div>
 
