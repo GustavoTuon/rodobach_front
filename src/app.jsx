@@ -4,7 +4,7 @@ const { useState, useEffect } = React;
 const SCREEN_SCRIPTS = [
   "src/screens/diretoria.jsx",
   "src/screens/simulador.jsx",
-  "src/screens/viagens.jsx",
+  "src/screens/viagens.jsx?v=20260803-google-routes",
   "src/screens/folgas-motoristas.jsx?v=20260803-corte-marco",
   "src/screens/status-carga.jsx",
   "src/screens/trafegus.jsx",
@@ -12,16 +12,16 @@ const SCREEN_SCRIPTS = [
   "src/screens/dre-empresarial.jsx",
   "src/screens/analise-frota.jsx",
   "src/screens/precos-combustivel.jsx",
-  "src/screens/custos-veiculos.jsx",
-  "src/screens/manutencoes-veiculos.jsx",
+  "src/screens/custos-veiculos.jsx?v=20260803-redesign",
+  "src/screens/manutencoes-veiculos.jsx?v=20260803-bi-redesign",
   "src/screens/analise-clientes.jsx",
   "src/screens/rentabilidade-clientes.jsx",
   "src/screens/lucro-viagens.jsx",
   "src/screens/resultado-fretes.jsx",
   "src/screens/faturamento-diario.jsx",
   "src/screens/comparativo-faturamento.jsx",
-  "src/screens/manutencao.jsx",
-  "src/screens/pneus.jsx?v=20260603-historico-pneu",
+  "src/screens/manutencao.jsx?v=20260803-km-fallback-5",
+  "src/screens/pneus.jsx?v=20260803-km-fallback",
   "src/screens/automacoes.jsx",
   "src/screens/consulta-cte.jsx?v=20260731-xml-nfe",
   "src/screens/controle-canhotos.jsx?v=20260803-3",
@@ -50,8 +50,8 @@ const NAV = [
   { id: "lucro-viagens",   label: "Res. Viagem",  icon: "route",       title: "Resultado por Viagem", group: "resultados", section: "direcao" },
   { id: "clientes",        label: "Análise",      icon: "user",        title: "Análise de Clientes", group: "clientes", section: "direcao" },
   { id: "clientes-lucro",  label: "Lucro",        icon: "chart",       title: "Rentabilidade Clientes", group: "clientes", section: "direcao" },
-  { id: "custos-veiculos", label: "Custos",       icon: "truck",       title: "Custos por Veiculo", group: "manutencoes", section: "direcao" },
-  { id: "manutencoes-veiculos", label: "Lançamentos", icon: "wrench", title: "Manutenções e Custos por Veículo", group: "manutencoes", section: "direcao" },
+  { id: "custos-veiculos", label: "Visão geral", icon: "truck", title: "Custos da Frota", group: "manutencoes", section: "direcao" },
+  { id: "manutencoes-veiculos", label: "Extrato detalhado", icon: "wrench", title: "Extrato de Custos e Manutenções", group: "manutencoes", section: "direcao" },
   { id: "simulador",       label: "Calculadora",  icon: "calculator",  title: "Calculadora de Frete ANTT", section: "operacao" },
   { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações", section: "operacao" },
   { id: "folgas-motoristas", label: "Folgas",      icon: "user",        title: "Jornada e Folgas dos Motoristas", section: "operacao" },
@@ -84,7 +84,7 @@ const NAV_GROUPS = {
   manutencoes: {
     label: "Manutenções",
     icon: "wrench",
-    screens: ["custos-veiculos", "manutencoes-veiculos"],
+    screens: ["manutencoes-veiculos"],
   },
   resultados: {
     label: "Resultado por viagem",
@@ -363,32 +363,10 @@ const App = () => {
       body = <ComparativoFaturamento onNavigate={onNavigate}/>;
       break;
     case "custos-veiculos":
-      body = (
-        <ScreenGroup
-          tabs={[
-            { id: "custos-veiculos", label: "Custos", available: hasScreen("custos-veiculos") },
-            { id: "manutencoes-veiculos", label: "Lançamentos", available: hasScreen("manutencoes-veiculos") },
-          ]}
-          active={currentScreen}
-          onChange={onNavigate}
-        >
-          <CustosVeiculos onNavigate={onNavigate}/>
-        </ScreenGroup>
-      );
+      body = <ManutencoesVeiculos onNavigate={onNavigate}/>;
       break;
     case "manutencoes-veiculos":
-      body = (
-        <ScreenGroup
-          tabs={[
-            { id: "custos-veiculos", label: "Custos", available: hasScreen("custos-veiculos") },
-            { id: "manutencoes-veiculos", label: "Lançamentos", available: hasScreen("manutencoes-veiculos") },
-          ]}
-          active={currentScreen}
-          onChange={onNavigate}
-        >
-          <ManutencoesVeiculos onNavigate={onNavigate}/>
-        </ScreenGroup>
-      );
+      body = <ManutencoesVeiculos onNavigate={onNavigate}/>;
       break;
     case "clientes":
       body = (

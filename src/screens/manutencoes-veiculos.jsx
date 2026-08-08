@@ -103,6 +103,25 @@ function mvInjectStyles() {
     .mv-cat-row { display:flex; align-items:center; gap:6px; cursor:pointer; padding:2px 0; }
     .mv-cat-row:hover .mv-cat-name { color:var(--text); }
     .mv-cat-row.active .mv-cat-name { color:var(--text); font-weight:600; }
+    .mv-view-tabs { display:inline-flex; padding:3px; gap:3px; border:1px solid var(--border); border-radius:9px; background:var(--surface-2); }
+    .mv-view-tabs button { border:0; border-radius:6px; padding:7px 13px; background:transparent; color:var(--text-3); font-size:12px; cursor:pointer; }
+    .mv-view-tabs button.active { background:var(--surface); color:var(--text); box-shadow:0 1px 4px rgba(0,0,0,.25); }
+    .mv-section-title { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin:25px 0 11px; }
+    .mv-section-title h2 { margin:0; font-size:15px; }
+    .mv-insights { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+    .mv-insight { padding:13px 14px; border:1px solid var(--border); border-radius:9px; background:var(--surface); min-height:72px; }
+    .mv-insight strong { display:block; font-size:12.5px; margin-bottom:5px; }
+    .mv-insight span { color:var(--text-3); font-size:11.5px; line-height:1.45; }
+    .mv-severity-high { border-left:3px solid #ef4444; } .mv-severity-warn { border-left:3px solid #f59e0b; } .mv-severity-info { border-left:3px solid #3b82f6; }
+    .mv-audit-table-wrap { max-height:66vh; overflow:auto; }
+    .mv-audit-table thead th { position:sticky; top:0; z-index:4; background:var(--surface-2); }
+    .mv-audit-table th:nth-child(2), .mv-audit-table td:nth-child(2) { position:sticky; left:0; z-index:2; background:var(--surface); }
+    .mv-audit-table thead th:nth-child(2) { z-index:5; background:var(--surface-2); }
+    .mv-audit-table tbody tr:nth-child(even) td { background-color:rgba(255,255,255,.012); }
+    .mv-audit-table tbody tr:hover td { background-color:rgba(79,127,171,.10); }
+    .mv-group-row td { position:static!important; background:var(--surface-2)!important; color:var(--text-2); font-weight:600; border-top:1px solid var(--border-strong); }
+    .mv-anomaly { box-shadow:inset 3px 0 #ef4444; }
+    @media(max-width:1000px){.mv-insights{grid-template-columns:1fr 1fr}} @media(max-width:680px){.mv-insights{grid-template-columns:1fr}}
   `;
   document.head.appendChild(s);
 }
@@ -158,16 +177,30 @@ const ManutencoesVeiculos = () => {
   const [detailLoading, setDetailLoading] = React.useState(false);
   const [detailError,   setDetailError]   = React.useState("");
   const detailRef = React.useRef(null);
+  const [selectedLancamento, setSelectedLancamento] = React.useState(null);
+  const [viewMode, setViewMode] = React.useState("executiva");
 
   // ── Tabela ────────────────────────────────────────────────────────────────────
   const [tableSearch, setTableSearch] = React.useState("");
   const [sortCol,     setSortCol]     = React.useState("data");
   const [sortDir,     setSortDir]     = React.useState("desc");
   const [tablePage,   setTablePage]   = React.useState(0);
+  const [groupBy, setGroupBy] = React.useState("none");
+  const [collapsedGroups, setCollapsedGroups] = React.useState([]);
+  const [selectedRows, setSelectedRows] = React.useState([]);
   const PAGE_SIZE = 20;
 
   // ── Effects ───────────────────────────────────────────────────────────────────
   React.useEffect(() => { mvInjectStyles(); }, []);
+  React.useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("rb-mv-view") || "null");
+      if (saved?.groupBy) setGroupBy(saved.groupBy);
+      if (saved?.sortCol) setSortCol(saved.sortCol);
+      if (saved?.sortDir) setSortDir(saved.sortDir);
+      if (saved?.tableSearch) setTableSearch(saved.tableSearch);
+    } catch (_) {}
+  }, []);
 
   React.useEffect(() => {
     window.RB_API.getManutencoesVeiculosFiltros()
@@ -230,6 +263,36 @@ const ManutencoesVeiculos = () => {
   const maxComparativoValor = Math.max(1, ...comparativo.map(c => c.valor));
   const maxComparativoMedio = Math.max(1, ...comparativo.map(c => c.custoMedio));
 
+  const intelligence = React.useMemo(() => {
+    const current = evolucaoMensal[evolucaoMensal.length - 1];
+    const previous = evolucaoMensal[evolucaoMensal.length - 2];
+    const variation = mvNum(previous?.valor) ? ((mvNum(current?.valor) / mvNum(previous.valor)) - 1) * 100 : null;
+    const avgEntry = lancamentos.length ? totalGeral / lancamentos.length : 0;
+    const avgVehicle = rankingPlacas.length ? totalGeral / rankingPlacas.length : 0;
+    const largestEntry = [...lancamentos].sort((a,b) => mvNum(b.valorTotal)-mvNum(a.valorTotal))[0];
+    const recurringProduct = [...produtos].sort((a,b) => mvNum(b.lancamentos)-mvNum(a.lancamentos))[0];
+    const recurringSupplier = [...fornecedores].sort((a,b) => mvNum(b.lancamentos)-mvNum(a.lancamentos))[0];
+    const groups = { operacional:0, preventiva:0, corretiva:0 };
+    lancamentos.forEach(l => {
+      if (["abastecimento","despesas_viagem","multas"].includes(l.categoria)) groups.operacional += mvNum(l.valorTotal);
+      else if (["pneus","pecas_estoque"].includes(l.categoria)) groups.preventiva += mvNum(l.valorTotal);
+      else groups.corretiva += mvNum(l.valorTotal);
+    });
+    const productPrices = {};
+    lancamentos.forEach(l => { if (l.produto && mvNum(l.valorUnitario)>0) (productPrices[l.produto] ||= []).push(mvNum(l.valorUnitario)); });
+    const anomalyKeys = new Set();
+    Object.entries(productPrices).forEach(([name, prices]) => {
+      const avg = prices.reduce((s,v)=>s+v,0)/prices.length;
+      lancamentos.forEach(l => { if(l.produto===name && prices.length>1 && mvNum(l.valorUnitario)>avg*1.5) anomalyKeys.add(l.chaveOrigem); });
+    });
+    const duplicateKeys = new Set(); const seen = new Map();
+    lancamentos.forEach(l => {
+      const k=[l.data,l.placa,l.numeroDocumento,l.produto,mvNum(l.valorTotal).toFixed(2)].join("|");
+      if(seen.has(k)){ duplicateKeys.add(l.chaveOrigem); duplicateKeys.add(seen.get(k)); } else seen.set(k,l.chaveOrigem);
+    });
+    return { current, previous, variation, avgEntry, avgVehicle, largestEntry, recurringProduct, recurringSupplier, groups, anomalyKeys, duplicateKeys };
+  }, [evolucaoMensal, lancamentos, produtos, fornecedores, rankingPlacas, totalGeral]);
+
   const sortedLancamentos = React.useMemo(() => {
     const q = tableSearch.trim().toLowerCase();
     let list = lancamentos;
@@ -239,6 +302,11 @@ const ManutencoesVeiculos = () => {
     );
     const dir = sortDir === "asc" ? 1 : -1;
     return [...list].sort((a, b) => {
+      if (groupBy !== "none") {
+        const fields={placa:"placa",categoria:"categoriaLabel",fornecedor:"fornecedor",documento:"numeroDocumento",centro:"centroCusto"};
+        const field=fields[groupBy]; const av=String(a[field]||"Não informado"); const bv=String(b[field]||"Não informado");
+        if(av!==bv) return av.localeCompare(bv,"pt-BR");
+      }
       if (sortCol === "data")         return dir * ((a.data||"")         < (b.data||"")         ? -1 : 1);
       if (sortCol === "placa")        return dir * ((a.placa||"")        < (b.placa||"")        ? -1 : 1);
       if (sortCol === "categoria")    return dir * ((a.categoriaLabel||"") < (b.categoriaLabel||"") ? -1 : 1);
@@ -249,10 +317,22 @@ const ManutencoesVeiculos = () => {
       if (sortCol === "centroCusto")  return dir * ((a.centroCusto||"")  < (b.centroCusto||"")  ? -1 : 1);
       return 0;
     });
-  }, [lancamentos, tableSearch, sortCol, sortDir]);
+  }, [lancamentos, tableSearch, sortCol, sortDir, groupBy]);
 
   const totalPages = Math.max(1, Math.ceil(sortedLancamentos.length / PAGE_SIZE));
   const pageRows   = sortedLancamentos.slice(tablePage * PAGE_SIZE, (tablePage+1) * PAGE_SIZE);
+  const groupField = {placa:"placa",categoria:"categoriaLabel",fornecedor:"fornecedor",documento:"numeroDocumento",centro:"centroCusto"}[groupBy];
+  const auditRows = [];
+  let lastGroup = null;
+  pageRows.forEach((row) => {
+    const group = groupField ? (row[groupField] || "Não informado") : null;
+    if (groupField && group !== lastGroup) {
+      const members = sortedLancamentos.filter(x => (x[groupField] || "Não informado") === group);
+      auditRows.push({ __group:true, label:group, count:members.length, total:members.reduce((s,x)=>s+mvNum(x.valorTotal),0) });
+      lastGroup = group;
+    }
+    if (!groupField || !collapsedGroups.includes(group)) auditRows.push(row);
+  });
 
   const activeFiltersCount = ["placa","categoria","fornecedor","centro","produto"].filter(k => filters[k] && filters[k] !== "todos").length;
   const periodLabel = `${mvDateFmt(filters.dataInicio)} a ${mvDateFmt(filters.dataFim)}`;
@@ -335,10 +415,14 @@ const ManutencoesVeiculos = () => {
       {/* ── Cabeçalho ── */}
       <div className="page-head">
         <div>
-          <h1>Manutenções por Veículo</h1>
-          <div className="sub">Abastecimentos, OS externas, NF, pneus, multas e despesas de viagem · {periodLabel}</div>
+          <h1>Extrato de Custos e Manutenções</h1>
+          <div className="sub">Consulte cada lançamento do ERP, seus itens, documentos e vínculo com o veículo · {periodLabel}</div>
         </div>
         <div className="actions">
+          <div className="mv-view-tabs">
+            <button className={viewMode==="executiva"?"active":""} onClick={() => setViewMode("executiva")}>Visão Executiva</button>
+            <button className={viewMode==="auditoria"?"active":""} onClick={() => setViewMode("auditoria")}>Visão Auditoria</button>
+          </div>
           {MV_PERIODS.map(p => (
             <button key={p.key}
                     className={`btn${filters.dataInicio === p.getRange().start && !activeFiltersCount && periodo===p.key ? " primary" : ""}`}
@@ -391,12 +475,16 @@ const ManutencoesVeiculos = () => {
         </div>
       )}
 
+      {viewMode === "executiva" && <>
+      <div className="mv-section-title"><div><h2>Resumo executivo</h2><span className="muted" style={{fontSize:11.5}}>Indicadores essenciais do período selecionado</span></div></div>
       {/* ── KPIs ── */}
       <div className="grid cols-5" style={{marginBottom:16}}>
         <div className="kpi" style={{borderLeft:"3px solid #ef4444"}}>
           <div className="kpi-label"><Icon name="money"/><span>Total gasto no período</span></div>
           <div className="kpi-value">{mvBRL(totalGeral)}</div>
-          <span className="kpi-delta flat">{mvNum(resumo.totalLancamentos)} lançamentos</span>
+          <span className={`kpi-delta ${intelligence.variation===null?"flat":intelligence.variation>0?"down":"up"}`}>
+            {intelligence.variation===null ? `${mvNum(resumo.totalLancamentos)} lançamentos` : `${intelligence.variation>0?"+":""}${mvPct(intelligence.variation)} vs. mês anterior`}
+          </span>
         </div>
         <div className={`kpi${resumo.placaMaiorGasto && resumo.placaMaiorGasto !== "-" ? " mv-kpi-click" : ""}`}
              style={{borderLeft:"3px solid #3b82f6"}}
@@ -423,6 +511,27 @@ const ManutencoesVeiculos = () => {
         </div>
       </div>
 
+      <div className="grid cols-4" style={{marginBottom:16}}>
+        <div className="kpi"><div className="kpi-label">Custo por lançamento</div><div className="kpi-value">{mvBRL(intelligence.avgEntry)}</div><span className="kpi-delta flat">média do período</span></div>
+        <div className="kpi"><div className="kpi-label">Maior fornecedor</div><div className="kpi-value" style={{fontSize:14}}>{fornecedores[0]?.nome || "—"}</div><span className="kpi-delta flat">{mvBRL(fornecedores[0]?.valor)}</span></div>
+        <div className="kpi"><div className="kpi-label">Maior lançamento</div><div className="kpi-value">{mvBRL(intelligence.largestEntry?.valorTotal)}</div><span className="kpi-delta flat">{intelligence.largestEntry?.placa || "—"} · {intelligence.largestEntry?.produto || "Sem descrição"}</span></div>
+        <div className="kpi"><div className="kpi-label">Custo por km</div><div className="kpi-value" style={{fontSize:16}}>Não disponível</div><span className="kpi-delta flat">quilometragem ausente na consulta atual</span></div>
+      </div>
+      <div className="mv-section-title"><div><h2>Insights automáticos</h2><span className="muted" style={{fontSize:11.5}}>Sinais calculados sobre o resultado atual</span></div></div>
+      <div className="mv-insights" style={{marginBottom:16}}>
+        <div className={`mv-insight ${mvNum(intelligence.variation)>15?"mv-severity-high":"mv-severity-info"}`}><strong>Evolução dos custos</strong><span>{intelligence.variation===null?"Comparação indisponível neste período.":`Variação de ${intelligence.variation>0?"+":""}${mvPct(intelligence.variation)} sobre o mês anterior.`}</span></div>
+        <div className="mv-insight mv-severity-warn"><strong>Veículos acima da média</strong><span>{rankingPlacas.filter(v=>mvNum(v.valor)>intelligence.avgVehicle).length} acima de {mvBRL(intelligence.avgVehicle)}.</span></div>
+        <div className="mv-insight mv-severity-info"><strong>Categoria predominante</strong><span>{categorias[0]?.label || "Sem dados"} · {mvPct(categorias[0]?.percentual)} do total.</span></div>
+        <div className="mv-insight mv-severity-info"><strong>Fornecedor recorrente</strong><span>{intelligence.recurringSupplier?.nome || "Sem dados"} · {mvNum(intelligence.recurringSupplier?.lancamentos)} lançamentos.</span></div>
+        <div className="mv-insight mv-severity-info"><strong>Item recorrente</strong><span>{intelligence.recurringProduct?.nome || "Sem dados"} · {mvNum(intelligence.recurringProduct?.lancamentos)} lançamentos.</span></div>
+        <div className={`mv-insight ${intelligence.anomalyKeys.size||intelligence.duplicateKeys.size?"mv-severity-high":"mv-severity-info"}`}><strong>Alertas de auditoria</strong><span>{intelligence.anomalyKeys.size} preço(s) fora do padrão · {intelligence.duplicateKeys.size} possível(is) duplicidade(s).</span></div>
+      </div>
+      <div className="mv-section-title"><div><h2>Composição gerencial</h2><span className="muted" style={{fontSize:11.5}}>Agrupamento visual sem alterar a categoria original</span></div></div>
+      <div className="grid cols-3" style={{marginBottom:16}}>
+        {[['Operacionais',intelligence.groups.operacional,'#f59e0b'],['Manutenção preventiva',intelligence.groups.preventiva,'#22c55e'],['Manutenção corretiva',intelligence.groups.corretiva,'#ef4444']].map(([label,value,color])=><div className="kpi" key={label} style={{borderLeft:`3px solid ${color}`}}><div className="kpi-label">{label}</div><div className="kpi-value">{mvBRL(value)}</div><span className="kpi-delta flat">{totalGeral?mvPct(value/totalGeral*100):'0%'} do total</span></div>)}
+      </div>
+      <div className="mv-section-title"><div><h2>Área analítica</h2><span className="muted" style={{fontSize:11.5}}>Evolução, participação e concentração dos custos</span></div></div>
+
       {/* ── Seção A: Evolução mensal + Custos por categoria ── */}
       <div className="grid cols-2-1" style={{marginBottom:16}}>
 
@@ -444,6 +553,8 @@ const ManutencoesVeiculos = () => {
               }}>
                 {evolucaoMensal.map((item, idx) => {
                   const val  = mvNum(item.valor);
+                  const prev = mvNum(evolucaoMensal[idx-1]?.valor);
+                  const delta = prev ? ((val/prev)-1)*100 : null;
                   const barH = val>0 ? Math.max(Math.round((val/maxMonthly)*148), 6) : 2;
                   const isHov= hoveredMonth===idx;
                   return (
@@ -460,6 +571,8 @@ const ManutencoesVeiculos = () => {
                             <span style={{fontFamily:"var(--font-mono)", textAlign:"right"}}>{mvBRL(val)}</span>
                             <span style={{color:"var(--text-3)"}}>Lançamentos</span>
                             <span style={{fontFamily:"var(--font-mono)", textAlign:"right"}}>{item.lancamentos}</span>
+                            <span style={{color:"var(--text-3)"}}>Evolução</span>
+                            <span style={{fontFamily:"var(--font-mono)", textAlign:"right",color:delta>0?"#ef4444":delta<0?"#22c55e":"var(--text)"}}>{delta===null?"—":`${delta>0?"+":""}${mvPct(delta)}`}</span>
                           </div>
                         </div>
                       )}
@@ -626,6 +739,8 @@ const ManutencoesVeiculos = () => {
       </div>
 
       {/* ── Seção D: Análise detalhada por veículo ── */}
+      </>}
+
       {selectedPlaca && (
         <div className="card card-flush" style={{marginBottom:16}} ref={detailRef}>
           <div className="card-header">
@@ -764,10 +879,18 @@ const ManutencoesVeiculos = () => {
       )}
 
       {/* ── Seção E: Tabela detalhada de lançamentos ── */}
+      {viewMode === "auditoria" && <>
+      <div className="mv-section-title"><div><h2>Auditoria operacional</h2><span className="muted" style={{fontSize:11.5}}>Localize, agrupe e valide lançamentos do ERP</span></div><span className="badge info">{intelligence.anomalyKeys.size + intelligence.duplicateKeys.size} alerta(s)</span></div>
       <div className="card card-flush" style={{marginBottom:16}}>
         <div className="card-header">
-          <h3>Lançamentos detalhados</h3>
+          <div>
+            <h3>Extrato detalhado</h3>
+            <span className="meta muted">Clique em um lançamento para visualizar todos os dados</span>
+          </div>
           <div className="row" style={{gap:8}}>
+            <select value={groupBy} onChange={e=>{setGroupBy(e.target.value);setCollapsedGroups([]);setTablePage(0);}} style={{height:28,border:"1px solid var(--border)",borderRadius:6,background:"var(--surface-2)",color:"var(--text)",fontSize:12,padding:"0 8px"}}>
+              <option value="none">Sem agrupamento</option><option value="placa">Agrupar por veículo</option><option value="categoria">Por categoria</option><option value="fornecedor">Por fornecedor</option><option value="documento">Por documento</option><option value="centro">Por centro de custo</option>
+            </select>
             <div style={{position:"relative"}}>
               <Icon name="search" size={13} style={{position:"absolute", left:8, top:"50%", transform:"translateY(-50%)", color:"var(--text-4)", pointerEvents:"none"}}/>
               <input type="text" placeholder="Buscar em todos os campos…" value={tableSearch}
@@ -775,12 +898,15 @@ const ManutencoesVeiculos = () => {
                      style={{height:28, paddingLeft:27, paddingRight:8, border:"1px solid var(--border)", borderRadius:"var(--r)", background:"var(--surface-2)", fontSize:12.5, width:230, outline:"none"}}/>
             </div>
             <span className="muted" style={{fontSize:11.5}}>{sortedLancamentos.length} lançamento{sortedLancamentos.length!==1?"s":""}</span>
+            {selectedRows.length>0 && <span className="badge info">{selectedRows.length} selecionado(s)</span>}
             <button className="btn sm" onClick={exportCsv}><Icon name="download" size={12}/> CSV</button>
+            <button className="btn sm" onClick={()=>{localStorage.setItem('rb-mv-view',JSON.stringify({groupBy,sortCol,sortDir,tableSearch}));}}>Salvar visão</button>
           </div>
         </div>
-        <table className="tbl">
+        <div className="mv-audit-table-wrap"><table className="tbl mv-audit-table">
           <thead>
             <tr>
+              <th style={{width:34}}><input type="checkbox" checked={pageRows.length>0&&pageRows.every(l=>selectedRows.includes(l.chaveOrigem))} onChange={e=>setSelectedRows(e.target.checked?[...new Set([...selectedRows,...pageRows.map(l=>l.chaveOrigem)])]:selectedRows.filter(k=>!pageRows.some(l=>l.chaveOrigem===k)))}/></th>
               <th style={{cursor:"pointer", whiteSpace:"nowrap"}} onClick={() => toggleSort("data")}>Data <SortArrow col="data"/></th>
               <th style={{cursor:"pointer"}} onClick={() => toggleSort("placa")}>Placa <SortArrow col="placa"/></th>
               <th style={{cursor:"pointer"}} onClick={() => toggleSort("categoria")}>Categoria <SortArrow col="categoria"/></th>
@@ -797,13 +923,16 @@ const ManutencoesVeiculos = () => {
           <tbody>
             {pageRows.length===0 && (
               <tr>
-                <td colSpan="11" className="muted" style={{padding:24, textAlign:"center", fontSize:12.5}}>
+                <td colSpan="12" className="muted" style={{padding:24, textAlign:"center", fontSize:12.5}}>
                   {loading ? "Carregando…" : tableSearch ? "Nenhum resultado para a busca." : "Nenhum lançamento encontrado com os filtros aplicados."}
                 </td>
               </tr>
             )}
-            {pageRows.map((l, i) => (
-              <tr key={`${l.chaveOrigem}-${i}`} className="clickable" onClick={() => setSelectedPlaca(selectedPlaca===l.placa ? "" : l.placa)}>
+            {auditRows.map((l, i) => l.__group ? (
+              <tr className="mv-group-row clickable" key={`group-${l.label}-${i}`} onClick={()=>setCollapsedGroups(s=>s.includes(l.label)?s.filter(x=>x!==l.label):[...s,l.label])}><td colSpan="12">{collapsedGroups.includes(l.label)?"▸":"▾"} {l.label} <span className="muted" style={{marginLeft:8,fontWeight:400}}>{l.count} lançamento(s) · {mvBRL(l.total)}</span></td></tr>
+            ) : (
+              <tr key={`${l.chaveOrigem}-${i}`} className={`clickable${intelligence.anomalyKeys.has(l.chaveOrigem)||intelligence.duplicateKeys.has(l.chaveOrigem)?" mv-anomaly":""}`} onClick={() => setSelectedLancamento(l)}>
+                <td onClick={e=>e.stopPropagation()}><input type="checkbox" checked={selectedRows.includes(l.chaveOrigem)} onChange={e=>setSelectedRows(s=>e.target.checked?[...new Set([...s,l.chaveOrigem])]:s.filter(k=>k!==l.chaveOrigem))}/></td>
                 <td className="date">{mvDateFmt(l.data)}</td>
                 <td style={{fontFamily:"var(--font-mono)", fontWeight:600}}>{l.placa}</td>
                 <td className="cell-badge">
@@ -823,7 +952,7 @@ const ManutencoesVeiculos = () => {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
         {totalPages>1 && (
           <div className="tbl-footer">
             <span>Página {tablePage+1} de {totalPages} · {sortedLancamentos.length} registros</span>
@@ -836,6 +965,69 @@ const ManutencoesVeiculos = () => {
           </div>
         )}
       </div>
+      </>}
+
+      {selectedLancamento && (
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.58)",zIndex:1200,display:"flex",justifyContent:"flex-end"}} onClick={() => setSelectedLancamento(null)}>
+          <aside style={{width:"min(560px,96vw)",height:"100%",background:"var(--surface)",borderLeft:"1px solid var(--border)",boxShadow:"-18px 0 50px rgba(0,0,0,.28)",overflowY:"auto",padding:24}} onClick={e => e.stopPropagation()}>
+            <div className="row between" style={{marginBottom:20,alignItems:"flex-start"}}>
+              <div>
+                <div className="muted" style={{fontSize:11,textTransform:"uppercase",letterSpacing:".08em",marginBottom:5}}>Detalhe do lançamento</div>
+                <h2 style={{margin:0,fontSize:18}}>{selectedLancamento.produto || selectedLancamento.categoriaLabel}</h2>
+                <div className="muted" style={{fontSize:12,marginTop:5}}>{mvDateFmt(selectedLancamento.data)} · {selectedLancamento.placa}</div>
+              </div>
+              <button className="btn sm ghost" onClick={() => setSelectedLancamento(null)}><Icon name="x" size={15}/></button>
+            </div>
+
+            <div className="grid cols-2" style={{marginBottom:18}}>
+              <div className="kpi" style={{borderLeft:`3px solid ${mvCatColor(selectedLancamento.categoria)}`}}>
+                <div className="kpi-label">Valor total</div>
+                <div className="kpi-value">{mvBRL(selectedLancamento.valorTotal)}</div>
+              </div>
+              <div className="kpi" style={{borderLeft:"3px solid var(--brand-blue)"}}>
+                <div className="kpi-label">Quantidade</div>
+                <div className="kpi-value">{mvNum(selectedLancamento.quantidade).toLocaleString("pt-BR",{maximumFractionDigits:3})}</div>
+                <span className="kpi-delta flat">{mvBRL(selectedLancamento.valorUnitario)} por unidade</span>
+              </div>
+            </div>
+
+            {(intelligence.anomalyKeys.has(selectedLancamento.chaveOrigem) || intelligence.duplicateKeys.has(selectedLancamento.chaveOrigem)) && (
+              <div className="mv-insight mv-severity-high" style={{marginBottom:16,minHeight:0}}><strong>Atenção na auditoria</strong><span>{intelligence.anomalyKeys.has(selectedLancamento.chaveOrigem)?"Valor unitário acima da média deste item. ":""}{intelligence.duplicateKeys.has(selectedLancamento.chaveOrigem)?"Há outro lançamento com os mesmos dados principais.":""}</span></div>
+            )}
+
+            <div className="card" style={{padding:14,marginBottom:16}}>
+              <div className="row between" style={{marginBottom:10}}><strong style={{fontSize:12.5}}>Histórico recente do veículo</strong><span className="muted" style={{fontSize:11}}>{lancamentos.filter(x=>x.placa===selectedLancamento.placa).length} lançamentos</span></div>
+              {lancamentos.filter(x=>x.placa===selectedLancamento.placa).slice(0,5).map((x,i)=><div key={`${x.chaveOrigem}-${i}`} style={{display:"grid",gridTemplateColumns:"72px 1fr auto",gap:8,padding:"7px 0",borderBottom:"1px solid var(--divider)",fontSize:11.5}}><span className="muted">{mvDateFmt(x.data)}</span><span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{x.produto || x.categoriaLabel}</span><strong style={{fontFamily:"var(--font-mono)"}}>{mvBRL(x.valorTotal)}</strong></div>)}
+            </div>
+
+            {[
+              ["Placa", selectedLancamento.placa],
+              ["Veículo", selectedLancamento.veiculoNome],
+              ["Categoria", selectedLancamento.categoriaLabel],
+              ["Fornecedor", selectedLancamento.fornecedor],
+              ["Código do fornecedor", selectedLancamento.fornecedorCodigo],
+              ["Produto/serviço", selectedLancamento.produto],
+              ["Código do produto", selectedLancamento.produtoCodigo],
+              ["Tipo de documento", selectedLancamento.tipoDocumento],
+              ["Documento", [selectedLancamento.numeroDocumento,selectedLancamento.serieDocumento].filter(Boolean).join(" / ")],
+              ["Centro de custo", selectedLancamento.centroCusto],
+              ["Código do centro", selectedLancamento.centroCustoCodigo],
+              ["Origem no ERP", mvOrigemLabel(selectedLancamento.origem)],
+              ["Identificador técnico", selectedLancamento.chaveOrigem],
+            ].map(([label,value]) => (
+              <div key={label} style={{display:"grid",gridTemplateColumns:"155px 1fr",gap:14,padding:"10px 0",borderBottom:"1px solid var(--divider)",fontSize:13}}>
+                <span className="muted">{label}</span>
+                <span style={{fontWeight:500,wordBreak:"break-word"}}>{value || "—"}</span>
+              </div>
+            ))}
+
+            <div className="row" style={{gap:8,marginTop:20}}>
+              <button className="btn primary" onClick={() => { setSelectedPlaca(selectedLancamento.placa); setSelectedLancamento(null); }}><Icon name="truck" size={13}/> Analisar veículo</button>
+              <button className="btn" onClick={() => { setPlaca(selectedLancamento.placa); setFilters(f => ({...f,placa:selectedLancamento.placa})); setSelectedLancamento(null); }}><Icon name="filter" size={13}/> Filtrar esta placa</button>
+            </div>
+          </aside>
+        </div>
+      )}
 
     </div>
   );

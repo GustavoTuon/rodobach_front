@@ -677,10 +677,13 @@ const ModalMovimento = ({ dados, onClose, onConfirmar, loading }) => {
     const isEngate = odometroInfo.engate?.placaPrincipal && placaOdometro && placaOdometro !== odometroInfo.placaSolicitada;
     const origem = String(odometroInfo.origem || "");
     if (isEngate && origem.includes("hodometro")) return `Km do hodometro do cavalo engatado ${placaOdometro}.`;
+    if (origem.includes("sistema_abastecimento")) return `Km preenchido pelo último abastecimento do sistema${isEngate ? ` do cavalo ${placaOdometro}` : ""}.`;
+    if (origem.includes("sistema_viagem")) return `Km preenchido pela última viagem do sistema${isEngate ? ` do cavalo ${placaOdometro}` : ""}.`;
+    if (origem.includes("sistema_ordem_servico")) return `Km preenchido pela última ordem de serviço${isEngate ? ` do cavalo ${placaOdometro}` : ""}.`;
     if (isEngate) return `Km da telemetria do cavalo engatado ${placaOdometro}.`;
     if (origem.includes("hodometro")) return "Km preenchido pelo hodometro.";
     if (String(odometroInfo.origem || "").includes("telemetria")) return "Km preenchido pela telemetria.";
-    return "Km preenchido pelo cadastro do frotas.";
+    return "Km preenchido pelo lançamento mais recente do sistema.";
   })();
 
   async function handleConfirmar() {
