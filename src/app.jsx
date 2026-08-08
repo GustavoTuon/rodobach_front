@@ -1,4 +1,6 @@
 ﻿// Norte Telemetria — App shell, router, sidebar, Tweaks
+import { getNavForUser as filterNavForUser } from "./permissions.js";
+
 const { useState, useEffect } = React;
 
 const SCREEN_SCRIPTS = [
@@ -33,6 +35,7 @@ const SCREEN_GLOBALS = [
   "DreEmpresarial", "AnaliseClientes",
   "RentabilidadeClientes", "LucroViagens", "ResultadoFretes", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n", "ConsultaCte", "ControleCanhotos",
 ];
+const SCREEN_MODULES = import.meta.glob("./screens/*.jsx");
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "theme": "auto",
@@ -134,11 +137,7 @@ const ScreenGroup = ({ tabs, active, onChange, children }) => {
 };
 
 function getNavForUser(user) {
-  const permissions = user?.permissions || {};
-  return BASE_NAV.filter(n => {
-    if (n.adminOnly && !user?.admin) return false;
-    return permissions[n.id] !== false;
-  });
+  return filterNavForUser(BASE_NAV, user);
 }
 
 function readRoute() {
@@ -214,23 +213,10 @@ const App = () => {
     (async () => {
       try {
         for (const src of SCREEN_SCRIPTS) {
-          let loaded = false;
-          let lastError = null;
-          for (let attempt = 1; attempt <= 2 && !loaded; attempt += 1) {
-            try {
-              const separator = src.includes("?") ? "&" : "?";
-              const res = await fetch(`${src}${separator}screen=${encodeURIComponent(src)}&attempt=${attempt}`, { cache: "no-store" });
-              if (!res.ok) throw new Error(`HTTP ${res.status}`);
-              const code = await res.text();
-              const { code: compiled } = Babel.transform(code, { presets: ["react"], filename: src });
-              // eslint-disable-next-line no-eval
-              eval(compiled);
-              loaded = true;
-            } catch (error) {
-              lastError = error;
-            }
-          }
-          if (!loaded) console.error(`Erro ao carregar tela ${src}:`, lastError);
+          const cleanSrc = src.split("?")[0].replace(/^src\//, "./");
+          const load = SCREEN_MODULES[cleanSrc];
+          if (!load) throw new Error(`Modulo nao encontrado: ${cleanSrc}`);
+          await load();
         }
         setScreensReady(true);
       } catch (e) {
