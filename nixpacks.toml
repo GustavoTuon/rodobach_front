@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_22", "nginx"]
+nixPkgs = ["nodejs_24", "nginx"]
 
 [phases.install]
 cmds = ["npm ci --include=optional --force"]
