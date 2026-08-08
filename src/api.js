@@ -2,6 +2,7 @@ const LOCAL_API_BASE = "http://localhost:3333/api";
 const PRODUCTION_API_BASE = "https://rodobach-rodobach-back-consultoria.eupgpd.easypanel.host/api";
 
 const API_BASE = window.RB_API_BASE
+  || import.meta.env.VITE_API_BASE_URL
   || (["localhost", "127.0.0.1"].includes(window.location.hostname)
     ? LOCAL_API_BASE
     : PRODUCTION_API_BASE);
@@ -180,6 +181,10 @@ window.RB_API = {
     body: JSON.stringify(payload),
   }),
   sendOportunidadesN8n: (payload) => apiRequest("/oportunidades-retorno/enviar-n8n", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
+  sendOportunidadeCliente: (payload) => apiRequest("/oportunidades-retorno/enviar-cliente", {
     method: "POST",
     body: JSON.stringify(payload),
   }),

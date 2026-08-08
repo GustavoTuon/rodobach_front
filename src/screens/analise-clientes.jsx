@@ -1308,7 +1308,7 @@ const AnaliseClientes = () => {
       </div>
 
       {/* fim do bloco "clientes" */}
-      </>}
+      </>
     </div>
   );
 };
