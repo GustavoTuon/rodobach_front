@@ -376,6 +376,10 @@ const Viagens = ({ onNavigate }) => {
   const [cidadeOptions,  setCidadeOptions]  = useState({ origem: [], destino: [] });
   const [cidadeLoading,  setCidadeLoading]  = useState({ origem: false, destino: false });
   const [activeAuto,     setActiveAuto]     = useState("");
+  const [docSearch,      setDocSearch]      = useState("");
+  const [docResults,     setDocResults]     = useState([]);
+  const [docSearching,   setDocSearching]   = useState(false);
+  const [docSearchError, setDocSearchError] = useState("");
   const nextId = useRef(1);
   const citySearchTimers = useRef({});
   const activeAutoRef = useRef("");
@@ -792,6 +796,25 @@ const Viagens = ({ onNavigate }) => {
     setF("documentosFinanceiros", normalizeDocumentosFinanceiros(form.documentosFinanceiros).filter(doc => doc.id !== id));
   const setDocumentoFinanceiro = (id, field, value) =>
     setF("documentosFinanceiros", normalizeDocumentosFinanceiros(form.documentosFinanceiros).map(doc => doc.id === id ? { ...doc, [field]: value } : doc));
+  const pesquisarDocumentoFinanceiro = async () => {
+    const q = docSearch.trim();
+    if (q.length < 2) return;
+    setDocSearching(true); setDocSearchError("");
+    try {
+      const result = await window.RB_API.searchViagemDocumentos(q);
+      setDocResults(Array.isArray(result) ? result : []);
+    } catch (error) {
+      setDocResults([]); setDocSearchError(error?.message || "Nao foi possivel pesquisar os documentos.");
+    } finally { setDocSearching(false); }
+  };
+  const vincularDocumentoFinanceiro = (documento) => {
+    const atuais = normalizeDocumentosFinanceiros(form.documentosFinanceiros);
+    if (atuais.some(doc => doc.tipo === documento.tipo && String(doc.numero) === String(documento.numero))) return;
+    setF("documentosFinanceiros", [...atuais, {
+      id: `local-${Date.now()}`, tipo: documento.tipo || "CT-e", numero: String(documento.numero || ""),
+      chave: documento.chave || "", link: "", observacoes: documento.observacoes || "",
+    }]);
+  };
 
   const applyVgPeriod = (key) => {
     const p = VG_PERIODS.find(x => x.key === key);
@@ -1837,6 +1860,27 @@ const Viagens = ({ onNavigate }) => {
             <button className="btn" type="button" onClick={addDocumentoFinanceiro}>
               <Icon name="plus" size={13}/> Adicionar
             </button>
+          </div>
+
+          <div style={{border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 10, marginBottom: 10}}>
+            <div style={{fontSize: 12, fontWeight: 600, marginBottom: 6}}>Buscar documento emitido no ERP</div>
+            <div className="row" style={{gap: 8}}>
+              <input style={{...fs, flex: 1}} value={docSearch} onChange={e => setDocSearch(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); pesquisarDocumentoFinanceiro(); } }}
+                placeholder="CT-e, NF, chave ou placa"/>
+              <button className="btn" type="button" disabled={docSearching || docSearch.trim().length < 2} onClick={pesquisarDocumentoFinanceiro}>
+                {docSearching ? "Buscando..." : "Pesquisar"}
+              </button>
+            </div>
+            {docSearchError && <div style={{fontSize: 11.5, color: "var(--danger)", marginTop: 6}}>{docSearchError}</div>}
+            {!!docResults.length && <div className="col" style={{gap: 6, marginTop: 8}}>{docResults.map((doc, index) => (
+              <button key={`${doc.serie}-${doc.numero}-${index}`} type="button" className="btn" onClick={() => vincularDocumentoFinanceiro(doc)}
+                style={{height: "auto", padding: 8, justifyContent: "space-between", textAlign: "left"}}>
+                <span><strong>CT-e {doc.serie}-{doc.numero}</strong><br/><small>{doc.cliente} · {doc.placa || "Sem placa"}{doc.notas?.length ? ` · NF ${doc.notas.join(", ")}` : ""}</small></span>
+                <span>Vincular</span>
+              </button>
+            ))}</div>}
+            {!docSearching && docSearch.trim().length >= 2 && !docResults.length && !docSearchError && <div className="muted" style={{fontSize: 11.5, marginTop: 6}}>Pesquise para localizar CT-e, NF ou chave no ERP.</div>}
           </div>
 
           {normalizeDocumentosFinanceiros(form.documentosFinanceiros).length === 0 && (
