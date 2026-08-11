@@ -156,7 +156,7 @@ function buildDiretoriaActions({ dre, frota, clientes, rentabilidade }) {
     actions.push({ icon: "speedometer", tone: "#8b5cf6", title: "Acompanhar custo por km", text: "Comparar frota, combustível e manutenção antes de novas viagens.", value: dirBRL(geral.custoPorKm) });
   }
   if (dirNum(lucroFrota.veiculosPrejuizo) > 0) {
-    actions.push({ icon: "truck", tone: "#ef4444", title: "Veículos com prejuízo", text: "Priorizar análise por placa no Frota BI.", value: String(lucroFrota.veiculosPrejuizo) });
+    actions.push({ icon: "truck", tone: "#ef4444", title: "Veículos com prejuízo", text: "Priorizar análise no painel de custos da frota.", value: String(lucroFrota.veiculosPrejuizo) });
   }
   if (dirNum(clientesSummary.totalVencido) > 0) {
     actions.push({ icon: "clock", tone: "#ef4444", title: "Recebíveis vencidos", text: "Direcionar cobrança e bloquear novos fretes de maior risco.", value: dirBRL(clientesSummary.totalVencido) });
@@ -364,7 +364,7 @@ const Diretoria = ({ onNavigate }) => {
         <DirCard title="Acesso rapido" meta="Aprofundar analise">
           <div className="dir-links">
             <button className="dir-link" onClick={() => onNavigate("dre-empresarial")}><span><Icon name="chart"/>DRE Empresarial</span><em>resultado e contas</em></button>
-            <button className="dir-link" onClick={() => onNavigate("analise-frota")}><span><Icon name="truck"/>Frota BI</span><em>margem, custo/km e placas</em></button>
+            <button className="dir-link" onClick={() => onNavigate("custos-veiculos")}><span><Icon name="truck"/>Custos da frota</span><em>custos, manutenção e placas</em></button>
             <button className="dir-link" onClick={() => onNavigate("clientes")}><span><Icon name="user"/>Clientes</span><em>faturamento e lucro</em></button>
             <button className="dir-link" onClick={() => onNavigate("custos-veiculos")}><span><Icon name="wrench"/>Manutencoes</span><em>custos e lancamentos</em></button>
           </div>
@@ -389,7 +389,7 @@ const Diretoria = ({ onNavigate }) => {
 
         <DirCard title="Veiculos com maior custo" meta="Proprios e terceiros - prioridade de investigacao">
           <div className="dir-rank-list">
-            {state.loadingFrota && <div className="dir-empty">Carregando Frota BI...</div>}
+            {state.loadingFrota && <div className="dir-empty">Carregando dados da frota...</div>}
             {topVeiculosCusto.map((item) => <DirRank key={item.placa || item.label} label={item.placa || item.label} sub={item.tipo || item.centroCusto || "Custo acumulado"} value={dirShort(item.custo || item.value)} tone="#f97316"/>)}
             {!state.loadingFrota && !topVeiculosCusto.length && <div className="dir-empty">Sem ranking de veiculos no periodo.</div>}
           </div>

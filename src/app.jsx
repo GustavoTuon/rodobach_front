@@ -47,7 +47,6 @@ const NAV = [
   { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial", section: "direcao" },
   { id: "faturamento-diario", label: "Fat. Diário", icon: "chart",     title: "Faturamento Diário", section: "direcao" },
   { id: "comparativo-faturamento", label: "Comp. Mensal", icon: "chart", title: "Comparativo Mensal", section: "direcao" },
-  { id: "analise-frota",   label: "Frota BI",     icon: "truck",       title: "Analise de Frota", section: "direcao" },
   { id: "abastecimentos",  label: "Abastecimentos", icon: "fuel",       title: "Análise de Abastecimentos", section: "direcao" },
   { id: "precos-combustivel", label: "Preços Postos", icon: "money",     title: "Preços combinados de combustível", section: "direcao" },
   { id: "lucro-viagens",   label: "Res. Viagem",  icon: "route",       title: "Resultado por Viagem", group: "resultados", section: "direcao" },
@@ -319,9 +318,6 @@ const App = () => {
       break;
     case "dre-empresarial":
       body = <DreEmpresarial onNavigate={onNavigate}/>;
-      break;
-    case "analise-frota":
-      body = <AnaliseFrota key="frota-bi" onNavigate={onNavigate}/>;
       break;
     case "abastecimentos":
       body = <AnaliseFrota key="abastecimentos" onNavigate={onNavigate} modoAbastecimento/>;

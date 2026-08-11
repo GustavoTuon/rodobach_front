@@ -6,7 +6,6 @@ const TELAS_GRUPOS = [
   { id: "perm_dre_empresarial", label: "DRE Empresarial" },
   { id: "perm_faturamento_diario", label: "Faturamento Diário" },
   { id: "perm_comparativo_faturamento", label: "Comparativo Mensal" },
-  { id: "perm_analise_frota",   label: "Frota BI" },
   { id: "perm_abastecimentos",  label: "Abastecimentos" },
   { id: "perm_precos_combustivel", label: "Preços Postos" },
   { id: "perm_lucro_viagens",   label: "Resultado por Viagem" },
