@@ -1356,7 +1356,7 @@ function ManutencaoMensagens() {
                           <div style={{ fontSize: 12 }}><span className="muted">Validade</span><br/><strong style={{ color: "var(--brand-blue)" }}>{dataBR(a.data_proximo_envio)}</strong></div>
                         </div> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: 8, marginBottom: 8 }}>
                           <div style={{ fontSize: 12 }}><span className="muted">Intervalo</span><br/><strong>{fmtKm(a.intervalo_km)}</strong></div>
-                          <div style={{ fontSize: 12 }}><span className="muted">KM atual</span><br/><strong>{fmtKm(a.km_atual)}</strong><br/><small className="muted">{a.km_fonte === "telemetria" ? "Telemetria" : a.km_fonte === "abastecimento" ? "Sistema · abastecimento" : a.km_fonte === "viagem" ? "Sistema · viagem" : a.km_fonte === "ordem_servico" ? "Sistema · ordem de serviço" : "Sem referência"}</small></div>
+                          <div style={{ fontSize: 12 }}><span className="muted">KM atual</span><br/><strong>{fmtKm(a.km_atual)}</strong><br/><small className="muted">{a.km_fonte === "telemetria" ? "Telemetria" : a.km_fonte === "abastecimento" ? "Sistema · abastecimento" : a.km_fonte === "viagem" ? "Sistema · viagem" : a.km_fonte === "ordem_servico" ? "Sistema · ordem de serviço" : "Sem referência"}</small>{a.telemetria_descartada && <><br/><small style={{color:"var(--warn)"}}>Telemetria divergente ignorada ({fmtKm(a.telemetria_km)})</small></>}</div>
                           <div style={{ fontSize: 12 }}><span className="muted">Enviar no KM</span><br/><strong style={{ color: "var(--brand-blue)" }}>{fmtKm(kmProximoDoItem(a))}</strong></div>
                         </div>}
 

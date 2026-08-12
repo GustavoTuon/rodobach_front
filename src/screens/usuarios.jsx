@@ -11,7 +11,6 @@ const TELAS_GRUPOS = [
   { id: "perm_lucro_viagens",   label: "Resultado por Viagem" },
   { id: "perm_clientes",        label: "Análise de Clientes" },
   { id: "perm_clientes_lucro",  label: "Rentabilidade de Clientes" },
-  { id: "perm_custos_veiculos", label: "Custos por Veículo" },
   { id: "perm_manutencoes_veiculos", label: "Manutenções por Veículo" },
   ]},
   { id: "operacao", label: "Operação", telas: [
@@ -22,7 +21,11 @@ const TELAS_GRUPOS = [
   { id: "perm_trafegus", label: "Trafegus" },
   { id: "perm_oportunidades_retorno", label: "Retorno" },
   { id: "perm_consulta_nfe", label: "Consultar NF-e" },
+  { id: "perm_controle_canhotos", label: "Canhotos" },
+  ]},
+  { id: "frota", label: "Frota", telas: [
   { id: "perm_pneus",           label: "Pneus" },
+  { id: "perm_manutencao_posicoes", label: "Peças por posição" },
   { id: "perm_manutencao",      label: "Automações" },
   ]},
   { id: "sistema", label: "Sistema", telas: [
@@ -45,6 +48,7 @@ const FORM_VAZIO = {
   perm_manutencao: true, perm_automacoes_n8n: true, perm_settings: true,
   perm_folgas_motoristas: true, perm_trafegus: true,
   perm_oportunidades_retorno: true, perm_consulta_nfe: true,
+  perm_controle_canhotos: true, perm_manutencao_posicoes: true,
 };
 
 const Toggle = ({ value, onChange, label }) => (
@@ -128,6 +132,8 @@ const GerenciarUsuarios = ({ onNavigate }) => {
       perm_trafegus: u.perm_trafegus ?? u.perm_viagens ?? true,
       perm_oportunidades_retorno: u.perm_oportunidades_retorno ?? u.perm_viagens ?? true,
       perm_consulta_nfe: u.perm_consulta_nfe ?? u.perm_viagens ?? true,
+      perm_controle_canhotos: u.perm_controle_canhotos ?? u.perm_consulta_nfe ?? u.perm_viagens ?? true,
+      perm_manutencao_posicoes: u.perm_manutencao_posicoes ?? u.perm_manutencao ?? true,
     });
     setErro("");
     setModal(u);

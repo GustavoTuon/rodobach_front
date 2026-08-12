@@ -209,6 +209,10 @@ window.RB_API = {
 
   // ── Manutenção ────────────────────────────────────────────────────────────
   listVeiculosManutencao: () => apiRequest("/manutencao/veiculos"),
+  listComponentesPosicao: (placa) => apiRequest(`/manutencao/componentes-posicao${buildQuery({ placa })}`),
+  getOpcoesComponentesPosicao: () => apiRequest("/manutencao/componentes-posicao/opcoes"),
+  createComponentePosicao: (payload) => apiRequest("/manutencao/componentes-posicao", { method: "POST", body: JSON.stringify(payload) }),
+  createComponentesPosicaoLote: (payload) => apiRequest("/manutencao/componentes-posicao/lote", { method: "POST", body: JSON.stringify(payload) }),
   listContatosManutencao: () => apiRequest("/manutencao/contatos"),
   createContatoManutencao: (payload) => apiRequest("/manutencao/contatos", {
     method: "POST",
