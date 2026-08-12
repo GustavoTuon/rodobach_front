@@ -23,6 +23,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/faturamento-diario.jsx",
   "src/screens/comparativo-faturamento.jsx",
   "src/screens/manutencao.jsx?v=20260803-km-fallback-5",
+  "src/screens/manutencao-posicoes.jsx",
   "src/screens/pneus.jsx?v=20260803-km-fallback",
   "src/screens/automacoes.jsx",
   "src/screens/consulta-cte.jsx?v=20260731-xml-nfe",
@@ -33,7 +34,7 @@ const SCREEN_GLOBALS = [
   "Diretoria", "SimuladorFrete", "Viagens", "FolgasMotoristas",
   "StatusCargaFrota", "Trafegus", "OportunidadesRetorno",
   "DreEmpresarial", "AnaliseClientes",
-  "RentabilidadeClientes", "LucroViagens", "ResultadoFretes", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n", "ConsultaCte", "ControleCanhotos",
+  "RentabilidadeClientes", "LucroViagens", "ResultadoFretes", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "ManutencaoPosicoesScreen", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n", "ConsultaCte", "ControleCanhotos",
 ];
 const SCREEN_MODULES = import.meta.glob("./screens/*.jsx");
 
@@ -62,8 +63,9 @@ const NAV = [
   { id: "oportunidades-retorno", label: "Retorno", icon: "route", title: "Clientes próximos e carga de retorno", section: "operacao" },
   { id: "consulta-cte", label: "Consultar NF-e", icon: "search", title: "Consulta de chave da NF-e", section: "operacao" },
   { id: "controle-canhotos", label: "Canhotos", icon: "check", title: "Controle de canhotos", section: "operacao" },
-  { id: "pneus",           label: "Pneus",        icon: "truck",       title: "Movimentação de Pneus", section: "operacao" },
-  { id: "manutencao",      label: "Automações",   icon: "wrench",      title: "Automação de Manutenção", section: "operacao" },
+  { id: "pneus",           label: "Pneus",        icon: "truck",       title: "Movimentação de Pneus", subgroup: "frota", section: "operacao" },
+  { id: "manutencao-posicoes", label: "Peças por posição", icon: "wrench", title: "Manutenção por posição", subgroup: "frota", section: "operacao" },
+  { id: "manutencao",      label: "Automações",   icon: "bell",        title: "Automação de Manutenção", subgroup: "frota", section: "operacao" },
   { id: "automacoes-n8n",  label: "n8n",          icon: "plug",        title: "Automações n8n", sistema: true },
   { id: "settings",        label: "Configurações", icon: "settings",   title: "Configurações",    sistema: true },
   { id: "usuarios",        label: "Usuários",     icon: "user",        title: "Gerenciar Usuários", sistema: true, adminOnly: true },
@@ -157,6 +159,7 @@ const App = () => {
   const [auth, setAuth] = useState({ checking: true, user: null });
   const [screensReady, setScreensReady] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(() => window.innerWidth > 960);
+  const [frotaMenu, setFrotaMenu] = useState(null);
 
   // Verificar sessÃ£o existente ao carregar
   useEffect(() => {
@@ -278,6 +281,7 @@ const App = () => {
   const onNavigate = (screen) => {
     if (visibleNav.some(n => n.id === screen)) {
       go(screen);
+      setFrotaMenu(null);
       if (window.innerWidth <= 960) setSidebarExpanded(false);
     }
   };
@@ -399,6 +403,9 @@ const App = () => {
     case "pneus":
       body = <Pneus onNavigate={onNavigate}/>;
       break;
+    case "manutencao-posicoes":
+      body = <ManutencaoPosicoesScreen/>;
+      break;
     case "settings":
       body = <SettingsScreen theme={t.theme} setTheme={(v) => setTweak("theme", v)} density={t.density} setDensity={(v) => setTweak("density", v)} onNavigate={onNavigate} canManageUsers={hasScreen("usuarios")}/>;
       break;
@@ -432,7 +439,18 @@ const App = () => {
             return (
               <div className="nav-section" key={section}>
                 <div className="nav-label">{label}</div>
-                {renderNavItems(items)}
+                {renderNavItems(items.filter(item => !item.subgroup))}
+                {items.some(item => item.subgroup === "frota") && <button
+                  type="button"
+                  className={`nav-item nav-flyout-trigger ${items.some(item => item.subgroup === "frota" && item.id === currentScreen) ? "active" : ""}`}
+                  data-tip="Frota"
+                  aria-expanded={Boolean(frotaMenu)}
+                  onClick={event => {
+                    if (frotaMenu) return setFrotaMenu(null);
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    setFrotaMenu({ left: rect.right + 7, top: Math.max(8, Math.min(rect.top, window.innerHeight - 180)) });
+                  }}
+                ><Icon name="truck"/><span className="lbl">Frota</span><Icon name="chevron-right" size={13}/></button>}
               </div>
             );
           })}
@@ -469,6 +487,11 @@ const App = () => {
           </button>
         </div>
       </aside>
+
+      {frotaMenu && <><button className="nav-flyout-dismiss" aria-label="Fechar opções da frota" onClick={() => setFrotaMenu(null)}/><div className="nav-flyout" style={{ left: frotaMenu.left, top: frotaMenu.top }}>
+        <div className="nav-flyout-title"><Icon name="truck" size={14}/><span>Frota</span></div>
+        {renderNavItems(sidebarNav.filter(item => item.subgroup === "frota"))}
+      </div></>}
 
       <main className="main">
         <div style={{flex: 1, overflow: "hidden", display: "flex", flexDirection: "column"}}>

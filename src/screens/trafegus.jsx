@@ -1,4 +1,31 @@
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
 // Monitor de SMs e alterações de rota do Elite OP / Trafegus.
+const OfficialRouteMap = ({ route }) => {
+  const mapElement = React.useRef(null);
+
+  React.useEffect(() => {
+    const points = (route?.polyline || []).map((point) => [point.latitude, point.longitude]);
+    if (!mapElement.current || points.length < 2) return undefined;
+    const map = L.map(mapElement.current, { preferCanvas: true, zoomControl: true });
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap",
+    }).addTo(map);
+    const safetyRoute = L.polyline(points, { color: "#244ee8", weight: 6, opacity: 0.95 }).addTo(map);
+    L.circleMarker(points[0], { radius: 7, color: "#fff", weight: 3, fillColor: "#16a34a", fillOpacity: 1 })
+      .bindTooltip("Origem").addTo(map);
+    L.circleMarker(points.at(-1), { radius: 7, color: "#fff", weight: 3, fillColor: "#dc2626", fillOpacity: 1 })
+      .bindTooltip("Destino").addTo(map);
+    map.fitBounds(safetyRoute.getBounds(), { padding: [24, 24] });
+    window.setTimeout(() => map.invalidateSize(), 0);
+    return () => map.remove();
+  }, [route]);
+
+  return <div ref={mapElement} style={{height:"min(52vh, 520px)",width:"100%",borderRadius:8,overflow:"hidden"}}/>;
+};
+
 const Trafegus = () => {
   const [data, setData] = React.useState({ resumo: {}, sms: [], alteracoes: [] });
   const [loading, setLoading] = React.useState(true);
@@ -35,17 +62,10 @@ const Trafegus = () => {
     try {
       setRouteDetail(await window.RB_API.getTrafegusGoogleRoute(smId));
     } catch (requestError) {
-      setRouteError(requestError?.message || "Não foi possível montar a rota do Google Maps.");
+      setRouteError(requestError?.message || "Não foi possível carregar a rota oficial da SM.");
     } finally {
       setRouteLoading(false);
     }
-  };
-
-  const copyGoogleRoute = async () => {
-    if (!routeDetail?.googleMapsUrl) return;
-    await navigator.clipboard.writeText(routeDetail.googleMapsUrl);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
   };
 
   const formatDate = (value) => {
@@ -131,7 +151,7 @@ const Trafegus = () => {
                     <td>{formatDate(row.previsaoInicio)}<div className="muted" style={{fontSize:10.5}}>até {formatDate(row.previsaoFim)}</div></td>
                     <td>
                       <div style={{display:"flex",gap:6,whiteSpace:"nowrap"}}>
-                        <button className="btn sm primary" onClick={() => openRouteOptions(row.id)}><Icon name="route"/> GPS</button>
+                        <button className="btn sm primary" onClick={() => openRouteOptions(row.id)}><Icon name="route"/> Rota exata</button>
                         {row.linkRota
                           ? <a className="btn sm" href={row.linkRota} target="_blank" rel="noreferrer"><Icon name="map"/> Elite</a>
                           : <span className="badge warn">Sem link</span>}
@@ -183,25 +203,41 @@ const Trafegus = () => {
             <div style={{padding:16,overflow:"auto"}}>
               {routeLoading && <div className="muted" style={{padding:22,textAlign:"center"}}>Consultando o Guia de Viagem e montando a rota...</div>}
               {routeError && <div style={{padding:14,color:"var(--crit)",border:"1px solid var(--crit-border)",borderRadius:8}}>{routeError}</div>}
-              {!routeLoading && !routeError && routeDetail.googleMapsUrl && (
+              {!routeLoading && !routeError && routeDetail.rotaOficial?.polyline?.length && (
                 <>
                   <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}>
-                    <a className="btn primary" href={routeDetail.googleMapsUrl} target="_blank" rel="noreferrer"><Icon name="map"/> Abrir no Google Maps</a>
-                    <button className="btn" onClick={copyGoogleRoute}><Icon name="copy"/> {copied ? "Link copiado" : "Copiar link"}</button>
+                    <a className="btn primary" href={routeDetail.rotaOficial.url} target="_blank" rel="noreferrer"><Icon name="map"/> Abrir rota oficial Elite</a>
+                    <button className="btn" onClick={async () => {
+                      await navigator.clipboard.writeText(routeDetail.rotaOficial.url);
+                      setCopied(true);
+                      window.setTimeout(() => setCopied(false), 1800);
+                    }}><Icon name="copy"/> {copied ? "Link copiado" : "Copiar rota oficial"}</button>
                     <a className="btn" href={routeDetail.whatsappUrl} target="_blank" rel="noreferrer"><Icon name="whatsapp"/> Enviar ao motorista</a>
                     <span className={`badge ${routeDetail.telefoneEncontrado ? "ok" : "warn"}`}>
                       {routeDetail.telefoneEncontrado ? `Telefone encontrado · final ${routeDetail.telefoneFinal}` : "Telefone não encontrado — escolher contato"}
                     </span>
                   </div>
 
+                  <div style={{padding:"11px 13px",marginBottom:12,border:"1px solid var(--crit-border)",borderRadius:8,background:"var(--crit-bg)",color:"var(--crit)",fontWeight:600}}>
+                    Rota de segurança: a linha abaixo usa as {routeDetail.rotaOficial.polyline.length.toLocaleString("pt-BR")} coordenadas originais da SM. Não utilizar Google Maps ou Waze, pois esses aplicativos recalculam o caminho e podem causar bloqueio do veículo.
+                  </div>
+
+                  <div className="card card-flush" style={{marginBottom:12}}>
+                    <div className="card-header">
+                      <h3>{routeDetail.rotaOficial.descricao || "Rota oficial da SM"}</h3>
+                      <span className="meta muted">{routeDetail.rotaOficial.distanciaKm ? `${routeDetail.rotaOficial.distanciaKm.toLocaleString("pt-BR")} km` : ""}</span>
+                    </div>
+                    <OfficialRouteMap route={routeDetail.rotaOficial}/>
+                  </div>
+
                   <div className="card card-flush">
                     <div className="card-header">
-                      <h3>Entregas na ordem do Trafegus</h3>
-                      <span className="meta muted">{routeDetail.entregas?.length || 0} entregas · paradas permitidas excluídas</span>
+                      <h3>Locais da viagem</h3>
+                      <span className="meta muted">{routeDetail.entregas?.length || 0} entregas</span>
                     </div>
                     <div className="card-body">
-                      {(routeDetail.locais || []).map((local, index) => (
-                        <div key={`${local.tipo}-${local.ordem}-${index}`} style={{display:"grid",gridTemplateColumns:"34px 90px 1fr auto",gap:10,alignItems:"center",padding:"10px 0",borderBottom:index < routeDetail.locais.length - 1 ? "1px solid var(--divider)" : 0}}>
+                      {(routeDetail.locais || []).map((local, index, displayedLocations) => (
+                        <div key={`${local.tipo}-${local.ordem}-${index}`} style={{display:"grid",gridTemplateColumns:"34px 90px 1fr auto",gap:10,alignItems:"center",padding:"10px 0",borderBottom:index < displayedLocations.length - 1 ? "1px solid var(--divider)" : 0}}>
                           <span style={{width:26,height:26,borderRadius:"50%",display:"grid",placeItems:"center",background:local.tipo === "ENTREGA" ? "rgba(56,189,248,.16)" : "rgba(34,197,94,.16)",color:local.tipo === "ENTREGA" ? "#38bdf8" : "#22c55e",fontWeight:700}}>{index + 1}</span>
                           <span className={`badge ${local.tipo === "ENTREGA" ? "warn" : "ok"}`}>{local.tipo}</span>
                           <div><strong>{local.descricao}</strong><div className="muted" style={{fontSize:10.5}}>{local.latitude}, {local.longitude}</div></div>
