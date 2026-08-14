@@ -175,6 +175,7 @@ window.RB_API = {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/dre-empresarial${buildQuery(params)}`);
   },
+  getFluxoCaixa: (filters = {}) => apiRequest(`/financeiro/fluxo-caixa${buildQuery(filters || {})}`),
   getDreLancamentoDetalhe: (detailKey = {}) =>
     apiRequest(`/financeiro/dre-empresarial/lancamento-detalhe${buildQuery(detailKey)}`),
   getTrafegusDashboard: () => apiRequest("/trafegus/dashboard"),

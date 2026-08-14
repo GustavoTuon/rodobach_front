@@ -64,6 +64,8 @@ function dreEmpSortByDate(a, b) {
 
 function dreEmpCostType(row) {
   const text = `${row.contaMascara || ""} ${row.contaFinanceira || ""} ${row.categoriaDre || ""} ${row.pessoaNome || ""} ${row.historico || ""}`.toLowerCase();
+  const account = `${row.contaFinanceira || ""} ${row.historico || ""}`.toLowerCase();
+  if (account.includes("lavação") || account.includes("lavacao") || account.includes("lavagem")) return "Lavação";
   if (text.includes("pedagio") || text.includes("pedágio")) return "Pedagio";
   if (text.includes("borracharia")) return "Borracharia";
   if (text.includes("combust") || text.includes("lubrificant") || text.includes("posto")) return "Combustivel";
