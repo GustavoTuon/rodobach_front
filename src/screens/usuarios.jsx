@@ -1,73 +1,134 @@
 ﻿const { useState, useEffect, useRef } = React;
 
 const TELAS_GRUPOS = [
-  { id: "direcao", label: "Direção", telas: [
-  { id: "perm_diretoria", label: "Diretoria" },
-  { id: "perm_dre_empresarial", label: "DRE Empresarial" },
-  { id: "perm_faturamento_diario", label: "Faturamento Diário" },
-  { id: "perm_comparativo_faturamento", label: "Comparativo Mensal" },
-  { id: "perm_abastecimentos",  label: "Abastecimentos" },
-  { id: "perm_precos_combustivel", label: "Preços Postos" },
-  { id: "perm_lucro_viagens",   label: "Resultado por Viagem" },
-  { id: "perm_clientes",        label: "Análise de Clientes" },
-  { id: "perm_clientes_lucro",  label: "Rentabilidade de Clientes" },
-  { id: "perm_manutencoes_veiculos", label: "Manutenções por Veículo" },
-  ]},
-  { id: "operacao", label: "Operação", telas: [
-  { id: "perm_simulador",       label: "Calculadora" },
-  { id: "perm_viagens",         label: "Viagens" },
-  { id: "perm_folgas_motoristas", label: "Folgas" },
-  { id: "perm_status_carga",    label: "Status Carga" },
-  { id: "perm_trafegus", label: "Trafegus" },
-  { id: "perm_oportunidades_retorno", label: "Retorno" },
-  { id: "perm_consulta_nfe", label: "Consultar NF-e" },
-  { id: "perm_controle_canhotos", label: "Canhotos" },
-  ]},
-  { id: "frota", label: "Frota", telas: [
-  { id: "perm_pneus",           label: "Pneus" },
-  { id: "perm_manutencao_posicoes", label: "Peças por posição" },
-  { id: "perm_manutencao",      label: "Automações" },
-  ]},
-  { id: "sistema", label: "Sistema", telas: [
-  { id: "perm_automacoes_n8n",  label: "n8n" },
-  { id: "perm_settings",        label: "Configurações" },
-  ]},
+  {
+    id: "direcao",
+    label: "Direção",
+    telas: [
+      { id: "perm_diretoria", label: "Diretoria" },
+      { id: "perm_dre_empresarial", label: "DRE Empresarial" },
+      { id: "perm_faturamento_diario", label: "Faturamento Diário" },
+      { id: "perm_comparativo_faturamento", label: "Comparativo Mensal" },
+      { id: "perm_abastecimentos", label: "Abastecimentos" },
+      { id: "perm_precos_combustivel", label: "Preços Postos" },
+      { id: "perm_lucro_viagens", label: "Resultado por Viagem" },
+      { id: "perm_clientes", label: "Análise de Clientes" },
+      { id: "perm_clientes_lucro", label: "Rentabilidade de Clientes" },
+      { id: "perm_manutencoes_veiculos", label: "Manutenções por Veículo" },
+    ],
+  },
+  {
+    id: "operacao",
+    label: "Operação",
+    telas: [
+      { id: "perm_simulador", label: "Calculadora" },
+      { id: "perm_viagens", label: "Viagens" },
+      { id: "perm_aprovar_viagens", label: "Aprovar viagens (Comercial)" },
+      { id: "perm_folgas_motoristas", label: "Folgas" },
+      { id: "perm_status_carga", label: "Status Carga" },
+      { id: "perm_trafegus", label: "Trafegus" },
+      { id: "perm_oportunidades_retorno", label: "Retorno" },
+      { id: "perm_consulta_nfe", label: "Consultar NF-e" },
+      { id: "perm_controle_canhotos", label: "Canhotos" },
+    ],
+  },
+  {
+    id: "frota",
+    label: "Frota",
+    telas: [
+      { id: "perm_pneus", label: "Pneus" },
+      { id: "perm_multas_frota", label: "Multas" },
+      { id: "perm_manutencao_posicoes", label: "Peças por posição" },
+      { id: "perm_manutencao", label: "Automações" },
+    ],
+  },
+  {
+    id: "sistema",
+    label: "Sistema",
+    telas: [
+      { id: "perm_automacoes_n8n", label: "n8n" },
+      { id: "perm_settings", label: "Configurações" },
+    ],
+  },
 ];
-const TELAS = TELAS_GRUPOS.flatMap(grupo => grupo.telas);
+const TELAS = TELAS_GRUPOS.flatMap((grupo) => grupo.telas);
 
 const FORM_VAZIO = {
-  login: "", senha: "", email: "", numero: "",
-  admin: false, ativo: true,
-  perm_diretoria: true, perm_simulador: true, perm_viagens: true,
-  perm_dre_empresarial: true, perm_analise_frota: true,
-  perm_abastecimentos: true, perm_precos_combustivel: true,
-  perm_faturamento_diario: true, perm_comparativo_faturamento: true,
+  login: "",
+  senha: "",
+  email: "",
+  numero: "",
+  admin: false,
+  ativo: true,
+  perm_diretoria: true,
+  perm_simulador: true,
+  perm_viagens: true,
+  perm_aprovar_viagens: false,
+  perm_dre_empresarial: true,
+  perm_analise_frota: true,
+  perm_abastecimentos: true,
+  perm_precos_combustivel: true,
+  perm_faturamento_diario: true,
+  perm_comparativo_faturamento: true,
   perm_lucro_viagens: true,
-  perm_custos_veiculos: true, perm_manutencoes_veiculos: true,
-  perm_clientes: true, perm_clientes_lucro: true, perm_status_carga: true, perm_pneus: true,
-  perm_manutencao: true, perm_automacoes_n8n: true, perm_settings: true,
-  perm_folgas_motoristas: true, perm_trafegus: true,
-  perm_oportunidades_retorno: true, perm_consulta_nfe: true,
-  perm_controle_canhotos: true, perm_manutencao_posicoes: true,
+  perm_custos_veiculos: true,
+  perm_manutencoes_veiculos: true,
+  perm_clientes: true,
+  perm_clientes_lucro: true,
+  perm_status_carga: true,
+  perm_pneus: true,
+  perm_multas_frota: true,
+  perm_manutencao: true,
+  perm_automacoes_n8n: true,
+  perm_settings: true,
+  perm_folgas_motoristas: true,
+  perm_trafegus: true,
+  perm_oportunidades_retorno: true,
+  perm_consulta_nfe: true,
+  perm_controle_canhotos: true,
+  perm_manutencao_posicoes: true,
 };
 
 const Toggle = ({ value, onChange, label }) => (
-  <label style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", userSelect: "none" }}>
+  <label
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 7,
+      cursor: "pointer",
+      userSelect: "none",
+    }}
+  >
     <div
       onClick={() => onChange(!value)}
       style={{
-        width: 36, height: 20, borderRadius: 10, flexShrink: 0,
+        width: 36,
+        height: 20,
+        borderRadius: 10,
+        flexShrink: 0,
         background: value ? "var(--brand-blue)" : "var(--border)",
-        position: "relative", transition: "background 150ms", cursor: "pointer",
+        position: "relative",
+        transition: "background 150ms",
+        cursor: "pointer",
       }}
     >
-      <div style={{
-        position: "absolute", top: 2, left: value ? 18 : 2,
-        width: 16, height: 16, borderRadius: "50%", background: "#fff",
-        transition: "left 150ms", boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-      }}/>
+      <div
+        style={{
+          position: "absolute",
+          top: 2,
+          left: value ? 18 : 2,
+          width: 16,
+          height: 16,
+          borderRadius: "50%",
+          background: "#fff",
+          transition: "left 150ms",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+        }}
+      />
     </div>
-    {label && <span style={{ fontSize: 12.5, color: "var(--text)" }}>{label}</span>}
+    {label && (
+      <span style={{ fontSize: 12.5, color: "var(--text)" }}>{label}</span>
+    )}
   </label>
 );
 
@@ -95,7 +156,9 @@ const GerenciarUsuarios = ({ onNavigate }) => {
     }
   };
 
-  useEffect(() => { carregar(); }, []);
+  useEffect(() => {
+    carregar();
+  }, []);
 
   const abrirCriacao = () => {
     setForm(FORM_VAZIO);
@@ -106,16 +169,21 @@ const GerenciarUsuarios = ({ onNavigate }) => {
 
   const abrirEdicao = (u) => {
     setForm({
-      login: u.login, senha: "",
-      email: u.email || "", numero: u.numero || "",
-      admin: u.admin, ativo: u.ativo,
+      login: u.login,
+      senha: "",
+      email: u.email || "",
+      numero: u.numero || "",
+      admin: u.admin,
+      ativo: u.ativo,
       perm_diretoria: u.perm_diretoria ?? true,
       perm_simulador: u.perm_simulador ?? true,
       perm_viagens: u.perm_viagens ?? true,
+      perm_aprovar_viagens: u.perm_aprovar_viagens ?? false,
       perm_dre_empresarial: u.perm_dre_empresarial ?? true,
       perm_analise_frota: u.perm_analise_frota ?? true,
       perm_abastecimentos: u.perm_abastecimentos ?? true,
-      perm_precos_combustivel: u.perm_precos_combustivel ?? u.perm_abastecimentos ?? true,
+      perm_precos_combustivel:
+        u.perm_precos_combustivel ?? u.perm_abastecimentos ?? true,
       perm_faturamento_diario: u.perm_faturamento_diario ?? true,
       perm_comparativo_faturamento: u.perm_comparativo_faturamento ?? true,
       perm_lucro_viagens: u.perm_lucro_viagens ?? true,
@@ -128,18 +196,28 @@ const GerenciarUsuarios = ({ onNavigate }) => {
       perm_settings: u.perm_settings ?? true,
       perm_manutencao: u.perm_manutencao ?? true,
       perm_automacoes_n8n: u.perm_automacoes_n8n ?? true,
-      perm_folgas_motoristas: u.perm_folgas_motoristas ?? u.perm_viagens ?? true,
+      perm_folgas_motoristas:
+        u.perm_folgas_motoristas ?? u.perm_viagens ?? true,
       perm_trafegus: u.perm_trafegus ?? u.perm_viagens ?? true,
-      perm_oportunidades_retorno: u.perm_oportunidades_retorno ?? u.perm_viagens ?? true,
+      perm_oportunidades_retorno:
+        u.perm_oportunidades_retorno ?? u.perm_viagens ?? true,
       perm_consulta_nfe: u.perm_consulta_nfe ?? u.perm_viagens ?? true,
-      perm_controle_canhotos: u.perm_controle_canhotos ?? u.perm_consulta_nfe ?? u.perm_viagens ?? true,
-      perm_manutencao_posicoes: u.perm_manutencao_posicoes ?? u.perm_manutencao ?? true,
+      perm_controle_canhotos:
+        u.perm_controle_canhotos ??
+        u.perm_consulta_nfe ??
+        u.perm_viagens ??
+        true,
+      perm_manutencao_posicoes:
+        u.perm_manutencao_posicoes ?? u.perm_manutencao ?? true,
     });
     setErro("");
     setModal(u);
   };
 
-  const fecharModal = () => { setModal(null); setErro(""); };
+  const fecharModal = () => {
+    setModal(null);
+    setErro("");
+  };
 
   const handleSalvar = async (e) => {
     e.preventDefault();
@@ -163,7 +241,12 @@ const GerenciarUsuarios = ({ onNavigate }) => {
   };
 
   const handleExcluir = async (u) => {
-    if (!confirm(`Excluir o usuário "${u.login}"? Esta ação não pode ser desfeita.`)) return;
+    if (
+      !confirm(
+        `Excluir o usuário "${u.login}"? Esta ação não pode ser desfeita.`,
+      )
+    )
+      return;
     try {
       await RB_API.deleteUsuario(u.id);
       await carregar();
@@ -172,13 +255,19 @@ const GerenciarUsuarios = ({ onNavigate }) => {
     }
   };
 
-  const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
+  const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
 
   const inputStyle = {
-    width: "100%", padding: "7px 10px",
-    border: "1.5px solid var(--border)", borderRadius: 6,
-    background: "var(--surface)", color: "var(--text)",
-    fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", outline: "none",
+    width: "100%",
+    padding: "7px 10px",
+    border: "1.5px solid var(--border)",
+    borderRadius: 6,
+    background: "var(--surface)",
+    color: "var(--text)",
+    fontSize: 13,
+    fontFamily: "inherit",
+    boxSizing: "border-box",
+    outline: "none",
   };
 
   return (
@@ -191,9 +280,15 @@ const GerenciarUsuarios = ({ onNavigate }) => {
         <button
           onClick={abrirCriacao}
           style={{
-            padding: "7px 16px", background: "var(--brand-blue)", color: "#fff",
-            border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600,
-            cursor: "pointer", fontFamily: "inherit",
+            padding: "7px 16px",
+            background: "var(--brand-blue)",
+            color: "#fff",
+            border: "none",
+            borderRadius: 7,
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: "pointer",
+            fontFamily: "inherit",
           }}
         >
           + Novo usuário
@@ -203,58 +298,132 @@ const GerenciarUsuarios = ({ onNavigate }) => {
       {/* Tabela */}
       <div className="card" style={{ padding: 0, overflow: "hidden" }}>
         {loading ? (
-          <div style={{ padding: 24, color: "var(--muted)", fontSize: 13 }}>Carregando…</div>
+          <div style={{ padding: 24, color: "var(--muted)", fontSize: 13 }}>
+            Carregando…
+          </div>
         ) : erroLista ? (
-          <div style={{ padding: 24, color: "#ef4444", fontSize: 13 }}>{erroLista}</div>
+          <div style={{ padding: 24, color: "#ef4444", fontSize: 13 }}>
+            {erroLista}
+          </div>
         ) : (
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+          <table
+            style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}
+          >
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                {["Login", "Email", "Número", "Perfil", "Status", "Telas liberadas", "Ações"].map(h => (
-                  <th key={h} style={{
-                    padding: "10px 14px", textAlign: "left",
-                    fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap",
-                  }}>{h}</th>
+                {[
+                  "Login",
+                  "Email",
+                  "Número",
+                  "Perfil",
+                  "Status",
+                  "Telas liberadas",
+                  "Ações",
+                ].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      padding: "10px 14px",
+                      textAlign: "left",
+                      fontWeight: 600,
+                      color: "var(--text)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {usuarios.map((u, i) => {
-                const telasCount = TELAS.filter(t => u[t.id]).length;
+                const telasCount = TELAS.filter((t) => u[t.id]).length;
                 return (
-                  <tr key={u.id} style={{ borderBottom: i < usuarios.length - 1 ? "1px solid var(--divider)" : "none" }}>
-                    <td style={{ padding: "10px 14px", fontWeight: 500 }}>{u.login}</td>
-                    <td style={{ padding: "10px 14px", color: "var(--muted)" }}>{u.email || "—"}</td>
-                    <td style={{ padding: "10px 14px", color: "var(--muted)" }}>{u.numero || "—"}</td>
-                    <td style={{ padding: "10px 14px" }}>
-                      <span style={{
-                        padding: "2px 8px", borderRadius: 4, fontSize: 11.5, fontWeight: 500,
-                        background: u.admin ? "rgba(79,127,171,0.15)" : "var(--accent-soft)",
-                        color: u.admin ? "var(--brand-blue)" : "var(--muted)",
-                      }}>{u.admin ? "Admin" : "Usuário"}</span>
+                  <tr
+                    key={u.id}
+                    style={{
+                      borderBottom:
+                        i < usuarios.length - 1
+                          ? "1px solid var(--divider)"
+                          : "none",
+                    }}
+                  >
+                    <td style={{ padding: "10px 14px", fontWeight: 500 }}>
+                      {u.login}
+                    </td>
+                    <td style={{ padding: "10px 14px", color: "var(--muted)" }}>
+                      {u.email || "—"}
+                    </td>
+                    <td style={{ padding: "10px 14px", color: "var(--muted)" }}>
+                      {u.numero || "—"}
                     </td>
                     <td style={{ padding: "10px 14px" }}>
-                      <span style={{
-                        padding: "2px 8px", borderRadius: 4, fontSize: 11.5, fontWeight: 500,
-                        background: u.ativo ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.08)",
-                        color: u.ativo ? "#16a34a" : "#ef4444",
-                      }}>{u.ativo ? "Ativo" : "Inativo"}</span>
+                      <span
+                        style={{
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          fontSize: 11.5,
+                          fontWeight: 500,
+                          background: u.admin
+                            ? "rgba(79,127,171,0.15)"
+                            : "var(--accent-soft)",
+                          color: u.admin ? "var(--brand-blue)" : "var(--muted)",
+                        }}
+                      >
+                        {u.admin ? "Admin" : "Usuário"}
+                      </span>
+                    </td>
+                    <td style={{ padding: "10px 14px" }}>
+                      <span
+                        style={{
+                          padding: "2px 8px",
+                          borderRadius: 4,
+                          fontSize: 11.5,
+                          fontWeight: 500,
+                          background: u.ativo
+                            ? "rgba(34,197,94,0.1)"
+                            : "rgba(239,68,68,0.08)",
+                          color: u.ativo ? "#16a34a" : "#ef4444",
+                        }}
+                      >
+                        {u.ativo ? "Ativo" : "Inativo"}
+                      </span>
                     </td>
                     <td style={{ padding: "10px 14px", color: "var(--muted)" }}>
                       {telasCount}/{TELAS.length} telas
                     </td>
                     <td style={{ padding: "10px 14px" }}>
                       <div style={{ display: "flex", gap: 6 }}>
-                        <button onClick={() => abrirEdicao(u)} style={{
-                          padding: "4px 10px", background: "var(--surface)",
-                          border: "1px solid var(--border)", borderRadius: 5,
-                          fontSize: 12, cursor: "pointer", fontFamily: "inherit", color: "var(--text)",
-                        }}>Editar</button>
-                        <button onClick={() => handleExcluir(u)} style={{
-                          padding: "4px 10px", background: "transparent",
-                          border: "1px solid rgba(239,68,68,0.35)", borderRadius: 5,
-                          fontSize: 12, cursor: "pointer", fontFamily: "inherit", color: "#ef4444",
-                        }}>Excluir</button>
+                        <button
+                          onClick={() => abrirEdicao(u)}
+                          style={{
+                            padding: "4px 10px",
+                            background: "var(--surface)",
+                            border: "1px solid var(--border)",
+                            borderRadius: 5,
+                            fontSize: 12,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            color: "var(--text)",
+                          }}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleExcluir(u)}
+                          style={{
+                            padding: "4px 10px",
+                            background: "transparent",
+                            border: "1px solid rgba(239,68,68,0.35)",
+                            borderRadius: 5,
+                            fontSize: 12,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            color: "#ef4444",
+                          }}
+                        >
+                          Excluir
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -262,7 +431,14 @@ const GerenciarUsuarios = ({ onNavigate }) => {
               })}
               {usuarios.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ padding: "32px 14px", color: "var(--muted)", textAlign: "center" }}>
+                  <td
+                    colSpan={7}
+                    style={{
+                      padding: "32px 14px",
+                      color: "var(--muted)",
+                      textAlign: "center",
+                    }}
+                  >
                     Nenhum usuário cadastrado.
                   </td>
                 </tr>
@@ -275,142 +451,306 @@ const GerenciarUsuarios = ({ onNavigate }) => {
       {/* Modal */}
       {modal && (
         <div
-          onClick={e => e.target === e.currentTarget && fecharModal()}
+          onClick={(e) => e.target === e.currentTarget && fecharModal()}
           style={{
-            position: "fixed", inset: 0, zIndex: 1000,
-            background: "rgba(0,0,0,0.45)", backdropFilter: "blur(2px)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(0,0,0,0.45)",
+            backdropFilter: "blur(2px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
           }}
         >
-          <div className="user-modal" style={{
-            background: "var(--surface)", borderRadius: 12, width: "100%", maxWidth: 540,
-            maxHeight: "92vh", overflowY: "auto",
-            boxShadow: "0 24px 64px rgba(0,0,0,0.28)",
-          }}>
+          <div
+            className="user-modal"
+            style={{
+              background: "var(--surface)",
+              borderRadius: 12,
+              width: "100%",
+              maxWidth: 540,
+              maxHeight: "92vh",
+              overflowY: "auto",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.28)",
+            }}
+          >
             {/* Header modal */}
-            <div style={{
-              padding: "16px 20px 14px",
-              borderBottom: "1px solid var(--border)",
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              position: "sticky", top: 0, background: "var(--surface)", zIndex: 1,
-            }}>
+            <div
+              style={{
+                padding: "16px 20px 14px",
+                borderBottom: "1px solid var(--border)",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                position: "sticky",
+                top: 0,
+                background: "var(--surface)",
+                zIndex: 1,
+              }}
+            >
               <div style={{ fontWeight: 600, fontSize: 15 }}>
                 {modal === "create" ? "Novo usuário" : `Editar: ${modal.login}`}
               </div>
-              <button onClick={fecharModal} style={{
-                background: "none", border: "none", cursor: "pointer",
-                color: "var(--muted)", fontSize: 20, lineHeight: 1, padding: "0 4px",
-              }}>×</button>
+              <button
+                onClick={fecharModal}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--muted)",
+                  fontSize: 20,
+                  lineHeight: 1,
+                  padding: "0 4px",
+                }}
+              >
+                ×
+              </button>
             </div>
 
             <form onSubmit={handleSalvar} style={{ padding: 20 }}>
               {/* Dados básicos */}
-              <div className="user-basic-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+              <div
+                className="user-basic-grid"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 12,
+                  marginBottom: 16,
+                }}
+              >
                 <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 5, color: "var(--text)" }}>Login *</label>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      marginBottom: 5,
+                      color: "var(--text)",
+                    }}
+                  >
+                    Login *
+                  </label>
                   <input
-                    type="text" value={form.login}
-                    onChange={e => set("login", e.target.value)}
-                    style={inputStyle} required
+                    type="text"
+                    value={form.login}
+                    onChange={(e) => set("login", e.target.value)}
+                    style={inputStyle}
+                    required
                     placeholder="ex: joao.silva"
                   />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 5, color: "var(--text)" }}>
-                    Senha {modal !== "create" && <span style={{ fontWeight: 400, color: "var(--muted)" }}>(vazio = não alterar)</span>}
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      marginBottom: 5,
+                      color: "var(--text)",
+                    }}
+                  >
+                    Senha{" "}
+                    {modal !== "create" && (
+                      <span style={{ fontWeight: 400, color: "var(--muted)" }}>
+                        (vazio = não alterar)
+                      </span>
+                    )}
                   </label>
                   <div style={{ position: "relative" }}>
                     <input
-                      type={showSenha ? "text" : "password"} value={form.senha}
-                      onChange={e => set("senha", e.target.value)}
-                      style={{ ...inputStyle, paddingRight: 36 }} required={modal === "create"}
-                      placeholder={modal === "create" ? "Senha inicial" : "••••••••"}
+                      type={showSenha ? "text" : "password"}
+                      value={form.senha}
+                      onChange={(e) => set("senha", e.target.value)}
+                      style={{ ...inputStyle, paddingRight: 36 }}
+                      required={modal === "create"}
+                      placeholder={
+                        modal === "create" ? "Senha inicial" : "••••••••"
+                      }
                     />
                     <button
                       type="button"
-                      onClick={() => setShowSenha(v => !v)}
+                      onClick={() => setShowSenha((v) => !v)}
                       tabIndex={-1}
                       title={showSenha ? "Ocultar senha" : "Mostrar senha"}
                       style={{
-                        position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)",
-                        background: "none", border: "none", cursor: "pointer",
-                        color: "var(--muted)", padding: 2, display: "flex",
+                        position: "absolute",
+                        right: 8,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "var(--muted)",
+                        padding: 2,
+                        display: "flex",
                       }}
                     >
-                      <Icon name={showSenha ? "eye-off" : "eye"} size={15}/>
+                      <Icon name={showSenha ? "eye-off" : "eye"} size={15} />
                     </button>
                   </div>
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 5, color: "var(--text)" }}>Email</label>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      marginBottom: 5,
+                      color: "var(--text)",
+                    }}
+                  >
+                    Email
+                  </label>
                   <input
-                    type="email" value={form.email}
-                    onChange={e => set("email", e.target.value)}
-                    style={inputStyle} placeholder="email@exemplo.com"
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => set("email", e.target.value)}
+                    style={inputStyle}
+                    placeholder="email@exemplo.com"
                   />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: 12, fontWeight: 500, marginBottom: 5, color: "var(--text)" }}>Número / Telefone</label>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: 12,
+                      fontWeight: 500,
+                      marginBottom: 5,
+                      color: "var(--text)",
+                    }}
+                  >
+                    Número / Telefone
+                  </label>
                   <input
-                    type="text" value={form.numero}
-                    onChange={e => set("numero", e.target.value)}
-                    style={inputStyle} placeholder="(00) 00000-0000"
+                    type="text"
+                    value={form.numero}
+                    onChange={(e) => set("numero", e.target.value)}
+                    style={inputStyle}
+                    placeholder="(00) 00000-0000"
                   />
                 </div>
               </div>
 
               {/* Flags */}
-              <div className="user-status-flags" style={{
-                display: "flex", gap: 24, padding: "12px 14px",
-                background: "var(--bg)", borderRadius: 8, marginBottom: 16,
-              }}>
-                <Toggle value={form.admin} onChange={v => set("admin", v)} label="Administrador (pode cadastrar usuários)"/>
-                <Toggle value={form.ativo} onChange={v => set("ativo", v)} label="Ativo"/>
+              <div
+                className="user-status-flags"
+                style={{
+                  display: "flex",
+                  gap: 24,
+                  padding: "12px 14px",
+                  background: "var(--bg)",
+                  borderRadius: 8,
+                  marginBottom: 16,
+                }}
+              >
+                <Toggle
+                  value={form.admin}
+                  onChange={(v) => set("admin", v)}
+                  label="Administrador (pode cadastrar usuários)"
+                />
+                <Toggle
+                  value={form.ativo}
+                  onChange={(v) => set("ativo", v)}
+                  label="Ativo"
+                />
               </div>
 
               {/* Permissões de telas */}
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text)", marginBottom: 10 }}>
+                <div
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: "var(--text)",
+                    marginBottom: 10,
+                  }}
+                >
                   Permissões de telas
                 </div>
                 <div className="user-permission-groups">
-                  {TELAS_GRUPOS.map(grupo => (
+                  {TELAS_GRUPOS.map((grupo) => (
                     <section className="user-permission-group" key={grupo.id}>
-                      <div className="user-permission-group-title">{grupo.label}</div>
+                      <div className="user-permission-group-title">
+                        {grupo.label}
+                      </div>
                       <div className="user-permission-grid">
-                        {grupo.telas.map(t => (
-                          <Toggle key={t.id} value={form[t.id]} onChange={v => set(t.id, v)} label={t.label}/>
+                        {grupo.telas.map((t) => (
+                          <Toggle
+                            key={t.id}
+                            value={form[t.id]}
+                            onChange={(v) => set(t.id, v)}
+                            label={t.label}
+                          />
                         ))}
                       </div>
                     </section>
                   ))}
                 </div>
-                <div style={{ marginTop: 6, fontSize: 11.5, color: "var(--muted)" }}>
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontSize: 11.5,
+                    color: "var(--muted)",
+                  }}
+                >
                   Telas desativadas ficam ocultas no menu do usuário.
                 </div>
               </div>
 
               {/* Erro */}
               {erro && (
-                <div style={{
-                  marginBottom: 14, padding: "8px 12px",
-                  background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)",
-                  borderRadius: 6, fontSize: 12.5, color: "#ef4444",
-                }}>{erro}</div>
+                <div
+                  style={{
+                    marginBottom: 14,
+                    padding: "8px 12px",
+                    background: "rgba(239,68,68,0.08)",
+                    border: "1px solid rgba(239,68,68,0.2)",
+                    borderRadius: 6,
+                    fontSize: 12.5,
+                    color: "#ef4444",
+                  }}
+                >
+                  {erro}
+                </div>
               )}
 
               {/* Ações */}
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                <button type="button" onClick={fecharModal} style={{
-                  padding: "8px 16px", background: "var(--surface)",
-                  border: "1px solid var(--border)", borderRadius: 6,
-                  fontSize: 13, cursor: "pointer", fontFamily: "inherit", color: "var(--text)",
-                }}>Cancelar</button>
-                <button type="submit" disabled={saving} style={{
-                  padding: "8px 16px", background: "var(--brand-blue)", color: "#fff",
-                  border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600,
-                  cursor: saving ? "not-allowed" : "pointer", fontFamily: "inherit",
-                }}>
+              <div
+                style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}
+              >
+                <button
+                  type="button"
+                  onClick={fecharModal}
+                  style={{
+                    padding: "8px 16px",
+                    background: "var(--surface)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 6,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    color: "var(--text)",
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  style={{
+                    padding: "8px 16px",
+                    background: "var(--brand-blue)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 6,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: saving ? "not-allowed" : "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
                   {saving ? "Salvando…" : "Salvar"}
                 </button>
               </div>

@@ -142,6 +142,11 @@ window.RB_API = {
   deleteViagem: (id) => apiRequest(`/viagens/${id}`, {
     method: "DELETE",
   }),
+  updateViagemAprovacao: (id, payload) => apiRequest(`/viagens/${id}/aprovacao`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }),
+  getViagemAuditoria: (id) => apiRequest(`/viagens/${id}/auditoria`),
 
   // ── Financeiro ────────────────────────────────────────────────────────────
   getAnaliseFrota: (filters = {}) => apiRequest(`/frota/analise${buildQuery(filters || {})}`),
@@ -156,6 +161,9 @@ window.RB_API = {
   listGruposClientes: () => apiRequest("/abastecimentos/acordos/grupos-clientes"),
   getDivergenciasAbastecimento: (filters = {}) => apiRequest(`/abastecimentos/acordos/divergencias${buildQuery(filters || {})}`),
   getStatusCargaFrota: (filters = {}) => apiRequest(`/frota/status-carga${buildQuery(filters || {})}`),
+  listMultasFrota: (filters = {}) => apiRequest(`/frota/multas${buildQuery(filters || {})}`),
+  saveControleMultaFrota: (empresa, codigo, payload) => apiRequest(`/frota/multas/${encodeURIComponent(empresa)}/${encodeURIComponent(codigo)}/controle`, { method: "PUT", body: JSON.stringify(payload) }),
+  getAuditoriaMultaFrota: (empresa, codigo) => apiRequest(`/frota/multas/${encodeURIComponent(empresa)}/${encodeURIComponent(codigo)}/auditoria`),
   getCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos${buildQuery(filters || {})}`),
   getAuditoriaCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos/auditoria${buildQuery(filters || {})}`),
   getCustosVeiculosFiltros: () => apiRequest("/financeiro/custos-veiculos/filtros"),
@@ -210,9 +218,12 @@ window.RB_API = {
   // ── Manutenção ────────────────────────────────────────────────────────────
   listVeiculosManutencao: () => apiRequest("/manutencao/veiculos"),
   listComponentesPosicao: (placa) => apiRequest(`/manutencao/componentes-posicao${buildQuery({ placa })}`),
+  consultaComponentesPosicao: (filters = {}) => apiRequest(`/manutencao/componentes-posicao/consulta${buildQuery(filters)}`),
   getOpcoesComponentesPosicao: () => apiRequest("/manutencao/componentes-posicao/opcoes"),
   createComponentePosicao: (payload) => apiRequest("/manutencao/componentes-posicao", { method: "POST", body: JSON.stringify(payload) }),
   createComponentesPosicaoLote: (payload) => apiRequest("/manutencao/componentes-posicao/lote", { method: "POST", body: JSON.stringify(payload) }),
+  updateComponentePosicao: (id, payload) => apiRequest(`/manutencao/componentes-posicao/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  cancelComponentesPosicao: (payload) => apiRequest("/manutencao/componentes-posicao/cancelar", { method: "POST", body: JSON.stringify(payload) }),
   listContatosManutencao: () => apiRequest("/manutencao/contatos"),
   createContatoManutencao: (payload) => apiRequest("/manutencao/contatos", {
     method: "POST",

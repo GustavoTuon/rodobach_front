@@ -25,6 +25,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/manutencao.jsx?v=20260803-km-fallback-5",
   "src/screens/manutencao-posicoes.jsx",
   "src/screens/pneus.jsx?v=20260803-km-fallback",
+  "src/screens/multas-frota.jsx",
   "src/screens/automacoes.jsx",
   "src/screens/consulta-cte.jsx?v=20260731-xml-nfe",
   "src/screens/controle-canhotos.jsx?v=20260803-3",
@@ -34,7 +35,7 @@ const SCREEN_GLOBALS = [
   "Diretoria", "SimuladorFrete", "Viagens", "FolgasMotoristas",
   "StatusCargaFrota", "Trafegus", "OportunidadesRetorno",
   "DreEmpresarial", "AnaliseClientes",
-  "RentabilidadeClientes", "LucroViagens", "ResultadoFretes", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "ManutencaoPosicoesScreen", "Pneus", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n", "ConsultaCte", "ControleCanhotos",
+  "RentabilidadeClientes", "LucroViagens", "ResultadoFretes", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "ManutencaoPosicoesScreen", "Pneus", "MultasFrota", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n", "ConsultaCte", "ControleCanhotos",
 ];
 const SCREEN_MODULES = import.meta.glob("./screens/*.jsx");
 
@@ -64,6 +65,7 @@ const NAV = [
   { id: "consulta-cte", label: "Consultar NF-e", icon: "search", title: "Consulta de chave da NF-e", section: "operacao" },
   { id: "controle-canhotos", label: "Canhotos", icon: "check", title: "Controle de canhotos", section: "operacao" },
   { id: "pneus",           label: "Pneus",        icon: "truck",       title: "Movimentação de Pneus", subgroup: "frota", section: "operacao" },
+  { id: "multas-frota", label: "Multas", icon: "alert", title: "Controle de Multas da Frota", subgroup: "frota", section: "operacao" },
   { id: "manutencao-posicoes", label: "Peças por posição", icon: "wrench", title: "Manutenção por posição", subgroup: "frota", section: "operacao" },
   { id: "manutencao",      label: "Automações",   icon: "bell",        title: "Automação de Manutenção", subgroup: "frota", section: "operacao" },
   { id: "automacoes-n8n",  label: "n8n",          icon: "plug",        title: "Automações n8n", sistema: true },
@@ -309,7 +311,7 @@ const App = () => {
       body = <SimuladorFrete onNavigate={onNavigate}/>;
       break;
     case "viagens":
-      body = <Viagens onNavigate={onNavigate}/>;
+      body = <Viagens onNavigate={onNavigate} user={auth.user}/>;
       break;
     case "folgas-motoristas":
       body = <FolgasMotoristas onNavigate={onNavigate}/>;
@@ -402,6 +404,9 @@ const App = () => {
       break;
     case "pneus":
       body = <Pneus onNavigate={onNavigate}/>;
+      break;
+    case "multas-frota":
+      body = <MultasFrota/>;
       break;
     case "manutencao-posicoes":
       body = <ManutencaoPosicoesScreen/>;
