@@ -1432,23 +1432,9 @@ const Viagens = ({ onNavigate, user }) => {
       setForm(normalizeViagemForm(saved));
       return saved;
     } catch (error) {
-      console.warn(
-        "Nao foi possivel salvar no backend. Salvando localmente.",
-        error,
-      );
-      if (payload.id) {
-        setViagens((prev) =>
-          prev.map((v) => (v.id === payload.id ? { ...payload } : v)),
-        );
-        setForm(normalizeViagemForm(payload));
-        return payload;
-      } else {
-        const id = nextId.current++;
-        const localSaved = { ...payload, id };
-        setViagens((prev) => [...prev, localSaved]);
-        setForm(normalizeViagemForm(localSaved));
-        return localSaved;
-      }
+      console.error("Não foi possível salvar a viagem no servidor.", error);
+      window.alert(`A viagem não foi salva. ${error?.message || "Verifique a conexão e tente novamente."}`);
+      return null;
     }
   };
 
@@ -1486,6 +1472,23 @@ const Viagens = ({ onNavigate, user }) => {
         endereco: "",
         nf: "",
         obs: "",
+      },
+    ]);
+  };
+
+  const addTrocaNota = () => {
+    setParadas((current) => [
+      ...current,
+      {
+        id: Date.now(),
+        ordem: current.length + 1,
+        tipo: "troca_nota",
+        cidade: "",
+        uf: "",
+        cliente: "",
+        endereco: "",
+        nf: "",
+        obs: "Local onde a nota será trocada antes de seguir ao destino final",
       },
     ]);
   };
@@ -2379,6 +2382,11 @@ const Viagens = ({ onNavigate, user }) => {
                                 por {v.aprovadoPor}
                               </small>
                             )}
+                          {v.atualizadoPor && (
+                            <small className="vg-approved-by" title={v.atualizadoEm ? new Date(v.atualizadoEm).toLocaleString("pt-BR") : ""}>
+                              alterado por {v.atualizadoPor}
+                            </small>
+                          )}
                         </td>
                         <td onClick={(e) => e.stopPropagation()}>
                           <div
@@ -2797,9 +2805,7 @@ const Viagens = ({ onNavigate, user }) => {
                           color: "var(--text-2)",
                         }}
                       >
-                        {
-                          "Ve\u00edculo de frota selecionado. Os dados do motorista e documentos ser\u00e3o usados do cadastro interno."
-                        }
+                        O motorista foi sugerido pelo cadastro da placa. Se outra pessoa fizer esta viagem, altere no campo abaixo.
                       </div>
                     )}
                   </div>
@@ -2826,6 +2832,15 @@ const Viagens = ({ onNavigate, user }) => {
             );
           })()}
         </Fg>
+        {isFleetVehicle && (
+          <Fg label="Motorista desta viagem">
+            <input list="motoristas-frota-list" style={fs} value={form.motorista}
+              onChange={(e) => { const value=e.target.value; setF("motorista",value); searchAutocomplete("motoristas",value); applyMotorista(value); }}
+              placeholder="Pode trocar o motorista sugerido" />
+            <datalist id="motoristas-frota-list">{opcoes.motoristas.map((m)=><option key={m} value={m}/>)}</datalist>
+            <div className="muted" style={{fontSize:11,marginTop:5}}>A alteração vale apenas para esta viagem.</div>
+          </Fg>
+        )}
         <Fg label="Vendedor (opcional)">
           <AutoField
             value={form.vendedor}
@@ -3109,13 +3124,14 @@ const Viagens = ({ onNavigate, user }) => {
             >
               Paradas / Entregas ({form.paradas.length})
             </div>
-            <button
-              className="btn"
-              style={{ padding: "4px 10px", fontSize: 12 }}
-              onClick={addParada}
-            >
-              <Icon name="plus" size={12} /> Adicionar parada
-            </button>
+            <div className="row" style={{gap:6}}>
+              <button className="btn" style={{padding:"4px 10px",fontSize:12,borderColor:"#60a5fa",color:"#60a5fa"}} onClick={addTrocaNota}>
+                <Icon name="file" size={12}/> Troca de nota
+              </button>
+              <button className="btn" style={{padding:"4px 10px",fontSize:12}} onClick={addParada}>
+                <Icon name="plus" size={12}/> Outra parada
+              </button>
+            </div>
           </div>
 
           {form.paradas.length === 0 && (
@@ -3149,7 +3165,7 @@ const Viagens = ({ onNavigate, user }) => {
                       color: "var(--text-2)",
                     }}
                   >
-                    Parada {i + 1}
+                    {p.tipo === "troca_nota" ? `Troca de nota ${i + 1}` : `Parada ${i + 1}`}
                   </span>
                   <button
                     className="icon-btn"
@@ -3175,6 +3191,7 @@ const Viagens = ({ onNavigate, user }) => {
                       <option value="entrega">Entrega</option>
                       <option value="coleta">Coleta</option>
                       <option value="transbordo">Transbordo</option>
+                      <option value="troca_nota">Troca de nota</option>
                     </select>
                   </Fg>
                   <Fg label="Cidade / UF">
@@ -3217,7 +3234,7 @@ const Viagens = ({ onNavigate, user }) => {
                       />
                     </div>
                   </Fg>
-                  <Fg label="Cliente / Destinatario">
+                  <Fg label={p.tipo === "troca_nota" ? "Local / empresa que troca a nota" : "Cliente / Destinatário"}>
                     <AutoField
                       value={p.cliente}
                       activeKey={`parada-cliente-${p.id}`}
@@ -3266,6 +3283,7 @@ const Viagens = ({ onNavigate, user }) => {
                     />
                   </Fg>
                 </div>
+                {p.tipo === "troca_nota" && <div style={{marginTop:9,padding:"8px 10px",borderRadius:6,background:"rgba(59,130,246,.10)",color:"#60a5fa",fontSize:11.5}}>Depois da troca, o veículo continua para o destino final. Tudo permanece em uma única viagem e com um único valor de frete.</div>}
               </div>
             ))}
           </div>
@@ -4186,6 +4204,11 @@ const Viagens = ({ onNavigate, user }) => {
                   : "Salvar documentos"}
             </button>
           </div>
+          {documentsSaved && (
+            <div style={{marginTop:10,padding:"9px 11px",border:"1px solid rgba(16,185,129,.35)",borderRadius:6,background:"rgba(16,185,129,.10)",color:"#34d399",fontSize:12}}>
+              CT-e salvo no servidor. A situação da viagem foi atualizada para <strong>{(SITUACOES[calcularSituacaoViagem(form)] || SITUACOES.faltando_dados).label}</strong>.
+            </div>
+          )}
         </div>
 
         {/* Resumo final */}
@@ -4245,6 +4268,13 @@ const Viagens = ({ onNavigate, user }) => {
               { l: "Rota Maps", v: hasCustomMapsRoute ? "Link colado" : "" },
               { l: "Cliente", v: form.cliente },
               { l: "Motorista", v: form.motorista },
+              { l: "Criado por", v: form.criadoPor || "" },
+              {
+                l: "Última alteração",
+                v: form.atualizadoPor
+                  ? `${form.atualizadoPor}${form.atualizadoEm ? ` · ${new Date(form.atualizadoEm).toLocaleString("pt-BR")}` : ""}`
+                  : "",
+              },
               {
                 l: "Consulta",
                 v: consultaMotoristaOk

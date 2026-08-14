@@ -63,12 +63,21 @@ const CV_RESULT_STATUS = {
 };
 
 const CV_PERIODS = [
+  { key: "today", label: "Hoje", range: () => ({ start: cvTodayISO(), end: cvTodayISO() }) },
   { key: "7d", label: "7 dias", range: () => ({ start: cvDaysAgoISO(6), end: cvTodayISO() }) },
   { key: "30d", label: "30 dias", range: () => ({ start: cvDaysAgoISO(29), end: cvTodayISO() }) },
   { key: "month", label: "Este mes", range: () => {
     const d = new Date();
     return { start: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`, end: cvTodayISO() };
   } },
+  { key: "prev-month", label: "Mês anterior", range: () => {
+    const d = new Date();
+    const first = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+    const last = new Date(d.getFullYear(), d.getMonth(), 0);
+    const iso = (x) => [x.getFullYear(), String(x.getMonth() + 1).padStart(2, "0"), String(x.getDate()).padStart(2, "0")].join("-");
+    return { start: iso(first), end: iso(last) };
+  } },
+  { key: "year", label: "Ano atual", range: () => ({ start: `${new Date().getFullYear()}-01-01`, end: cvTodayISO() }) },
 ];
 
 const CvKpi = ({ label, value, sub, icon, tone }) => (
@@ -91,6 +100,24 @@ const CvBar = ({ label, value, max, meta, tone, onClick }) => {
       {meta && <div className="muted" style={{ fontSize: 11, marginTop: 3 }}>{meta}</div>}
     </button>
   );
+};
+
+const CvTrendChart = ({ items }) => {
+  const width = 760;
+  const height = 190;
+  const pad = { top: 14, right: 12, bottom: 32, left: 12 };
+  const max = Math.max(1, ...items.map((item) => cvNum(item.custo)));
+  const slot = (width - pad.left - pad.right) / Math.max(1, items.length);
+  const barWidth = Math.max(10, Math.min(46, slot * 0.58));
+  return <div className="cv-trend"><svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="Evolução mensal dos custos">
+    <line x1={pad.left} y1={height - pad.bottom} x2={width - pad.right} y2={height - pad.bottom} className="cv-chart-axis"/>
+    {items.map((item, index) => {
+      const barHeight = Math.max(2, cvNum(item.custo) / max * (height - pad.top - pad.bottom));
+      const x = pad.left + index * slot + (slot - barWidth) / 2;
+      const y = height - pad.bottom - barHeight;
+      return <g key={item.mes}><title>{`${item.label}: ${cvBRL(item.custo)} · Pago ${cvBRL(item.pago)} · Em aberto ${cvBRL(item.aberto)}`}</title><rect x={x} y={y} width={barWidth} height={barHeight} rx="3" className="cv-chart-bar"/><text x={x + barWidth / 2} y={height - 12} textAnchor="middle" className="cv-chart-label">{item.label}</text></g>;
+    })}
+  </svg></div>;
 };
 
 const CvDetailModal = ({ placa, filters, onClose }) => {
@@ -182,7 +209,7 @@ const CvDetailModal = ({ placa, filters, onClose }) => {
                 <table className="data-table compact">
                   <thead><tr><th>Data</th><th>Tipo</th><th>Fornecedor</th><th>Descricao</th><th className="num">Valor</th><th>Status</th></tr></thead>
                   <tbody>
-                    {d.launches.slice(0, 12).map((row) => (
+                    {d.launches.map((row) => (
                       <tr key={row.id}>
                         <td>{cvDate(row.data)}</td>
                         <td>{row.tipoCusto}</td>
@@ -205,7 +232,7 @@ const CvDetailModal = ({ placa, filters, onClose }) => {
 
 const CustosVeiculos = () => {
   const defaultRange = CV_PERIODS[1].range();
-  const [modo, setModo] = React.useState("despesas");
+  const [modo, setModo] = React.useState("geral");
   const [dataInicio, setDataInicio] = React.useState(defaultRange.start);
   const [dataFim, setDataFim] = React.useState(defaultRange.end);
   const [placa, setPlaca] = React.useState("");
@@ -213,7 +240,6 @@ const CustosVeiculos = () => {
   const [tipoCusto, setTipoCusto] = React.useState("todos");
   const [situacao, setSituacao] = React.useState("todos");
   const [fornecedor, setFornecedor] = React.useState("");
-  const [empresa, setEmpresa] = React.useState("");
   const [valorMin, setValorMin] = React.useState("");
   const [valorMax, setValorMax] = React.useState("");
   const [search, setSearch] = React.useState("");
@@ -223,6 +249,13 @@ const CustosVeiculos = () => {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [detailPlate, setDetailPlate] = React.useState("");
+  const [moreFilters, setMoreFilters] = React.useState(false);
+  const [showAllSuppliers, setShowAllSuppliers] = React.useState(false);
+  const [showAllRanking, setShowAllRanking] = React.useState(false);
+  const [launchPage, setLaunchPage] = React.useState(1);
+  const [launchSort, setLaunchSort] = React.useState({ key: "data", direction: "desc" });
+  const [expandedCosts, setExpandedCosts] = React.useState(() => new Set());
+  const [costSearch, setCostSearch] = React.useState("");
 
   React.useEffect(() => {
     window.RB_API.getCustosVeiculosFiltros().then((payload) => setOptions(payload || {})).catch(() => {});
@@ -232,7 +265,7 @@ const CustosVeiculos = () => {
     let active = true;
     setLoading(true);
     setError("");
-    window.RB_API.getCustosVeiculos({ ...filters, limit: 300 })
+    window.RB_API.getCustosVeiculos({ ...filters, limit: 5000 })
       .then((payload) => { if (active) setData(cvNormalize(payload)); })
       .catch((err) => {
         if (!active) return;
@@ -243,24 +276,25 @@ const CustosVeiculos = () => {
     return () => { active = false; };
   }, [JSON.stringify(filters)]);
 
+  React.useEffect(() => setLaunchPage(1), [data.launches.length]);
+
   const applyShortcut = (key) => {
     const p = CV_PERIODS.find((item) => item.key === key);
     if (!p) return;
     const r = p.range();
     setDataInicio(r.start);
     setDataFim(r.end);
-    setFilters({ dataInicio: r.start, dataFim: r.end, placa, centro, tipoCusto, situacao, fornecedor, empresa, proprietario:"frota", valorMin, valorMax, search });
+    setFilters({ dataInicio: r.start, dataFim: r.end, placa, centro, tipoCusto, situacao, fornecedor, proprietario:"frota", valorMin, valorMax, search });
   };
 
-  const applyFilters = () => setFilters({ dataInicio, dataFim, placa, centro, tipoCusto, situacao, fornecedor, empresa, proprietario:"frota", valorMin, valorMax, search });
+  const applyFilters = () => setFilters({ dataInicio, dataFim, placa, centro, tipoCusto, situacao, fornecedor, proprietario:"frota", valorMin, valorMax, search });
   const clearFilters = () => {
     const r = CV_PERIODS[1].range();
-    setDataInicio(r.start); setDataFim(r.end); setPlaca(""); setCentro(""); setTipoCusto("todos"); setSituacao("todos"); setFornecedor(""); setEmpresa(""); setValorMin(""); setValorMax(""); setSearch("");
+    setDataInicio(r.start); setDataFim(r.end); setPlaca(""); setCentro(""); setTipoCusto("todos"); setSituacao("todos"); setFornecedor(""); setValorMin(""); setValorMax(""); setSearch("");
     setFilters({ dataInicio: r.start, dataFim: r.end, proprietario: "frota" });
   };
 
   const s = data.summary || {};
-  const maxMonth = Math.max(1, ...data.monthly.map((item) => cvNum(item.custo)));
   const maxRank = Math.max(1, ...data.ranking.map((item) => cvNum(item.custo)));
   const maxType = Math.max(1, ...data.types.map((item) => cvNum(item.custo)));
   const maxSupplier = Math.max(1, ...data.suppliers.map((item) => cvNum(item.custo)));
@@ -271,39 +305,138 @@ const CustosVeiculos = () => {
   const maxProfit = Math.max(1, ...profitRank.lucro.map((item) => Math.abs(cvNum(item.lucro))));
   const maxLoss = Math.max(1, ...profitRank.prejuizo.map((item) => Math.abs(cvNum(item.lucro))));
   const maxCostKm = Math.max(1, ...profitRank.custoKm.map((item) => Math.abs(cvNum(item.custoPorKm))));
+  const overdue = data.status.find((item) => item.situacao === "vencido") || {};
+  const averageVehicle = cvNum(s.totalVeiculos) ? cvNum(s.custoTotal) / cvNum(s.totalVeiculos) : 0;
+  const sortedLaunches = [...data.launches].sort((a, b) => {
+    const av = launchSort.key === "valor" ? cvNum(a.valor) : String(a[launchSort.key] || "");
+    const bv = launchSort.key === "valor" ? cvNum(b.valor) : String(b[launchSort.key] || "");
+    const result = typeof av === "number" ? av - bv : av.localeCompare(bv, "pt-BR");
+    return launchSort.direction === "asc" ? result : -result;
+  });
+  const launchPageSize = 50;
+  const launchPages = Math.max(1, Math.ceil(sortedLaunches.length / launchPageSize));
+  const visibleLaunches = sortedLaunches.slice((launchPage - 1) * launchPageSize, launchPage * launchPageSize);
+  const sortLaunches = (key) => {
+    setLaunchSort((old) => ({ key, direction: old.key === key && old.direction === "desc" ? "asc" : "desc" }));
+    setLaunchPage(1);
+  };
+  const applyCategory = (tipo) => {
+    setTipoCusto(tipo);
+    setFilters((old) => ({ ...old, tipoCusto: tipo }));
+    setLaunchPage(1);
+  };
+  const attention = [
+    cvNum(s.custoVencido) > 0 && { title: `${cvBRL(s.custoVencido)} em despesas vencidas`, sub: `${overdue.lancamentos || 0} lançamentos precisam de atenção`, link: "Ver lançamentos →", action: () => { setSituacao("vencido"); setFilters((old) => ({ ...old, situacao: "vencido" })); } },
+    data.types[0] && { title: `${data.types[0].tipo} representa ${cvNum(s.custoTotal) ? (cvNum(data.types[0].custo) / cvNum(s.custoTotal) * 100).toFixed(1) : 0}% dos custos`, sub: `${cvBRL(data.types[0].custo)} em ${data.types[0].lancamentos} lançamentos`, link: "Ver despesas →", action: () => applyCategory(data.types[0].tipo) },
+    data.ranking[0] && { title: `${data.ranking[0].placa} é o veículo com maior custo`, sub: `${cvBRL(data.ranking[0].custo)} no período`, link: "Analisar veículo →", action: () => setDetailPlate(data.ranking[0].placa) },
+    data.suppliers[0] && { title: `${data.suppliers[0].fornecedor} concentra ${cvNum(s.custoTotal) ? (cvNum(data.suppliers[0].custo) / cvNum(s.custoTotal) * 100).toFixed(1) : 0}% dos gastos`, sub: `${cvBRL(data.suppliers[0].custo)} em ${data.suppliers[0].lancamentos} lançamentos`, link: "Ver fornecedor →", action: () => { setFornecedor(data.suppliers[0].fornecedor); setFilters((old) => ({ ...old, fornecedor: data.suppliers[0].fornecedor })); } },
+  ].filter(Boolean).slice(0, 4);
+  const executiveText = data.types[0] && data.ranking[0]
+    ? `Neste período, a frota acumulou ${cvBRL(s.custoTotal)} em custos. ${data.types[0].tipo} respondeu por ${(cvNum(data.types[0].custo) / Math.max(1, cvNum(s.custoTotal)) * 100).toFixed(1)}%, existem ${cvBRL(s.custoVencido)} vencidos e ${data.ranking[0].placa} foi o veículo com maior despesa.`
+    : "Os indicadores serão resumidos assim que houver movimentação no período selecionado.";
+  const selectedProfit = profitVehicles.find((item) => item.placa === placa);
+  const financial = modo === "veiculo" ? (selectedProfit || { receita: 0, custo: 0, lucro: 0, margem: 0 }) : {
+    receita: profitSummary.receitaTotal,
+    custo: profitSummary.custoTotal || s.custoTotal,
+    lucro: profitSummary.lucroTotal,
+    margem: profitSummary.margem,
+  };
+  const compositionRows = data.launches.filter((row) => {
+    const q = costSearch.trim().toLowerCase();
+    return !q || `${row.tipoCusto} ${row.descricao} ${row.historico} ${row.fornecedor} ${row.documento}`.toLowerCase().includes(q);
+  });
+  const composition = Object.values(compositionRows.reduce((groups, row) => {
+    const category = row.tipoCusto || "Sem categoria";
+    groups[category] ||= { category, value: 0, count: 0, subcategories: {} };
+    groups[category].value += cvNum(row.valor); groups[category].count += 1;
+    const sub = row.descricao || row.historico || "Sem classificação detalhada";
+    groups[category].subcategories[sub] ||= { name: sub, value: 0, rows: [] };
+    groups[category].subcategories[sub].value += cvNum(row.valor); groups[category].subcategories[sub].rows.push(row);
+    return groups;
+  }, {})).sort((a, b) => b.value - a.value);
+  const toggleCost = (category) => setExpandedCosts((old) => { const next = new Set(old); if (next.has(category)) next.delete(category); else next.add(category); return next; });
+  const openVehicle = (vehiclePlate) => { setPlaca(vehiclePlate); setModo("veiculo"); setFilters((old) => ({ ...old, placa: vehiclePlate })); window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   return (
     <div className="view cv-view">
       <div className="page-head">
         <div>
           <h1>Custos por Veículo</h1>
-          <div className="sub">Despesas da frota e lucro/prejuízo por placa com receita de conhecimentos/CT-e</div>
+          <div className="sub">Entenda quanto a frota custa e de onde vem cada despesa.</div>
         </div>
         <div className="actions">
-          <button className={`btn${modo === "despesas" ? " primary" : ""}`} onClick={() => setModo("despesas")}>Despesas da frota</button>
-          <button className={`btn${modo === "lucro" ? " primary" : ""}`} onClick={() => setModo("lucro")}>Lucro por veículo</button>
-          {CV_PERIODS.map((p) => <button key={p.key} className="btn" onClick={() => applyShortcut(p.key)}>{p.label}</button>)}
-          <button className="btn" onClick={() => window.RB_API.getCustosVeiculos(filters).then((payload) => setData(cvNormalize(payload)))}><Icon name="refresh"/> Atualizar</button>
+          <div className="cv-tabs">
+            <button className={modo === "geral" ? "active" : ""} onClick={() => { setModo("geral"); setPlaca(""); setFilters((old) => ({ ...old, placa: "" })); }}>Visão geral</button>
+            <button className={modo === "veiculo" ? "active" : ""} onClick={() => setModo("veiculo")}>Por veículo</button>
+          </div>
+          <select className="btn cv-period-select" defaultValue="7d" onChange={(e)=>applyShortcut(e.target.value)} aria-label="Período rápido">
+            {CV_PERIODS.map((p)=><option key={p.key} value={p.key}>{p.label}</option>)}
+          </select>
+          <button className="btn" onClick={() => window.RB_API.getCustosVeiculos({ ...filters, limit: 5000 }).then((payload) => setData(cvNormalize(payload)))}><Icon name="refresh"/> Atualizar</button>
         </div>
       </div>
 
-      <div className="cv-filters card">
-        <label>Data inicial<input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></label>
-        <label>Data final<input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)}/></label>
-        <label>Placa<RBCombobox value={placa} onChange={setPlaca} options={options.placas || []} placeholder="Todas" transform={(v) => v.toUpperCase()} tag={() => "Placa"}/></label>
-        <label>Centro de custo<RBCombobox value={centro} onChange={setCentro} options={options.centros || []} placeholder="Todos" getLabel={(c) => c.codigo ? `${c.codigo} - ${c.nome}` : c.nome} getValue={(c) => c.codigo ? `${c.codigo} - ${c.nome}` : c.nome} tag={() => "Centro"}/></label>
-        <label>Tipo de custo<select value={tipoCusto} onChange={(e) => setTipoCusto(e.target.value)}><option value="todos">Todos</option>{(options.tipos || []).map((t) => <option key={t} value={t}>{t}</option>)}</select></label>
-        <label>Situação<select value={situacao} onChange={(e) => setSituacao(e.target.value)}><option value="todos">Todas</option>{(options.situacoes || []).map((st) => <option key={st} value={st}>{CV_STATUS[st]?.label || st}</option>)}</select></label>
-        <label>Fornecedor<RBCombobox value={fornecedor} onChange={setFornecedor} options={options.fornecedores || []} placeholder="Todos" getLabel={(f) => f.codigo ? `${f.codigo} - ${f.nome}` : f.nome} getValue={(f) => f.codigo ? `${f.codigo} - ${f.nome}` : f.nome} tag={() => "Fornecedor"}/></label>
-        <label>Empresa<select value={empresa} onChange={(e) => setEmpresa(e.target.value)}><option value="">Todas</option>{(options.empresas || []).map((e) => <option key={e} value={e}>{e}</option>)}</select></label>
-        <label>Valor mínimo<input type="number" value={valorMin} placeholder="0,00" onChange={(e) => setValorMin(e.target.value)}/></label>
-        <label>Valor máximo<input type="number" value={valorMax} placeholder="Sem limite" onChange={(e) => setValorMax(e.target.value)}/></label>
-        <label>Busca livre<input value={search} placeholder="Descrição, documento, origem..." onChange={(e) => setSearch(e.target.value)}/></label>
-        <div className="cv-filter-actions"><button className="btn primary" onClick={applyFilters}><Icon name="search"/> Filtrar</button><button className="btn" onClick={clearFilters}><Icon name="x"/> Limpar</button></div>
+      <div className="cv-filters-clean card">
+        <div className="cv-filter-title"><div><strong>Filtrar custos</strong><span>Escolha uma placa ou pesquise uma despesa</span></div><span className="cv-fleet-badge"><Icon name="truck" size={12}/> Somente frota própria</span></div>
+        <div className="cv-filter-main">
+          <label>Placa<select value={placa} onChange={(e) => { const value=e.target.value; setPlaca(value); if(value)setModo("veiculo"); setFilters((old)=>({...old,placa:value,proprietario:"frota"})); setLaunchPage(1); }}><option value="">Toda a frota</option>{(options.placas||[]).map((item)=><option key={item} value={item}>{item}</option>)}</select></label>
+          <label className="cv-search-field">Buscar despesa<input value={search} placeholder="Descrição, documento ou fornecedor" onChange={(e)=>setSearch(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&applyFilters()}/></label>
+          <button className="btn primary" onClick={applyFilters}><Icon name="search"/> Aplicar</button>
+          <button className={`btn ${moreFilters?"active":""}`} onClick={()=>setMoreFilters((v)=>!v)}>Filtros avançados <span>{moreFilters?"−":"+"}</span></button>
+          <button className="btn ghost" onClick={clearFilters} title="Limpar filtros"><Icon name="x"/> Limpar</button>
+        </div>
+        {moreFilters && <div className="cv-filter-advanced">
+          <label>Data inicial<input type="date" value={dataInicio} onChange={(e)=>setDataInicio(e.target.value)}/></label>
+          <label>Data final<input type="date" value={dataFim} onChange={(e)=>setDataFim(e.target.value)}/></label>
+          <label>Centro de custo<RBCombobox value={centro} onChange={setCentro} options={options.centros||[]} placeholder="Todos" getLabel={(c)=>c.codigo?`${c.codigo} - ${c.nome}`:c.nome} getValue={(c)=>c.codigo?`${c.codigo} - ${c.nome}`:c.nome} tag={()=>"Centro"}/></label>
+          <label>Tipo de custo<select value={tipoCusto} onChange={(e)=>setTipoCusto(e.target.value)}><option value="todos">Todos</option>{(options.tipos||[]).map((t)=><option key={t} value={t}>{t}</option>)}</select></label>
+          <label>Situação<select value={situacao} onChange={(e)=>setSituacao(e.target.value)}><option value="todos">Todas</option>{(options.situacoes||[]).map((st)=><option key={st} value={st}>{CV_STATUS[st]?.label||st}</option>)}</select></label>
+          <label>Fornecedor<RBCombobox value={fornecedor} onChange={setFornecedor} options={options.fornecedores||[]} placeholder="Todos" getLabel={(f)=>f.codigo?`${f.codigo} - ${f.nome}`:f.nome} getValue={(f)=>f.codigo?`${f.codigo} - ${f.nome}`:f.nome} tag={()=>"Fornecedor"}/></label>
+          <label>Valor mínimo<input type="number" value={valorMin} placeholder="R$ 0,00" onChange={(e)=>setValorMin(e.target.value)}/></label>
+          <label>Valor máximo<input type="number" value={valorMax} placeholder="Sem limite" onChange={(e)=>setValorMax(e.target.value)}/></label>
+        </div>}
+      </div>
+
+      <div className="cv-filter-chips">
+        <span>{cvDate(filters.dataInicio)} até {cvDate(filters.dataFim)}</span>
+        {filters.placa && <span>Placa: {filters.placa}</span>}
+        {filters.tipoCusto && filters.tipoCusto !== "todos" && <button onClick={() => applyCategory("todos")}>{filters.tipoCusto} ×</button>}
+        {filters.fornecedor && <span>Fornecedor: {filters.fornecedor}</span>}
+        {filters.situacao && filters.situacao !== "todos" && <span>Situação: {CV_STATUS[filters.situacao]?.label || filters.situacao}</span>}
       </div>
 
       {error && <div className="card" style={{ borderColor: "var(--crit)", color: "var(--crit)" }}>{error}</div>}
       {loading && <div className="card">Carregando custos...</div>}
+
+      {(modo === "geral" || modo === "veiculo") && (
+      <>
+        {modo === "veiculo" && !placa && <div className="card cv-select-vehicle"><Icon name="truck"/><div><strong>Selecione uma placa</strong><span>Use o campo Placa acima para abrir o raio-X financeiro do veículo.</span></div></div>}
+        <div className="cv-financial-summary">
+          <CvKpi label="Receita" value={cvBRL(financial.receita)} sub={modo === "veiculo" ? placa || "Selecione uma placa" : "Receita da frota no período"} icon="trending-up" tone="#22c55e"/>
+          <CvKpi label="Custos" value={cvBRL(financial.custo)} sub={`${s.quantidadeLancamentos || 0} lançamentos rastreáveis`} icon="money" tone="#f59e0b"/>
+          <CvKpi label="Resultado" value={cvBRL(financial.lucro)} sub="Receita menos custos" icon="chart" tone={cvNum(financial.lucro) >= 0 ? "#22c55e" : "#ef4444"}/>
+          <CvKpi label="Margem" value={`${cvNum(financial.margem).toFixed(1)}%`} sub={selectedProfit?.custoPorKm ? `Custo/km ${cvBRL(selectedProfit.custoPorKm)}` : "Resultado sobre a receita"} icon="trending-up" tone={cvNum(financial.margem) >= 0 ? "#22c55e" : "#ef4444"}/>
+        </div>
+
+        <div className="card cv-composition">
+          <div className="section-head"><div><h2>Composição dos custos</h2><div className="muted">Categoria → classificação financeira → lançamento individual</div></div><div className="cv-composition-actions"><input value={costSearch} onChange={(e) => setCostSearch(e.target.value)} placeholder="Buscar custo, fornecedor ou descrição..."/><button className="btn" onClick={() => setExpandedCosts(new Set(composition.map((item) => item.category)))}>Expandir tudo</button><button className="btn" onClick={() => setExpandedCosts(new Set())}>Recolher tudo</button></div></div>
+          <div className="cv-cost-tree">
+            {composition.map((item) => {
+              const open = expandedCosts.has(item.category);
+              const pct = cvNum(s.custoTotal) ? item.value / cvNum(s.custoTotal) * 100 : 0;
+              return <div className={`cv-cost-group${open ? " open" : ""}`} key={item.category}>
+                <button className="cv-cost-group-head" onClick={() => toggleCost(item.category)}><Icon name={open ? "chevron-down" : "chevron-right"}/><span><strong>{item.category}</strong><small>{item.count} lançamentos · {pct.toFixed(1)}% do total</small></span><b>{cvBRL(item.value)}</b></button>
+                <div className="cv-cost-share"><i style={{ width: `${Math.min(100, pct)}%` }}/></div>
+                {open && <div className="cv-subcosts">{Object.values(item.subcategories).sort((a,b) => b.value - a.value).map((sub) => <details key={sub.name}><summary><span>{sub.name}</span><small>{sub.rows.length} lanç.</small><b>{cvBRL(sub.value)}</b></summary><div className="table-wrap"><table className="data-table compact"><thead><tr><th>Data</th><th>Placa</th><th>Fornecedor</th><th>Histórico</th><th>Documento</th><th>Situação</th><th>Origem</th><th className="num">Valor</th></tr></thead><tbody>{sub.rows.map((row, index) => <tr key={`${row.id}-${index}`}><td>{cvDate(row.data)}</td><td>{row.placa}</td><td>{row.fornecedor}</td><td title={row.historico}>{row.historico || row.descricao || "-"}</td><td>{row.documento || "-"}</td><td><span className={`badge ${CV_STATUS[row.situacao]?.cls || ""}`}>{CV_STATUS[row.situacao]?.label || row.situacao}</span></td><td>{row.origem}</td><td className="num">{cvBRL(row.valor)}</td></tr>)}</tbody></table></div></details>)}</div>}
+              </div>;
+            })}
+            {!composition.length && <div className="cv-empty"><strong>Nenhuma despesa encontrada.</strong><span>Altere o período ou limpe os filtros para consultar outros lançamentos.</span><button className="btn" onClick={clearFilters}>Limpar filtros</button></div>}
+          </div>
+        </div>
+
+        {modo === "geral" && <div className="card"><div className="section-head"><div><h2>Resultado por veículo</h2><div className="muted">Receita, custos e resultado da frota no período</div></div><span className="muted">{profitVehicles.length} veículos</span></div><div className="table-wrap"><table className="data-table compact"><thead><tr><th>Placa</th><th>Veículo</th><th className="num">Receita</th><th className="num">Custos</th><th className="num">Resultado</th><th>Margem</th><th className="num">Custo/km</th><th>Ação</th></tr></thead><tbody>{profitVehicles.map((row) => <tr key={row.placa}><td><strong>{row.placa}</strong></td><td>{row.veiculoNome || "-"}</td><td className="num">{cvBRL(row.receita)}</td><td className="num">{cvBRL(row.custo)}</td><td className="num" style={{ color: cvNum(row.lucro) >= 0 ? "var(--ok)" : "var(--crit)" }}>{cvBRL(row.lucro)}</td><td>{cvNum(row.margem).toFixed(1)}%</td><td className="num">{cvBRL(row.custoPorKm)}</td><td><button className="btn" onClick={() => openVehicle(row.placa)}>Ver detalhes</button></td></tr>)}</tbody></table></div></div>}
+      </>
+      )}
 
       {modo === "despesas" && (
       <>
@@ -311,34 +444,36 @@ const CustosVeiculos = () => {
         <CvKpi label="Custo total" value={cvBRL(s.custoTotal)} sub={`${s.quantidadeLancamentos || 0} lancamentos`} icon="money" tone="#ef4444"/>
         <CvKpi label="Custo pago" value={cvBRL(s.custoPago)} sub="Baixado no financeiro" icon="check" tone="#22c55e"/>
         <CvKpi label="Em aberto" value={cvBRL(s.custoAberto)} sub={`Vencido: ${cvBRL(s.custoVencido)}`} icon="clock" tone="#f59e0b"/>
-        <CvKpi label="Media por veiculo" value={cvBRL(s.custoMedioVeiculo)} sub={`${s.totalVeiculos || 0} veiculos/centros`} icon="truck" tone="#3b82f6"/>
-        <CvKpi label="Maior custo" value={s.veiculoMaiorCusto || "-"} sub={cvBRL(s.maiorCustoValor)} icon="alert" tone="#a855f7"/>
-        <CvKpi label="Maior categoria" value={s.maiorCategoria || "-"} sub={cvBRL(s.maiorCategoriaValor)} icon="chart" tone="#0ea5e9"/>
-        <CvKpi label="Maior fornecedor" value={s.maiorFornecedor || "-"} sub={cvBRL(s.maiorFornecedorValor)} icon="user" tone="#64748b"/>
-        <CvKpi label="Lancamentos" value={String(s.quantidadeLancamentos || 0)} sub="Detalhados abaixo" icon="file" tone="#64748b"/>
+        <CvKpi label="Vencido" value={cvBRL(s.custoVencido)} sub={`${overdue.lancamentos || 0} lançamentos vencidos`} icon="alert" tone={cvNum(s.custoVencido) ? "#ef4444" : "#64748b"}/>
+        <CvKpi label="Média por veículo" value={cvBRL(averageVehicle)} sub={`${s.totalVeiculos || 0} veículos com movimentação`} icon="truck" tone="#3b82f6"/>
       </div>
+
+      <div className="cv-executive"><Icon name="chart"/><span>{executiveText}</span></div>
+      {!!attention.length && <div className="card cv-attention"><div className="section-head"><h2>Pontos de atenção</h2></div><div className="cv-attention-grid">{attention.map((item, index) => <button key={index} onClick={item.action}><Icon name="alert"/><span><strong>{item.title}</strong><small>{item.sub}</small></span><b>{item.link}</b></button>)}</div></div>}
 
       <div className="cv-panels">
         <div className="card">
-          <div className="section-head"><h2>Custo por mes</h2></div>
-          {data.monthly.map((item) => <CvBar key={item.mes} label={item.label} value={item.custo} max={maxMonth} meta={`Pago ${cvShortMoney(item.pago)} | aberto ${cvShortMoney(item.aberto)}`}/>)}
+          <div className="section-head"><h2>Evolução dos custos</h2></div>
+          {!!data.monthly.length && <CvTrendChart items={data.monthly}/>} 
           {!data.monthly.length && <div className="muted">Sem custos no periodo.</div>}
         </div>
         <div className="card">
-          <div className="section-head"><h2>Ranking de veiculos</h2></div>
-          {data.ranking.slice(0, 10).map((item) => <CvBar key={item.placa} label={item.placa} value={item.custo} max={maxRank} meta={`${item.lancamentos} lanc. - ${item.centroCusto || ""}`} onClick={() => setDetailPlate(item.placa)}/>)}
+          <div className="section-head"><h2>Veículos com maior custo</h2></div>
+          {data.ranking.slice(0, showAllRanking ? data.ranking.length : 5).map((item) => <CvBar key={item.placa} label={item.placa} value={item.custo} max={maxRank} meta={`${cvNum(s.custoTotal) ? (cvNum(item.custo) / cvNum(s.custoTotal) * 100).toFixed(1) : 0}% da frota · ${item.custoPorKm ? `${cvBRL(item.custoPorKm)}/km · ` : ""}${item.lancamentos} lanç.`} onClick={() => setDetailPlate(item.placa)}/>)}
+          {data.ranking.length > 5 && <button className="btn" onClick={() => setShowAllRanking((v) => !v)}>{showAllRanking ? "Mostrar Top 5" : "Ver ranking completo"}</button>}
           {!data.ranking.length && <div className="muted">Nenhum veiculo encontrado.</div>}
         </div>
       </div>
 
-      <div className="cv-panels three">
+      <div className="cv-cost-breakdown">
         <div className="card">
-          <div className="section-head"><h2>Tipo/categoria</h2></div>
-          {data.types.map((item) => <CvBar key={item.tipo} label={item.tipo} value={item.custo} max={maxType} meta={`${item.lancamentos} lanc.`}/>)}
+          <div className="section-head"><h2>Onde estamos gastando?</h2></div>
+          {data.types.map((item) => <CvBar key={item.tipo} label={item.tipo} value={item.custo} max={maxType} meta={`${item.lancamentos} lanç. · ${cvNum(s.custoTotal) ? (cvNum(item.custo) / cvNum(s.custoTotal) * 100).toFixed(1) : 0}% do total`} onClick={() => applyCategory(item.tipo)}/>)}
         </div>
         <div className="card">
           <div className="section-head"><h2>Fornecedor</h2></div>
-          {data.suppliers.slice(0, 8).map((item) => <CvBar key={`${item.fornecedorCodigo}-${item.fornecedor}`} label={item.fornecedor} value={item.custo} max={maxSupplier} meta={`${item.lancamentos} lanc.`}/>)}
+          {data.suppliers.slice(0, showAllSuppliers ? data.suppliers.length : 5).map((item) => <CvBar key={`${item.fornecedorCodigo}-${item.fornecedor}`} label={item.fornecedor} value={item.custo} max={maxSupplier} meta={`${item.lancamentos} lanç. · ${cvNum(s.custoTotal) ? (cvNum(item.custo) / cvNum(s.custoTotal) * 100).toFixed(1) : 0}%`} onClick={() => { setFornecedor(item.fornecedor); setFilters((old) => ({ ...old, fornecedor: item.fornecedor })); }}/>)}
+          {data.suppliers.length > 5 && <button className="btn" onClick={() => setShowAllSuppliers((v) => !v)}>{showAllSuppliers ? "Mostrar principais" : "Ver todos os fornecedores"}</button>}
         </div>
         <div className="card">
           <div className="section-head"><h2>Pago x aberto x vencido</h2></div>
@@ -348,18 +483,18 @@ const CustosVeiculos = () => {
 
       <div className="card">
         <div className="section-head">
-          <div><h2>Detalhamento dos lançamentos</h2><div className="muted" style={{ fontSize: 12 }}>Origem: financeiro.pagar, rateios e abastecimentos operacionais não duplicados</div></div>
-          <div className="muted" style={{ fontSize: 12 }}>Validacao: base filtrada {cvBRL(data.validation.baseFiltrada)}</div>
+          <div><h2>Lançamentos</h2><div className="muted" style={{ fontSize: 12 }}>Extrato completo de financeiro, rateios e abastecimentos sem duplicidade</div></div>
+          <div className="muted" style={{ fontSize: 12 }}>{data.launches.length} registros · Página {launchPage} de {launchPages}</div>
         </div>
         <div className="table-wrap">
           <table className="data-table compact">
             <thead>
               <tr>
-                <th>Data</th><th>Placa/Centro</th><th>Centro de custo</th><th>Tipo</th><th>Fornecedor</th><th>Descrição</th><th className="num">Valor</th><th>Vencimento</th><th>Pagamento</th><th>Status</th><th>Origem</th>
+                <th><button className="cv-sort" onClick={() => sortLaunches("data")}>Data ↕</button></th><th><button className="cv-sort" onClick={() => sortLaunches("placa")}>Placa ↕</button></th><th>Centro de custo</th><th>Categoria</th><th>Fornecedor</th><th>Descrição</th><th>Documento</th><th className="num"><button className="cv-sort" onClick={() => sortLaunches("valor")}>Valor ↕</button></th><th><button className="cv-sort" onClick={() => sortLaunches("vencimento")}>Vencimento ↕</button></th><th>Status</th><th>Origem</th>
               </tr>
             </thead>
             <tbody>
-              {data.launches.map((row) => (
+              {visibleLaunches.map((row) => (
                 <tr key={row.id} className="clickable" onClick={() => row.placa && !row.placa.startsWith("CC ") && setDetailPlate(row.placa)}>
                   <td>{cvDate(row.data)}</td>
                   <td style={{ fontFamily: "var(--font-mono)", fontWeight: 600 }}>{row.placa || "Nao identificado"}</td>
@@ -367,9 +502,9 @@ const CustosVeiculos = () => {
                   <td>{row.tipoCusto}</td>
                   <td>{row.fornecedor}</td>
                   <td title={row.historico}>{row.descricao || row.historico || "-"}</td>
+                  <td>{row.documento || "-"}</td>
                   <td className="num">{cvBRL(row.valor)}</td>
                   <td>{cvDate(row.vencimento)}</td>
-                  <td>{cvDate(row.pagamento)}</td>
                   <td><span className={`badge ${CV_STATUS[row.situacao]?.cls || ""}`}>{CV_STATUS[row.situacao]?.label || row.situacao}</span></td>
                   <td>{row.origem}</td>
                 </tr>
@@ -378,6 +513,7 @@ const CustosVeiculos = () => {
             </tbody>
           </table>
         </div>
+        {launchPages > 1 && <div className="cv-pagination"><button className="btn" disabled={launchPage === 1} onClick={() => setLaunchPage((p) => Math.max(1, p - 1))}>Anterior</button><span>Página {launchPage} de {launchPages}</span><button className="btn" disabled={launchPage === launchPages} onClick={() => setLaunchPage((p) => Math.min(launchPages, p + 1))}>Próxima</button></div>}
       </div>
       </>
       )}

@@ -404,6 +404,42 @@ function acInjectStyles() {
     .ac-rank-tab.active { color: var(--brand-blue); border-bottom: 2px solid var(--brand-blue); }
     .ac-rank-tab { border-bottom: 2px solid transparent; padding: 6px 12px; cursor:pointer; font-size:12.5px; font-weight:500; color:var(--text-3); transition:color 0.15s; }
     .ac-rank-tab:hover { color: var(--text); }
+    .ac-ranking-kpi { min-width:0; }
+    .ac-ranking-client { margin:8px 0 3px;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .ac-ranking-value { font:600 20px/1.25 var(--font-mono);margin-bottom:3px; }
+    .ac-ranking-header { gap:16px; }
+    .ac-ranking-tabs { display:flex;gap:4px;padding:0 18px;border-bottom:1px solid var(--divider);overflow-x:auto; }
+    .ac-ranking-tabs .ac-rank-tab { display:flex;align-items:center;gap:7px;white-space:nowrap;padding:11px 12px;background:none;border-top:0;border-left:0;border-right:0; }
+    .ac-ranking-tabs .ac-rank-tab span { min-width:20px;padding:1px 6px;border-radius:10px;background:var(--surface-3);font:10px var(--font-mono); }
+    .ac-ranking-row { width:100%;display:grid;grid-template-columns:34px minmax(190px,1.3fr) minmax(280px,2fr) 80px minmax(150px,1fr);align-items:center;gap:14px;padding:13px 18px;border:0;border-bottom:1px solid var(--divider);background:transparent;color:var(--text);text-align:left;cursor:pointer; }
+    .ac-ranking-row:hover { background:var(--hover); }
+    .ac-ranking-position { width:27px;height:27px;display:grid;place-items:center;border-radius:50%;background:var(--surface-3);font:600 11px var(--font-mono);color:var(--text-3); }
+    .ac-ranking-name { min-width:0;display:flex;flex-direction:column;gap:4px; }
+    .ac-ranking-name strong { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px; }
+    .ac-ranking-name small { color:var(--text-3);font-size:10.5px; }
+    .ac-ranking-bars { display:grid;grid-template-columns:58px 1fr;gap:4px 8px;align-items:center; }
+    .ac-ranking-bars small { color:var(--text-3);font-size:10px;display:flex;justify-content:space-between;gap:8px; }
+    .ac-ranking-bars small b { display:none; }
+    .ac-ranking-bars i { height:5px;background:var(--surface-3);border-radius:4px;overflow:hidden; }
+    .ac-ranking-bars em { display:block;height:100%;border-radius:4px;min-width:2px; }
+    .ac-ranking-change { font:600 13px var(--font-mono);text-align:right; }
+    .ac-ranking-action { display:flex;justify-content:flex-end;align-items:center;gap:5px;color:var(--text-3);font-size:11px; }
+    .ac-modal-summary { display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px; }
+    .ac-modal-summary>div { padding:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;min-width:0; }
+    .ac-modal-summary span,.ac-modal-health span { display:block;color:var(--text-3);font-size:10.5px;margin-bottom:6px; }
+    .ac-modal-summary strong { display:block;font:600 14px var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+    .ac-modal-health { display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px; }
+    .ac-modal-health>div { min-height:72px;padding:12px;border:1px solid var(--divider);border-radius:8px; }
+    .ac-modal-health strong { display:block;font-size:13px;margin-bottom:4px; }
+    .ac-modal-health small { display:block;color:var(--text-3);font-size:10.5px;margin-top:7px; }
+    .ac-modal-more { width:100%;display:flex;justify-content:space-between;align-items:center;padding:10px 2px;background:none;border:0;border-top:1px solid var(--divider);color:var(--text-3);font-size:11.5px;cursor:pointer; }
+    .ac-modal-more:hover { color:var(--text); }
+    .ac-modal-details { border-top:1px solid var(--divider); }
+    .ac-modal-details>div { display:flex;justify-content:space-between;gap:16px;padding:8px 2px;border-bottom:1px solid var(--divider);font-size:12px; }
+    .ac-modal-details span { color:var(--text-3); }
+    .ac-modal-details strong { text-align:right;font-weight:500; }
+    @media(max-width:1000px) { .ac-ranking-row{grid-template-columns:30px minmax(170px,1fr) minmax(220px,1.5fr) 70px}.ac-ranking-action{display:none}.ac-ranking-cards{grid-template-columns:repeat(2,1fr)!important} }
+    @media(max-width:720px) { .ac-ranking-row{grid-template-columns:28px 1fr 70px}.ac-ranking-bars{display:none}.ac-ranking-cards{grid-template-columns:1fr!important}.ac-ranking-header{align-items:flex-start!important;flex-direction:column}.ac-ranking-header input{width:100%!important}.ac-modal-summary{grid-template-columns:1fr}.ac-modal-health{grid-template-columns:1fr}.ac-client-modal{padding:18px!important} }
   `;
   document.head.appendChild(s);
 }
@@ -445,44 +481,52 @@ const AcAcaoBadge = ({ acao }) => {
 
 // ── Modal de detalhe do cliente ───────────────────────────────────────────────
 const AcClienteModal = ({ row, onClose }) => {
+  const [showDetails, setShowDetails] = React.useState(false);
+  React.useEffect(() => { setShowDetails(false); }, [row?.codigo]);
   if (!row) return null;
-  const fields = [
-    ["Cliente",            row.nome],
-    ["Documento",          row.documento || "—"],
-    ["Status comercial",   <AcStatusBadge status={row.statusComercial}/>],
-    ["Ação sugerida",      <AcAcaoBadge acao={row.acaoSugerida}/>],
-    ["Total no período",   acBRL(row.totalPeriodo)],
-    ["Recebido no periodo", acBRL(row.totalRecebido)],
-    ["Em aberto",          acBRL(row.totalAberto)],
-    ["Vencido",            acBRL(row.totalVencido)],
-    ["Inadimplente",       acBRL(row.totalInadimplente)],
-    ["Total anterior",     acBRL(row.totalAnterior)],
-    ["Crescimento",        row.crescimento !== null ? (
-      <span className={`kpi-delta ${acNum(row.crescimento)>=0?"up":"down"}`}>
-        {acNum(row.crescimento)>=0?"▲":"▼"} {Math.abs(acNum(row.crescimento)).toFixed(1)}%
-      </span>
-    ) : "—"],
-    ["Lançamentos",        row.lancamentos],
-    ["Ticket médio",       acBRL(row.ticketMedio)],
-    ["Último faturamento", acDateFmt(row.ultimoFaturamento)],
-    ["Dias sem faturar",   row.diasSemFaturar != null ? `${row.diasSemFaturar} dias` : "—"],
-    ["1º faturamento",     acDateFmt(row.primeiroFaturamento)],
+  const growth = row.crescimento == null ? null : acNum(row.crescimento);
+  const isStopped = acNum(row.totalPeriodo) === 0;
+  const needsRecencyAttention = !isStopped && acNum(row.diasSemFaturar) > 30;
+  const tone = isStopped || (growth != null && growth < -5) ? "#ef4444" : growth != null && growth > 5 ? "#22c55e" : "#94a3b8";
+  const headline = isStopped
+    ? "Este cliente não faturou no período selecionado."
+    : growth == null
+      ? "Ainda não há período anterior para comparação."
+      : growth > 5
+        ? `O faturamento aumentou ${Math.abs(growth).toFixed(1)}%.`
+        : growth < -5
+          ? `O faturamento caiu ${Math.abs(growth).toFixed(1)}%.`
+          : "O faturamento permaneceu estável.";
+  const detailFields = [
+    ["Documento", row.documento || "—"], ["Recebido", acBRL(row.totalRecebido)],
+    ["Em aberto", acBRL(row.totalAberto)], ["Vencido", acBRL(row.totalVencido)],
+    ["Lançamentos", row.lancamentos], ["Ticket médio", acBRL(row.ticketMedio)],
+    ["Primeiro faturamento", acDateFmt(row.primeiroFaturamento)],
   ];
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.55)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}
          onClick={onClose}>
-      <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:12,padding:"20px 24px",width:460,maxWidth:"100%",maxHeight:"82vh",overflowY:"auto"}}
+      <div className="ac-client-modal" style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:12,padding:"20px 24px",width:520,maxWidth:"100%",maxHeight:"86vh",overflowY:"auto"}}
            onClick={e=>e.stopPropagation()}>
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
-          <span style={{fontWeight:600,fontSize:15,letterSpacing:"-0.01em"}}>Detalhe do cliente</span>
+        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",marginBottom:18,gap:16}}>
+          <div style={{minWidth:0}}><div className="muted" style={{fontSize:11,marginBottom:4}}>ANÁLISE DO CLIENTE</div><strong style={{fontSize:16,display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.nome}</strong></div>
           <button className="btn sm ghost" onClick={onClose}><Icon name="x" size={14}/></button>
         </div>
-        {fields.map(([label,value])=>(
-          <div key={label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid var(--divider)",fontSize:13}}>
-            <span style={{color:"var(--text-3)"}}>{label}</span>
-            <span style={{fontWeight:500,textAlign:"right",maxWidth:"60%"}}>{value}</span>
-          </div>
-        ))}
+        <div style={{padding:"13px 15px",borderRadius:8,background:`color-mix(in srgb, ${tone} 10%, transparent)`,border:`1px solid color-mix(in srgb, ${tone} 32%, transparent)`,marginBottom:16}}>
+          <div style={{display:"flex",alignItems:"center",gap:9,color:tone,fontWeight:600,fontSize:14}}><span style={{fontSize:20}}>{isStopped?"!":growth>5?"↑":growth<-5?"↓":"→"}</span>{headline}</div>
+          <div className="muted" style={{fontSize:11.5,marginTop:5,marginLeft:27}}>{needsRecencyAttention?<span style={{color:"#fbbf24"}}>Atenção: a última fatura foi há {row.diasSemFaturar} dias.</span>:(ACAO_LABELS[row.acaoSugerida] || "Acompanhar o cliente")}</div>
+        </div>
+        <div className="ac-modal-summary">
+          <div><span>Faturamento atual</span><strong>{acBRL(row.totalPeriodo)}</strong></div>
+          <div><span>Período anterior</span><strong>{acBRL(row.totalAnterior)}</strong></div>
+          <div><span>Variação</span><strong style={{color:tone}}>{growth==null?"—":`${growth>=0?"+":""}${growth.toFixed(1)}%`}</strong></div>
+        </div>
+        <div className="ac-modal-health">
+          <div><span>Último faturamento</span><strong>{acDateFmt(row.ultimoFaturamento)}</strong><small>{row.diasSemFaturar != null?`${row.diasSemFaturar} dias atrás`:""}</small></div>
+          <div><span>Situação</span><AcStatusBadge status={row.statusComercial}/><small><AcAcaoBadge acao={row.acaoSugerida}/></small></div>
+        </div>
+        <button className="ac-modal-more" onClick={()=>setShowDetails(v=>!v)}>{showDetails?"Ocultar informações financeiras":"Ver mais informações"}<span>{showDetails?"⌃":"⌄"}</span></button>
+        {showDetails && <div className="ac-modal-details">{detailFields.map(([label,value])=><div key={label}><span>{label}</span><strong style={label==="Vencido"&&acNum(row.totalVencido)>0?{color:"#ef4444"}:{}}>{value}</strong></div>)}</div>}
       </div>
     </div>
   );
@@ -517,6 +561,10 @@ const AnaliseClientes = () => {
   const [rankTab,      setRankTab]      = React.useState("top");
   const [selectedMonth,setSelectedMonth]= React.useState("");
   const [drillOrigin,  setDrillOrigin]  = React.useState(null);
+  const [quickClient,  setQuickClient]  = React.useState("");
+  const [quickResult,  setQuickResult]  = React.useState(null);
+  const [quickLoading, setQuickLoading] = React.useState(false);
+  const [quickError,   setQuickError]   = React.useState("");
   const PAGE_SIZE = 20;
 
   React.useEffect(() => { acInjectStyles(); }, []);
@@ -597,6 +645,26 @@ const AnaliseClientes = () => {
     setSortCol("diasSemFaturar");
     setSortDir("desc");
     setTablePage(0);
+  };
+
+  const analyzeClient = async () => {
+    const query = quickClient.trim().toLowerCase();
+    if (!query) { setQuickError("Digite o nome do cliente."); return; }
+    const matches = (data?.clients || []).filter(c => (c.nome || "").toLowerCase().includes(query) || String(c.codigo || "") === query);
+    const selected = matches.sort((a,b) => acNum(b.totalPeriodo) - acNum(a.totalPeriodo))[0];
+    if (!selected) { setQuickResult(null); setQuickError("Cliente não encontrado no período. Tente pesquisar parte do nome ou selecione 12 meses."); return; }
+    setQuickLoading(true); setQuickError("");
+    try {
+      const filters = manualFilter
+        ? { dataInicio: manualFilter.dataInicio, dataFim: manualFilter.dataFim }
+        : { period: periodo };
+      filters.cliente = selected.codigo;
+      filters.empresa = empresa;
+      const payload = await window.RB_API.getAnaliseClientes(filters);
+      setQuickResult({ client: payload?.clients?.[0] || selected, monthly: payload?.monthly || [], summary: payload?.summary || {} });
+      setQuickClient(selected.nome);
+    } catch (e) { setQuickResult(null); setQuickError(e?.message || "Não foi possível analisar este cliente."); }
+    finally { setQuickLoading(false); }
   };
 
   // ── Dados derivados ─────────────────────────────────────────────────────────
@@ -755,6 +823,20 @@ const AnaliseClientes = () => {
     a.click(); URL.revokeObjectURL(url);
   };
 
+  const quickRow = quickResult?.client || null;
+  const quickMonthly = quickResult?.monthly || [];
+  const quickMax = Math.max(1, ...quickMonthly.map(item => acNum(item.valorTotal)));
+  const quickGrowth = quickRow?.crescimento;
+  const quickHeadline = quickRow
+    ? quickGrowth === null || quickGrowth === undefined
+      ? `${quickRow.nome} faturou ${acBRL(quickRow.totalPeriodo)} no período selecionado.`
+      : acNum(quickGrowth) > 0
+        ? `Sim. O faturamento de ${quickRow.nome} aumentou ${Math.abs(acNum(quickGrowth)).toFixed(1)}% em relação ao período anterior.`
+        : acNum(quickGrowth) < 0
+          ? `O faturamento de ${quickRow.nome} caiu ${Math.abs(acNum(quickGrowth)).toFixed(1)}% em relação ao período anterior.`
+          : `O faturamento de ${quickRow.nome} permaneceu estável em relação ao período anterior.`
+    : "";
+
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="view">
@@ -824,6 +906,19 @@ const AnaliseClientes = () => {
         <button className="btn" onClick={clearFilter}><Icon name="x" size={12}/> Limpar</button>
         {manualFilter && <span className="badge info">Filtro personalizado ativo</span>}
         <span className="muted" style={{marginLeft:"auto",fontSize:11.5}}>Base: dataemissaorec · financeiro.receber · {empresa==="todas"?"todas as empresas":empresa==="2"?"RB Transportes":"empresa "+empresa}</span>
+      </div>
+
+      <div className="ac-quick card">
+        <div className="ac-quick-search">
+          <div><h2>O faturamento deste cliente aumentou?</h2><span>Digite o nome e veja uma resposta simples.</span></div>
+          <div className="ac-quick-controls"><input list="ac-quick-client-list" value={quickClient} onChange={e=>setQuickClient(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")analyzeClient();}} placeholder="Ex.: ESAF"/><datalist id="ac-quick-client-list">{clients.map(c=><option key={c.codigo} value={c.nome}/>)}</datalist><button className="btn primary" onClick={analyzeClient} disabled={quickLoading}><Icon name="search"/>{quickLoading?" Analisando...":" Analisar cliente"}</button>{quickResult&&<button className="btn" onClick={()=>{setQuickResult(null);setQuickClient("");setQuickError("");}}>Limpar</button>}</div>
+        </div>
+        {quickError&&<div className="ac-quick-error">{quickError}</div>}
+        {quickRow&&<div className="ac-quick-result">
+          <div className={`ac-quick-answer ${acNum(quickGrowth)>0?"up":acNum(quickGrowth)<0?"down":"flat"}`}><Icon name={acNum(quickGrowth)>=0?"trending-up":"arrow-down"}/><div><strong>{quickHeadline}</strong><span>Comparação entre períodos equivalentes de {periodLabel.toLowerCase()}.</span></div></div>
+          <div className="ac-quick-kpis"><div><span>Faturamento atual</span><strong>{acBRL(quickRow.totalPeriodo)}</strong></div><div><span>Período anterior</span><strong>{acBRL(quickRow.totalAnterior)}</strong></div><div><span>Variação</span><strong className={acNum(quickGrowth)>=0?"positive":"negative"}>{acSignedPct(quickGrowth)}</strong></div><div><span>Mesmo período ano anterior</span><strong>{acBRL(quickRow.totalAnoAnterior)}</strong><small>{acSignedPct(quickRow.crescimentoAnoAnterior)}</small></div><div><span>Em aberto</span><strong>{acBRL(quickRow.totalAberto)}</strong></div><div><span>Vencido</span><strong>{acBRL(quickRow.totalVencido)}</strong></div></div>
+          <div className="ac-quick-chart"><div className="section-head"><h3>Evolução mensal</h3><span className="muted">{quickMonthly.length} meses</span></div><div className="ac-quick-bars">{quickMonthly.map(item=><div key={item.mes} title={`${item.label}: ${acBRL(item.valorTotal)}`}><b>{acShortBRL(item.valorTotal)}</b><i style={{height:`${Math.max(3,acNum(item.valorTotal)/quickMax*100)}%`}}/><span>{item.label}</span></div>)}</div></div>
+        </div>}
       </div>
 
       {/* ── Banner de status ── */}
@@ -1313,4 +1408,119 @@ const AnaliseClientes = () => {
   );
 };
 
+const RankingClientes = () => {
+  const [periodo, setPeriodo] = React.useState("3m");
+  const [empresa, setEmpresa] = React.useState("todas");
+  const [data, setData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState("");
+  const [rankTab, setRankTab] = React.useState("queda");
+  const [search, setSearch] = React.useState("");
+  const [selectedRow, setSelectedRow] = React.useState(null);
+
+  React.useEffect(() => { acInjectStyles(); }, []);
+  React.useEffect(() => {
+    let active = true;
+    setLoading(true); setError("");
+    window.RB_API.getAnaliseClientes({ period: periodo, empresa })
+      .then(payload => { if (active) setData(payload); })
+      .catch(err => { if (active) { setData(null); setError(err?.message || "Não foi possível carregar o ranking."); } })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [periodo, empresa]);
+
+  const clients = data?.clients || [];
+  const billed = clients.filter(c => acNum(c.totalPeriodo) > 0);
+  const growth = clients.filter(c => c.crescimento != null && acNum(c.crescimento) > 5 && acNum(c.totalPeriodo) > 0)
+    .sort((a,b) => acNum(b.crescimento) - acNum(a.crescimento));
+  const decline = clients.filter(c => c.crescimento != null && acNum(c.crescimento) < -5 && acNum(c.totalAnterior) > 0)
+    .sort((a,b) => acNum(a.crescimento) - acNum(b.crescimento));
+  const stopped = clients.filter(c => acNum(c.totalPeriodo) === 0 || acNum(c.diasSemFaturar) > 30)
+    .sort((a,b) => acNum(b.totalAnterior) - acNum(a.totalAnterior));
+  const top = [...billed].sort((a,b) => acNum(b.totalPeriodo) - acNum(a.totalPeriodo));
+  const low = [...billed].sort((a,b) => acNum(a.totalPeriodo) - acNum(b.totalPeriodo));
+  const biggestGrowth = growth[0];
+  const biggestDecline = decline[0];
+  const leader = top[0];
+
+  const tabs = [
+    { key:"top", label:"Mais faturaram", rows:top, tone:"#22c55e" },
+    { key:"crescimento", label:"Mais cresceram", rows:growth, tone:"#38bdf8" },
+    { key:"queda", label:"Mais caíram", rows:decline, tone:"#ef4444" },
+    { key:"baixo", label:"Menor faturamento", rows:low, tone:"#f97316" },
+    { key:"parados", label:"Inativos há 30+ dias", rows:stopped, tone:"#b91c1c" },
+  ];
+  const active = tabs.find(t => t.key === rankTab) || tabs[0];
+  const query = search.trim().toLowerCase();
+  const visible = active.rows.filter(c => !query || (c.nome || "").toLowerCase().includes(query)).slice(0,50);
+  const status = c => {
+    if (acNum(c.totalPeriodo) === 0) return { label:"Sem faturamento no período", color:"#ef4444", symbol:"!", inactive:true };
+    if (c.crescimento == null) return { label:"Sem comparação", color:"var(--text-3)", symbol:"•" };
+    if (acNum(c.crescimento) > 5) return { label:"Crescendo", color:"#22c55e", symbol:"↑" };
+    if (acNum(c.crescimento) < -5) return { label:"Em queda", color:"#ef4444", symbol:"↓" };
+    return { label:"Estável", color:"#94a3b8", symbol:"→" };
+  };
+  const card = (label, client, value, color, helper) => (
+    <div className="kpi ac-ranking-kpi" style={{borderLeft:`3px solid ${color}`}}>
+      <div className="kpi-label"><span>{label}</span></div>
+      <div className="ac-ranking-client" title={client?.nome}>{client?.nome || "Sem dados"}</div>
+      <div className="ac-ranking-value" style={{color}}>{client ? value : "—"}</div>
+      <span className="muted" style={{fontSize:11}}>{helper}</span>
+    </div>
+  );
+
+  return (
+    <div className="view">
+      <AcClienteModal row={selectedRow} onClose={()=>setSelectedRow(null)}/>
+      <div className="page-head">
+        <div><h1>Ranking e evolução</h1><div className="sub">Veja rapidamente quem cresceu e quem precisa de atenção</div></div>
+        <div className="actions">
+          {AC_PERIODS.map(p => <button key={p.key} className={`btn${periodo===p.key?" primary":""}`} onClick={()=>setPeriodo(p.key)}>{p.label}</button>)}
+          <select className="btn" value={empresa} onChange={e=>setEmpresa(e.target.value)} aria-label="Empresa">
+            <option value="todas">Todas as empresas</option><option value="2">RB Transportes</option><option value="1">Empresa 1</option>
+          </select>
+        </div>
+      </div>
+
+      {(loading || error) && <div className="card" style={{padding:"12px 16px",marginBottom:14}}><span className={error?"kpi-delta down":"muted"}>{loading?"Carregando ranking…":error}</span></div>}
+
+      <div className="grid cols-4 ac-ranking-cards" style={{marginBottom:16}}>
+        {card("Maior faturamento", leader, acBRL(leader?.totalPeriodo), "#22c55e", "valor no período")}
+        {card("Maior crescimento", biggestGrowth, biggestGrowth?`↑ ${acNum(biggestGrowth.crescimento).toFixed(1)}%`:"—", "#38bdf8", "comparado ao período anterior")}
+        {card("Maior queda", biggestDecline, biggestDecline?`↓ ${Math.abs(acNum(biggestDecline.crescimento)).toFixed(1)}%`:"—", "#ef4444", "prioridade comercial")}
+        {card("Sem nova fatura há 30+ dias", stopped[0], `${stopped.length} clientes`, "#f97316", "podem ter faturado no início do período")}
+      </div>
+
+      <div className="card card-flush">
+        <div className="card-header ac-ranking-header">
+          <div><h3>Clientes por desempenho</h3><span className="muted" style={{fontSize:11.5}}>Clique em um cliente para ver os detalhes</span></div>
+          <div style={{position:"relative"}}><Icon name="search" size={13} style={{position:"absolute",left:9,top:9,color:"var(--text-4)"}}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar cliente…" style={{height:30,width:220,paddingLeft:28,border:"1px solid var(--border)",borderRadius:"var(--r)",background:"var(--surface-2)",color:"var(--text)"}}/></div>
+        </div>
+        <div className="ac-ranking-tabs">
+          {tabs.map(t => <button key={t.key} className={`ac-rank-tab ${rankTab===t.key?"active":""}`} onClick={()=>setRankTab(t.key)}>{t.label}<span>{t.rows.length}</span></button>)}
+        </div>
+        <div className="ac-ranking-list">
+          {!loading && visible.length===0 && <div className="muted" style={{padding:28,textAlign:"center"}}>Nenhum cliente encontrado neste ranking.</div>}
+          {visible.map((c,i) => {
+            const st=status(c);
+            const previous=acNum(c.totalAnterior), current=acNum(c.totalPeriodo);
+            const max=Math.max(1,current,previous);
+            return <button key={c.codigo || i} className="ac-ranking-row" onClick={()=>setSelectedRow(c)}>
+              <span className="ac-ranking-position">{i+1}</span>
+              <span className="ac-ranking-name"><strong>{c.nome}</strong><small><span style={{color:st.color,fontWeight:700}}>{st.symbol} {st.label}</span>{c.diasSemFaturar!=null&&acNum(c.diasSemFaturar)>30?<span style={{color:"#fbbf24"}}> · Atenção: última fatura há {c.diasSemFaturar} dias</span>:c.diasSemFaturar!=null?` · última fatura há ${c.diasSemFaturar} dias`:""}</small></span>
+              <span className="ac-ranking-bars">
+                <small>Atual <b>{acBRL(current)}</b></small><i><em style={{width:`${current/max*100}%`,background:st.color}}/></i>
+                <small>Anterior <b>{acBRL(previous)}</b></small><i><em style={{width:`${previous/max*100}%`,background:"#64748b"}}/></i>
+              </span>
+              <span className="ac-ranking-change" style={{color:st.color}}>{c.crescimento==null?"—":`${acNum(c.crescimento)>=0?"+":""}${acNum(c.crescimento).toFixed(1)}%`}</span>
+              <span className="ac-ranking-action">{ACAO_LABELS[c.acaoSugerida] || "Ver detalhes"}<Icon name="chevron-right" size={14}/></span>
+            </button>;
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 window.AnaliseClientes = AnaliseClientes;
+window.RankingClientes = RankingClientes;

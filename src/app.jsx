@@ -12,6 +12,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/trafegus.jsx",
   "src/screens/oportunidades-retorno.jsx",
   "src/screens/dre-empresarial.jsx",
+  "src/screens/fluxo-caixa.jsx",
   "src/screens/analise-frota.jsx",
   "src/screens/precos-combustivel.jsx",
   "src/screens/custos-veiculos.jsx?v=20260803-redesign",
@@ -34,7 +35,7 @@ const SCREEN_SCRIPTS = [
 const SCREEN_GLOBALS = [
   "Diretoria", "SimuladorFrete", "Viagens", "FolgasMotoristas",
   "StatusCargaFrota", "Trafegus", "OportunidadesRetorno",
-  "DreEmpresarial", "AnaliseClientes",
+  "DreEmpresarial", "FluxoCaixa", "AnaliseClientes", "RankingClientes",
   "RentabilidadeClientes", "LucroViagens", "ResultadoFretes", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "ManutencaoPosicoesScreen", "Pneus", "MultasFrota", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n", "ConsultaCte", "ControleCanhotos",
 ];
 const SCREEN_MODULES = import.meta.glob("./screens/*.jsx");
@@ -46,16 +47,17 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 
 const NAV = [
   { id: "diretoria",       label: "Diretoria",    icon: "dashboard",   title: "Resumo executivo", section: "direcao" },
-  { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial", section: "direcao" },
-  { id: "faturamento-diario", label: "Fat. Diário", icon: "chart",     title: "Faturamento Diário", section: "direcao" },
-  { id: "comparativo-faturamento", label: "Comp. Mensal", icon: "chart", title: "Comparativo Mensal", section: "direcao" },
+  { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial", subgroup: "financeiro", section: "direcao" },
+  { id: "fluxo-caixa", label: "Fluxo de Caixa", icon: "money", title: "Fluxo de Caixa", subgroup: "financeiro", section: "direcao" },
+  { id: "faturamento-diario", label: "Fat. Diário", icon: "chart",     title: "Faturamento Diário", subgroup: "financeiro", section: "direcao" },
+  { id: "comparativo-faturamento", label: "Comp. Mensal", icon: "chart", title: "Comparativo Mensal", subgroup: "financeiro", section: "direcao" },
+  { id: "custos-veiculos", label: "Custos e prejuízo", icon: "chart", title: "Custos e Prejuízo da Frota", subgroup: "financeiro", section: "direcao" },
   { id: "abastecimentos",  label: "Abastecimentos", icon: "fuel",       title: "Análise de Abastecimentos", section: "direcao" },
   { id: "precos-combustivel", label: "Preços Postos", icon: "money",     title: "Preços combinados de combustível", section: "direcao" },
   { id: "lucro-viagens",   label: "Res. Viagem",  icon: "route",       title: "Resultado por Viagem", group: "resultados", section: "direcao" },
   { id: "clientes",        label: "Análise",      icon: "user",        title: "Análise de Clientes", group: "clientes", section: "direcao" },
+  { id: "clientes-ranking",label: "Ranking",      icon: "chart",       title: "Ranking e evolução de Clientes", group: "clientes", section: "direcao", permission: "clientes" },
   { id: "clientes-lucro",  label: "Lucro",        icon: "chart",       title: "Rentabilidade Clientes", group: "clientes", section: "direcao" },
-  { id: "custos-veiculos", label: "Visão geral", icon: "truck", title: "Custos da Frota", group: "manutencoes", section: "direcao" },
-  { id: "manutencoes-veiculos", label: "Extrato detalhado", icon: "wrench", title: "Extrato de Custos e Manutenções", group: "manutencoes", section: "direcao" },
   { id: "simulador",       label: "Calculadora",  icon: "calculator",  title: "Calculadora de Frete ANTT", section: "operacao" },
   { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações", section: "operacao" },
   { id: "folgas-motoristas", label: "Folgas",      icon: "user",        title: "Jornada e Folgas dos Motoristas", section: "operacao" },
@@ -85,12 +87,7 @@ const NAV_GROUPS = {
   clientes: {
     label: "Clientes",
     icon: "user",
-    screens: ["clientes", "clientes-lucro"],
-  },
-  manutencoes: {
-    label: "Manutenções",
-    icon: "wrench",
-    screens: ["manutencoes-veiculos"],
+    screens: ["clientes", "clientes-ranking", "clientes-lucro"],
   },
   resultados: {
     label: "Resultado por viagem",
@@ -162,6 +159,7 @@ const App = () => {
   const [screensReady, setScreensReady] = useState(false);
   const [sidebarExpanded, setSidebarExpanded] = useState(() => window.innerWidth > 960);
   const [frotaMenu, setFrotaMenu] = useState(null);
+  const [financeiroMenu, setFinanceiroMenu] = useState(null);
 
   // Verificar sessÃ£o existente ao carregar
   useEffect(() => {
@@ -284,6 +282,7 @@ const App = () => {
     if (visibleNav.some(n => n.id === screen)) {
       go(screen);
       setFrotaMenu(null);
+      setFinanceiroMenu(null);
       if (window.innerWidth <= 960) setSidebarExpanded(false);
     }
   };
@@ -325,6 +324,9 @@ const App = () => {
     case "dre-empresarial":
       body = <DreEmpresarial onNavigate={onNavigate}/>;
       break;
+    case "fluxo-caixa":
+      body = <FluxoCaixa onNavigate={onNavigate}/>;
+      break;
     case "abastecimentos":
       body = <AnaliseFrota key="abastecimentos" onNavigate={onNavigate} modoAbastecimento/>;
       break;
@@ -351,7 +353,7 @@ const App = () => {
       body = <ComparativoFaturamento onNavigate={onNavigate}/>;
       break;
     case "custos-veiculos":
-      body = <ManutencoesVeiculos onNavigate={onNavigate}/>;
+      body = <CustosVeiculos onNavigate={onNavigate}/>;
       break;
     case "manutencoes-veiculos":
       body = <ManutencoesVeiculos onNavigate={onNavigate}/>;
@@ -361,6 +363,7 @@ const App = () => {
         <ScreenGroup
           tabs={[
             { id: "clientes", label: "Análise", available: hasScreen("clientes") },
+            { id: "clientes-ranking", label: "Ranking e evolução", available: hasScreen("clientes-ranking") },
             { id: "clientes-lucro", label: "Lucro", available: hasScreen("clientes-lucro") },
           ]}
           active={currentScreen}
@@ -370,11 +373,27 @@ const App = () => {
         </ScreenGroup>
       );
       break;
+    case "clientes-ranking":
+      body = (
+        <ScreenGroup
+          tabs={[
+            { id: "clientes", label: "Análise", available: hasScreen("clientes") },
+            { id: "clientes-ranking", label: "Ranking e evolução", available: hasScreen("clientes-ranking") },
+            { id: "clientes-lucro", label: "Lucro", available: hasScreen("clientes-lucro") },
+          ]}
+          active={currentScreen}
+          onChange={onNavigate}
+        >
+          <RankingClientes onNavigate={onNavigate}/>
+        </ScreenGroup>
+      );
+      break;
     case "clientes-lucro":
       body = (
         <ScreenGroup
           tabs={[
             { id: "clientes", label: "Análise", available: hasScreen("clientes") },
+            { id: "clientes-ranking", label: "Ranking e evolução", available: hasScreen("clientes-ranking") },
             { id: "clientes-lucro", label: "Lucro", available: hasScreen("clientes-lucro") },
           ]}
           active={currentScreen}
@@ -444,7 +463,20 @@ const App = () => {
             return (
               <div className="nav-section" key={section}>
                 <div className="nav-label">{label}</div>
-                {renderNavItems(items.filter(item => !item.subgroup))}
+                {renderNavItems(items.filter(item => !item.subgroup && (section !== "direcao" || item.id === "diretoria")))}
+                {items.some(item => item.subgroup === "financeiro") && <button
+                  type="button"
+                  className={`nav-item nav-flyout-trigger ${items.some(item => item.subgroup === "financeiro" && item.id === currentScreen) ? "active" : ""}`}
+                  data-tip="Financeiro"
+                  aria-expanded={Boolean(financeiroMenu)}
+                  onClick={event => {
+                    if (financeiroMenu) return setFinanceiroMenu(null);
+                    setFrotaMenu(null);
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    setFinanceiroMenu({ left: rect.right + 7, top: Math.max(8, Math.min(rect.top, window.innerHeight - 180)) });
+                  }}
+                ><Icon name="chart"/><span className="lbl">Financeiro</span><Icon name="chevron-right" size={13}/></button>}
+                {section === "direcao" && renderNavItems(items.filter(item => !item.subgroup && item.id !== "diretoria"))}
                 {items.some(item => item.subgroup === "frota") && <button
                   type="button"
                   className={`nav-item nav-flyout-trigger ${items.some(item => item.subgroup === "frota" && item.id === currentScreen) ? "active" : ""}`}
@@ -452,6 +484,7 @@ const App = () => {
                   aria-expanded={Boolean(frotaMenu)}
                   onClick={event => {
                     if (frotaMenu) return setFrotaMenu(null);
+                    setFinanceiroMenu(null);
                     const rect = event.currentTarget.getBoundingClientRect();
                     setFrotaMenu({ left: rect.right + 7, top: Math.max(8, Math.min(rect.top, window.innerHeight - 180)) });
                   }}
@@ -496,6 +529,11 @@ const App = () => {
       {frotaMenu && <><button className="nav-flyout-dismiss" aria-label="Fechar opções da frota" onClick={() => setFrotaMenu(null)}/><div className="nav-flyout" style={{ left: frotaMenu.left, top: frotaMenu.top }}>
         <div className="nav-flyout-title"><Icon name="truck" size={14}/><span>Frota</span></div>
         {renderNavItems(sidebarNav.filter(item => item.subgroup === "frota"))}
+      </div></>}
+
+      {financeiroMenu && <><button className="nav-flyout-dismiss" aria-label="Fechar opções financeiras" onClick={() => setFinanceiroMenu(null)}/><div className="nav-flyout" style={{ left: financeiroMenu.left, top: financeiroMenu.top }}>
+        <div className="nav-flyout-title"><Icon name="chart" size={14}/><span>Financeiro</span></div>
+        {renderNavItems(sidebarNav.filter(item => item.subgroup === "financeiro"))}
       </div></>}
 
       <main className="main">
