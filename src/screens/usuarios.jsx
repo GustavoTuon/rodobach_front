@@ -12,6 +12,7 @@ const TELAS_GRUPOS = [
       { id: "perm_abastecimentos", label: "Abastecimentos" },
       { id: "perm_precos_combustivel", label: "Preços Postos" },
       { id: "perm_lucro_viagens", label: "Resultado por Viagem" },
+      { id: "perm_custos_veiculos", label: "Resultado por Veículo" },
       { id: "perm_clientes", label: "Análise de Clientes" },
       { id: "perm_clientes_lucro", label: "Rentabilidade de Clientes" },
       { id: "perm_manutencoes_veiculos", label: "Manutenções por Veículo" },

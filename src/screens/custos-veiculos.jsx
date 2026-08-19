@@ -18,6 +18,21 @@ function cvBRL(value) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cvNum(value));
 }
 
+function cvOptionalBRL(value) {
+  return value === null || value === undefined ? "—" : cvBRL(value);
+}
+
+function cvMargin(value) {
+  return value === null || value === undefined ? "—" : `${cvNum(value).toFixed(1)}%`;
+}
+
+function cvVariation(item, positiveIsGood = true) {
+  const value = item?.variacaoPercentual;
+  if (value === null || value === undefined) return "Sem base anterior";
+  const improved = positiveIsGood ? value >= 0 : value <= 0;
+  return `${value > 0 ? "+" : ""}${cvNum(value).toFixed(1)}% vs. período anterior${improved ? "" : " • atenção"}`;
+}
+
 function cvDate(value) {
   if (!value) return "-";
   const [y, m, d] = String(value).slice(0, 10).split("-");
@@ -40,12 +55,14 @@ function cvNormalize(data) {
     monthly: Array.isArray(base.monthly) ? base.monthly : [],
     ranking: Array.isArray(base.ranking) ? base.ranking : [],
     types: Array.isArray(base.types) ? base.types : [],
+    otherBreakdown: Array.isArray(base.otherBreakdown) ? base.otherBreakdown : [],
     suppliers: Array.isArray(base.suppliers) ? base.suppliers : [],
     status: Array.isArray(base.status) ? base.status : [],
     launches: Array.isArray(base.launches) ? base.launches : [],
     validation: base.validation || {},
     profit: base.profit || { summary: {}, vehicles: [], rankings: { lucro: [], prejuizo: [], custoKm: [] } },
     audit: base.audit || {},
+    comparison: base.comparison || {},
   };
 }
 
@@ -160,7 +177,7 @@ const CvDetailModal = ({ placa, filters, onClose }) => {
           <>
             <div className="cv-detail-grid">
               <CvKpi label="Total gasto" value={cvBRL(d.summary.custoTotal)} sub={`${d.summary.quantidadeLancamentos || 0} lançamentos`} tone="#ef4444" icon="money"/>
-              <CvKpi label="Custo por km" value={cvBRL(v.custoPorKm)} sub={v.kmAtual ? `${Number(v.kmAtual).toLocaleString("pt-BR")} km atual` : "Sem km informado"} tone="#3b82f6" icon="speedometer"/>
+              <CvKpi label="Custo por km" value={cvOptionalBRL(v.custoPorKm)} sub={v.coberturaTelemetria === "confirmada" ? `${Number(v.distanciaKm || 0).toLocaleString("pt-BR")} km no período` : "Telemetria sem cobertura completa"} tone="#3b82f6" icon="speedometer"/>
               <CvKpi label="Aberto" value={cvBRL(d.summary.custoAberto)} sub={`Vencido: ${cvBRL(d.summary.custoVencido)}`} tone="#f59e0b" icon="clock"/>
             </div>
 
@@ -231,10 +248,11 @@ const CvDetailModal = ({ placa, filters, onClose }) => {
 };
 
 const CustosVeiculos = () => {
-  const defaultRange = CV_PERIODS[1].range();
+  const defaultRange = CV_PERIODS.find((item) => item.key === "month").range();
   const [modo, setModo] = React.useState("geral");
   const [dataInicio, setDataInicio] = React.useState(defaultRange.start);
   const [dataFim, setDataFim] = React.useState(defaultRange.end);
+  const [periodKey, setPeriodKey] = React.useState("month");
   const [placa, setPlaca] = React.useState("");
   const [centro, setCentro] = React.useState("");
   const [tipoCusto, setTipoCusto] = React.useState("todos");
@@ -282,14 +300,23 @@ const CustosVeiculos = () => {
     const p = CV_PERIODS.find((item) => item.key === key);
     if (!p) return;
     const r = p.range();
+    setPeriodKey(key);
     setDataInicio(r.start);
     setDataFim(r.end);
     setFilters({ dataInicio: r.start, dataFim: r.end, placa, centro, tipoCusto, situacao, fornecedor, proprietario:"frota", valorMin, valorMax, search });
   };
 
-  const applyFilters = () => setFilters({ dataInicio, dataFim, placa, centro, tipoCusto, situacao, fornecedor, proprietario:"frota", valorMin, valorMax, search });
+  const applyFilters = () => {
+    if (!dataInicio || !dataFim || dataInicio > dataFim) {
+      setError("Informe um período válido: a data inicial não pode ser posterior à data final.");
+      return;
+    }
+    setError("");
+    setFilters({ dataInicio, dataFim, placa, centro, tipoCusto, situacao, fornecedor, proprietario:"frota", valorMin, valorMax, search });
+  };
   const clearFilters = () => {
-    const r = CV_PERIODS[1].range();
+    const r = CV_PERIODS.find((item) => item.key === "month").range();
+    setPeriodKey("month");
     setDataInicio(r.start); setDataFim(r.end); setPlaca(""); setCentro(""); setTipoCusto("todos"); setSituacao("todos"); setFornecedor(""); setValorMin(""); setValorMax(""); setSearch("");
     setFilters({ dataInicio: r.start, dataFim: r.end, proprietario: "frota" });
   };
@@ -335,12 +362,28 @@ const CustosVeiculos = () => {
     ? `Neste período, a frota acumulou ${cvBRL(s.custoTotal)} em custos. ${data.types[0].tipo} respondeu por ${(cvNum(data.types[0].custo) / Math.max(1, cvNum(s.custoTotal)) * 100).toFixed(1)}%, existem ${cvBRL(s.custoVencido)} vencidos e ${data.ranking[0].placa} foi o veículo com maior despesa.`
     : "Os indicadores serão resumidos assim que houver movimentação no período selecionado.";
   const selectedProfit = profitVehicles.find((item) => item.placa === placa);
-  const financial = modo === "veiculo" ? (selectedProfit || { receita: 0, custo: 0, lucro: 0, margem: 0 }) : {
+  const financial = modo === "veiculo" ? (selectedProfit || { receita: 0, custo: 0, lucro: 0, margem: null, distanciaKm: null, custoPorKm: null }) : {
     receita: profitSummary.receitaTotal,
     custo: profitSummary.custoTotal || s.custoTotal,
     lucro: profitSummary.lucroTotal,
     margem: profitSummary.margem,
+    distanciaKm: profitSummary.distanciaKm,
+    custoPorKm: profitSummary.custoPorKm,
   };
+  const managementCosts = [
+    { key: "operacional", label: "Operacionais", value: s.custoOperacional, note: "Operação direta da frota" },
+    { key: "financeiro", label: "Financeiros", value: s.custoFinanceiro, note: "Empréstimos, juros e consórcios" },
+    { key: "fixo", label: "Fixos", value: s.custoFixo, note: "Seguros, IPVA e licenciamento" },
+    { key: "extraordinario", label: "Extraordinários", value: s.custoExtraordinario, note: "Multas, sinistros e indenizações" },
+    { key: "nao_classificado", label: "Não classificados", value: s.custoNaoClassificado, note: "Requer revisão financeira" },
+  ];
+  const managementAlerts = [
+    profitSummary.veiculosCustoSemReceita > 0 && { tone: "crit", title: `${profitSummary.veiculosCustoSemReceita} veículos com custo e sem receita`, note: "Verifique o período da receita ou veículos parados." },
+    profitSummary.veiculosPrejuizo > 0 && { tone: "warn", title: `${profitSummary.veiculosPrejuizo} veículos no prejuízo`, note: "Ordene a tabela pelo resultado para investigar." },
+    cvNum(s.custoNaoClassificado) > 0 && { tone: "warn", title: `${cvBRL(s.custoNaoClassificado)} sem classificação`, note: "Revise as contas exibidas dentro de Outros." },
+    data.audit?.possiveisDivergenciasPlaca > 0 && { tone: "crit", title: `${data.audit.possiveisDivergenciasPlaca} divergências de placa`, note: "A associação entre lançamento e veículo requer conferência." },
+    data.audit?.veiculosTelemetriaParcial > 0 && { tone: "info", title: `${data.audit.veiculosTelemetriaParcial} veículos com telemetria parcial`, note: "O custo/km fica indisponível para evitar números incorretos." },
+  ].filter(Boolean).slice(0, 4);
   const compositionRows = data.launches.filter((row) => {
     const q = costSearch.trim().toLowerCase();
     return !q || `${row.tipoCusto} ${row.descricao} ${row.historico} ${row.fornecedor} ${row.documento}`.toLowerCase().includes(q);
@@ -369,7 +412,8 @@ const CustosVeiculos = () => {
             <button className={modo === "geral" ? "active" : ""} onClick={() => { setModo("geral"); setPlaca(""); setFilters((old) => ({ ...old, placa: "" })); }}>Visão geral</button>
             <button className={modo === "veiculo" ? "active" : ""} onClick={() => setModo("veiculo")}>Por veículo</button>
           </div>
-          <select className="btn cv-period-select" defaultValue="7d" onChange={(e)=>applyShortcut(e.target.value)} aria-label="Período rápido">
+          <select className="btn cv-period-select" value={periodKey} onChange={(e)=>applyShortcut(e.target.value)} aria-label="Período rápido">
+            {periodKey === "custom" && <option value="custom" disabled>Personalizado</option>}
             {CV_PERIODS.map((p)=><option key={p.key} value={p.key}>{p.label}</option>)}
           </select>
           <button className="btn" onClick={() => window.RB_API.getCustosVeiculos({ ...filters, limit: 5000 }).then((payload) => setData(cvNormalize(payload)))}><Icon name="refresh"/> Atualizar</button>
@@ -378,6 +422,11 @@ const CustosVeiculos = () => {
 
       <div className="cv-filters-clean card">
         <div className="cv-filter-title"><div><strong>Filtrar custos</strong><span>Escolha uma placa ou pesquise uma despesa</span></div><span className="cv-fleet-badge"><Icon name="truck" size={12}/> Somente frota própria</span></div>
+        <div className="cv-date-filter-row">
+          <label>Data inicial<input type="date" value={dataInicio} max={dataFim || undefined} onChange={(e)=>{setDataInicio(e.target.value);setPeriodKey("custom");}}/></label>
+          <label>Data final<input type="date" value={dataFim} min={dataInicio || undefined} onChange={(e)=>{setDataFim(e.target.value);setPeriodKey("custom");}}/></label>
+          <span className="muted">Período usado em todos os indicadores, gráficos e lançamentos.</span>
+        </div>
         <div className="cv-filter-main">
           <label>Placa<select value={placa} onChange={(e) => { const value=e.target.value; setPlaca(value); if(value)setModo("veiculo"); setFilters((old)=>({...old,placa:value,proprietario:"frota"})); setLaunchPage(1); }}><option value="">Toda a frota</option>{(options.placas||[]).map((item)=><option key={item} value={item}>{item}</option>)}</select></label>
           <label className="cv-search-field">Buscar despesa<input value={search} placeholder="Descrição, documento ou fornecedor" onChange={(e)=>setSearch(e.target.value)} onKeyDown={(e)=>e.key==="Enter"&&applyFilters()}/></label>
@@ -386,8 +435,6 @@ const CustosVeiculos = () => {
           <button className="btn ghost" onClick={clearFilters} title="Limpar filtros"><Icon name="x"/> Limpar</button>
         </div>
         {moreFilters && <div className="cv-filter-advanced">
-          <label>Data inicial<input type="date" value={dataInicio} onChange={(e)=>setDataInicio(e.target.value)}/></label>
-          <label>Data final<input type="date" value={dataFim} onChange={(e)=>setDataFim(e.target.value)}/></label>
           <label>Centro de custo<RBCombobox value={centro} onChange={setCentro} options={options.centros||[]} placeholder="Todos" getLabel={(c)=>c.codigo?`${c.codigo} - ${c.nome}`:c.nome} getValue={(c)=>c.codigo?`${c.codigo} - ${c.nome}`:c.nome} tag={()=>"Centro"}/></label>
           <label>Tipo de custo<select value={tipoCusto} onChange={(e)=>setTipoCusto(e.target.value)}><option value="todos">Todos</option>{(options.tipos||[]).map((t)=><option key={t} value={t}>{t}</option>)}</select></label>
           <label>Situação<select value={situacao} onChange={(e)=>setSituacao(e.target.value)}><option value="todos">Todas</option>{(options.situacoes||[]).map((st)=><option key={st} value={st}>{CV_STATUS[st]?.label||st}</option>)}</select></label>
@@ -412,10 +459,36 @@ const CustosVeiculos = () => {
       <>
         {modo === "veiculo" && !placa && <div className="card cv-select-vehicle"><Icon name="truck"/><div><strong>Selecione uma placa</strong><span>Use o campo Placa acima para abrir o raio-X financeiro do veículo.</span></div></div>}
         <div className="cv-financial-summary">
-          <CvKpi label="Receita" value={cvBRL(financial.receita)} sub={modo === "veiculo" ? placa || "Selecione uma placa" : "Receita da frota no período"} icon="trending-up" tone="#22c55e"/>
-          <CvKpi label="Custos" value={cvBRL(financial.custo)} sub={`${s.quantidadeLancamentos || 0} lançamentos rastreáveis`} icon="money" tone="#f59e0b"/>
-          <CvKpi label="Resultado" value={cvBRL(financial.lucro)} sub="Receita menos custos" icon="chart" tone={cvNum(financial.lucro) >= 0 ? "#22c55e" : "#ef4444"}/>
-          <CvKpi label="Margem" value={`${cvNum(financial.margem).toFixed(1)}%`} sub={selectedProfit?.custoPorKm ? `Custo/km ${cvBRL(selectedProfit.custoPorKm)}` : "Resultado sobre a receita"} icon="trending-up" tone={cvNum(financial.margem) >= 0 ? "#22c55e" : "#ef4444"}/>
+          <CvKpi label="Receita" value={cvBRL(financial.receita)} sub={modo === "veiculo" ? placa || "Selecione uma placa" : cvVariation(data.comparison?.receita, true)} icon="trending-up" tone="#22c55e"/>
+          <CvKpi label="Custos" value={cvBRL(financial.custo)} sub={modo === "veiculo" ? `${s.quantidadeLancamentos || 0} lançamentos rastreáveis` : cvVariation(data.comparison?.custo, false)} icon="money" tone="#f59e0b"/>
+          <CvKpi label="Resultado total" value={cvBRL(financial.lucro)} sub={modo === "veiculo" ? "Receita menos todos os custos" : cvVariation(data.comparison?.resultado, true)} icon="chart" tone={cvNum(financial.lucro) >= 0 ? "#22c55e" : "#ef4444"}/>
+          {modo === "geral" && <CvKpi label="Resultado operacional" value={cvBRL(profitSummary.resultadoOperacional)} sub={`Margem ${cvMargin(profitSummary.margemOperacional)}`} icon="chart" tone={cvNum(profitSummary.resultadoOperacional) >= 0 ? "#22c55e" : "#ef4444"}/>}
+          <CvKpi label="Margem" value={cvMargin(financial.margem)} sub={financial.receita > 0 ? "Resultado sobre a receita" : "Sem receita no período"} icon="trending-up" tone={financial.margem === null || financial.margem === undefined ? "#64748b" : cvNum(financial.margem) >= 0 ? "#22c55e" : "#ef4444"}/>
+          <CvKpi label="Distância" value={financial.distanciaKm > 0 ? `${Number(financial.distanciaKm).toLocaleString("pt-BR")} km` : "—"} sub="Telemetria com cobertura confirmada" icon="truck" tone="#3b82f6"/>
+          <CvKpi label="Custo por km" value={cvOptionalBRL(financial.custoPorKm)} sub={financial.custoPorKm === null || financial.custoPorKm === undefined ? "Sem cobertura completa" : "Custos ÷ km do período"} icon="speedometer" tone="#8b5cf6"/>
+        </div>
+
+        {!!managementAlerts.length && <div className="card cv-attention"><div className="section-head"><div><h2>Pontos de atenção</h2><div className="muted">Leitura automática do período selecionado</div></div></div><div className="cv-attention-grid">{managementAlerts.map((item, index) => <div className={`cv-management-alert ${item.tone}`} key={index}><Icon name="alert"/><span><strong>{item.title}</strong><small>{item.note}</small></span></div>)}</div></div>}
+
+        <details className="card cv-data-quality">
+          <summary>Qualidade dos dados <span className="muted">Abrir auditoria técnica</span></summary>
+          <div className="section-head"><div><h2>Qualidade dos dados</h2><div className="muted">Indicadores que afetam a confiança da análise</div></div><span className={`badge ${(data.audit?.possiveisDivergenciasPlaca || data.audit?.registrosSemPlaca) ? "warn" : "ok"}`}>{(data.audit?.possiveisDivergenciasPlaca || data.audit?.registrosSemPlaca) ? "Requer atenção" : "Sem divergências críticas"}</span></div>
+          <div className="cv-mini-list">
+            <div><span>Telemetria confirmada</span><strong>{data.audit?.veiculosTelemetriaConfirmada || 0}</strong><em>veículos</em></div>
+            <div><span>Cobertura parcial</span><strong>{data.audit?.veiculosTelemetriaParcial || 0}</strong><em>custo/km indisponível</em></div>
+            <div><span>Sem telemetria</span><strong>{data.audit?.veiculosSemTelemetria || 0}</strong><em>veículos</em></div>
+            <div><span>Sem placa</span><strong>{data.audit?.registrosSemPlaca || 0}</strong><em>lançamentos</em></div>
+            <div><span>Divergência placa/veículo</span><strong>{data.audit?.possiveisDivergenciasPlaca || 0}</strong><em>possíveis casos</em></div>
+          </div>
+        </details>
+
+        <div className="card cv-management-costs">
+          <div className="section-head"><div><h2>Natureza gerencial dos custos</h2><div className="muted">Separação para entender o que pertence à operação e o que pressiona o resultado total</div></div></div>
+          <div className="cv-mini-list">
+            {managementCosts.map((item) => <div key={item.key}><span>{item.label}</span><strong>{cvBRL(item.value)}</strong><em>{item.note}</em></div>)}
+          </div>
+          {cvNum(s.custoNaoClassificado) > 0 && <div className="cv-executive"><Icon name="alert"/><span><strong>{cvBRL(s.custoNaoClassificado)}</strong> ainda não possui classificação gerencial. Os lançamentos permanecem no resultado total e podem ser conferidos em “Outros”.</span></div>}
+          {!!data.otherBreakdown.length && <div className="cv-other-breakdown"><div className="section-head"><div><h3>O que está dentro de “Outros”</h3><div className="muted">Contas financeiras com maior impacto no período</div></div></div><div className="cv-mini-list">{data.otherBreakdown.slice(0, 6).map((item) => <div key={item.classificacao}><span>{item.classificacao}</span><strong>{cvBRL(item.custo)}</strong><em>{item.lancamentos} lançamentos</em></div>)}</div></div>}
         </div>
 
         <div className="card cv-composition">
@@ -434,7 +507,7 @@ const CustosVeiculos = () => {
           </div>
         </div>
 
-        {modo === "geral" && <div className="card"><div className="section-head"><div><h2>Resultado por veículo</h2><div className="muted">Receita, custos e resultado da frota no período</div></div><span className="muted">{profitVehicles.length} veículos</span></div><div className="table-wrap"><table className="data-table compact"><thead><tr><th>Placa</th><th>Veículo</th><th className="num">Receita</th><th className="num">Custos</th><th className="num">Resultado</th><th>Margem</th><th className="num">Custo/km</th><th>Ação</th></tr></thead><tbody>{profitVehicles.map((row) => <tr key={row.placa}><td><strong>{row.placa}</strong></td><td>{row.veiculoNome || "-"}</td><td className="num">{cvBRL(row.receita)}</td><td className="num">{cvBRL(row.custo)}</td><td className="num" style={{ color: cvNum(row.lucro) >= 0 ? "var(--ok)" : "var(--crit)" }}>{cvBRL(row.lucro)}</td><td>{cvNum(row.margem).toFixed(1)}%</td><td className="num">{cvBRL(row.custoPorKm)}</td><td><button className="btn" onClick={() => openVehicle(row.placa)}>Ver detalhes</button></td></tr>)}</tbody></table></div></div>}
+        {modo === "geral" && <div className="card"><div className="section-head"><div><h2>Resultado por veículo</h2><div className="muted">Receita, custos e resultado da frota no período</div></div><span className="muted">{profitVehicles.length} veículos</span></div><div className="table-wrap"><table className="data-table compact"><thead><tr><th>Placa</th><th>Veículo</th><th className="num">Receita</th><th className="num">Custos</th><th className="num">Resultado</th><th>Margem</th><th className="num">Distância</th><th className="num">Custo/km</th><th>Ação</th></tr></thead><tbody>{profitVehicles.map((row) => <tr key={row.placa}><td><strong>{row.placa}</strong></td><td>{row.veiculoNome || "-"}</td><td className="num">{cvBRL(row.receita)}</td><td className="num">{cvBRL(row.custo)}</td><td className="num" style={{ color: cvNum(row.lucro) >= 0 ? "var(--ok)" : "var(--crit)" }}>{cvBRL(row.lucro)}</td><td>{cvMargin(row.margem)}</td><td className="num" title={`Cobertura: ${row.coberturaTelemetria || "indisponível"}`}>{row.distanciaKm > 0 ? `${Number(row.distanciaKm).toLocaleString("pt-BR")} km` : "—"}</td><td className="num">{cvOptionalBRL(row.custoPorKm)}</td><td><button className="btn" onClick={() => openVehicle(row.placa)}>Ver detalhes</button></td></tr>)}</tbody></table></div></div>}
       </>
       )}
 
@@ -587,7 +660,8 @@ const CustosVeiculos = () => {
       </>
       )}
 
-      <div className="card" style={{ marginTop: 16 }}>
+      <details className="card cv-technical-audit" style={{ marginTop: 16 }}>
+        <summary>Auditoria completa <span className="muted">Origens e conferência técnica dos registros</span></summary>
         <div className="section-head">
           <div><h2>Auditoria dos dados</h2><div className="muted" style={{ fontSize: 12 }}>Resumo tecnico para conferencia em desenvolvimento</div></div>
           <span className="badge info">{data.audit?.registrosFiltrados || 0} registros</span>
@@ -601,7 +675,7 @@ const CustosVeiculos = () => {
           <div><span>Centro administrativo</span><strong>{data.audit?.registrosCentroAdministrativo || 0}</strong><em>na base filtrada</em></div>
           <div><span>Divergencias placa/veiculo</span><strong>{data.audit?.possiveisDivergenciasPlaca || 0}</strong><em>possiveis casos</em></div>
         </div>
-      </div>
+      </details>
 
       <CvDetailModal placa={detailPlate} filters={filters} onClose={() => setDetailPlate("")}/>
     </div>
