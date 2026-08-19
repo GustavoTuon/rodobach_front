@@ -499,6 +499,7 @@ const AcClienteModal = ({ row, onClose }) => {
           : "O faturamento permaneceu estável.";
   const detailFields = [
     ["Documento", row.documento || "—"], ["Recebido", acBRL(row.totalRecebido)],
+    ["Filiais consolidadas", row.quantidadeFiliais > 1 ? row.quantidadeFiliais : "—"],
     ["Em aberto", acBRL(row.totalAberto)], ["Vencido", acBRL(row.totalVencido)],
     ["Lançamentos", row.lancamentos], ["Ticket médio", acBRL(row.ticketMedio)],
     ["Primeiro faturamento", acDateFmt(row.primeiroFaturamento)],
@@ -527,6 +528,10 @@ const AcClienteModal = ({ row, onClose }) => {
         </div>
         <button className="ac-modal-more" onClick={()=>setShowDetails(v=>!v)}>{showDetails?"Ocultar informações financeiras":"Ver mais informações"}<span>{showDetails?"⌃":"⌄"}</span></button>
         {showDetails && <div className="ac-modal-details">{detailFields.map(([label,value])=><div key={label}><span>{label}</span><strong style={label==="Vencido"&&acNum(row.totalVencido)>0?{color:"#ef4444"}:{}}>{value}</strong></div>)}</div>}
+        {showDetails && row.quantidadeFiliais > 1 && <div style={{marginTop:14}}>
+          <div className="muted" style={{fontSize:10.5,marginBottom:6}}>CADASTROS CONSOLIDADOS PELO CNPJ RAIZ</div>
+          <div className="ac-modal-details">{row.filiais.map(f=><div key={f.codigo}><span>{f.codigo} · {f.nome}</span><strong>{acBRL(f.totalPeriodo)}</strong></div>)}</div>
+        </div>}
       </div>
     </div>
   );
@@ -1414,7 +1419,7 @@ const RankingClientes = () => {
   const [data, setData] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
-  const [rankTab, setRankTab] = React.useState("queda");
+  const [rankTab, setRankTab] = React.useState("top");
   const [search, setSearch] = React.useState("");
   const [selectedRow, setSelectedRow] = React.useState(null);
 
@@ -1422,7 +1427,7 @@ const RankingClientes = () => {
   React.useEffect(() => {
     let active = true;
     setLoading(true); setError("");
-    window.RB_API.getAnaliseClientes({ period: periodo, empresa })
+    window.RB_API.getAnaliseClientes({ period: periodo, empresa, incluirSemFaturamento: "1" })
       .then(payload => { if (active) setData(payload); })
       .catch(err => { if (active) { setData(null); setError(err?.message || "Não foi possível carregar o ranking."); } })
       .finally(() => { if (active) setLoading(false); });
@@ -1473,7 +1478,7 @@ const RankingClientes = () => {
     <div className="view">
       <AcClienteModal row={selectedRow} onClose={()=>setSelectedRow(null)}/>
       <div className="page-head">
-        <div><h1>Ranking e evolução</h1><div className="sub">Veja rapidamente quem cresceu e quem precisa de atenção</div></div>
+        <div><h1>Ranking e evolução</h1><div className="sub">Veja rapidamente quem cresceu e quem precisa de atenção · {acDateFmt(data?.period?.startDate)} a {acDateFmt(data?.period?.endDate)}</div></div>
         <div className="actions">
           {AC_PERIODS.map(p => <button key={p.key} className={`btn${periodo===p.key?" primary":""}`} onClick={()=>setPeriodo(p.key)}>{p.label}</button>)}
           <select className="btn" value={empresa} onChange={e=>setEmpresa(e.target.value)} aria-label="Empresa">
@@ -1507,7 +1512,7 @@ const RankingClientes = () => {
             const max=Math.max(1,current,previous);
             return <button key={c.codigo || i} className="ac-ranking-row" onClick={()=>setSelectedRow(c)}>
               <span className="ac-ranking-position">{i+1}</span>
-              <span className="ac-ranking-name"><strong>{c.nome}</strong><small><span style={{color:st.color,fontWeight:700}}>{st.symbol} {st.label}</span>{c.diasSemFaturar!=null&&acNum(c.diasSemFaturar)>30?<span style={{color:"#fbbf24"}}> · Atenção: última fatura há {c.diasSemFaturar} dias</span>:c.diasSemFaturar!=null?` · última fatura há ${c.diasSemFaturar} dias`:""}</small></span>
+              <span className="ac-ranking-name"><strong>{c.nome}</strong><small><span style={{color:st.color,fontWeight:700}}>{st.symbol} {st.label}</span>{acNum(c.quantidadeFiliais)>1?<span> · empresa consolidada: {c.quantidadeFiliais} filiais</span>:null}{c.diasSemFaturar!=null&&acNum(c.diasSemFaturar)>30?<span style={{color:"#fbbf24"}}> · Atenção: última fatura há {c.diasSemFaturar} dias</span>:c.diasSemFaturar!=null?` · última fatura há ${c.diasSemFaturar} dias`:""}</small></span>
               <span className="ac-ranking-bars">
                 <small>Atual <b>{acBRL(current)}</b></small><i><em style={{width:`${current/max*100}%`,background:st.color}}/></i>
                 <small>Anterior <b>{acBRL(previous)}</b></small><i><em style={{width:`${previous/max*100}%`,background:"#64748b"}}/></i>

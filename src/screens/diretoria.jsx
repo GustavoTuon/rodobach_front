@@ -364,9 +364,9 @@ const Diretoria = ({ onNavigate }) => {
         <DirCard title="Acesso rapido" meta="Aprofundar analise">
           <div className="dir-links">
             <button className="dir-link" onClick={() => onNavigate("dre-empresarial")}><span><Icon name="chart"/>DRE Empresarial</span><em>resultado e contas</em></button>
-            <button className="dir-link" onClick={() => onNavigate("custos-veiculos")}><span><Icon name="truck"/>Custos da frota</span><em>custos, manutenção e placas</em></button>
+            <button className="dir-link" onClick={() => onNavigate("resultado-veiculos")}><span><Icon name="truck"/>Resultado por veículo</span><em>receita, custos e lucro da frota</em></button>
             <button className="dir-link" onClick={() => onNavigate("clientes")}><span><Icon name="user"/>Clientes</span><em>faturamento e lucro</em></button>
-            <button className="dir-link" onClick={() => onNavigate("custos-veiculos")}><span><Icon name="wrench"/>Manutencoes</span><em>custos e lancamentos</em></button>
+            <button className="dir-link" onClick={() => onNavigate("resultado-veiculos")}><span><Icon name="wrench"/>Custos e lançamentos</span><em>detalhes por veículo e carreta</em></button>
           </div>
         </DirCard>
       </div>

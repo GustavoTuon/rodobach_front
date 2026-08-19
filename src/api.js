@@ -165,6 +165,7 @@ window.RB_API = {
   saveControleMultaFrota: (empresa, codigo, payload) => apiRequest(`/frota/multas/${encodeURIComponent(empresa)}/${encodeURIComponent(codigo)}/controle`, { method: "PUT", body: JSON.stringify(payload) }),
   getAuditoriaMultaFrota: (empresa, codigo) => apiRequest(`/frota/multas/${encodeURIComponent(empresa)}/${encodeURIComponent(codigo)}/auditoria`),
   getCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos${buildQuery(filters || {})}`),
+  getResultadoVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos/resultado${buildQuery(filters || {})}`),
   getAuditoriaCustosVeiculos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos/auditoria${buildQuery(filters || {})}`),
   getCustosVeiculosFiltros: () => apiRequest("/financeiro/custos-veiculos/filtros"),
   getCustosVeiculoDetalhe: (placa, filters = {}) => apiRequest(`/financeiro/custos-veiculos/${encodeURIComponent(placa)}${buildQuery(filters || {})}`),
@@ -176,6 +177,7 @@ window.RB_API = {
     return apiRequest(`/financeiro/dre-empresarial${buildQuery(params)}`);
   },
   getFluxoCaixa: (filters = {}) => apiRequest(`/financeiro/fluxo-caixa${buildQuery(filters || {})}`),
+  getDespesasFuturas: (filters = {}) => apiRequest(`/financeiro/despesas-futuras${buildQuery(filters || {})}`),
   getDreLancamentoDetalhe: (detailKey = {}) =>
     apiRequest(`/financeiro/dre-empresarial/lancamento-detalhe${buildQuery(detailKey)}`),
   getTrafegusDashboard: () => apiRequest("/trafegus/dashboard"),

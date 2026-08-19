@@ -241,6 +241,7 @@ const DreEmpresarial = () => {
     });
     return {
       placa: selectedPlate,
+      modelo: rows.find((row) => row.veiculoModelo)?.veiculoModelo || rows.find((row) => row.veiculoNome)?.veiculoNome || "Modelo não informado",
       receita,
       custo,
       lucro: receita - custo,
@@ -693,7 +694,7 @@ const DreEmpresarial = () => {
             <div className="card-header" style={{borderBottom:"1px solid var(--divider)"}}>
               <div>
                 <h3>Detalhamento da placa {selectedPlateDetail.placa}</h3>
-                <span className="meta muted">Recebimentos, rotas e custos resumidos por tipo</span>
+                <span className="meta muted"><strong style={{color:"var(--text-2)"}}>{selectedPlateDetail.modelo}</strong> · Recebimentos, rotas e custos resumidos por tipo</span>
               </div>
               <button className="icon-btn" onClick={() => setSelectedPlate(null)} title="Fechar"><Icon name="x"/></button>
             </div>

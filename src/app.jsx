@@ -13,9 +13,10 @@ const SCREEN_SCRIPTS = [
   "src/screens/oportunidades-retorno.jsx",
   "src/screens/dre-empresarial.jsx",
   "src/screens/fluxo-caixa.jsx",
+  "src/screens/despesas-futuras.jsx",
   "src/screens/analise-frota.jsx",
   "src/screens/precos-combustivel.jsx",
-  "src/screens/custos-veiculos.jsx?v=20260803-redesign",
+  "src/screens/resultado-veiculos.jsx",
   "src/screens/manutencoes-veiculos.jsx?v=20260803-bi-redesign",
   "src/screens/analise-clientes.jsx",
   "src/screens/rentabilidade-clientes.jsx",
@@ -35,8 +36,8 @@ const SCREEN_SCRIPTS = [
 const SCREEN_GLOBALS = [
   "Diretoria", "SimuladorFrete", "Viagens", "FolgasMotoristas",
   "StatusCargaFrota", "Trafegus", "OportunidadesRetorno",
-  "DreEmpresarial", "FluxoCaixa", "AnaliseClientes", "RankingClientes",
-  "RentabilidadeClientes", "LucroViagens", "ResultadoFretes", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "ManutencaoPosicoesScreen", "Pneus", "MultasFrota", "CustosVeiculos", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n", "ConsultaCte", "ControleCanhotos",
+  "DreEmpresarial", "FluxoCaixa", "DespesasFuturas", "AnaliseClientes", "RankingClientes",
+  "RentabilidadeClientes", "LucroViagens", "ResultadoFretes", "ResultadoVeiculos", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "ManutencaoPosicoesScreen", "Pneus", "MultasFrota", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n", "ConsultaCte", "ControleCanhotos",
 ];
 const SCREEN_MODULES = import.meta.glob("./screens/*.jsx");
 
@@ -47,17 +48,18 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 
 const NAV = [
   { id: "diretoria",       label: "Diretoria",    icon: "dashboard",   title: "Resumo executivo", section: "direcao" },
-  { id: "dre-empresarial", label: "DRE Emp.",     icon: "chart",       title: "DRE Empresarial", subgroup: "financeiro", section: "direcao" },
-  { id: "fluxo-caixa", label: "Fluxo de Caixa", icon: "money", title: "Fluxo de Caixa", subgroup: "financeiro", section: "direcao" },
-  { id: "faturamento-diario", label: "Fat. Diário", icon: "chart",     title: "Faturamento Diário", subgroup: "financeiro", section: "direcao" },
-  { id: "comparativo-faturamento", label: "Comp. Mensal", icon: "chart", title: "Comparativo Mensal", subgroup: "financeiro", section: "direcao" },
-  { id: "custos-veiculos", label: "Custos e prejuízo", icon: "chart", title: "Custos e Prejuízo da Frota", subgroup: "financeiro", section: "direcao" },
-  { id: "abastecimentos",  label: "Abastecimentos", icon: "fuel",       title: "Análise de Abastecimentos", section: "direcao" },
-  { id: "precos-combustivel", label: "Preços Postos", icon: "money",     title: "Preços combinados de combustível", section: "direcao" },
-  { id: "lucro-viagens",   label: "Res. Viagem",  icon: "route",       title: "Resultado por Viagem", group: "resultados", section: "direcao" },
-  { id: "clientes",        label: "Análise",      icon: "user",        title: "Análise de Clientes", group: "clientes", section: "direcao" },
-  { id: "clientes-ranking",label: "Ranking",      icon: "chart",       title: "Ranking e evolução de Clientes", group: "clientes", section: "direcao", permission: "clientes" },
-  { id: "clientes-lucro",  label: "Lucro",        icon: "chart",       title: "Rentabilidade Clientes", group: "clientes", section: "direcao" },
+  { id: "dre-empresarial", label: "DRE Empresarial", icon: "chart", title: "DRE Empresarial", subgroup: "financeiro", section: "financeiro" },
+  { id: "fluxo-caixa", label: "Fluxo de Caixa", icon: "money", title: "Fluxo de Caixa", subgroup: "financeiro", section: "financeiro" },
+  { id: "despesas-futuras", label: "Despesas Futuras", icon: "clock", title: "Despesas Futuras", subgroup: "financeiro", section: "financeiro", permission: "fluxo-caixa" },
+  { id: "faturamento-diario", label: "Faturamento Diário", icon: "chart", title: "Faturamento Diário", subgroup: "financeiro", section: "financeiro" },
+  { id: "comparativo-faturamento", label: "Comparativo Mensal", icon: "chart", title: "Comparativo Mensal", subgroup: "financeiro", section: "financeiro" },
+  { id: "resultado-veiculos", label: "Resultado por Veículo", icon: "truck", title: "Resultado por Veículo", subgroup: "financeiro", section: "financeiro", permission: "custos-veiculos" },
+  { id: "lucro-viagens", label: "Resultado por Viagem", icon: "route", title: "Resultado por Viagem", group: "resultados", section: "financeiro" },
+  { id: "clientes", label: "Análise", icon: "user", title: "Análise de Clientes", group: "clientes", section: "financeiro" },
+  { id: "clientes-ranking",label: "Ranking", icon: "chart", title: "Ranking e evolução de Clientes", group: "clientes", section: "financeiro", permission: "clientes" },
+  { id: "clientes-lucro", label: "Lucro", icon: "chart", title: "Rentabilidade Clientes", group: "clientes", section: "financeiro" },
+  { id: "abastecimentos", label: "Abastecimentos", icon: "fuel", title: "Análise de Abastecimentos", subgroup: "frota", section: "frota" },
+  { id: "precos-combustivel", label: "Preços dos Postos", icon: "money", title: "Preços combinados de combustível", subgroup: "frota", section: "frota" },
   { id: "simulador",       label: "Calculadora",  icon: "calculator",  title: "Calculadora de Frete ANTT", section: "operacao" },
   { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações", section: "operacao" },
   { id: "folgas-motoristas", label: "Folgas",      icon: "user",        title: "Jornada e Folgas dos Motoristas", section: "operacao" },
@@ -66,11 +68,11 @@ const NAV = [
   { id: "oportunidades-retorno", label: "Retorno", icon: "route", title: "Clientes próximos e carga de retorno", section: "operacao" },
   { id: "consulta-cte", label: "Consultar NF-e", icon: "search", title: "Consulta de chave da NF-e", section: "operacao" },
   { id: "controle-canhotos", label: "Canhotos", icon: "check", title: "Controle de canhotos", section: "operacao" },
-  { id: "pneus",           label: "Pneus",        icon: "truck",       title: "Movimentação de Pneus", subgroup: "frota", section: "operacao" },
-  { id: "multas-frota", label: "Multas", icon: "alert", title: "Controle de Multas da Frota", subgroup: "frota", section: "operacao" },
-  { id: "manutencao-posicoes", label: "Peças por posição", icon: "wrench", title: "Manutenção por posição", subgroup: "frota", section: "operacao" },
-  { id: "manutencao",      label: "Automações",   icon: "bell",        title: "Automação de Manutenção", subgroup: "frota", section: "operacao" },
-  { id: "automacoes-n8n",  label: "n8n",          icon: "plug",        title: "Automações n8n", sistema: true },
+  { id: "pneus", label: "Pneus", icon: "truck", title: "Movimentação de Pneus", subgroup: "frota", section: "frota" },
+  { id: "multas-frota", label: "Multas", icon: "alert", title: "Controle de Multas da Frota", subgroup: "frota", section: "frota" },
+  { id: "manutencao-posicoes", label: "Manutenções", icon: "wrench", title: "Manutenção por posição", subgroup: "frota", section: "frota" },
+  { id: "manutencao", label: "Alertas de Manutenção", icon: "bell", title: "Automação de Manutenção", subgroup: "frota", section: "frota" },
+  { id: "automacoes-n8n", label: "Automações n8n", icon: "plug", title: "Automações n8n", section: "ferramentas" },
   { id: "settings",        label: "Configurações", icon: "settings",   title: "Configurações",    sistema: true },
   { id: "usuarios",        label: "Usuários",     icon: "user",        title: "Gerenciar Usuários", sistema: true, adminOnly: true },
 ];
@@ -79,8 +81,11 @@ const BASE_NAV = NAV;
 const DEFAULT_SCREEN = "diretoria";
 
 const NAV_SECTION_LABELS = {
-  direcao: "Direção",
+  direcao: "Visão geral",
+  financeiro: "Financeiro",
   operacao: "Operação",
+  frota: "Frota",
+  ferramentas: "Ferramentas",
 };
 
 const NAV_GROUPS = {
@@ -327,6 +332,9 @@ const App = () => {
     case "fluxo-caixa":
       body = <FluxoCaixa onNavigate={onNavigate}/>;
       break;
+    case "despesas-futuras":
+      body = <DespesasFuturas onNavigate={onNavigate}/>;
+      break;
     case "abastecimentos":
       body = <AnaliseFrota key="abastecimentos" onNavigate={onNavigate} modoAbastecimento/>;
       break;
@@ -352,8 +360,8 @@ const App = () => {
     case "comparativo-faturamento":
       body = <ComparativoFaturamento onNavigate={onNavigate}/>;
       break;
-    case "custos-veiculos":
-      body = <CustosVeiculos onNavigate={onNavigate}/>;
+    case "resultado-veiculos":
+      body = <ResultadoVeiculos onNavigate={onNavigate}/>;
       break;
     case "manutencoes-veiculos":
       body = <ManutencoesVeiculos onNavigate={onNavigate}/>;
@@ -463,7 +471,7 @@ const App = () => {
             return (
               <div className="nav-section" key={section}>
                 <div className="nav-label">{label}</div>
-                {renderNavItems(items.filter(item => !item.subgroup && (section !== "direcao" || item.id === "diretoria")))}
+                {renderNavItems(items.filter(item => !item.subgroup && section !== "financeiro" && (section !== "direcao" || item.id === "diretoria")))}
                 {items.some(item => item.subgroup === "financeiro") && <button
                   type="button"
                   className={`nav-item nav-flyout-trigger ${items.some(item => item.subgroup === "financeiro" && item.id === currentScreen) ? "active" : ""}`}
@@ -476,6 +484,7 @@ const App = () => {
                     setFinanceiroMenu({ left: rect.right + 7, top: Math.max(8, Math.min(rect.top, window.innerHeight - 180)) });
                   }}
                 ><Icon name="chart"/><span className="lbl">Financeiro</span><Icon name="chevron-right" size={13}/></button>}
+                {section === "financeiro" && renderNavItems(items.filter(item => !item.subgroup))}
                 {section === "direcao" && renderNavItems(items.filter(item => !item.subgroup && item.id !== "diretoria"))}
                 {items.some(item => item.subgroup === "frota") && <button
                   type="button"
@@ -494,7 +503,7 @@ const App = () => {
           })}
 
           <div className="nav-section">
-            <div className="nav-label">Sistema</div>
+            <div className="nav-label">Administração</div>
             {renderNavItems(sidebarNav.filter(n => n.sistema))}
           </div>
         </div>
