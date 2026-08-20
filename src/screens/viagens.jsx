@@ -50,6 +50,45 @@ const VG_PERIODS = [
   { key: "mes-ant", label: "Mês anterior", gr: vgPrevMonth },
   { key: "custom", label: "Personalizado", gr: null },
 ];
+const VG_UFS = [
+  "AC",
+  "AL",
+  "AP",
+  "AM",
+  "BA",
+  "CE",
+  "DF",
+  "ES",
+  "GO",
+  "MA",
+  "MT",
+  "MS",
+  "MG",
+  "PA",
+  "PB",
+  "PR",
+  "PE",
+  "PI",
+  "RJ",
+  "RN",
+  "RS",
+  "RO",
+  "RR",
+  "SC",
+  "SP",
+  "SE",
+  "TO",
+];
+const COMMERCIAL_BY_LOGIN = {
+  maicon: "MAICON STEINBACH",
+  mauricio: "MAURICIO STEINBACK",
+};
+const commercialForUser = (user) =>
+  COMMERCIAL_BY_LOGIN[
+    String(user?.login || "")
+      .trim()
+      .toLowerCase()
+  ] || "";
 
 const SITUACOES = {
   faltando_dados: { label: "Faltando Dados", cls: "warn" },
@@ -837,8 +876,11 @@ const Viagens = ({ onNavigate, user }) => {
   const [filtroSit, setFiltroSit] = useState("todos");
   const [fCliente, setFCliente] = useState("");
   const [fOrigem, setFOrigem] = useState("");
+  const [fUfOrigem, setFUfOrigem] = useState("");
   const [fDestino, setFDestino] = useState("");
+  const [fUfDestino, setFUfDestino] = useState("");
   const [fMaterial, setFMaterial] = useState("");
+  const [fVendedor, setFVendedor] = useState("");
   const [fPeriodo, setFPeriodo] = useState("30d");
   const [fDataInicio, setFDataInicio] = useState(() => vgDaysAgo(29));
   const [fDataFim, setFDataFim] = useState(() => vgToday());
@@ -972,6 +1014,7 @@ const Viagens = ({ onNavigate, user }) => {
             ? sim.valorMotorista.toFixed(2)
             : "",
           valorCliente: sim.valorCliente ? sim.valorCliente.toFixed(2) : "",
+          vendedor: commercialForUser(user),
         }),
       );
       setStep(1);
@@ -1024,16 +1067,23 @@ const Viagens = ({ onNavigate, user }) => {
     if (!Array.isArray(items) || items.length === 0) return;
     setOpcoes((prev) => {
       const current = prev.detalhes?.[key] || [];
-      const byLabel = new Map(
-        current.map((item) => [
-          String(item.placa || item.nome || item.label || "").toLowerCase(),
-          item,
-        ]),
-      );
+      const identity = (item) =>
+        key === "clientes"
+          ? String(
+              item.documento ||
+                item.cnpj ||
+                item.cpf ||
+                item.codigo ||
+                item.nome ||
+                item.label ||
+                "",
+            ).toLowerCase()
+          : String(
+              item.placa || item.nome || item.label || item.codigo || "",
+            ).toLowerCase();
+      const byLabel = new Map(current.map((item) => [identity(item), item]));
       items.forEach((item) => {
-        const label = String(
-          item.placa || item.nome || item.label || "",
-        ).toLowerCase();
+        const label = identity(item);
         if (label) byLabel.set(label, { ...byLabel.get(label), ...item });
       });
       const labels = items
@@ -1107,28 +1157,39 @@ const Viagens = ({ onNavigate, user }) => {
   };
 
   const applyCliente = (field, value) => {
-    const item = (opcoes.detalhes?.clientes || []).find(
-      (c) =>
-        String(c.nome || "").toLowerCase() ===
-        String(value || "").toLowerCase(),
-    );
+    const item =
+      value && typeof value === "object"
+        ? value
+        : (opcoes.detalhes?.clientes || []).find(
+            (c) =>
+              String(c.nome || "").toLowerCase() ===
+              String(value || "").toLowerCase(),
+          );
     if (!item) return;
     if (VIAGENS_FORM_DEBUG)
       console.debug("[Viagens][autocomplete cliente]", {
         campo: field,
-        selecionado: value,
+        selecionado: item.documento || item.nome,
         preenchido: item,
       });
     setForm((prev) => {
+      const shouldFillOrigin = Boolean(item.cidade) && field === "cliente";
       const shouldFillDestination =
-        Boolean(item.cidade) &&
-        (field === "clienteFinal" ||
-          (field === "cliente" && !prev.clienteFinal && !prev.destino));
+        Boolean(item.cidade) && field === "clienteFinal";
       return {
         ...prev,
         [field]: item.nome || prev[field],
-        condicaoPagamento: item.condicaoPagamento || prev.condicaoPagamento,
+        condicaoPagamento:
+          field === "tomadorServico"
+            ? item.condicaoPagamento || prev.condicaoPagamento
+            : prev.condicaoPagamento,
         vendedor: item.vendedor || prev.vendedor,
+        origem: shouldFillOrigin ? item.cidade : prev.origem,
+        ufOrigem: shouldFillOrigin
+          ? String(item.uf || "")
+              .toUpperCase()
+              .slice(0, 2)
+          : prev.ufOrigem,
         destino: shouldFillDestination ? item.cidade : prev.destino,
         ufDestino: shouldFillDestination
           ? String(item.uf || "")
@@ -1156,6 +1217,17 @@ const Viagens = ({ onNavigate, user }) => {
         .filter(Boolean)
         .join(" "),
     ).toLowerCase();
+
+  const clientOptionDetail = (item = {}) =>
+    [
+      item.razaoSocial && item.razaoSocial !== item.nome
+        ? item.razaoSocial
+        : "",
+      item.documento || item.cnpj || item.cpf || "",
+      !item.documento && !item.cnpj && !item.cpf ? item.cidade || "" : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
 
   const filterAutocompleteOptions = (items, value, limit = 30) => {
     const q = String(value || "")
@@ -1363,6 +1435,7 @@ const Viagens = ({ onNavigate, user }) => {
     !isFleetVehicle && !form.motorista && "motorista",
     !form.cliente && "cliente",
     !form.material && "material/carga",
+    !form.vendedor && "vendedor responsável",
     !form.valorCliente && "valor do cliente",
     !isFleetVehicle && !form.valorMotorista && "valor do motorista",
   ].filter(Boolean);
@@ -1378,7 +1451,9 @@ const Viagens = ({ onNavigate, user }) => {
 
   const openNew = () => {
     const num = `V-${new Date().getFullYear()}-${String(nextId.current).padStart(3, "0")}`;
-    setForm(normalizeViagemForm({ numero: num }));
+    setForm(
+      normalizeViagemForm({ numero: num, vendedor: commercialForUser(user) }),
+    );
     setStep(1);
     setMode("form");
   };
@@ -1433,7 +1508,9 @@ const Viagens = ({ onNavigate, user }) => {
       return saved;
     } catch (error) {
       console.error("Não foi possível salvar a viagem no servidor.", error);
-      window.alert(`A viagem não foi salva. ${error?.message || "Verifique a conexão e tente novamente."}`);
+      window.alert(
+        `A viagem não foi salva. ${error?.message || "Verifique a conexão e tente novamente."}`,
+      );
       return null;
     }
   };
@@ -1702,8 +1779,11 @@ const Viagens = ({ onNavigate, user }) => {
     const f = { limit: 500 };
     if (fCliente.trim()) f.cliente = fCliente.trim();
     if (fOrigem.trim()) f.origem = fOrigem.trim();
+    if (fUfOrigem) f.ufOrigem = fUfOrigem;
     if (fDestino.trim()) f.destino = fDestino.trim();
+    if (fUfDestino) f.ufDestino = fUfDestino;
     if (fMaterial.trim()) f.material = fMaterial.trim();
+    if (fVendedor.trim()) f.vendedor = fVendedor.trim();
     if (fDataInicio) f.dataInicio = fDataInicio;
     if (fDataFim) f.dataFim = fDataFim;
     setAppliedFilters(f);
@@ -1712,8 +1792,11 @@ const Viagens = ({ onNavigate, user }) => {
     const r = VG_PERIODS.find((x) => x.key === "30d").gr();
     setFCliente("");
     setFOrigem("");
+    setFUfOrigem("");
     setFDestino("");
+    setFUfDestino("");
     setFMaterial("");
+    setFVendedor("");
     setFPeriodo("30d");
     setFDataInicio(r.s);
     setFDataFim(r.e);
@@ -1933,21 +2016,40 @@ const Viagens = ({ onNavigate, user }) => {
               }}
             >
               Filtros
-              {[fCliente, fOrigem, fDestino, fMaterial].filter((x) => x.trim())
-                .length > 0 && (
+              {[
+                fCliente,
+                fOrigem,
+                fUfOrigem,
+                fDestino,
+                fUfDestino,
+                fMaterial,
+                fVendedor,
+              ].filter((x) => x.trim()).length > 0 && (
                 <span
                   className="badge info"
                   style={{ marginLeft: 8, fontSize: 10 }}
                 >
                   {
-                    [fCliente, fOrigem, fDestino, fMaterial].filter((x) =>
-                      x.trim(),
-                    ).length
+                    [
+                      fCliente,
+                      fOrigem,
+                      fUfOrigem,
+                      fDestino,
+                      fUfDestino,
+                      fMaterial,
+                      fVendedor,
+                    ].filter((x) => x.trim()).length
                   }{" "}
                   ativo
-                  {[fCliente, fOrigem, fDestino, fMaterial].filter((x) =>
-                    x.trim(),
-                  ).length > 1
+                  {[
+                    fCliente,
+                    fOrigem,
+                    fUfOrigem,
+                    fDestino,
+                    fUfDestino,
+                    fMaterial,
+                    fVendedor,
+                  ].filter((x) => x.trim()).length > 1
                     ? "s"
                     : ""}
                 </span>
@@ -1958,7 +2060,7 @@ const Viagens = ({ onNavigate, user }) => {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(4,1fr)",
+              gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))",
               gap: 10,
               marginBottom: 10,
             }}
@@ -1981,12 +2083,30 @@ const Viagens = ({ onNavigate, user }) => {
                 detail: "Origem",
               },
               {
+                label: "UF origem",
+                val: fUfOrigem,
+                set: setFUfOrigem,
+                key: "vg-uf-ori",
+                opts: VG_UFS,
+                detail: "UF origem",
+                select: true,
+              },
+              {
                 label: "Destino",
                 val: fDestino,
                 set: setFDestino,
                 key: "vg-dest",
                 opts: opcoes.destinos,
                 detail: "Destino",
+              },
+              {
+                label: "UF destino",
+                val: fUfDestino,
+                set: setFUfDestino,
+                key: "vg-uf-dest",
+                opts: VG_UFS,
+                detail: "UF destino",
+                select: true,
               },
               {
                 label: "Material",
@@ -1996,7 +2116,15 @@ const Viagens = ({ onNavigate, user }) => {
                 opts: opcoes.materiais,
                 detail: "Material",
               },
-            ].map(({ label, val, set, key, opts, detail }) => (
+              {
+                label: "Vendedor",
+                val: fVendedor,
+                set: setFVendedor,
+                key: "vg-vendedor",
+                opts: opcoes.vendedores,
+                detail: "Vendedor",
+              },
+            ].map(({ label, val, set, key, opts, detail, select }) => (
               <div key={label}>
                 <div
                   style={{
@@ -2008,19 +2136,47 @@ const Viagens = ({ onNavigate, user }) => {
                 >
                   {label}
                 </div>
-                <AutoField
-                  value={val}
-                  activeKey={key}
-                  placeholder="Todos"
-                  options={filterAutocompleteOptions(
-                    simpleAutoOptions(opts),
-                    val,
-                  )}
-                  optionKey={(item, index) => item.label || index}
-                  onChange={set}
-                  onSelect={(item) => selectFilterOption(set, item)}
-                  renderOption={(item) => renderSimpleAutoOption(item, detail)}
-                />
+                {select ? (
+                  <select
+                    value={val}
+                    onChange={(event) => set(event.target.value)}
+                    aria-label={label}
+                    style={{
+                      width: "100%",
+                      height: 31,
+                      padding: "0 9px",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--r)",
+                      background: "var(--surface)",
+                      color: "var(--text)",
+                      fontSize: 12,
+                      outline: "none",
+                    }}
+                  >
+                    <option value="">Todos</option>
+                    {opts.map((uf) => (
+                      <option key={uf} value={uf}>
+                        {uf}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <AutoField
+                    value={val}
+                    activeKey={key}
+                    placeholder="Todos"
+                    options={filterAutocompleteOptions(
+                      simpleAutoOptions(opts),
+                      val,
+                    )}
+                    optionKey={(item, index) => item.label || index}
+                    onChange={set}
+                    onSelect={(item) => selectFilterOption(set, item)}
+                    renderOption={(item) =>
+                      renderSimpleAutoOption(item, detail)
+                    }
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -2383,7 +2539,16 @@ const Viagens = ({ onNavigate, user }) => {
                               </small>
                             )}
                           {v.atualizadoPor && (
-                            <small className="vg-approved-by" title={v.atualizadoEm ? new Date(v.atualizadoEm).toLocaleString("pt-BR") : ""}>
+                            <small
+                              className="vg-approved-by"
+                              title={
+                                v.atualizadoEm
+                                  ? new Date(v.atualizadoEm).toLocaleString(
+                                      "pt-BR",
+                                    )
+                                  : ""
+                              }
+                            >
                               alterado por {v.atualizadoPor}
                             </small>
                           )}
@@ -2805,7 +2970,8 @@ const Viagens = ({ onNavigate, user }) => {
                           color: "var(--text-2)",
                         }}
                       >
-                        O motorista foi sugerido pelo cadastro da placa. Se outra pessoa fizer esta viagem, altere no campo abaixo.
+                        O motorista foi sugerido pelo cadastro da placa. Se
+                        outra pessoa fizer esta viagem, altere no campo abaixo.
                       </div>
                     )}
                   </div>
@@ -2834,33 +3000,54 @@ const Viagens = ({ onNavigate, user }) => {
         </Fg>
         {isFleetVehicle && (
           <Fg label="Motorista desta viagem">
-            <input list="motoristas-frota-list" style={fs} value={form.motorista}
-              onChange={(e) => { const value=e.target.value; setF("motorista",value); searchAutocomplete("motoristas",value); applyMotorista(value); }}
-              placeholder="Pode trocar o motorista sugerido" />
-            <datalist id="motoristas-frota-list">{opcoes.motoristas.map((m)=><option key={m} value={m}/>)}</datalist>
-            <div className="muted" style={{fontSize:11,marginTop:5}}>A alteração vale apenas para esta viagem.</div>
+            <input
+              list="motoristas-frota-list"
+              style={fs}
+              value={form.motorista}
+              onChange={(e) => {
+                const value = e.target.value;
+                setF("motorista", value);
+                searchAutocomplete("motoristas", value);
+                applyMotorista(value);
+              }}
+              placeholder="Pode trocar o motorista sugerido"
+            />
+            <datalist id="motoristas-frota-list">
+              {opcoes.motoristas.map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+            <div className="muted" style={{ fontSize: 11, marginTop: 5 }}>
+              A alteração vale apenas para esta viagem.
+            </div>
           </Fg>
         )}
-        <Fg label="Vendedor (opcional)">
-          <AutoField
+        <Fg label="Vendedor responsável">
+          <select
+            style={fs}
             value={form.vendedor}
-            activeKey="vendedor"
-            placeholder="Nome do vendedor"
-            options={filterAutocompleteOptions(
-              simpleAutoOptions(opcoes.vendedores),
-              form.vendedor,
-            )}
-            optionKey={(item, index) => item.label || index}
-            onChange={(value) => {
-              setF("vendedor", value);
-              searchAutocomplete("vendedores", value);
-            }}
-            onSelect={(item) => {
-              setF("vendedor", item.label || item.nome || "");
-              setActiveAuto("");
-            }}
-            renderOption={(item) => renderSimpleAutoOption(item, "Vendedor")}
-          />
+            disabled={Boolean(commercialForUser(user))}
+            onChange={(event) => setF("vendedor", event.target.value)}
+          >
+            <option value="">Selecione o vendedor</option>
+            {[
+              ...new Set([
+                ...Object.values(COMMERCIAL_BY_LOGIN),
+                form.vendedor,
+              ]),
+            ]
+              .filter(Boolean)
+              .map((seller) => (
+                <option key={seller} value={seller}>
+                  {seller}
+                </option>
+              ))}
+          </select>
+          {commercialForUser(user) && (
+            <div className="muted" style={{ fontSize: 11, marginTop: 5 }}>
+              Preenchido automaticamente pelo usuário conectado.
+            </div>
+          )}
         </Fg>
       </div>
 
@@ -3124,12 +3311,25 @@ const Viagens = ({ onNavigate, user }) => {
             >
               Paradas / Entregas ({form.paradas.length})
             </div>
-            <div className="row" style={{gap:6}}>
-              <button className="btn" style={{padding:"4px 10px",fontSize:12,borderColor:"#60a5fa",color:"#60a5fa"}} onClick={addTrocaNota}>
-                <Icon name="file" size={12}/> Troca de nota
+            <div className="row" style={{ gap: 6 }}>
+              <button
+                className="btn"
+                style={{
+                  padding: "4px 10px",
+                  fontSize: 12,
+                  borderColor: "#60a5fa",
+                  color: "#60a5fa",
+                }}
+                onClick={addTrocaNota}
+              >
+                <Icon name="file" size={12} /> Troca de nota
               </button>
-              <button className="btn" style={{padding:"4px 10px",fontSize:12}} onClick={addParada}>
-                <Icon name="plus" size={12}/> Outra parada
+              <button
+                className="btn"
+                style={{ padding: "4px 10px", fontSize: 12 }}
+                onClick={addParada}
+              >
+                <Icon name="plus" size={12} /> Outra parada
               </button>
             </div>
           </div>
@@ -3165,7 +3365,9 @@ const Viagens = ({ onNavigate, user }) => {
                       color: "var(--text-2)",
                     }}
                   >
-                    {p.tipo === "troca_nota" ? `Troca de nota ${i + 1}` : `Parada ${i + 1}`}
+                    {p.tipo === "troca_nota"
+                      ? `Troca de nota ${i + 1}`
+                      : `Parada ${i + 1}`}
                   </span>
                   <button
                     className="icon-btn"
@@ -3234,7 +3436,13 @@ const Viagens = ({ onNavigate, user }) => {
                       />
                     </div>
                   </Fg>
-                  <Fg label={p.tipo === "troca_nota" ? "Local / empresa que troca a nota" : "Cliente / Destinatário"}>
+                  <Fg
+                    label={
+                      p.tipo === "troca_nota"
+                        ? "Local / empresa que troca a nota"
+                        : "Cliente / Destinatário"
+                    }
+                  >
                     <AutoField
                       value={p.cliente}
                       activeKey={`parada-cliente-${p.id}`}
@@ -3283,7 +3491,22 @@ const Viagens = ({ onNavigate, user }) => {
                     />
                   </Fg>
                 </div>
-                {p.tipo === "troca_nota" && <div style={{marginTop:9,padding:"8px 10px",borderRadius:6,background:"rgba(59,130,246,.10)",color:"#60a5fa",fontSize:11.5}}>Depois da troca, o veículo continua para o destino final. Tudo permanece em uma única viagem e com um único valor de frete.</div>}
+                {p.tipo === "troca_nota" && (
+                  <div
+                    style={{
+                      marginTop: 9,
+                      padding: "8px 10px",
+                      borderRadius: 6,
+                      background: "rgba(59,130,246,.10)",
+                      color: "#60a5fa",
+                      fontSize: 11.5,
+                    }}
+                  >
+                    Depois da troca, o veículo continua para o destino final.
+                    Tudo permanece em uma única viagem e com um único valor de
+                    frete.
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -3295,7 +3518,7 @@ const Viagens = ({ onNavigate, user }) => {
   const renderStep2 = () => (
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
       <div className="col" style={{ gap: 14 }}>
-        <Fg label="Cliente (tomador do frete)">
+        <Fg label="Cliente inicial (onde a carga começa)">
           <AutoField
             value={form.cliente}
             activeKey="cliente"
@@ -3306,11 +3529,13 @@ const Viagens = ({ onNavigate, user }) => {
                 : opcoes.clientes.map((c) => ({ nome: c })),
               form.cliente,
             )}
-            optionKey={(item, index) => item.nome || item.label || index}
+            optionKey={(item, index) =>
+              item.documento || item.codigo || item.nome || item.label || index
+            }
             onChange={(value) => {
               setF("cliente", value);
               searchAutocomplete("clientes", value);
-              applyCliente("cliente", value);
+              applyCliente("cliente", item);
             }}
             onSelect={(item) => {
               const value = item.nome || item.label || "";
@@ -3321,14 +3546,12 @@ const Viagens = ({ onNavigate, user }) => {
             renderOption={(item) => (
               <>
                 <span>{item.nome || item.label}</span>
-                <b>
-                  {item.documento || item.cnpj || item.cpf || item.cidade || ""}
-                </b>
+                <b>{clientOptionDetail(item)}</b>
               </>
             )}
           />
         </Fg>
-        <Fg label="Cliente Final (se diferente)">
+        <Fg label="Cliente final (onde a carga será entregue)">
           <AutoField
             value={form.clienteFinal}
             activeKey="clienteFinal"
@@ -3341,11 +3564,13 @@ const Viagens = ({ onNavigate, user }) => {
                   })),
               form.clienteFinal,
             )}
-            optionKey={(item, index) => item.nome || item.label || index}
+            optionKey={(item, index) =>
+              item.documento || item.codigo || item.nome || item.label || index
+            }
             onChange={(value) => {
               setF("clienteFinal", value);
               searchAutocomplete("clientes", value);
-              applyCliente("clienteFinal", value);
+              applyCliente("clienteFinal", item);
             }}
             onSelect={(item) => {
               const value = item.nome || item.label || "";
@@ -3356,18 +3581,16 @@ const Viagens = ({ onNavigate, user }) => {
             renderOption={(item) => (
               <>
                 <span>{item.nome || item.label}</span>
-                <b>
-                  {item.documento || item.cnpj || item.cpf || item.cidade || ""}
-                </b>
+                <b>{clientOptionDetail(item)}</b>
               </>
             )}
           />
         </Fg>
-        <Fg label="Tomador de Servico">
+        <Fg label="Tomador do serviço (quem vai pagar)">
           <AutoField
             value={form.tomadorServico}
             activeKey="tomadorServico"
-            placeholder="Opcional"
+            placeholder="Selecione quem pagará o frete"
             options={filterAutocompleteOptions(
               opcoes.detalhes?.clientes?.length
                 ? opcoes.detalhes.clientes
@@ -3376,11 +3599,13 @@ const Viagens = ({ onNavigate, user }) => {
                   })),
               form.tomadorServico,
             )}
-            optionKey={(item, index) => item.nome || item.label || index}
+            optionKey={(item, index) =>
+              item.documento || item.codigo || item.nome || item.label || index
+            }
             onChange={(value) => {
               setF("tomadorServico", value);
               searchAutocomplete("clientes", value);
-              applyCliente("tomadorServico", value);
+              applyCliente("tomadorServico", item);
             }}
             onSelect={(item) => {
               const value = item.nome || item.label || "";
@@ -3391,9 +3616,7 @@ const Viagens = ({ onNavigate, user }) => {
             renderOption={(item) => (
               <>
                 <span>{item.nome || item.label}</span>
-                <b>
-                  {item.documento || item.cnpj || item.cpf || item.cidade || ""}
-                </b>
+                <b>{clientOptionDetail(item)}</b>
               </>
             )}
           />
@@ -3563,13 +3786,17 @@ const Viagens = ({ onNavigate, user }) => {
             placeholder="Número da CNH"
           />
         </Fg>
-        <Fg label="ANTT / RNTRC">
+        <Fg label="ANTT / RNTRC do proprietário do veículo">
           <input
             style={fs}
             value={form.antt}
             onChange={(e) => setF("antt", e.target.value)}
             placeholder="Número ANTT do veículo"
           />
+          <div className="muted" style={{ fontSize: 11, marginTop: 5 }}>
+            Preenchido automaticamente pela placa ou pelo motorista, usando o
+            proprietário cadastrado no ERP.
+          </div>
         </Fg>
       </div>
       <div className="col" style={{ gap: 14 }}>
@@ -3964,20 +4191,23 @@ const Viagens = ({ onNavigate, user }) => {
             }}
           >
             <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
-              Buscar documento emitido no ERP
+              Buscar CT-e pelo número no ERP
             </div>
             <div className="row" style={{ gap: 8 }}>
               <input
                 style={{ ...fs, flex: 1 }}
+                inputMode="numeric"
                 value={docSearch}
-                onChange={(e) => setDocSearch(e.target.value)}
+                onChange={(e) =>
+                  setDocSearch(e.target.value.replace(/\D/g, ""))
+                }
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
                     pesquisarDocumentoFinanceiro();
                   }
                 }}
-                placeholder="CT-e, NF, chave ou placa"
+                placeholder="Ex.: 4030"
               />
               <button
                 className="btn"
@@ -4205,8 +4435,27 @@ const Viagens = ({ onNavigate, user }) => {
             </button>
           </div>
           {documentsSaved && (
-            <div style={{marginTop:10,padding:"9px 11px",border:"1px solid rgba(16,185,129,.35)",borderRadius:6,background:"rgba(16,185,129,.10)",color:"#34d399",fontSize:12}}>
-              CT-e salvo no servidor. A situação da viagem foi atualizada para <strong>{(SITUACOES[calcularSituacaoViagem(form)] || SITUACOES.faltando_dados).label}</strong>.
+            <div
+              style={{
+                marginTop: 10,
+                padding: "9px 11px",
+                border: "1px solid rgba(16,185,129,.35)",
+                borderRadius: 6,
+                background: "rgba(16,185,129,.10)",
+                color: "#34d399",
+                fontSize: 12,
+              }}
+            >
+              CT-e salvo no servidor. A situação da viagem foi atualizada para{" "}
+              <strong>
+                {
+                  (
+                    SITUACOES[calcularSituacaoViagem(form)] ||
+                    SITUACOES.faltando_dados
+                  ).label
+                }
+              </strong>
+              .
             </div>
           )}
         </div>
