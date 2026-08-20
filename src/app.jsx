@@ -29,52 +29,264 @@ const SCREEN_SCRIPTS = [
   "src/screens/pneus.jsx?v=20260803-km-fallback",
   "src/screens/multas-frota.jsx",
   "src/screens/automacoes.jsx",
-  "src/screens/consulta-cte.jsx?v=20260731-xml-nfe",
+  "src/screens/consulta-cte.jsx?v=20260819-ncm-rateio",
   "src/screens/controle-canhotos.jsx?v=20260803-3",
 ];
 
 const SCREEN_GLOBALS = [
-  "Diretoria", "SimuladorFrete", "Viagens", "FolgasMotoristas",
-  "StatusCargaFrota", "Trafegus", "OportunidadesRetorno",
-  "DreEmpresarial", "FluxoCaixa", "DespesasFuturas", "AnaliseClientes", "RankingClientes",
-  "RentabilidadeClientes", "LucroViagens", "ResultadoFretes", "ResultadoVeiculos", "FaturamentoDiario", "ComparativoFaturamento", "ManutencaoMensagens", "ManutencaoPosicoesScreen", "Pneus", "MultasFrota", "ManutencoesVeiculos", "AnaliseFrota", "PrecosCombustivel", "AutomacoesN8n", "ConsultaCte", "ControleCanhotos",
+  "Diretoria",
+  "SimuladorFrete",
+  "Viagens",
+  "FolgasMotoristas",
+  "StatusCargaFrota",
+  "Trafegus",
+  "OportunidadesRetorno",
+  "DreEmpresarial",
+  "FluxoCaixa",
+  "DespesasFuturas",
+  "AnaliseClientes",
+  "RankingClientes",
+  "RentabilidadeClientes",
+  "LucroViagens",
+  "ResultadoFretes",
+  "ResultadoVeiculos",
+  "FaturamentoDiario",
+  "ComparativoFaturamento",
+  "ManutencaoMensagens",
+  "ManutencaoPosicoesScreen",
+  "Pneus",
+  "MultasFrota",
+  "ManutencoesVeiculos",
+  "AnaliseFrota",
+  "PrecosCombustivel",
+  "AutomacoesN8n",
+  "ConsultaCte",
+  "ControleCanhotos",
 ];
 const SCREEN_MODULES = import.meta.glob("./screens/*.jsx");
 
-const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-  "theme": "auto",
-  "density": "comfortable"
-}/*EDITMODE-END*/;
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/ {
+  theme: "auto",
+  density: "comfortable",
+}; /*EDITMODE-END*/
 
 const NAV = [
-  { id: "diretoria",       label: "Diretoria",    icon: "dashboard",   title: "Resumo executivo", section: "direcao" },
-  { id: "dre-empresarial", label: "DRE Empresarial", icon: "chart", title: "DRE Empresarial", subgroup: "financeiro", section: "financeiro" },
-  { id: "fluxo-caixa", label: "Fluxo de Caixa", icon: "money", title: "Fluxo de Caixa", subgroup: "financeiro", section: "financeiro" },
-  { id: "despesas-futuras", label: "Despesas Futuras", icon: "clock", title: "Despesas Futuras", subgroup: "financeiro", section: "financeiro", permission: "fluxo-caixa" },
-  { id: "faturamento-diario", label: "Faturamento Diário", icon: "chart", title: "Faturamento Diário", subgroup: "financeiro", section: "financeiro" },
-  { id: "comparativo-faturamento", label: "Comparativo Mensal", icon: "chart", title: "Comparativo Mensal", subgroup: "financeiro", section: "financeiro" },
-  { id: "resultado-veiculos", label: "Resultado por Veículo", icon: "truck", title: "Resultado por Veículo", subgroup: "financeiro", section: "financeiro", permission: "custos-veiculos" },
-  { id: "lucro-viagens", label: "Resultado por Viagem", icon: "route", title: "Resultado por Viagem", group: "resultados", section: "financeiro" },
-  { id: "clientes", label: "Análise", icon: "user", title: "Análise de Clientes", group: "clientes", section: "financeiro" },
-  { id: "clientes-ranking",label: "Ranking", icon: "chart", title: "Ranking e evolução de Clientes", group: "clientes", section: "financeiro", permission: "clientes" },
-  { id: "clientes-lucro", label: "Lucro", icon: "chart", title: "Rentabilidade Clientes", group: "clientes", section: "financeiro" },
-  { id: "abastecimentos", label: "Abastecimentos", icon: "fuel", title: "Análise de Abastecimentos", subgroup: "frota", section: "frota" },
-  { id: "precos-combustivel", label: "Preços dos Postos", icon: "money", title: "Preços combinados de combustível", subgroup: "frota", section: "frota" },
-  { id: "simulador",       label: "Calculadora",  icon: "calculator",  title: "Calculadora de Frete ANTT", section: "operacao" },
-  { id: "viagens",         label: "Viagens",      icon: "route",       title: "Viagens e Cotações", section: "operacao" },
-  { id: "folgas-motoristas", label: "Folgas",      icon: "user",        title: "Jornada e Folgas dos Motoristas", section: "operacao" },
-  { id: "status-carga",    label: "Status Carga", icon: "package",     title: "Status de Carga da Frota", section: "operacao" },
-  { id: "trafegus",        label: "Trafegus",     icon: "map",         title: "SMs e Rotas do Trafegus", section: "operacao" },
-  { id: "oportunidades-retorno", label: "Retorno", icon: "route", title: "Clientes próximos e carga de retorno", section: "operacao" },
-  { id: "consulta-cte", label: "Consultar NF-e", icon: "search", title: "Consulta de chave da NF-e", section: "operacao" },
-  { id: "controle-canhotos", label: "Canhotos", icon: "check", title: "Controle de canhotos", section: "operacao" },
-  { id: "pneus", label: "Pneus", icon: "truck", title: "Movimentação de Pneus", subgroup: "frota", section: "frota" },
-  { id: "multas-frota", label: "Multas", icon: "alert", title: "Controle de Multas da Frota", subgroup: "frota", section: "frota" },
-  { id: "manutencao-posicoes", label: "Manutenções", icon: "wrench", title: "Manutenção por posição", subgroup: "frota", section: "frota" },
-  { id: "manutencao", label: "Alertas de Manutenção", icon: "bell", title: "Automação de Manutenção", subgroup: "frota", section: "frota" },
-  { id: "automacoes-n8n", label: "Automações n8n", icon: "plug", title: "Automações n8n", section: "ferramentas" },
-  { id: "settings",        label: "Configurações", icon: "settings",   title: "Configurações",    sistema: true },
-  { id: "usuarios",        label: "Usuários",     icon: "user",        title: "Gerenciar Usuários", sistema: true, adminOnly: true },
+  {
+    id: "diretoria",
+    label: "Diretoria",
+    icon: "dashboard",
+    title: "Resumo executivo",
+    section: "direcao",
+  },
+  {
+    id: "dre-empresarial",
+    label: "DRE Empresarial",
+    icon: "chart",
+    title: "DRE Empresarial",
+    subgroup: "financeiro",
+    section: "financeiro",
+  },
+  {
+    id: "fluxo-caixa",
+    label: "Fluxo de Caixa",
+    icon: "money",
+    title: "Fluxo de Caixa",
+    subgroup: "financeiro",
+    section: "financeiro",
+  },
+  {
+    id: "despesas-futuras",
+    label: "Despesas Futuras",
+    icon: "clock",
+    title: "Despesas Futuras",
+    subgroup: "financeiro",
+    section: "financeiro",
+    permission: "fluxo-caixa",
+  },
+  {
+    id: "faturamento-diario",
+    label: "Faturamento Diário",
+    icon: "chart",
+    title: "Faturamento Diário",
+    subgroup: "financeiro",
+    section: "financeiro",
+  },
+  {
+    id: "comparativo-faturamento",
+    label: "Comparativo Mensal",
+    icon: "chart",
+    title: "Comparativo Mensal",
+    subgroup: "financeiro",
+    section: "financeiro",
+  },
+  {
+    id: "resultado-veiculos",
+    label: "Resultado por Veículo",
+    icon: "truck",
+    title: "Resultado por Veículo",
+    subgroup: "financeiro",
+    section: "financeiro",
+    permission: "custos-veiculos",
+  },
+  {
+    id: "lucro-viagens",
+    label: "Resultado por Viagem",
+    icon: "route",
+    title: "Resultado por Viagem",
+    group: "resultados",
+    section: "financeiro",
+  },
+  {
+    id: "clientes",
+    label: "Análise",
+    icon: "user",
+    title: "Análise de Clientes",
+    group: "clientes",
+    section: "financeiro",
+  },
+  {
+    id: "clientes-ranking",
+    label: "Ranking",
+    icon: "chart",
+    title: "Ranking e evolução de Clientes",
+    group: "clientes",
+    section: "financeiro",
+    permission: "clientes",
+  },
+  {
+    id: "clientes-lucro",
+    label: "Lucro",
+    icon: "chart",
+    title: "Rentabilidade Clientes",
+    group: "clientes",
+    section: "financeiro",
+  },
+  {
+    id: "abastecimentos",
+    label: "Abastecimentos",
+    icon: "fuel",
+    title: "Análise de Abastecimentos",
+    subgroup: "frota",
+    section: "frota",
+  },
+  {
+    id: "precos-combustivel",
+    label: "Preços dos Postos",
+    icon: "money",
+    title: "Preços combinados de combustível",
+    subgroup: "frota",
+    section: "frota",
+  },
+  {
+    id: "simulador",
+    label: "Calculadora",
+    icon: "calculator",
+    title: "Calculadora de Frete ANTT",
+    section: "operacao",
+  },
+  {
+    id: "viagens",
+    label: "Viagens",
+    icon: "route",
+    title: "Viagens e Cotações",
+    section: "operacao",
+  },
+  {
+    id: "folgas-motoristas",
+    label: "Folgas",
+    icon: "user",
+    title: "Jornada e Folgas dos Motoristas",
+    section: "operacao",
+  },
+  {
+    id: "status-carga",
+    label: "Status Carga",
+    icon: "package",
+    title: "Status de Carga da Frota",
+    section: "operacao",
+  },
+  {
+    id: "trafegus",
+    label: "Trafegus",
+    icon: "map",
+    title: "SMs e Rotas do Trafegus",
+    section: "operacao",
+  },
+  {
+    id: "oportunidades-retorno",
+    label: "Retorno",
+    icon: "route",
+    title: "Clientes próximos e carga de retorno",
+    section: "operacao",
+  },
+  {
+    id: "consulta-cte",
+    label: "NF / NCM e rateio",
+    icon: "search",
+    title: "Consulta de NCM e rateio de frete",
+    section: "operacao",
+  },
+  {
+    id: "controle-canhotos",
+    label: "Canhotos",
+    icon: "check",
+    title: "Controle de canhotos",
+    section: "operacao",
+  },
+  {
+    id: "pneus",
+    label: "Pneus",
+    icon: "truck",
+    title: "Movimentação de Pneus",
+    subgroup: "frota",
+    section: "frota",
+  },
+  {
+    id: "multas-frota",
+    label: "Multas",
+    icon: "alert",
+    title: "Controle de Multas da Frota",
+    subgroup: "frota",
+    section: "frota",
+  },
+  {
+    id: "manutencao-posicoes",
+    label: "Manutenções",
+    icon: "wrench",
+    title: "Manutenção por posição",
+    subgroup: "frota",
+    section: "frota",
+  },
+  {
+    id: "manutencao",
+    label: "Alertas de Manutenção",
+    icon: "bell",
+    title: "Automação de Manutenção",
+    subgroup: "frota",
+    section: "frota",
+  },
+  {
+    id: "automacoes-n8n",
+    label: "Automações n8n",
+    icon: "plug",
+    title: "Automações n8n",
+    section: "ferramentas",
+  },
+  {
+    id: "settings",
+    label: "Configurações",
+    icon: "settings",
+    title: "Configurações",
+    sistema: true,
+  },
+  {
+    id: "usuarios",
+    label: "Usuários",
+    icon: "user",
+    title: "Gerenciar Usuários",
+    sistema: true,
+    adminOnly: true,
+  },
 ];
 
 const BASE_NAV = NAV;
@@ -112,29 +324,48 @@ function getSidebarNav(visibleNav) {
       .find(Boolean);
     if (!group || !firstAvailable) return [];
     seenGroups.add(n.group);
-    return [{
-      ...firstAvailable,
-      id: firstAvailable.id,
-      label: group.label,
-      icon: group.icon,
-      group: n.group,
-    }];
+    return [
+      {
+        ...firstAvailable,
+        id: firstAvailable.id,
+        label: group.label,
+        icon: group.icon,
+        group: n.group,
+      },
+    ];
   });
 }
 
 function isNavActive(item, currentScreen) {
-  if (item.group) return NAV_GROUPS[item.group]?.screens.includes(currentScreen);
+  if (item.group)
+    return NAV_GROUPS[item.group]?.screens.includes(currentScreen);
   return currentScreen === item.id;
 }
 
 const ScreenGroup = ({ tabs, active, onChange, children }) => {
   const availableTabs = tabs.filter((tab) => tab.available !== false);
   return (
-    <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <div style={{ padding: "16px 24px 0", flexShrink: 0 }}>
-        <Tabs tabs={availableTabs} active={active} onChange={onChange}/>
+        <Tabs tabs={availableTabs} active={active} onChange={onChange} />
       </div>
-      <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         {children}
       </div>
     </div>
@@ -162,7 +393,9 @@ const App = () => {
   const [route, setRouteState] = useState(readRoute());
   const [auth, setAuth] = useState({ checking: true, user: null });
   const [screensReady, setScreensReady] = useState(false);
-  const [sidebarExpanded, setSidebarExpanded] = useState(() => window.innerWidth > 960);
+  const [sidebarExpanded, setSidebarExpanded] = useState(
+    () => window.innerWidth > 960,
+  );
   const [frotaMenu, setFrotaMenu] = useState(null);
   const [financeiroMenu, setFinanceiroMenu] = useState(null);
 
@@ -172,7 +405,7 @@ const App = () => {
     const cachedUser = RB_AUTH.getUser();
     if (token && cachedUser) {
       RB_AUTH.me()
-        .then(data => setAuth({ checking: false, user: data.user }))
+        .then((data) => setAuth({ checking: false, user: data.user }))
         .catch(() => {
           RB_AUTH.logout();
           setAuth({ checking: false, user: null });
@@ -200,9 +433,8 @@ const App = () => {
   useEffect(() => {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => {
-      const resolved = t.theme === "auto"
-        ? (mq.matches ? "dark" : "light")
-        : t.theme;
+      const resolved =
+        t.theme === "auto" ? (mq.matches ? "dark" : "light") : t.theme;
       document.documentElement.setAttribute("data-theme", resolved);
       document.documentElement.setAttribute("data-theme-pref", t.theme);
     };
@@ -246,29 +478,51 @@ const App = () => {
   // â”€â”€ Estados de carregamento e nÃ£o autenticado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (auth.checking) {
     return (
-      <div style={{
-        minHeight: "100vh", display: "flex",
-        alignItems: "center", justifyContent: "center",
-        background: "var(--bg)",
-      }}>
-        <div style={{ color: "var(--muted)", fontSize: 13.5 }}>Verificando sessão…</div>
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--bg)",
+        }}
+      >
+        <div style={{ color: "var(--muted)", fontSize: 13.5 }}>
+          Verificando sessão…
+        </div>
       </div>
     );
   }
 
   if (!auth.user) {
-    return <LoginScreen onLogin={handleLogin}/>;
+    return <LoginScreen onLogin={handleLogin} />;
   }
 
   if (!screensReady) {
     return (
-      <div style={{
-        minHeight: "100vh", display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center", background: "var(--bg)", gap: 16,
-      }}>
-        <img src="uploads/LOGO NORTE-03.png" alt="Norte"
-          style={{ maxWidth: 160, opacity: 0.7, filter: "invert(var(--logo-invert, 0))" }}/>
-        <div style={{ color: "var(--muted)", fontSize: 13 }}>Carregando o sistema…</div>
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--bg)",
+          gap: 16,
+        }}
+      >
+        <img
+          src="uploads/LOGO NORTE-03.png"
+          alt="Norte"
+          style={{
+            maxWidth: 160,
+            opacity: 0.7,
+            filter: "invert(var(--logo-invert, 0))",
+          }}
+        />
+        <div style={{ color: "var(--muted)", fontSize: 13 }}>
+          Carregando o sistema…
+        </div>
       </div>
     );
   }
@@ -278,106 +532,129 @@ const App = () => {
   const sidebarNav = getSidebarNav(visibleNav);
 
   // Se a tela atual nÃ£o estÃ¡ acessÃ­vel ao usuÃ¡rio, cair na primeira disponÃ­vel
-  const currentScreen = visibleNav.some(n => n.id === route.screen)
+  const currentScreen = visibleNav.some((n) => n.id === route.screen)
     ? route.screen
-    : (visibleNav[0]?.id || DEFAULT_SCREEN);
+    : visibleNav[0]?.id || DEFAULT_SCREEN;
 
   const go = (screen) => setRoute({ screen });
   const onNavigate = (screen) => {
-    if (visibleNav.some(n => n.id === screen)) {
+    if (visibleNav.some((n) => n.id === screen)) {
       go(screen);
       setFrotaMenu(null);
       setFinanceiroMenu(null);
       if (window.innerWidth <= 960) setSidebarExpanded(false);
     }
   };
-  const hasScreen = (screen) => visibleNav.some(n => n.id === screen);
-  const renderNavItems = (items) => items.map(n => (
-    <button
-      key={n.id}
-      className={`nav-item ${isNavActive(n, currentScreen) ? "active" : ""}`}
-      data-tip={n.label}
-      data-has-badge={n.badge != null ? "true" : "false"}
-      onClick={() => onNavigate(n.id)}
-    >
-      <Icon name={n.icon}/>
-      <span className="lbl">{n.label}</span>
-      {n.badge != null && <span className="badge-count">{n.badge}</span>}
-    </button>
-  ));
+  const hasScreen = (screen) => visibleNav.some((n) => n.id === screen);
+  const renderNavItems = (items) =>
+    items.map((n) => (
+      <button
+        key={n.id}
+        className={`nav-item ${isNavActive(n, currentScreen) ? "active" : ""}`}
+        data-tip={n.label}
+        data-has-badge={n.badge != null ? "true" : "false"}
+        onClick={() => onNavigate(n.id)}
+      >
+        <Icon name={n.icon} />
+        <span className="lbl">{n.label}</span>
+        {n.badge != null && <span className="badge-count">{n.badge}</span>}
+      </button>
+    ));
 
   let body = null;
   switch (currentScreen) {
     case "diretoria":
-      body = <Diretoria onNavigate={onNavigate}/>;
+      body = <Diretoria onNavigate={onNavigate} />;
       break;
     case "simulador":
-      body = <SimuladorFrete onNavigate={onNavigate}/>;
+      body = <SimuladorFrete onNavigate={onNavigate} />;
       break;
     case "viagens":
-      body = <Viagens onNavigate={onNavigate} user={auth.user}/>;
+      body = <Viagens onNavigate={onNavigate} user={auth.user} />;
       break;
     case "folgas-motoristas":
-      body = <FolgasMotoristas onNavigate={onNavigate}/>;
+      body = <FolgasMotoristas onNavigate={onNavigate} />;
       break;
     case "status-carga":
-      body = <StatusCargaFrota onNavigate={onNavigate}/>;
+      body = <StatusCargaFrota onNavigate={onNavigate} />;
       break;
     case "trafegus":
-      body = <Trafegus onNavigate={onNavigate}/>;
+      body = <Trafegus onNavigate={onNavigate} />;
       break;
     case "dre-empresarial":
-      body = <DreEmpresarial onNavigate={onNavigate}/>;
+      body = <DreEmpresarial onNavigate={onNavigate} />;
       break;
     case "fluxo-caixa":
-      body = <FluxoCaixa onNavigate={onNavigate}/>;
+      body = <FluxoCaixa onNavigate={onNavigate} />;
       break;
     case "despesas-futuras":
-      body = <DespesasFuturas onNavigate={onNavigate}/>;
+      body = <DespesasFuturas onNavigate={onNavigate} />;
       break;
     case "abastecimentos":
-      body = <AnaliseFrota key="abastecimentos" onNavigate={onNavigate} modoAbastecimento/>;
+      body = (
+        <AnaliseFrota
+          key="abastecimentos"
+          onNavigate={onNavigate}
+          modoAbastecimento
+        />
+      );
       break;
     case "precos-combustivel":
-      body = <PrecosCombustivel onNavigate={onNavigate}/>;
+      body = <PrecosCombustivel onNavigate={onNavigate} />;
       break;
     case "lucro-viagens":
       body = (
         <ScreenGroup
           tabs={[
-            { id: "lucro-viagens", label: "Resultado por viagem", available: hasScreen("lucro-viagens") },
+            {
+              id: "lucro-viagens",
+              label: "Resultado por viagem",
+              available: hasScreen("lucro-viagens"),
+            },
           ]}
           active={currentScreen}
           onChange={onNavigate}
         >
-          <ResultadoFretes onNavigate={onNavigate}/>
+          <ResultadoFretes onNavigate={onNavigate} />
         </ScreenGroup>
       );
       break;
     case "faturamento-diario":
-      body = <FaturamentoDiario onNavigate={onNavigate}/>;
+      body = <FaturamentoDiario onNavigate={onNavigate} />;
       break;
     case "comparativo-faturamento":
-      body = <ComparativoFaturamento onNavigate={onNavigate}/>;
+      body = <ComparativoFaturamento onNavigate={onNavigate} />;
       break;
     case "resultado-veiculos":
-      body = <ResultadoVeiculos onNavigate={onNavigate}/>;
+      body = <ResultadoVeiculos onNavigate={onNavigate} />;
       break;
     case "manutencoes-veiculos":
-      body = <ManutencoesVeiculos onNavigate={onNavigate}/>;
+      body = <ManutencoesVeiculos onNavigate={onNavigate} />;
       break;
     case "clientes":
       body = (
         <ScreenGroup
           tabs={[
-            { id: "clientes", label: "Análise", available: hasScreen("clientes") },
-            { id: "clientes-ranking", label: "Ranking e evolução", available: hasScreen("clientes-ranking") },
-            { id: "clientes-lucro", label: "Lucro", available: hasScreen("clientes-lucro") },
+            {
+              id: "clientes",
+              label: "Análise",
+              available: hasScreen("clientes"),
+            },
+            {
+              id: "clientes-ranking",
+              label: "Ranking e evolução",
+              available: hasScreen("clientes-ranking"),
+            },
+            {
+              id: "clientes-lucro",
+              label: "Lucro",
+              available: hasScreen("clientes-lucro"),
+            },
           ]}
           active={currentScreen}
           onChange={onNavigate}
         >
-          <AnaliseClientes onNavigate={onNavigate}/>
+          <AnaliseClientes onNavigate={onNavigate} />
         </ScreenGroup>
       );
       break;
@@ -385,14 +662,26 @@ const App = () => {
       body = (
         <ScreenGroup
           tabs={[
-            { id: "clientes", label: "Análise", available: hasScreen("clientes") },
-            { id: "clientes-ranking", label: "Ranking e evolução", available: hasScreen("clientes-ranking") },
-            { id: "clientes-lucro", label: "Lucro", available: hasScreen("clientes-lucro") },
+            {
+              id: "clientes",
+              label: "Análise",
+              available: hasScreen("clientes"),
+            },
+            {
+              id: "clientes-ranking",
+              label: "Ranking e evolução",
+              available: hasScreen("clientes-ranking"),
+            },
+            {
+              id: "clientes-lucro",
+              label: "Lucro",
+              available: hasScreen("clientes-lucro"),
+            },
           ]}
           active={currentScreen}
           onChange={onNavigate}
         >
-          <RankingClientes onNavigate={onNavigate}/>
+          <RankingClientes onNavigate={onNavigate} />
         </ScreenGroup>
       );
       break;
@@ -400,121 +689,216 @@ const App = () => {
       body = (
         <ScreenGroup
           tabs={[
-            { id: "clientes", label: "Análise", available: hasScreen("clientes") },
-            { id: "clientes-ranking", label: "Ranking e evolução", available: hasScreen("clientes-ranking") },
-            { id: "clientes-lucro", label: "Lucro", available: hasScreen("clientes-lucro") },
+            {
+              id: "clientes",
+              label: "Análise",
+              available: hasScreen("clientes"),
+            },
+            {
+              id: "clientes-ranking",
+              label: "Ranking e evolução",
+              available: hasScreen("clientes-ranking"),
+            },
+            {
+              id: "clientes-lucro",
+              label: "Lucro",
+              available: hasScreen("clientes-lucro"),
+            },
           ]}
           active={currentScreen}
           onChange={onNavigate}
         >
-          <RentabilidadeClientes onNavigate={onNavigate}/>
+          <RentabilidadeClientes onNavigate={onNavigate} />
         </ScreenGroup>
       );
       break;
     case "manutencao":
-      body = <ManutencaoMensagens onNavigate={onNavigate}/>;
+      body = <ManutencaoMensagens onNavigate={onNavigate} />;
       break;
     case "automacoes-n8n":
-      body = <AutomacoesN8n onNavigate={onNavigate}/>;
+      body = <AutomacoesN8n onNavigate={onNavigate} />;
       break;
     case "oportunidades-retorno":
-      body = <OportunidadesRetorno onNavigate={onNavigate}/>;
+      body = <OportunidadesRetorno onNavigate={onNavigate} />;
       break;
     case "consulta-cte":
-      body = <ConsultaCte/>;
+      body = <ConsultaCte />;
       break;
     case "controle-canhotos":
-      body = <ControleCanhotos/>;
+      body = <ControleCanhotos />;
       break;
     case "usuarios":
-      body = <GerenciarUsuarios onNavigate={onNavigate}/>;
+      body = <GerenciarUsuarios onNavigate={onNavigate} />;
       break;
     case "pneus":
-      body = <Pneus onNavigate={onNavigate}/>;
+      body = <Pneus onNavigate={onNavigate} />;
       break;
     case "multas-frota":
-      body = <MultasFrota/>;
+      body = <MultasFrota />;
       break;
     case "manutencao-posicoes":
-      body = <ManutencaoPosicoesScreen/>;
+      body = <ManutencaoPosicoesScreen />;
       break;
     case "settings":
-      body = <SettingsScreen theme={t.theme} setTheme={(v) => setTweak("theme", v)} density={t.density} setDensity={(v) => setTweak("density", v)} onNavigate={onNavigate} canManageUsers={hasScreen("usuarios")}/>;
+      body = (
+        <SettingsScreen
+          theme={t.theme}
+          setTheme={(v) => setTweak("theme", v)}
+          density={t.density}
+          setDensity={(v) => setTweak("density", v)}
+          onNavigate={onNavigate}
+          canManageUsers={hasScreen("usuarios")}
+        />
+      );
       break;
     default:
-      body = <SimuladorFrete onNavigate={onNavigate}/>;
+      body = <SimuladorFrete onNavigate={onNavigate} />;
       break;
   }
 
   const userLogin = auth.user.login || "Usuário";
-  const userInitials = userLogin.split(".").map(p => p[0] || "").join("").toUpperCase().slice(0, 2) || "U";
+  const userInitials =
+    userLogin
+      .split(".")
+      .map((p) => p[0] || "")
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "U";
 
   return (
-    <div className={`app-shell ${sidebarExpanded ? "sidebar-is-expanded" : "sidebar-is-collapsed"}`}>
-      {sidebarExpanded && <button className="sidebar-backdrop" aria-label="Fechar menu" onClick={() => setSidebarExpanded(false)}/>}
-      <aside className={`sidebar ${sidebarExpanded ? "expanded" : "collapsed"}`}>
+    <div
+      className={`app-shell ${sidebarExpanded ? "sidebar-is-expanded" : "sidebar-is-collapsed"}`}
+    >
+      {sidebarExpanded && (
+        <button
+          className="sidebar-backdrop"
+          aria-label="Fechar menu"
+          onClick={() => setSidebarExpanded(false)}
+        />
+      )}
+      <aside
+        className={`sidebar ${sidebarExpanded ? "expanded" : "collapsed"}`}
+      >
         <div className="sidebar-brand">
           <img
             src="uploads/LOGO NORTE-03.png"
             alt="Norte"
             className="sidebar-logo"
           />
-          <button className="sidebar-toggle" onClick={() => setSidebarExpanded(v => !v)} title={sidebarExpanded ? "Recolher menu" : "Expandir menu"} aria-label={sidebarExpanded ? "Recolher menu" : "Expandir menu"}>
-            <Icon name={sidebarExpanded ? "x" : "chevron-right"} size={17}/>
+          <button
+            className="sidebar-toggle"
+            onClick={() => setSidebarExpanded((v) => !v)}
+            title={sidebarExpanded ? "Recolher menu" : "Expandir menu"}
+            aria-label={sidebarExpanded ? "Recolher menu" : "Expandir menu"}
+          >
+            <Icon name={sidebarExpanded ? "x" : "chevron-right"} size={17} />
           </button>
         </div>
 
         <div className="sidebar-nav-scroll">
           {Object.entries(NAV_SECTION_LABELS).map(([section, label]) => {
-            const items = sidebarNav.filter(n => !n.sistema && (n.section || "direcao") === section);
+            const items = sidebarNav.filter(
+              (n) => !n.sistema && (n.section || "direcao") === section,
+            );
             if (!items.length) return null;
             return (
               <div className="nav-section" key={section}>
                 <div className="nav-label">{label}</div>
-                {renderNavItems(items.filter(item => !item.subgroup && section !== "financeiro" && (section !== "direcao" || item.id === "diretoria")))}
-                {items.some(item => item.subgroup === "financeiro") && <button
-                  type="button"
-                  className={`nav-item nav-flyout-trigger ${items.some(item => item.subgroup === "financeiro" && item.id === currentScreen) ? "active" : ""}`}
-                  data-tip="Financeiro"
-                  aria-expanded={Boolean(financeiroMenu)}
-                  onClick={event => {
-                    if (financeiroMenu) return setFinanceiroMenu(null);
-                    setFrotaMenu(null);
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    setFinanceiroMenu({ left: rect.right + 7, top: Math.max(8, Math.min(rect.top, window.innerHeight - 180)) });
-                  }}
-                ><Icon name="chart"/><span className="lbl">Financeiro</span><Icon name="chevron-right" size={13}/></button>}
-                {section === "financeiro" && renderNavItems(items.filter(item => !item.subgroup))}
-                {section === "direcao" && renderNavItems(items.filter(item => !item.subgroup && item.id !== "diretoria"))}
-                {items.some(item => item.subgroup === "frota") && <button
-                  type="button"
-                  className={`nav-item nav-flyout-trigger ${items.some(item => item.subgroup === "frota" && item.id === currentScreen) ? "active" : ""}`}
-                  data-tip="Frota"
-                  aria-expanded={Boolean(frotaMenu)}
-                  onClick={event => {
-                    if (frotaMenu) return setFrotaMenu(null);
-                    setFinanceiroMenu(null);
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    setFrotaMenu({ left: rect.right + 7, top: Math.max(8, Math.min(rect.top, window.innerHeight - 180)) });
-                  }}
-                ><Icon name="truck"/><span className="lbl">Frota</span><Icon name="chevron-right" size={13}/></button>}
+                {renderNavItems(
+                  items.filter(
+                    (item) =>
+                      !item.subgroup &&
+                      section !== "financeiro" &&
+                      (section !== "direcao" || item.id === "diretoria"),
+                  ),
+                )}
+                {items.some((item) => item.subgroup === "financeiro") && (
+                  <button
+                    type="button"
+                    className={`nav-item nav-flyout-trigger ${items.some((item) => item.subgroup === "financeiro" && item.id === currentScreen) ? "active" : ""}`}
+                    data-tip="Financeiro"
+                    aria-expanded={Boolean(financeiroMenu)}
+                    onClick={(event) => {
+                      if (financeiroMenu) return setFinanceiroMenu(null);
+                      setFrotaMenu(null);
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      setFinanceiroMenu({
+                        left: rect.right + 7,
+                        top: Math.max(
+                          8,
+                          Math.min(rect.top, window.innerHeight - 180),
+                        ),
+                      });
+                    }}
+                  >
+                    <Icon name="chart" />
+                    <span className="lbl">Financeiro</span>
+                    <Icon name="chevron-right" size={13} />
+                  </button>
+                )}
+                {section === "financeiro" &&
+                  renderNavItems(items.filter((item) => !item.subgroup))}
+                {section === "direcao" &&
+                  renderNavItems(
+                    items.filter(
+                      (item) => !item.subgroup && item.id !== "diretoria",
+                    ),
+                  )}
+                {items.some((item) => item.subgroup === "frota") && (
+                  <button
+                    type="button"
+                    className={`nav-item nav-flyout-trigger ${items.some((item) => item.subgroup === "frota" && item.id === currentScreen) ? "active" : ""}`}
+                    data-tip="Frota"
+                    aria-expanded={Boolean(frotaMenu)}
+                    onClick={(event) => {
+                      if (frotaMenu) return setFrotaMenu(null);
+                      setFinanceiroMenu(null);
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      setFrotaMenu({
+                        left: rect.right + 7,
+                        top: Math.max(
+                          8,
+                          Math.min(rect.top, window.innerHeight - 180),
+                        ),
+                      });
+                    }}
+                  >
+                    <Icon name="truck" />
+                    <span className="lbl">Frota</span>
+                    <Icon name="chevron-right" size={13} />
+                  </button>
+                )}
               </div>
             );
           })}
 
           <div className="nav-section">
             <div className="nav-label">Administração</div>
-            {renderNavItems(sidebarNav.filter(n => n.sistema))}
+            {renderNavItems(sidebarNav.filter((n) => n.sistema))}
           </div>
         </div>
 
         <div className="sidebar-footer">
           <div className="avatar">{userInitials}</div>
           <div className="who" style={{ flex: 1, minWidth: 0 }}>
-            <div className="who-name" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div
+              className="who-name"
+              style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
               {userLogin}
             </div>
-            <div className="who-org" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <div
+              className="who-org"
+              style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
               {auth.user.email || "Rodobach"}
             </div>
           </div>
@@ -522,31 +906,78 @@ const App = () => {
             onClick={handleLogout}
             title="Sair do sistema"
             style={{
-              background: "none", border: "none", cursor: "pointer",
-              padding: "4px 6px", color: "var(--muted)", display: "flex",
-              alignItems: "center", borderRadius: 5, flexShrink: 0,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "4px 6px",
+              color: "var(--muted)",
+              display: "flex",
+              alignItems: "center",
+              borderRadius: 5,
+              flexShrink: 0,
               transition: "color 120ms",
             }}
-            onMouseOver={e => e.currentTarget.style.color = "var(--text)"}
-            onMouseOut={e => e.currentTarget.style.color = "var(--muted)"}
+            onMouseOver={(e) => (e.currentTarget.style.color = "var(--text)")}
+            onMouseOut={(e) => (e.currentTarget.style.color = "var(--muted)")}
           >
-            <Icon name="external" size={14}/>
+            <Icon name="external" size={14} />
           </button>
         </div>
       </aside>
 
-      {frotaMenu && <><button className="nav-flyout-dismiss" aria-label="Fechar opções da frota" onClick={() => setFrotaMenu(null)}/><div className="nav-flyout" style={{ left: frotaMenu.left, top: frotaMenu.top }}>
-        <div className="nav-flyout-title"><Icon name="truck" size={14}/><span>Frota</span></div>
-        {renderNavItems(sidebarNav.filter(item => item.subgroup === "frota"))}
-      </div></>}
+      {frotaMenu && (
+        <>
+          <button
+            className="nav-flyout-dismiss"
+            aria-label="Fechar opções da frota"
+            onClick={() => setFrotaMenu(null)}
+          />
+          <div
+            className="nav-flyout"
+            style={{ left: frotaMenu.left, top: frotaMenu.top }}
+          >
+            <div className="nav-flyout-title">
+              <Icon name="truck" size={14} />
+              <span>Frota</span>
+            </div>
+            {renderNavItems(
+              sidebarNav.filter((item) => item.subgroup === "frota"),
+            )}
+          </div>
+        </>
+      )}
 
-      {financeiroMenu && <><button className="nav-flyout-dismiss" aria-label="Fechar opções financeiras" onClick={() => setFinanceiroMenu(null)}/><div className="nav-flyout" style={{ left: financeiroMenu.left, top: financeiroMenu.top }}>
-        <div className="nav-flyout-title"><Icon name="chart" size={14}/><span>Financeiro</span></div>
-        {renderNavItems(sidebarNav.filter(item => item.subgroup === "financeiro"))}
-      </div></>}
+      {financeiroMenu && (
+        <>
+          <button
+            className="nav-flyout-dismiss"
+            aria-label="Fechar opções financeiras"
+            onClick={() => setFinanceiroMenu(null)}
+          />
+          <div
+            className="nav-flyout"
+            style={{ left: financeiroMenu.left, top: financeiroMenu.top }}
+          >
+            <div className="nav-flyout-title">
+              <Icon name="chart" size={14} />
+              <span>Financeiro</span>
+            </div>
+            {renderNavItems(
+              sidebarNav.filter((item) => item.subgroup === "financeiro"),
+            )}
+          </div>
+        </>
+      )}
 
       <main className="main">
-        <div style={{flex: 1, overflow: "hidden", display: "flex", flexDirection: "column"}}>
+        <div
+          style={{
+            flex: 1,
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
           {body}
         </div>
       </main>
@@ -556,7 +987,7 @@ const App = () => {
           <TweakRadio
             label="Tema"
             value={t.theme}
-            onChange={v => setTweak("theme", v)}
+            onChange={(v) => setTweak("theme", v)}
             options={[
               { value: "auto", label: "Auto" },
               { value: "light", label: "Claro" },
@@ -566,7 +997,7 @@ const App = () => {
           <TweakRadio
             label="Densidade"
             value={t.density}
-            onChange={v => setTweak("density", v)}
+            onChange={(v) => setTweak("density", v)}
             options={[
               { value: "comfortable", label: "Confortável" },
               { value: "compact", label: "Compacta" },
@@ -591,13 +1022,29 @@ function formatPhone(raw) {
 }
 
 // Settings — with theme + density switchers
-const SettingsScreen = ({ theme, setTheme, density, setDensity, onNavigate, canManageUsers }) => {
+const SettingsScreen = ({
+  theme,
+  setTheme,
+  density,
+  setDensity,
+  onNavigate,
+  canManageUsers,
+}) => {
   const [showWaModal, setShowWaModal] = React.useState(false);
-  const [waState, setWaState] = React.useState({ loading: false, qrcode: null, connected: false, phone: null, profileName: null, error: null });
-const pollRef = React.useRef(null);
+  const [waState, setWaState] = React.useState({
+    loading: false,
+    qrcode: null,
+    connected: false,
+    phone: null,
+    profileName: null,
+    error: null,
+  });
+  const pollRef = React.useRef(null);
 
   React.useEffect(() => {
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, []);
 
   async function loadQrCode() {
@@ -605,22 +1052,48 @@ const pollRef = React.useRef(null);
     try {
       const data = await RB_API.whatsappConnect();
       if (data.connected) {
-        setWaState({ loading: false, qrcode: null, connected: true, phone: data.phone, profileName: data.profileName, error: null });
+        setWaState({
+          loading: false,
+          qrcode: null,
+          connected: true,
+          phone: data.phone,
+          profileName: data.profileName,
+          error: null,
+        });
         return;
       }
-      setWaState({ loading: false, qrcode: data.qrcode, connected: false, phone: null, profileName: null, error: null });
+      setWaState({
+        loading: false,
+        qrcode: data.qrcode,
+        connected: false,
+        phone: null,
+        profileName: null,
+        error: null,
+      });
       if (pollRef.current) clearInterval(pollRef.current);
       pollRef.current = setInterval(async () => {
         try {
           const status = await RB_API.whatsappStatus();
           if (status.state === "open") {
-            setWaState({ loading: false, qrcode: null, connected: true, phone: status.phone, profileName: status.profileName, error: null });
+            setWaState({
+              loading: false,
+              qrcode: null,
+              connected: true,
+              phone: status.phone,
+              profileName: status.profileName,
+              error: null,
+            });
             clearInterval(pollRef.current);
           }
         } catch {}
       }, 3000);
     } catch (err) {
-      setWaState({ loading: false, qrcode: null, connected: false, error: err.message });
+      setWaState({
+        loading: false,
+        qrcode: null,
+        connected: false,
+        error: err.message,
+      });
     }
   }
 
@@ -657,51 +1130,184 @@ const pollRef = React.useRef(null);
 
   const ThemePreview = ({ kind }) => {
     const bgs = {
-      light: { bg: "#fafafa", surface: "#ffffff", border: "#e8e8eb", text: "#09090b", muted: "#71717a", accent: "#4f7fab" },
-      dark:  { bg: "#09090b", surface: "#0f0f11", border: "#232327", text: "#fafafa", muted: "#71717a", accent: "#6a98c4" },
+      light: {
+        bg: "#fafafa",
+        surface: "#ffffff",
+        border: "#e8e8eb",
+        text: "#09090b",
+        muted: "#71717a",
+        accent: "#4f7fab",
+      },
+      dark: {
+        bg: "#09090b",
+        surface: "#0f0f11",
+        border: "#232327",
+        text: "#fafafa",
+        muted: "#71717a",
+        accent: "#6a98c4",
+      },
     };
     if (kind === "auto") {
       return (
-        <div style={{display: "flex", borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)"}}>
-          <Mini c={bgs.light}/>
-          <Mini c={bgs.dark}/>
+        <div
+          style={{
+            display: "flex",
+            borderRadius: 6,
+            overflow: "hidden",
+            border: "1px solid var(--border)",
+          }}
+        >
+          <Mini c={bgs.light} />
+          <Mini c={bgs.dark} />
         </div>
       );
     }
     return (
-      <div style={{borderRadius: 6, overflow: "hidden", border: "1px solid var(--border)"}}>
-        <Mini c={bgs[kind]} full/>
+      <div
+        style={{
+          borderRadius: 6,
+          overflow: "hidden",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <Mini c={bgs[kind]} full />
       </div>
     );
   };
 
   const Mini = ({ c, full }) => (
-    <div style={{
-      flex: 1,
-      width: full ? "100%" : "50%",
-      height: 72,
-      background: c.bg,
-      padding: 8,
-      display: "flex",
-      gap: 6,
-    }}>
-      <div style={{width: 18, height: "100%", background: "#141936", borderRadius: 3, padding: 4, display: "flex", flexDirection: "column", gap: 3}}>
-        <div style={{width: 10, height: 2, background: "#6a98c4", borderRadius: 1}}/>
-        <div style={{width: 10, height: 1.5, background: "rgba(255,255,255,0.4)", borderRadius: 1}}/>
-        <div style={{width: 10, height: 1.5, background: "rgba(255,255,255,0.4)", borderRadius: 1}}/>
+    <div
+      style={{
+        flex: 1,
+        width: full ? "100%" : "50%",
+        height: 72,
+        background: c.bg,
+        padding: 8,
+        display: "flex",
+        gap: 6,
+      }}
+    >
+      <div
+        style={{
+          width: 18,
+          height: "100%",
+          background: "#141936",
+          borderRadius: 3,
+          padding: 4,
+          display: "flex",
+          flexDirection: "column",
+          gap: 3,
+        }}
+      >
+        <div
+          style={{
+            width: 10,
+            height: 2,
+            background: "#6a98c4",
+            borderRadius: 1,
+          }}
+        />
+        <div
+          style={{
+            width: 10,
+            height: 1.5,
+            background: "rgba(255,255,255,0.4)",
+            borderRadius: 1,
+          }}
+        />
+        <div
+          style={{
+            width: 10,
+            height: 1.5,
+            background: "rgba(255,255,255,0.4)",
+            borderRadius: 1,
+          }}
+        />
       </div>
-      <div style={{flex: 1, display: "flex", flexDirection: "column", gap: 4}}>
-        <div style={{height: 10, background: c.surface, border: `0.5px solid ${c.border}`, borderRadius: 2, display: "flex", padding: 2, gap: 2, alignItems: "center"}}>
-          <div style={{width: 8, height: 4, background: c.text, borderRadius: 1, opacity: 0.6}}/>
+      <div
+        style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}
+      >
+        <div
+          style={{
+            height: 10,
+            background: c.surface,
+            border: `0.5px solid ${c.border}`,
+            borderRadius: 2,
+            display: "flex",
+            padding: 2,
+            gap: 2,
+            alignItems: "center",
+          }}
+        >
+          <div
+            style={{
+              width: 8,
+              height: 4,
+              background: c.text,
+              borderRadius: 1,
+              opacity: 0.6,
+            }}
+          />
         </div>
-        <div style={{display: "grid", gridTemplateColumns: "1fr 1fr", gap: 3, flex: 1}}>
-          <div style={{background: c.surface, border: `0.5px solid ${c.border}`, borderRadius: 2, padding: 3}}>
-            <div style={{width: 8, height: 1.5, background: c.muted, borderRadius: 1, marginBottom: 2}}/>
-            <div style={{width: 14, height: 3, background: c.text, borderRadius: 1}}/>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 3,
+            flex: 1,
+          }}
+        >
+          <div
+            style={{
+              background: c.surface,
+              border: `0.5px solid ${c.border}`,
+              borderRadius: 2,
+              padding: 3,
+            }}
+          >
+            <div
+              style={{
+                width: 8,
+                height: 1.5,
+                background: c.muted,
+                borderRadius: 1,
+                marginBottom: 2,
+              }}
+            />
+            <div
+              style={{
+                width: 14,
+                height: 3,
+                background: c.text,
+                borderRadius: 1,
+              }}
+            />
           </div>
-          <div style={{background: c.surface, border: `0.5px solid ${c.border}`, borderRadius: 2, padding: 3}}>
-            <div style={{width: 8, height: 1.5, background: c.muted, borderRadius: 1, marginBottom: 2}}/>
-            <div style={{width: 12, height: 3, background: c.accent, borderRadius: 1}}/>
+          <div
+            style={{
+              background: c.surface,
+              border: `0.5px solid ${c.border}`,
+              borderRadius: 2,
+              padding: 3,
+            }}
+          >
+            <div
+              style={{
+                width: 8,
+                height: 1.5,
+                background: c.muted,
+                borderRadius: 1,
+                marginBottom: 2,
+              }}
+            />
+            <div
+              style={{
+                width: 12,
+                height: 3,
+                background: c.accent,
+                borderRadius: 1,
+              }}
+            />
           </div>
         </div>
       </div>
@@ -717,19 +1323,21 @@ const pollRef = React.useRef(null);
         </div>
       </div>
 
-      <div className="card" style={{marginBottom: 16}}>
-        <div className="section-head" style={{marginBottom: 14}}>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="section-head" style={{ marginBottom: 14 }}>
           <div>
-            <h2 style={{color: "var(--text)", fontSize: 14}}>Aparência</h2>
-            <div className="muted" style={{fontSize: 12, marginTop: 2}}>Personalize o tema e a densidade da interface</div>
+            <h2 style={{ color: "var(--text)", fontSize: 14 }}>Aparência</h2>
+            <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+              Personalize o tema e a densidade da interface
+            </div>
           </div>
         </div>
 
-        <div style={{marginBottom: 22}}>
-          <div className="row between" style={{marginBottom: 10}}>
+        <div style={{ marginBottom: 22 }}>
+          <div className="row between" style={{ marginBottom: 10 }}>
             <div>
-              <div style={{fontSize: 12.5, fontWeight: 500}}>Tema</div>
-              <div className="muted" style={{fontSize: 11.5, marginTop: 2}}>
+              <div style={{ fontSize: 12.5, fontWeight: 500 }}>Tema</div>
+              <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
                 {theme === "auto"
                   ? "Acompanhando o sistema operacional"
                   : `Fixo em modo ${theme === "light" ? "claro" : "escuro"}`}
@@ -737,8 +1345,8 @@ const pollRef = React.useRef(null);
             </div>
           </div>
 
-          <div className="grid cols-3" style={{gap: 12}}>
-            {themeOptions.map(opt => {
+          <div className="grid cols-3" style={{ gap: 12 }}>
+            {themeOptions.map((opt) => {
               const active = theme === opt.id;
               return (
                 <button
@@ -747,30 +1355,56 @@ const pollRef = React.useRef(null);
                   style={{
                     border: `1.5px solid ${active ? "var(--brand-blue)" : "var(--border)"}`,
                     borderRadius: 8,
-                    background: active ? "var(--accent-soft)" : "var(--surface)",
+                    background: active
+                      ? "var(--accent-soft)"
+                      : "var(--surface)",
                     padding: 12,
                     cursor: "pointer",
                     textAlign: "left",
-                    boxShadow: active ? "0 0 0 3px color-mix(in oklab, var(--brand-blue) 12%, transparent)" : "none",
+                    boxShadow: active
+                      ? "0 0 0 3px color-mix(in oklab, var(--brand-blue) 12%, transparent)"
+                      : "none",
                     transition: "all 120ms ease",
                     display: "flex",
                     flexDirection: "column",
                     gap: 10,
-                  }}>
-                  <ThemePreview kind={opt.preview}/>
+                  }}
+                >
+                  <ThemePreview kind={opt.preview} />
                   <div className="row between">
                     <div>
-                      <div style={{fontSize: 12.5, fontWeight: 500}}>{opt.label}</div>
-                      <div className="muted" style={{fontSize: 11.5, marginTop: 2}}>{opt.desc}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 500 }}>
+                        {opt.label}
+                      </div>
+                      <div
+                        className="muted"
+                        style={{ fontSize: 11.5, marginTop: 2 }}
+                      >
+                        {opt.desc}
+                      </div>
                     </div>
-                    <div style={{
-                      width: 16, height: 16, borderRadius: "50%",
-                      border: `1.5px solid ${active ? "var(--brand-blue)" : "var(--border-strong)"}`,
-                      background: active ? "var(--brand-blue)" : "transparent",
-                      display: "grid", placeItems: "center",
-                      flexShrink: 0,
-                    }}>
-                      {active && <Icon name="check" size={10} strokeWidth={3} style={{color: "#fff"}}/>}
+                    <div
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: "50%",
+                        border: `1.5px solid ${active ? "var(--brand-blue)" : "var(--border-strong)"}`,
+                        background: active
+                          ? "var(--brand-blue)"
+                          : "transparent",
+                        display: "grid",
+                        placeItems: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {active && (
+                        <Icon
+                          name="check"
+                          size={10}
+                          strokeWidth={3}
+                          style={{ color: "#fff" }}
+                        />
+                      )}
                     </div>
                   </div>
                 </button>
@@ -779,18 +1413,30 @@ const pollRef = React.useRef(null);
           </div>
         </div>
 
-        <div style={{borderTop: "1px solid var(--divider)", paddingTop: 16}}>
-          <div className="row between" style={{marginBottom: 10}}>
+        <div style={{ borderTop: "1px solid var(--divider)", paddingTop: 16 }}>
+          <div className="row between" style={{ marginBottom: 10 }}>
             <div>
-              <div style={{fontSize: 12.5, fontWeight: 500}}>Densidade da interface</div>
-              <div className="muted" style={{fontSize: 11.5, marginTop: 2}}>Ajuste o espaçamento de tabelas e cards</div>
+              <div style={{ fontSize: 12.5, fontWeight: 500 }}>
+                Densidade da interface
+              </div>
+              <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>
+                Ajuste o espaçamento de tabelas e cards
+              </div>
             </div>
           </div>
-          <div className="row" style={{gap: 8}}>
+          <div className="row" style={{ gap: 8 }}>
             {[
-              { id: "comfortable", label: "Confortável", desc: "Mais espaço entre os elementos" },
-              { id: "compact", label: "Compacta", desc: "Mais informação por tela" },
-            ].map(opt => {
+              {
+                id: "comfortable",
+                label: "Confortável",
+                desc: "Mais espaço entre os elementos",
+              },
+              {
+                id: "compact",
+                label: "Compacta",
+                desc: "Mais informação por tela",
+              },
+            ].map((opt) => {
               const active = density === opt.id;
               return (
                 <button
@@ -799,7 +1445,9 @@ const pollRef = React.useRef(null);
                   style={{
                     flex: 1,
                     border: `1.5px solid ${active ? "var(--brand-blue)" : "var(--border)"}`,
-                    background: active ? "var(--accent-soft)" : "var(--surface)",
+                    background: active
+                      ? "var(--accent-soft)"
+                      : "var(--surface)",
                     borderRadius: 8,
                     padding: "10px 14px",
                     cursor: "pointer",
@@ -807,19 +1455,39 @@ const pollRef = React.useRef(null);
                     display: "flex",
                     alignItems: "center",
                     gap: 12,
-                  }}>
-                  <div style={{
-                    width: 16, height: 16, borderRadius: "50%",
-                    border: `1.5px solid ${active ? "var(--brand-blue)" : "var(--border-strong)"}`,
-                    background: active ? "var(--brand-blue)" : "transparent",
-                    display: "grid", placeItems: "center",
-                    flexShrink: 0,
-                  }}>
-                    {active && <Icon name="check" size={10} strokeWidth={3} style={{color: "#fff"}}/>}
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      border: `1.5px solid ${active ? "var(--brand-blue)" : "var(--border-strong)"}`,
+                      background: active ? "var(--brand-blue)" : "transparent",
+                      display: "grid",
+                      placeItems: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {active && (
+                      <Icon
+                        name="check"
+                        size={10}
+                        strokeWidth={3}
+                        style={{ color: "#fff" }}
+                      />
+                    )}
                   </div>
                   <div>
-                    <div style={{fontSize: 12.5, fontWeight: 500}}>{opt.label}</div>
-                    <div className="muted" style={{fontSize: 11.5, marginTop: 1}}>{opt.desc}</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 500 }}>
+                      {opt.label}
+                    </div>
+                    <div
+                      className="muted"
+                      style={{ fontSize: 11.5, marginTop: 1 }}
+                    >
+                      {opt.desc}
+                    </div>
                   </div>
                 </button>
               );
@@ -828,121 +1496,251 @@ const pollRef = React.useRef(null);
         </div>
       </div>
 
-      <div className="section-head"><h2>Outras configurações</h2></div>
+      <div className="section-head">
+        <h2>Outras configurações</h2>
+      </div>
       <div className="grid cols-3">
         {[
-          { t: "Conta da empresa", d: "Norte Logística · CNPJ 32.480.591/0001-04", i: "user" },
-          { t: "Usuários e permissões", d: "Gerenciar acessos e telas liberadas", i: "user", action: canManageUsers ? () => onNavigate("usuarios") : null },
-          { t: "Perfis de alerta", d: "Velocidade · RPM · Cerca virtual · Sirene", i: "bell" },
-          { t: "Integração Trucks", d: "API v3.4 · token expira em 142 dias", i: "plug" },
-          { t: "Webhooks e notificações", d: "2 webhooks ativos", i: "external" },
-          { t: "Exportação e BI", d: "PowerBI · Looker Studio · CSV", i: "download" },
+          {
+            t: "Conta da empresa",
+            d: "Norte Logística · CNPJ 32.480.591/0001-04",
+            i: "user",
+          },
+          {
+            t: "Usuários e permissões",
+            d: "Gerenciar acessos e telas liberadas",
+            i: "user",
+            action: canManageUsers ? () => onNavigate("usuarios") : null,
+          },
+          {
+            t: "Perfis de alerta",
+            d: "Velocidade · RPM · Cerca virtual · Sirene",
+            i: "bell",
+          },
+          {
+            t: "Integração Trucks",
+            d: "API v3.4 · token expira em 142 dias",
+            i: "plug",
+          },
+          {
+            t: "Webhooks e notificações",
+            d: "2 webhooks ativos",
+            i: "external",
+          },
+          {
+            t: "Exportação e BI",
+            d: "PowerBI · Looker Studio · CSV",
+            i: "download",
+          },
         ].map((c, i) => (
-          <div key={i} className="card" style={{cursor: c.action ? "pointer" : "default", opacity: c.action === null ? 0.72 : 1}} onClick={c.action || undefined}>
+          <div
+            key={i}
+            className="card"
+            style={{
+              cursor: c.action ? "pointer" : "default",
+              opacity: c.action === null ? 0.72 : 1,
+            }}
+            onClick={c.action || undefined}
+          >
             <div className="row between">
-              <div className="row" style={{gap: 10}}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: 6,
-                  background: "var(--accent-soft)",
-                  display: "grid", placeItems: "center",
-                  color: "var(--brand-blue)",
-                  border: "1px solid var(--accent-border)",
-                }}>
-                  <Icon name={c.i} size={15}/>
+              <div className="row" style={{ gap: 10 }}>
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 6,
+                    background: "var(--accent-soft)",
+                    display: "grid",
+                    placeItems: "center",
+                    color: "var(--brand-blue)",
+                    border: "1px solid var(--accent-border)",
+                  }}
+                >
+                  <Icon name={c.i} size={15} />
                 </div>
-                <h3 style={{margin: 0, fontSize: 13}}>{c.t}</h3>
+                <h3 style={{ margin: 0, fontSize: 13 }}>{c.t}</h3>
               </div>
-              <Icon name="chevron-right" size={14} className="dim"/>
+              <Icon name="chevron-right" size={14} className="dim" />
             </div>
-            <div className="muted" style={{fontSize: 12, marginTop: 8}}>{c.d}</div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+              {c.d}
+            </div>
           </div>
         ))}
 
         {/* Card WhatsApp */}
-        <div className="card" style={{cursor: "pointer"}} onClick={openWaModal}>
+        <div
+          className="card"
+          style={{ cursor: "pointer" }}
+          onClick={openWaModal}
+        >
           <div className="row between">
-            <div className="row" style={{gap: 10}}>
-              <div style={{
-                width: 32, height: 32, borderRadius: 6,
-                background: "color-mix(in oklab, #25d366 12%, transparent)",
-                display: "grid", placeItems: "center",
-                color: "#25d366",
-                border: "1px solid color-mix(in oklab, #25d366 25%, transparent)",
-              }}>
-                <Icon name="whatsapp" size={15}/>
+            <div className="row" style={{ gap: 10 }}>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 6,
+                  background: "color-mix(in oklab, #25d366 12%, transparent)",
+                  display: "grid",
+                  placeItems: "center",
+                  color: "#25d366",
+                  border:
+                    "1px solid color-mix(in oklab, #25d366 25%, transparent)",
+                }}
+              >
+                <Icon name="whatsapp" size={15} />
               </div>
-              <h3 style={{margin: 0, fontSize: 13}}>WhatsApp</h3>
+              <h3 style={{ margin: 0, fontSize: 13 }}>WhatsApp</h3>
             </div>
-            <Icon name="chevron-right" size={14} className="dim"/>
+            <Icon name="chevron-right" size={14} className="dim" />
           </div>
-          <div className="muted" style={{fontSize: 12, marginTop: 8}}>Conectar celular para automações</div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+            Conectar celular para automações
+          </div>
         </div>
       </div>
 
       {/* Modal QR Code WhatsApp */}
       {showWaModal && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          zIndex: 1000, padding: 16,
-        }} onClick={e => { if (e.target === e.currentTarget) closeWaModal(); }}>
-          <div style={{
-            background: "var(--surface)", border: "1px solid var(--border)",
-            borderRadius: 12, padding: 24, width: "100%", maxWidth: 380,
-          }}>
-            <div className="row between" style={{marginBottom: 20}}>
-              <div className="row" style={{gap: 8}}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: 6,
-                  background: "color-mix(in oklab, #25d366 12%, transparent)",
-                  display: "grid", placeItems: "center", color: "#25d366",
-                  border: "1px solid color-mix(in oklab, #25d366 25%, transparent)",
-                }}>
-                  <Icon name="whatsapp" size={13}/>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: 16,
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeWaModal();
+          }}
+        >
+          <div
+            style={{
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              padding: 24,
+              width: "100%",
+              maxWidth: 380,
+            }}
+          >
+            <div className="row between" style={{ marginBottom: 20 }}>
+              <div className="row" style={{ gap: 8 }}>
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    background: "color-mix(in oklab, #25d366 12%, transparent)",
+                    display: "grid",
+                    placeItems: "center",
+                    color: "#25d366",
+                    border:
+                      "1px solid color-mix(in oklab, #25d366 25%, transparent)",
+                  }}
+                >
+                  <Icon name="whatsapp" size={13} />
                 </div>
-                <h2 style={{margin: 0, fontSize: 15}}>Conectar WhatsApp</h2>
+                <h2 style={{ margin: 0, fontSize: 15 }}>Conectar WhatsApp</h2>
               </div>
-              <button onClick={closeWaModal} style={{
-                background: "none", border: "none", cursor: "pointer",
-                color: "var(--muted)", padding: 4,
-              }}>
-                <Icon name="x" size={18}/>
+              <button
+                onClick={closeWaModal}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: "var(--muted)",
+                  padding: 4,
+                }}
+              >
+                <Icon name="x" size={18} />
               </button>
             </div>
 
             {waState.loading && (
-              <div style={{textAlign: "center", padding: "40px 0", color: "var(--muted)", fontSize: 13}}>
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "40px 0",
+                  color: "var(--muted)",
+                  fontSize: 13,
+                }}
+              >
                 Gerando QR Code...
               </div>
             )}
 
             {waState.connected && (
               <div>
-                <div style={{display: "flex", alignItems: "center", gap: 12, padding: "16px 0 20px"}}>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: "50%", flexShrink: 0,
-                    background: "color-mix(in oklab, #25d366 12%, transparent)",
-                    border: "2px solid #25d366",
-                    display: "grid", placeItems: "center",
-                    color: "#25d366",
-                  }}>
-                    <Icon name="check" size={20} strokeWidth={2.5}/>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "16px 0 20px",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 44,
+                      height: 44,
+                      borderRadius: "50%",
+                      flexShrink: 0,
+                      background:
+                        "color-mix(in oklab, #25d366 12%, transparent)",
+                      border: "2px solid #25d366",
+                      display: "grid",
+                      placeItems: "center",
+                      color: "#25d366",
+                    }}
+                  >
+                    <Icon name="check" size={20} strokeWidth={2.5} />
                   </div>
                   <div>
-                    <div style={{fontSize: 14, fontWeight: 600, color: "#25d366"}}>WhatsApp conectado!</div>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: "#25d366",
+                      }}
+                    >
+                      WhatsApp conectado!
+                    </div>
                     {waState.profileName && (
-                      <div style={{fontSize: 12.5, color: "var(--text)", marginTop: 1}}>{waState.profileName}</div>
+                      <div
+                        style={{
+                          fontSize: 12.5,
+                          color: "var(--text)",
+                          marginTop: 1,
+                        }}
+                      >
+                        {waState.profileName}
+                      </div>
                     )}
                     {waState.phone && (
-                      <div className="muted" style={{fontSize: 12, marginTop: 1}}>
+                      <div
+                        className="muted"
+                        style={{ fontSize: 12, marginTop: 1 }}
+                      >
                         {formatPhone(waState.phone)}
                       </div>
                     )}
                   </div>
                 </div>
 
-<div className="row" style={{gap: 8, justifyContent: "flex-end"}}>
-                  <button onClick={closeWaModal} className="btn primary" style={{fontSize: 13}}>
+                <div
+                  className="row"
+                  style={{ gap: 8, justifyContent: "flex-end" }}
+                >
+                  <button
+                    onClick={closeWaModal}
+                    className="btn primary"
+                    style={{ fontSize: 13 }}
+                  >
                     Fechar
                   </button>
                 </div>
@@ -950,30 +1748,52 @@ const pollRef = React.useRef(null);
             )}
 
             {waState.qrcode && !waState.connected && (
-              <div style={{textAlign: "center"}}>
-                <div className="muted" style={{fontSize: 12, marginBottom: 14, lineHeight: 1.5}}>
-                  Abra o WhatsApp → <strong>Dispositivos vinculados</strong> → <strong>Vincular um dispositivo</strong>
+              <div style={{ textAlign: "center" }}>
+                <div
+                  className="muted"
+                  style={{ fontSize: 12, marginBottom: 14, lineHeight: 1.5 }}
+                >
+                  Abra o WhatsApp → <strong>Dispositivos vinculados</strong> →{" "}
+                  <strong>Vincular um dispositivo</strong>
                 </div>
                 <img
                   src={waState.qrcode}
                   alt="QR Code WhatsApp"
-                  style={{width: 220, height: 220, borderRadius: 8, border: "1px solid var(--border)"}}
+                  style={{
+                    width: 220,
+                    height: 220,
+                    borderRadius: 8,
+                    border: "1px solid var(--border)",
+                  }}
                 />
-                <div className="muted" style={{fontSize: 11.5, marginTop: 10}}>
+                <div
+                  className="muted"
+                  style={{ fontSize: 11.5, marginTop: 10 }}
+                >
                   Aguardando leitura do QR Code...
                 </div>
-                <button onClick={loadQrCode} className="btn primary" style={{marginTop: 14, fontSize: 13}}>
+                <button
+                  onClick={loadQrCode}
+                  className="btn primary"
+                  style={{ marginTop: 14, fontSize: 13 }}
+                >
                   Gerar novo QR Code
                 </button>
               </div>
             )}
 
             {waState.error && (
-              <div style={{textAlign: "center", padding: "20px 0"}}>
-                <div style={{color: "#dc2626", fontSize: 13, marginBottom: 12}}>
+              <div style={{ textAlign: "center", padding: "20px 0" }}>
+                <div
+                  style={{ color: "#dc2626", fontSize: 13, marginBottom: 12 }}
+                >
                   {waState.error}
                 </div>
-                <button onClick={loadQrCode} className="btn primary" style={{fontSize: 13}}>
+                <button
+                  onClick={loadQrCode}
+                  className="btn primary"
+                  style={{ fontSize: 13 }}
+                >
                   Tentar novamente
                 </button>
               </div>
@@ -988,4 +1808,4 @@ const pollRef = React.useRef(null);
 window.App = App;
 
 // Mount
-ReactDOM.createRoot(document.getElementById("app")).render(<App/>);
+ReactDOM.createRoot(document.getElementById("app")).render(<App />);
