@@ -225,6 +225,7 @@ const NAV = [
     icon: "search",
     title: "Consulta de NCM e rateio de frete",
     section: "operacao",
+    permission: "consulta-cte",
   },
   {
     id: "controle-canhotos",

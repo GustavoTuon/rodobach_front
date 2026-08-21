@@ -29,7 +29,7 @@ const TELAS_GRUPOS = [
       { id: "perm_status_carga", label: "Status Carga" },
       { id: "perm_trafegus", label: "Trafegus" },
       { id: "perm_oportunidades_retorno", label: "Retorno" },
-      { id: "perm_consulta_nfe", label: "Consultar NF-e" },
+      { id: "perm_consulta_nfe", label: "NF / NCM e rateio" },
       { id: "perm_controle_canhotos", label: "Canhotos" },
     ],
   },
