@@ -2,7 +2,7 @@ import { consolidateNfes, parseNfeXml } from "../xml-nfe.js";
 
 const ConsultaCte = () => {
   const [modo, setModo] = React.useState("consulta");
-  const [tipo, setTipo] = React.useState("nf");
+  const [tipo, setTipo] = React.useState("ibrap");
   const [numero, setNumero] = React.useState("");
   const [serie, setSerie] = React.useState("1");
   const [fornecedor, setFornecedor] = React.useState("");
@@ -16,6 +16,8 @@ const ConsultaCte = () => {
   const [lendoXml, setLendoXml] = React.useState(false);
   const [freteXml, setFreteXml] = React.useState("");
   const [ratearFreteXml, setRatearFreteXml] = React.useState(false);
+  const [notaXmlAberta, setNotaXmlAberta] = React.useState("");
+  const [chaveCopiada, setChaveCopiada] = React.useState("");
 
   const numberValue = (value) => {
     const text = String(value || "").trim();
@@ -39,6 +41,25 @@ const ConsultaCte = () => {
       minimumFractionDigits: digits,
       maximumFractionDigits: digits,
     });
+
+  const copiarChave = async (chave) => {
+    const value = String(chave || "").trim();
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      const input = document.createElement("textarea");
+      input.value = value;
+      input.style.position = "fixed";
+      input.style.opacity = "0";
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      input.remove();
+    }
+    setChaveCopiada(value);
+    window.setTimeout(() => setChaveCopiada((current) => current === value ? "" : current), 1800);
+  };
 
   const resumoXml = consolidateNfes(notasXml);
   const freteXmlTotal = numberValue(freteXml);
@@ -139,19 +160,21 @@ const ConsultaCte = () => {
     event?.preventDefault();
     const cleanNumero = numero.replace(/\D/g, "");
     if (!cleanNumero) return setError("Informe o número da consulta.");
-    if (tipo === "nf" && !serie.trim())
+    if (["nf", "ibrap"].includes(tipo) && !serie.trim())
       return setError("Informe a série da nota fiscal.");
     setLoading(true);
     setError("");
     setSearched(false);
     setResultados([]);
     try {
-      const data = await window.RB_API.consultarNcmRateio({
-        tipo,
-        numero: cleanNumero,
-        serie: serie.trim(),
-        fornecedor: fornecedor.trim(),
-      });
+      const data = tipo === "ibrap"
+        ? await window.RB_API.consultarNfeIbrap(cleanNumero, serie.trim())
+        : await window.RB_API.consultarNcmRateio({
+            tipo,
+            numero: cleanNumero,
+            serie: serie.trim(),
+            fornecedor: fornecedor.trim(),
+          });
       setResultados(Array.isArray(data?.resultados) ? data.resultados : []);
       setSearched(true);
     } catch (requestError) {
@@ -197,6 +220,7 @@ const ConsultaCte = () => {
       {modo === "consulta" && <form className="card" onSubmit={consultar} style={{ padding: 18 }}>
         <div style={{ display: "flex", gap: 7, marginBottom: 16 }}>
           {[
+            ["ibrap", "Chave IBRAP / ESAF"],
             ["nf", "Buscar por nota fiscal"],
             ["cte", "Buscar por CT-e"],
           ].map(([key, label]) => (
@@ -213,7 +237,7 @@ const ConsultaCte = () => {
 
         <div className="ncm-query-grid">
           <label>
-            <span>{tipo === "nf" ? "Número da NF" : "Número do CT-e"}</span>
+            <span>{tipo === "cte" ? "Número do CT-e" : "Número da NF"}</span>
             <input
               autoFocus
               inputMode="numeric"
@@ -221,7 +245,7 @@ const ConsultaCte = () => {
               onChange={(event) =>
                 setNumero(event.target.value.replace(/\D/g, ""))
               }
-              placeholder={tipo === "nf" ? "Ex.: 718685" : "Ex.: 4347"}
+              placeholder={tipo === "cte" ? "Ex.: 4347" : "Ex.: 718685"}
               style={fieldStyle}
             />
           </label>
@@ -244,7 +268,7 @@ const ConsultaCte = () => {
               />
             </label>
           )}
-          <label>
+          {tipo !== "ibrap" && <label>
             <span>Frete total (R$)</span>
             <input
               inputMode="decimal"
@@ -253,7 +277,7 @@ const ConsultaCte = () => {
               placeholder="0,00"
               style={fieldStyle}
             />
-          </label>
+          </label>}
           <button
             className="btn primary"
             disabled={loading}
@@ -272,7 +296,22 @@ const ConsultaCte = () => {
         </div>
       )}
 
-      {modo === "consulta" && !!resultados.length && (
+      {modo === "consulta" && tipo === "ibrap" && !!resultados.length && (
+        <div className="card ncm-results nfe-key-results">
+          <div className="card-header"><div><h3>Chaves encontradas</h3><div className="meta">IBRAP / ESAF · todas as unidades cadastradas</div></div><span className="badge ok">{resultados.length} NF-e</span></div>
+          <div className="nfe-key-list">
+            {resultados.map((row) => (
+              <div className="nfe-key-card" key={`${row.empresa}-${row.serie}-${row.numeroCte}-${row.numeroNota}-${row.chaveNfe}`}>
+                <div className="nfe-key-head"><div><strong>NF-e {row.numeroNota}</strong><span>Série {row.serieNota || "—"} · emitida em {formatDate(row.dataEmissao)}</span></div><span>{row.origem || "ERP"}</span></div>
+                <div className="nfe-key-value"><code>{row.chaveNfe}</code><button type="button" className="btn primary" onClick={() => copiarChave(row.chaveNfe)}><Icon name="copy" size={13}/>{chaveCopiada === row.chaveNfe ? " Copiada!" : " Copiar chave"}</button></div>
+                {row.numeroCte && <div className="muted">CT-e {row.serie || ""}-{row.numeroCte}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {modo === "consulta" && tipo !== "ibrap" && !!resultados.length && (
         <div className="card ncm-results">
           <div className="ncm-summary">
             <div>
@@ -300,6 +339,7 @@ const ConsultaCte = () => {
                 <tr>
                   <th>Nota fiscal</th>
                   <th>Fornecedor</th>
+                  <th>Destinatário</th>
                   <th>CT-e</th>
                   <th>NCM predominante</th>
                   <th>Emissão</th>
@@ -320,10 +360,15 @@ const ConsultaCte = () => {
                     <td>
                       <strong>NF {item.numeroNota}</strong>
                       <div className="muted">Série {item.serieNota || "—"}</div>
+                      {item.chaveNfe && <div className="ncm-access-key"><code title={item.chaveNfe}>{item.chaveNfe}</code><button type="button" onClick={() => copiarChave(item.chaveNfe)}>{chaveCopiada === item.chaveNfe ? "Copiada" : "Copiar"}</button></div>}
                     </td>
                     <td>
                       {item.fornecedor || "—"}
                       <div className="muted">{item.origem}</div>
+                    </td>
+                    <td>
+                      {item.destinatario || "Não identificado"}
+                      {item.destinatarioDocumento && <div className="muted">{item.destinatarioDocumento}</div>}
                     </td>
                     <td>
                       {item.numeroCte
@@ -428,20 +473,38 @@ const ConsultaCte = () => {
                 </div>
                 <div style={{ overflowX: "auto" }}>
                 <table className="data-table ncm-table">
-                  <thead><tr><th>Arquivo / NF-e</th><th>Emitente</th><th>NCM predominante</th><th className="num">Valor</th><th className="num">Peso considerado</th>{ratearFreteXml && <><th className="num">Proporção</th><th className="num">Frete rateado</th></>}<th className="num">Valor por kg</th></tr></thead>
+                  <thead><tr><th>Arquivo / NF-e</th><th>Emitente</th><th>Destinatário</th><th>NCM predominante</th><th className="num">Valor</th><th className="num">Peso considerado</th>{ratearFreteXml && <><th className="num">Proporção</th><th className="num">Frete rateado</th></>}<th className="num">Valor por kg</th><th className="num">Detalhes</th></tr></thead>
                   <tbody>
                     {grupo.notes.map((note) => {
                       const noteSummary = consolidateNfes([note]);
+                      const noteKey = note.chave || note.arquivo;
+                      const aberta = notaXmlAberta === noteKey;
                       return (
-                        <tr key={note.chave || note.arquivo}>
-                          <td><strong>NF {note.numero || "—"}</strong><div className="muted">Série {note.serie || "—"} · {note.arquivo}</div></td>
+                        <React.Fragment key={noteKey}>
+                        <tr>
+                          <td><strong>NF {note.numero || "—"}</strong><div className="muted">Série {note.serie || "—"}</div></td>
                           <td>{note.emitente || "Não informado"}</td>
+                          <td>{note.cliente || "Não informado"}{note.clienteDocumento && <div className="muted">{note.clienteDocumento}</div>}</td>
                           <td><strong className="ncm-code">{noteSummary.ncmPredominante || "Não informado"}</strong></td>
                           <td className="num">{money(note.valorNota)}</td>
                           <td className="num">{decimal(note.pesoConsiderado)} kg<div className="muted">{note.pesoBruto ? "peso bruto" : note.pesoLiquido ? "peso líquido" : "não informado"}</div></td>
                           {ratearFreteXml && <><td className="num">{decimal(note.percentualPeso, 2)}%</td><td className="num ncm-rate"><strong>{money(note.freteRateado)}</strong></td></>}
                           <td className="num ncm-rate"><strong>{noteSummary.valorPorKg == null ? "—" : `${money(noteSummary.valorPorKg)} / kg`}</strong></td>
+                          <td className="num"><button type="button" className="btn sm" aria-expanded={aberta} onClick={() => setNotaXmlAberta(aberta ? "" : noteKey)}>{aberta ? "Ver menos" : "Ver mais"}</button></td>
                         </tr>
+                        {aberta && (
+                          <tr className="xml-note-detail-row">
+                            <td colSpan={ratearFreteXml ? 10 : 8}>
+                              <div className="xml-note-details">
+                                <div><span>Chave de acesso</span><strong className="ncm-code">{note.chave || "Não informada"}</strong></div>
+                                <div><span>Destinatário</span><strong>{note.cliente || "Não informado"}</strong><small>{note.clienteDocumento || "Documento não informado"}</small></div>
+                                <div><span>Emitente</span><strong>{note.emitente || "Não informado"}</strong><small>{note.emitenteDocumento || "Documento não informado"}</small></div>
+                                <div><span>Emissão</span><strong>{formatDate(note.emissao)}</strong></div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
                       );
                     })}
                   </tbody>

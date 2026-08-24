@@ -11290,6 +11290,17 @@ tr.row-ok td:first-child {
 .ncm-summary strong { font-size:22px; }
 .ncm-table { min-width:1000px; }
 .ncm-code { font-family:var(--font-mono); }
+.ncm-access-key { display:flex; align-items:center; gap:6px; margin-top:5px; max-width:310px; }
+.ncm-access-key code { overflow:hidden; color:var(--text-3); font:9.5px var(--font-mono); text-overflow:ellipsis; white-space:nowrap; }
+.ncm-access-key button { flex:none; padding:2px 6px; color:var(--accent); background:transparent; border:1px solid var(--border); border-radius:4px; cursor:pointer; font-size:9.5px; }
+.ncm-access-key button:hover { border-color:var(--accent); background:var(--accent-soft); }
+.nfe-key-list { display:grid; gap:12px; padding:16px; }
+.nfe-key-card { display:grid; gap:12px; padding:16px; border:1px solid var(--border); border-radius:9px; background:var(--surface-2); }
+.nfe-key-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+.nfe-key-head > div { display:grid; gap:3px; }
+.nfe-key-head span { color:var(--text-3); font-size:11px; }
+.nfe-key-value { display:flex; gap:10px; align-items:center; }
+.nfe-key-value code { flex:1; min-width:0; padding:11px 13px; border:1px solid var(--divider); border-radius:7px; background:var(--bg); overflow-wrap:anywhere; font:12px var(--font-mono); }
 .ncm-rate strong { color:var(--ok); }
 .ncm-warning { padding:14px; color:var(--warn); border-top:1px solid var(--border); }
 .ncm-mode-tabs { display:flex; gap:8px; margin-bottom:14px; }
@@ -11304,6 +11315,11 @@ tr.row-ok td:first-child {
 .xml-ncm-ranking { display:grid; gap:0; padding:16px; border-top:1px solid var(--border); }
 .xml-ncm-ranking > strong { margin-bottom:8px; }
 .xml-ncm-row { display:flex; justify-content:space-between; gap:16px; padding:8px 0; border-top:1px solid var(--border); }
+.xml-note-detail-row td { padding:0 !important; background:var(--surface-2); }
+.xml-note-details { display:grid; grid-template-columns:minmax(260px,2fr) repeat(3,minmax(160px,1fr)); gap:16px; padding:14px 16px; border-top:1px solid var(--border); text-align:left; }
+.xml-note-details > div { min-width:0; }
+.xml-note-details span,.xml-note-details small { display:block; color:var(--text-3); font-size:10.5px; }
+.xml-note-details strong { display:block; margin-top:4px; overflow-wrap:anywhere; font-size:12px; }
 .xml-freight-card { display:flex; align-items:center; gap:24px; margin-top:14px; padding:16px 18px; }
 .xml-rate-toggle { display:flex; align-items:flex-start; gap:10px; flex:1; cursor:pointer; }
 .xml-rate-toggle input { margin-top:3px; accent-color:var(--accent); }
@@ -11318,4 +11334,5 @@ tr.row-ok td:first-child {
 .xml-client-head strong { font-size:15px; }
 @media (max-width:1000px) { .ncm-query-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.ncm-query-grid .btn { width:100%; }.ncm-summary strong { font-size:17px; } }
 @media (max-width:1000px) { .xml-summary { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-@media (max-width:620px) { .ncm-query-grid,.ncm-summary { grid-template-columns:1fr; }.ncm-summary > div + div { border-left:0; border-top:1px solid var(--border); }.xml-upload-card,.xml-freight-card { align-items:stretch; flex-direction:column; }.xml-upload-card .btn { justify-content:center; }.xml-freight-value input { width:100%; }.xml-client-head { align-items:flex-start; flex-direction:column; }.xml-client-head > div:last-child { text-align:left; }.xml-ncm-row { align-items:flex-start; flex-direction:column; gap:3px; } }
+@media (max-width:620px) { .ncm-query-grid,.ncm-summary { grid-template-columns:1fr; }.ncm-summary > div + div { border-left:0; border-top:1px solid var(--border); }.xml-upload-card,.xml-freight-card { align-items:stretch; flex-direction:column; }.xml-upload-card .btn { justify-content:center; }.xml-freight-value input { width:100%; }.xml-client-head { align-items:flex-start; flex-direction:column; }.xml-client-head > div:last-child { text-align:left; }.xml-ncm-row { align-items:flex-start; flex-direction:column; gap:3px; }.xml-note-details { grid-template-columns:1fr; } }
+@media (max-width:620px) { .nfe-key-value { align-items:stretch; flex-direction:column; }.nfe-key-value .btn { justify-content:center; } }
