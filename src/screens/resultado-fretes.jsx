@@ -377,7 +377,7 @@ const ResultadoFretes = () => {
 
       <div className="card card-flush rf-operation">
         <div className="card-header">
-          <div><h3>Desempenho por veículo</h3><div className="meta">{documentos.length} CT-es · {veiculos.length} veículos · margem geral {rfPct(total.margem)}</div></div>
+          <div><h3>Desempenho por veículo</h3><div className="meta">{documentos.length} CT-es filtrados · {veiculos.length} veículos · margem do recorte {rfPct(total.margem)}</div></div>
           <input className="rf-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar CT-e, cliente, comercial, placa ou rota..." style={{ minWidth: 340 }}/>
         </div>
         <div className="rf-toolbar">
