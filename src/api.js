@@ -188,7 +188,55 @@ window.RB_API = {
     }),
   getViagemAuditoria: (id) => apiRequest(`/viagens/${id}/auditoria`),
 
+  getCargasViagensV2Resumo: () => apiRequest("/cargas-viagens-v2/resumo"),
+  getCargasViagensV2Filtros: () => apiRequest("/cargas-viagens-v2/filtros"),
+  listCargasV2: (filters = {}) =>
+    apiRequest(`/cargas-viagens-v2/cargas${buildQuery(filters)}`),
+  getCargaV2: (id) => apiRequest(`/cargas-viagens-v2/cargas/${id}`),
+  createCargaV2: (payload) =>
+    apiRequest("/cargas-viagens-v2/cargas", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateCargaV2: (id, payload) =>
+    apiRequest(`/cargas-viagens-v2/cargas/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteCargaV2: (id) =>
+    apiRequest(`/cargas-viagens-v2/cargas/${id}`, { method: "DELETE" }),
+  updateCargaAprovacaoV2: (id, payload) =>
+    apiRequest(`/cargas-viagens-v2/cargas/${id}/aprovacao`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  listViagensV2: (filters = {}) =>
+    apiRequest(`/cargas-viagens-v2/viagens${buildQuery(filters)}`),
+  getViagemV2: (id) => apiRequest(`/cargas-viagens-v2/viagens/${id}`),
+  createViagemV2: (payload) =>
+    apiRequest("/cargas-viagens-v2/viagens", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateViagemV2: (id, payload) =>
+    apiRequest(`/cargas-viagens-v2/viagens/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  deleteViagemV2: (id) =>
+    apiRequest(`/cargas-viagens-v2/viagens/${id}`, { method: "DELETE" }),
+  saveCargaDocumentosV2: (id, documentos) =>
+    apiRequest(`/cargas-viagens-v2/cargas/${id}/documentos`, {
+      method: "PUT",
+      body: JSON.stringify({ documentos }),
+    }),
+
   // ── Financeiro ────────────────────────────────────────────────────────────
+  calcularPrecoCargaV2: (payload) =>
+    apiRequest("/cargas-viagens-v2/gestao/preco", { method: "POST", body: JSON.stringify(payload) }),
+  consultarCotacaoFretesV2: (payload) =>
+    apiRequest("/cargas-viagens-v2/gestao/cotacao", { method: "POST", body: JSON.stringify(payload) }),
+
   getAnaliseFrota: (filters = {}) =>
     apiRequest(`/frota/analise${buildQuery(filters || {})}`),
   getAnaliseAbastecimentos: (filters = {}) =>

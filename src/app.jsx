@@ -6,7 +6,7 @@ const { useState, useEffect } = React;
 const SCREEN_SCRIPTS = [
   "src/screens/diretoria.jsx",
   "src/screens/simulador.jsx",
-  "src/screens/viagens.jsx?v=20260803-google-routes",
+  "src/screens/cargas-viagens-v2.jsx?v=20260824-tema-claro-5",
   "src/screens/folgas-motoristas.jsx?v=20260803-corte-marco",
   "src/screens/status-carga.jsx",
   "src/screens/trafegus.jsx",
@@ -36,7 +36,7 @@ const SCREEN_SCRIPTS = [
 const SCREEN_GLOBALS = [
   "Diretoria",
   "SimuladorFrete",
-  "Viagens",
+  "CargasViagensV2",
   "FolgasMotoristas",
   "StatusCargaFrota",
   "Trafegus",
@@ -186,9 +186,9 @@ const NAV = [
   },
   {
     id: "viagens",
-    label: "Viagens",
+    label: "Cargas e viagens",
     icon: "route",
-    title: "Viagens e Cotações",
+    title: "Cargas e viagens",
     section: "operacao",
   },
   {
@@ -571,7 +571,7 @@ const App = () => {
       body = <SimuladorFrete onNavigate={onNavigate} />;
       break;
     case "viagens":
-      body = <Viagens onNavigate={onNavigate} user={auth.user} />;
+      body = <CargasViagensV2 onNavigate={onNavigate} user={auth.user} />;
       break;
     case "folgas-motoristas":
       body = <FolgasMotoristas onNavigate={onNavigate} />;
