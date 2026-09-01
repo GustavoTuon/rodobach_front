@@ -536,13 +536,13 @@ function cv2PrintTrip(viagem) {
   });
 }
 
-function Cv2TripDetails({ viagem, onClose }) {
+function Cv2TripDetails({ viagem, onClose, onLinkCte }) {
   return <Cv2Modal title={`Viagem ${viagem.numero}`} subtitle={`${cv2Date(viagem.data)} · ${viagem.placa || "Sem placa"}`} onClose={onClose} wide>
     <div className="cv2-modal-body">
       <div className="cv2-detail-grid"><div><span>Operação</span><Cv2Status value={viagem.situacao} vehicleLinked={Boolean(viagem.placa)} /></div><div><span>Financeiro</span><Cv2FinancialStatus value={viagem.financeiro} /></div><div><span>Motorista</span><b>{viagem.motorista || "—"}</b></div><div><span>KM previsto</span><b>{viagem.km ?? "—"}</b></div><div><span>ANTT / RNTRC</span><b>{viagem.antt || "—"}</b></div><div><span>Celular / CNH</span><b>{[viagem.numeroMotorista, viagem.cnh].filter(Boolean).join(" · ") || "—"}</b></div></div>
       <Cv2TripBilling financeiro={viagem.financeiro} />
       <h3 className="cv2-subtitle">Cargas vinculadas</h3>
-      <div className="cv2-linked-loads">{viagem.cargas.map((carga) => <div key={carga.id}><div><strong>{carga.codigo} · {carga.cliente}</strong><span>{carga.origem}/{carga.ufOrigem} → {carga.destino}/{carga.ufDestino}</span></div><div className="cv2-linked-statuses"><Cv2Status value={carga.status} /><Cv2FinancialStatus value={carga.financeiro} /><button className="btn" onClick={() => cv2PrintLoad(carga)}><Icon name="file" size={13} /> Imprimir carga</button></div></div>)}</div>
+      <div className="cv2-linked-loads">{viagem.cargas.map((carga) => { const hasCte = (carga.documentos || []).some((doc) => String(doc.tipo || "").toUpperCase().includes("CT")); return <div key={carga.id}><div><strong>{carga.codigo} · {carga.cliente}</strong><span>{carga.origem}/{carga.ufOrigem} → {carga.destino}/{carga.ufDestino}</span></div><div className="cv2-linked-statuses"><Cv2Status value={carga.status} /><Cv2FinancialStatus value={carga.financeiro} /><button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => onLinkCte(carga)}><Icon name="file" size={13} /> {hasCte ? "Documentos / CT-e" : "Vincular CT-e"}</button><button className="btn" onClick={() => cv2PrintLoad(carga)}>Imprimir carga</button></div></div>; })}</div>
     </div>
     <footer className="cv2-modal-actions"><button className="btn" onClick={onClose}>Fechar</button><button className="btn primary" onClick={() => cv2PrintTrip(viagem)}>Imprimir folha da viagem</button></footer>
   </Cv2Modal>;
@@ -700,8 +700,7 @@ const CargasViagensV2 = ({ user }) => {
     const approvalPending = ["rascunho", "correcao_solicitada", "reprovada"].includes(carga.statusAprovacao || "rascunho");
     return <div className="cv2-row-actions">
       {carga.status === "aguardando_viagem" && <button className="btn primary" onClick={() => openViagemForm(carga.id)}>Programar veículo</button>}
-      {carga.status === "aguardando_cte" && carga.viagemId && <button className="btn primary" onClick={() => setModal({ type: "cte", item: carga })}>{hasCte ? "Documentos" : "Vincular CT-e"}</button>}
-      {["em_transito", "entregue"].includes(carga.status) && carga.viagemId && <button className="btn" onClick={() => setModal({ type: "cte", item: carga })}>Documentos</button>}
+      {carga.viagemId && <button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => setModal({ type: "cte", item: carga })}>{hasCte ? "Documentos / CT-e" : "Vincular CT-e"}</button>}
       <details className="cv2-more"><summary aria-label="Mais ações">•••</summary><div>
         <button onClick={() => cv2PrintLoad(carga)}><Icon name="file" size={13} /> Imprimir folha da carga</button>
         <button onClick={() => setModal({ type: "carga", item: carga })}>Editar carga</button>
@@ -766,7 +765,7 @@ const CargasViagensV2 = ({ user }) => {
     {modal?.type === "viagem" && <Cv2ViagemForm initial={modal.item} initialCargaId={modal.initialCargaId} cargas={modal.cargas || []} onClose={() => setModal(null)} onCreateCarga={(viagem) => setModal({ type: "cargaViagem", viagem })} onSaved={(item) => { setModal(modal.item ? null : { type: "tripDone", item }); load(true); }} />}
     {modal?.type === "cargaViagem" && <Cv2CargaForm user={user} onClose={() => setModal({ type: "details", item: modal.viagem })} onSaved={(carga) => saveCargaInViagem(modal.viagem, carga).catch((err) => { setError(cv2Error(err)); setModal(null); })} />}
     {modal?.type === "cte" && <Cv2CteModal carga={modal.item} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(true); }} />}
-    {modal?.type === "details" && <Cv2TripDetails viagem={modal.item} onClose={() => setModal(null)} />}
+    {modal?.type === "details" && <Cv2TripDetails viagem={modal.item} onClose={() => setModal(null)} onLinkCte={(carga) => setModal({ type: "cte", item: carga })} />}
     {modal?.type === "deleteCarga" && <Cv2DeleteModal type="carga" item={modal.item} onClose={() => setModal(null)} onDeleted={removeDone} />}
     {modal?.type === "deleteViagem" && <Cv2DeleteModal type="viagem" item={modal.item} onClose={() => setModal(null)} onDeleted={removeDone} />}
     {modal?.type === "tripDone" && <Cv2Modal title="Viagem criada com sucesso" subtitle={`${modal.item.numero} está aguardando a vinculação do CT-e.`} onClose={() => setModal(null)}><div className="cv2-modal-body"><div className="cv2-alert success"><b>{modal.item.placa}</b> · {modal.item.motorista || "Motorista não informado"}<br />{modal.item.cargas.length} carga(s) vinculada(s).</div></div><footer className="cv2-modal-actions"><button className="btn" onClick={() => setModal(null)}>Fechar</button><button className="btn primary" onClick={() => cv2PrintTrip(modal.item)}>Imprimir folha da viagem</button></footer></Cv2Modal>}
