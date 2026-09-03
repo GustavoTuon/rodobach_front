@@ -9,6 +9,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/cargas-viagens-v2.jsx?v=20260824-tema-claro-5",
   "src/screens/folgas-motoristas.jsx?v=20260803-corte-marco",
   "src/screens/status-carga.jsx",
+  "src/screens/ociosidade-frota.jsx",
   "src/screens/trafegus.jsx",
   "src/screens/oportunidades-retorno.jsx",
   "src/screens/dre-empresarial.jsx",
@@ -39,6 +40,7 @@ const SCREEN_GLOBALS = [
   "CargasViagensV2",
   "FolgasMotoristas",
   "StatusCargaFrota",
+  "OciosidadeFrota",
   "Trafegus",
   "OportunidadesRetorno",
   "DreEmpresarial",
@@ -204,6 +206,14 @@ const NAV = [
     icon: "package",
     title: "Status de Carga da Frota",
     section: "operacao",
+  },
+  {
+    id: "ociosidade-frota",
+    label: "Ociosidade (teste)",
+    icon: "clock",
+    title: "Ociosidade da Frota",
+    section: "operacao",
+    permission: "status-carga",
   },
   {
     id: "trafegus",
@@ -578,6 +588,9 @@ const App = () => {
       break;
     case "status-carga":
       body = <StatusCargaFrota onNavigate={onNavigate} />;
+      break;
+    case "ociosidade-frota":
+      body = <OciosidadeFrota onNavigate={onNavigate} />;
       break;
     case "trafegus":
       body = <Trafegus onNavigate={onNavigate} />;
