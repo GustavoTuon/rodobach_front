@@ -15,6 +15,14 @@ const fmValidation = {
   revisar: { label: "Revisar", color: "#dc2626", bg: "rgba(220,38,38,.12)" },
   sem_dados: { label: "Sem telemetria", color: "#71717a", bg: "rgba(113,113,122,.12)" },
 };
+const fmIsoDay = (date) => {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
+const fmHours = (value) => {
+  const minutes = Math.round(Number(value || 0) * 60);
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}min`;
+};
 
 const FolgasMotoristas = () => {
   const [data, setData] = React.useState({ itens: [], resumo: {}, total: 0 });
@@ -26,6 +34,12 @@ const FolgasMotoristas = () => {
   const [modal, setModal] = React.useState(null);
   const [saving, setSaving] = React.useState(false);
   const [updatedAt, setUpdatedAt] = React.useState(null);
+  const initialMacroEnd = React.useMemo(() => new Date(), []);
+  const initialMacroStart = React.useMemo(() => new Date(initialMacroEnd.getTime() - 7 * 86400000), [initialMacroEnd]);
+  const [macroFilters, setMacroFilters] = React.useState({ placa: "SXY5D26", inicio: fmIsoDay(initialMacroStart), fim: fmIsoDay(initialMacroEnd) });
+  const [macroData, setMacroData] = React.useState(null);
+  const [macroLoading, setMacroLoading] = React.useState(true);
+  const [macroError, setMacroError] = React.useState("");
   const limite = 50;
 
   const load = React.useCallback(async () => {
@@ -38,6 +52,14 @@ const FolgasMotoristas = () => {
   }, [busca, status, pagina]);
 
   React.useEffect(() => { const timer = setTimeout(load, 250); return () => clearTimeout(timer); }, [load]);
+
+  const loadMacros = React.useCallback(async () => {
+    setMacroLoading(true); setMacroError("");
+    try { setMacroData(await RB_API.getJornadaMacros(macroFilters)); }
+    catch (e) { setMacroError(e.message); }
+    finally { setMacroLoading(false); }
+  }, [macroFilters]);
+  React.useEffect(() => { loadMacros(); }, []); // carrega o teste inicial do SXY
 
   const save = async (event) => {
     event.preventDefault(); setSaving(true); setError("");
@@ -93,6 +115,33 @@ const FolgasMotoristas = () => {
         {card("Disponíveis", data.resumo?.disponiveis, "#047857")}
         {card("Saldo calculado de folgas", (data.itens||[]).reduce((s,x)=>s+(x.retroativo?.folgasDisponiveis||0),0), "#7c3aed")}
       </div>
+
+      <section style={{border:"1px solid var(--border)",borderRadius:11,background:"var(--surface)",padding:18,marginBottom:18}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,marginBottom:14}}>
+          <div><h2 style={{fontSize:16,margin:0}}>Tempo trabalhado pelas macros</h2><p style={{fontSize:12,color:"var(--muted)",margin:"5px 0 0"}}>Início e reinício abrem um trecho; parada, refeição, abastecimento, chegada e fim encerram o trecho.</p></div>
+          <span style={{fontSize:10.5,color:"#b45309",background:"rgba(217,119,6,.1)",padding:"6px 9px",borderRadius:999}}>Controle operacional</span>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"minmax(150px,1fr) 150px 150px auto",gap:9,alignItems:"end",marginBottom:14}}>
+          <label style={{fontSize:11,color:"var(--muted)"}}>Veículo<select value={macroFilters.placa} onChange={e=>setMacroFilters(current=>({...current,placa:e.target.value}))} style={{display:"block",width:"100%",height:36,marginTop:5,background:"var(--surface-2)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:7,padding:"0 9px"}}>{(macroData?.veiculos || [{placa:"SXY5D26",motorista:""}]).map(item=><option key={item.placa} value={item.placa}>{item.placa}{item.motorista?` · ${item.motorista}`:""}</option>)}</select></label>
+          <label style={{fontSize:11,color:"var(--muted)"}}>Início<input type="date" value={macroFilters.inicio} onChange={e=>setMacroFilters(current=>({...current,inicio:e.target.value}))} style={{display:"block",width:"100%",height:36,marginTop:5,boxSizing:"border-box",background:"var(--surface-2)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:7,padding:"0 9px"}}/></label>
+          <label style={{fontSize:11,color:"var(--muted)"}}>Fim<input type="date" value={macroFilters.fim} onChange={e=>setMacroFilters(current=>({...current,fim:e.target.value}))} style={{display:"block",width:"100%",height:36,marginTop:5,boxSizing:"border-box",background:"var(--surface-2)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:7,padding:"0 9px"}}/></label>
+          <button className="btn primary" onClick={loadMacros} disabled={macroLoading} style={{height:36}}>{macroLoading?"Calculando…":"Calcular período"}</button>
+        </div>
+        {macroError && <div style={{padding:11,background:"rgba(220,38,38,.1)",color:"#ef4444",borderRadius:7,marginBottom:12,fontSize:12}}>{macroError}</div>}
+        {macroData && <>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(120px,1fr))",gap:9,marginBottom:14}}>
+            {card("Tempo trabalhado", fmHours(macroData.resumo?.horasTrabalhadas), "#2563eb")}
+            {card("Tempo em paradas", fmHours(macroData.resumo?.horasParadas), "#d97706")}
+            {card("Trechos trabalhados", macroData.resumo?.trechosTrabalhados)}
+            {card("Maior trecho contínuo", fmHours(macroData.resumo?.maiorTrechoHoras), "#7c3aed")}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+            <div style={{border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}><div style={{padding:"9px 11px",background:"var(--surface-2)",fontSize:11,fontWeight:600}}>Trechos trabalhados</div><div style={{maxHeight:260,overflow:"auto"}}>{(macroData.sessoes||[]).slice().reverse().map((item,index)=><div key={`${item.inicio}-${index}`} style={{padding:"10px 11px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",gap:10,fontSize:11.5}}><div><strong>{fmDate(item.inicio)} → {fmDate(item.fim)}</strong><span style={{display:"block",color:"var(--muted)",marginTop:3}}>{item.inicioMacro} → {item.fimMacro || "Em andamento"}</span></div><b style={{color:"#60a5fa",whiteSpace:"nowrap"}}>{fmHours(item.duracaoHoras)}</b></div>)}{!macroData.sessoes?.length&&<div style={{padding:18,color:"var(--muted)",fontSize:12}}>Nenhum trecho completo no período.</div>}</div></div>
+            <div style={{border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}><div style={{padding:"9px 11px",background:"var(--surface-2)",fontSize:11,fontWeight:600}}>Macros recebidas</div><div style={{maxHeight:260,overflow:"auto"}}>{(macroData.eventos||[]).slice(0,50).map(item=><div key={item.id} style={{padding:"9px 11px",borderTop:"1px solid var(--border)",display:"grid",gridTemplateColumns:"110px 1fr auto",gap:9,fontSize:11.5}}><span style={{color:"var(--muted)"}}>{fmDate(item.dataHora)}</span><strong>{item.descricao}</strong><span style={{color:"var(--muted)"}}>{[item.municipio,item.uf].filter(Boolean).join("/")}</span></div>)}{!macroData.eventos?.length&&<div style={{padding:18,color:"var(--muted)",fontSize:12}}>Nenhuma macro recebida no período.</div>}</div></div>
+          </div>
+          <p style={{fontSize:10.5,color:"var(--muted)",margin:"11px 0 0"}}>ⓘ {macroData.aviso}</p>
+        </>}
+      </section>
 
       <div style={{display:"flex",gap:10,marginBottom:14}}>
         <div style={{position:"relative",flex:1,maxWidth:430}}>
