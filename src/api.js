@@ -120,6 +120,8 @@ window.RB_API = {
     }),
   listMotoristasFolgas: (filters = {}) =>
     apiRequest(`/motoristas/folgas${buildQuery(filters)}`),
+  getJornadaMacros: (filters = {}) =>
+    apiRequest(`/motoristas/jornada-macros${buildQuery(filters)}`),
   registrarSaidaMotorista: (payload) =>
     apiRequest("/motoristas/folgas/saidas", {
       method: "POST",
@@ -267,6 +269,8 @@ window.RB_API = {
     ),
   getStatusCargaFrota: (filters = {}) =>
     apiRequest(`/frota/status-carga${buildQuery(filters || {})}`),
+  getOciosidadeFrota: (filters = {}) =>
+    apiRequest(`/frota/ociosidade${buildQuery(filters || {})}`),
   listMultasFrota: (filters = {}) =>
     apiRequest(`/frota/multas${buildQuery(filters || {})}`),
   saveControleMultaFrota: (empresa, codigo, payload) =>
