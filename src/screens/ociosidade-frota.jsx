@@ -13,6 +13,7 @@ const ofNumber = (value, digits = 1) =>
   new Intl.NumberFormat("pt-BR", { maximumFractionDigits: digits }).format(
     Number(value || 0),
   );
+const ofBRL = (value) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
 const ofDateTime = (value) =>
   value
     ? new Intl.DateTimeFormat("pt-BR", {
@@ -31,14 +32,14 @@ const ofDuration = (hours) => {
     .join(" ");
 };
 
-function OfKpi({ label, value, sub, tone }) {
+function OfKpi({ label, value, sub, tone, help }) {
   return (
     <div
       className="card"
       style={{ padding: 17, borderLeft: `4px solid ${tone}`, minHeight: 104 }}
     >
       <div
-        className="muted"
+        className="muted of-kpi-label"
         style={{
           fontSize: 10,
           letterSpacing: ".06em",
@@ -46,7 +47,8 @@ function OfKpi({ label, value, sub, tone }) {
           fontWeight: 750,
         }}
       >
-        {label}
+        <span>{label}</span>
+        {help && <button type="button" className="of-help" aria-label={`Entenda: ${label}`}><span>i</span><div role="tooltip">{help}</div></button>}
       </div>
       <div
         style={{
@@ -110,6 +112,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
     : 0;
   const emptyPercent = Number(summary.percentualKmVazio || 0);
   const quality = data.qualidade || {};
+  const intervalRows = [...(data.rows || [])].sort((a, b) => Number(b.horasParadoVazio || 0) - Number(a.horasParadoVazio || 0));
   const quickPeriod = (start, end = ofToday()) => {
     setStartDate(start); setEndDate(end); load({ startDate: start, endDate: end });
   };
@@ -122,10 +125,12 @@ const OciosidadeFrota = ({ onNavigate }) => {
       .of-filters label{display:grid;gap:6px;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
       .of-filters input,.of-filters select{width:100%;height:40px;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);padding:0 11px;color-scheme:dark}
       .of-quick{display:flex;gap:6px;justify-content:flex-end;align-items:center;flex-wrap:wrap}.of-quick .btn{padding:9px 11px;white-space:nowrap}
+      .of-kpi-label{display:flex;align-items:center;justify-content:space-between;gap:8px}.of-help{position:relative;display:grid;place-items:center;flex:0 0 18px;width:18px;height:18px;padding:0;border:1px solid var(--border-strong);border-radius:50%;background:var(--surface-2);color:var(--text-2);font:700 10px inherit;cursor:help;text-transform:none;letter-spacing:0}.of-help>div{position:absolute;z-index:20;right:-5px;bottom:calc(100% + 9px);display:none;width:260px;padding:10px 12px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface-1);box-shadow:0 12px 30px rgba(0,0,0,.35);color:var(--text-2);font-size:11px;font-weight:500;line-height:1.5;text-align:left;letter-spacing:0;text-transform:none}.of-help:hover>div,.of-help:focus>div{display:block}.of-help>div:after{content:"";position:absolute;right:9px;top:100%;border:5px solid transparent;border-top-color:var(--border-strong)}
+      .of-calendar-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.of-calendar-grid>div{padding:13px;border:1px solid var(--border);border-radius:9px;background:var(--surface-2)}.of-calendar-grid span,.of-calendar-grid strong,.of-calendar-grid small{display:block}.of-calendar-grid span{color:var(--text-3);font-size:10px;text-transform:uppercase;letter-spacing:.05em}.of-calendar-grid strong{margin-top:6px;font-size:20px}.of-calendar-grid small{margin-top:4px;color:var(--text-3);font-size:10px}
       .of-two{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(280px,.65fr);gap:14px;margin-bottom:14px}
       .of-page .table-wrap{overflow:auto;max-width:100%}.of-page .tbl{min-width:1080px}
       @media(max-width:1100px){.of-filters{grid-template-columns:repeat(3,1fr)}.of-quick{grid-column:1/-1;justify-content:flex-start}.of-page .grid.cols-4{grid-template-columns:repeat(2,minmax(0,1fr))}.of-two{grid-template-columns:1fr}}
-      @media(max-width:650px){.of-page{padding:14px 12px 44px}.of-filters{grid-template-columns:1fr 1fr}.of-filters label:nth-child(3){grid-column:1/-1}.of-page .grid.cols-4{grid-template-columns:1fr}.of-quick{overflow-x:auto;flex-wrap:nowrap}.of-two{grid-template-columns:1fr}}
+      @media(max-width:650px){.of-page{padding:14px 12px 44px}.of-filters{grid-template-columns:1fr 1fr}.of-filters label:nth-child(3){grid-column:1/-1}.of-page .grid.cols-4{grid-template-columns:1fr}.of-quick{overflow-x:auto;flex-wrap:nowrap}.of-two,.of-calendar-grid{grid-template-columns:1fr}}
     `}</style>
       <div className="page-header">
         <div>
@@ -241,53 +246,99 @@ const OciosidadeFrota = ({ onNavigate }) => {
         <OfKpi
           label="KM total real"
           value={`${ofNumber(summary.kmTotal, 0)} km`}
-          sub="Variação do odômetro válido"
+          sub="Distância válida percorrida pela frota"
+          help="Soma da variação dos odômetros considerada confiável no período. É a base usada para separar quilômetros carregados, vazios e não classificados."
           tone="#64748b"
         />
         <OfKpi
           label="KM vazio"
           value={`${ofNumber(Number(summary.kmVazio || 0) + Number(summary.kmVazioConfirmado || 0), 0)} km`}
-          sub="Confirmado + inferido entre SMs"
+          sub="Deslocamento sem carga identificada"
+          help="Soma os trechos vazios confirmados nas SMs com os deslocamentos inferidos entre o fim de uma carga e o início da próxima. Quanto menor, melhor o aproveitamento da frota."
           tone="#2563eb"
         />
         <OfKpi
           label="Percentual de KM vazio"
           value={`${ofNumber(emptyPercent, 1)}%`}
-          sub="Sobre a distância total analisada"
+          sub="Participação do vazio no KM total"
+          help="Cálculo: KM vazio ÷ KM total real × 100. Mostra quanto da distância percorrida não transportou carga e deve ser analisado junto das oportunidades de retorno."
           tone={emptyPercent >= 20 ? "#dc2626" : "#d97706"}
         />
         <OfKpi
           label="Parado em condição vazia"
           value={ofDuration(summary.horasParadoVazio)}
-          sub="Telemetria abaixo de 5 km/h"
+          sub="Veículo vazio e praticamente imóvel"
+          help="Tempo em que o caminhão estava em um intervalo vazio e a telemetria registrou menos de 5 km/h. Pode representar espera por carga, fila, pátio ou intervalo operacional."
           tone="#dc2626"
         />
       </div>
       <div className="grid cols-4" style={{ marginBottom: 14 }}>
         <OfKpi
-          label="Percentual parado"
+          label="Parado nas janelas vazias"
           value={`${summary.percentualParado || 0}%`}
-          sub="Do tempo total vazio"
+          sub="Percentual apenas entre operações"
+          help="Cálculo: horas parado vazio ÷ tempo vazio total × 100. Um valor alto indica que o maior problema está na espera, não somente no deslocamento sem carga."
           tone="#dc2626"
         />
         <OfKpi
           label="Tempo vazio total"
           value={ofDuration(summary.horasVazio)}
-          sub={`${summary.veiculos || 0} caminhões analisados`}
+          sub={`Janela vazia de ${summary.veiculos || 0} caminhões`}
+          help="Tempo acumulado entre operações carregadas, do encerramento de uma carga ao início da próxima. Inclui tempo em movimento e tempo parado nessa condição."
           tone="#7c3aed"
         />
         <OfKpi
           label="Em movimento vazio"
           value={ofDuration(movingEmptyHours)}
-          sub="Tempo vazio menos tempo parado"
+          sub="Deslocamento vazio efetivamente rodando"
+          help="Cálculo: tempo vazio total − tempo parado vazio. Indica quanto tempo a frota esteve rodando sem carga em reposicionamentos ou retornos vazios."
           tone="#0891b2"
         />
         <OfKpi
           label="KM não classificado"
           value={`${ofNumber(summary.kmNaoClassificado, 0)} km`}
-          sub="Requer conferência operacional"
+          sub="Distância sem vínculo confiável com SM"
+          help="Quilômetros válidos no odômetro que não puderam ser associados com segurança a uma viagem carregada ou a um intervalo vazio. Valores altos reduzem a confiança da análise."
           tone="#64748b"
         />
+      </div>
+      <div className="grid cols-4" style={{ marginBottom: 14 }}>
+        <OfKpi
+          label="Média parada por caminhão"
+          value={ofDuration(summary.horasParadoMediaVeiculo)}
+          sub={`Média dos ${summary.veiculos || 0} veículos analisados`}
+          help="Cálculo: total acumulado de horas paradas ÷ quantidade de caminhões analisados. Facilita comparar períodos e evita interpretar a soma da frota como dias corridos."
+          tone="#f59e0b"
+        />
+        <OfKpi
+          label="Parado no período total"
+          value={`${ofNumber(summary.percentualParadoPeriodo, 1)}%`}
+          sub={`Sobre ${summary.diasPeriodo || 0} dias × ${summary.veiculos || 0} caminhões`}
+          help="Cálculo: horas paradas acumuladas ÷ todas as horas disponíveis dos caminhões no período. Este é o percentual adequado para entender o peso da parada no mês inteiro."
+          tone={Number(summary.percentualParadoPeriodo || 0) >= 25 ? "#dc2626" : "#d97706"}
+        />
+        <OfKpi
+          label="Custo fixo da ociosidade"
+          value={ofBRL(summary.custoOciosidadeEstimado)}
+          sub="Estimativa proporcional às horas paradas"
+          help="Usa o custo fixo diário médio de cada veículo nos últimos 90 dias e multiplica pelos dias equivalentes parados fora da base. Não inclui perda de receita nem custos variáveis."
+          tone="#a855f7"
+        />
+        <OfKpi
+          label="Descartado dentro da base"
+          value={ofDuration(summary.horasDescartadasBase)}
+          sub={data.cercaBase?.aplicada ? `Cerca ${data.cercaBase.nome} aplicada` : "Cerca da base não localizada"}
+          help="Tempo retirado da ociosidade porque a posição da telemetria estava dentro da cerca eletrônica da base cadastrada."
+          tone="#64748b"
+        />
+      </div>
+      <div className="card" style={{ padding: 18, marginBottom: 14 }}>
+        <div style={{ marginBottom: 14 }}><h3 style={{ margin: 0 }}>Quando ocorreram as paradas</h3><div className="muted" style={{ fontSize: 11 }}>Horas paradas fora da base, separadas pelo calendário</div></div>
+        <div className="of-calendar-grid">
+          <div><span>Dias úteis</span><strong>{ofDuration(summary.horasParadoDiaUtil)}</strong><small>{summary.horasParadoVazio ? ofNumber(summary.horasParadoDiaUtil / summary.horasParadoVazio * 100, 1) : 0}% das paradas</small></div>
+          <div><span>Finais de semana</span><strong>{ofDuration(summary.horasParadoFimSemana)}</strong><small>{summary.horasParadoVazio ? ofNumber(summary.horasParadoFimSemana / summary.horasParadoVazio * 100, 1) : 0}% das paradas</small></div>
+          <div><span>Feriados nacionais</span><strong>{ofDuration(summary.horasParadoFeriado)}</strong><small>{(data.calendario?.feriadosNacionais || []).length} feriado(s) no período</small></div>
+        </div>
       </div>
       <div className="of-two">
         <div className="card" style={{ padding: 18 }}>
@@ -301,7 +352,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
             <div>
               <h3 style={{ margin: 0 }}>Utilização dos quilômetros</h3>
               <span className="muted" style={{ fontSize: 11 }}>
-                {ofNumber(summary.kmTotal, 0)} km analisados
+                Como a distância total foi utilizada: com carga, vazia ou sem classificação · {ofNumber(summary.kmTotal, 0)} km analisados
               </span>
             </div>
             <b>{classifiedPercent}% classificados</b>
@@ -382,6 +433,9 @@ const OciosidadeFrota = ({ onNavigate }) => {
             <br />
             {summary.intervalos || 0} intervalos analisados
           </div>
+          <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid var(--border)", color: "var(--text-3)", fontSize: 10.5, lineHeight: 1.5 }}>
+            Mede a confiabilidade do resultado combinando cobertura da telemetria, quilômetros classificados e quantidade de intervalos válidos. Quanto mais próximo de 100, menor a necessidade de conferência manual.
+          </div>
         </div>
       </div>
       <div className="card" style={{ padding: 18, marginBottom: 14 }}>
@@ -436,7 +490,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
               Veículos que precisam de atenção
             </h3>
             <div className="muted" style={{ fontSize: 11 }}>
-              Ordenado pelo maior número de quilômetros vazios
+              Ordenado pelo maior tempo parado fora da base
             </div>
           </div>
         </div>
@@ -449,13 +503,14 @@ const OciosidadeFrota = ({ onNavigate }) => {
                 <th className="num">KM vazio</th>
                 <th className="num">% vazio</th>
                 <th className="num">Tempo parado</th>
-                <th className="num">% parado</th>
+                <th className="num">% do período</th>
+                <th className="num">Custo estimado</th>
                 <th className="num">Não classificado</th>
                 <th>Qualidade</th>
               </tr>
             </thead>
             <tbody>
-              {(data.ranking || []).map((row) => (
+              {[...(data.ranking || [])].sort((a, b) => Number(b.horasParadoVazio || 0) - Number(a.horasParadoVazio || 0)).map((row) => (
                 <tr key={row.placa}>
                   <td>
                     <Plate value={row.placa} />
@@ -470,7 +525,8 @@ const OciosidadeFrota = ({ onNavigate }) => {
                     <b>{ofNumber(row.percentualVazio, 1)}%</b>
                   </td>
                   <td className="num">{ofDuration(row.horasParadoVazio)}</td>
-                  <td className="num">{row.percentualParado}%</td>
+                  <td className="num">{ofNumber(row.percentualParadoPeriodo, 1)}%</td>
+                  <td className="num" title={`Custo fixo diário: ${ofBRL(row.custoFixoDiario)}`}>{ofBRL(row.custoOciosidadeEstimado)}</td>
                   <td className="num">
                     {ofNumber(row.kmNaoClassificado, 0)} km
                   </td>
@@ -490,7 +546,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
       <div className="card card-flush">
         <div className="card-header">
           <div>
-            <h3 style={{ marginBottom: 2 }}>Intervalos entre SMs</h3>
+            <h3 style={{ marginBottom: 2 }}>Maiores intervalos parados</h3>
             <div className="muted" style={{ fontSize: 11 }}>
               Do encerramento de uma operação ao início da seguinte
             </div>
@@ -513,7 +569,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
               </tr>
             </thead>
             <tbody>
-              {(data.rows || []).map((row) => {
+              {intervalRows.map((row) => {
                 const stoppedPercent = row.horasVazio
                   ? Math.round((row.horasParadoVazio / row.horasVazio) * 100)
                   : 0;
@@ -616,7 +672,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
               })}
               {!loading && !(data.rows || []).length && (
                 <tr>
-                  <td colSpan="8" className="muted">
+                  <td colSpan="9" className="muted">
                     Nenhum intervalo vazio encontrado no período.
                   </td>
                 </tr>

@@ -96,16 +96,19 @@ const FmChart = ({ meses }) => {
 };
 
 const ComparativoFaturamento = () => {
-  const [ano, setAno] = React.useState(fmTodayYear());
-  const [mesReferencia, setMesReferencia] = React.useState(fmTodayMonth());
-  const [mesAno, setMesAno] = React.useState(fmTodayMonthYear());
-  const [tipoVeiculo, setTipoVeiculo] = React.useState("todos");
-  const [cliente, setCliente] = React.useState("");
-  const [placa, setPlaca] = React.useState("");
-  const [filters, setFilters] = React.useState({ ano: fmTodayYear(), mesReferencia: fmTodayMonth(), mesAno: fmTodayMonthYear(), modoMes: true, tipoVeiculo: "todos" });
+  const initialFilters = React.useMemo(() => readSavedFilters("comparativo-faturamento", { ano: fmTodayYear(), mesReferencia: fmTodayMonth(), mesAno: fmTodayMonthYear(), modoMes: true, tipoVeiculo: "todos", cliente: "", placa: "" }), []);
+  const [ano, setAno] = React.useState(initialFilters.ano);
+  const [mesReferencia, setMesReferencia] = React.useState(initialFilters.mesReferencia);
+  const [mesAno, setMesAno] = React.useState(initialFilters.mesAno);
+  const [tipoVeiculo, setTipoVeiculo] = React.useState(initialFilters.tipoVeiculo);
+  const [cliente, setCliente] = React.useState(initialFilters.cliente || "");
+  const [placa, setPlaca] = React.useState(initialFilters.placa || "");
+  const [filters, setFilters] = React.useState(initialFilters);
   const [data, setData] = React.useState(() => fmNormalize(null));
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
+
+  React.useEffect(() => { saveFilters("comparativo-faturamento", filters); }, [JSON.stringify(filters)]);
 
   React.useEffect(() => {
     let active = true;

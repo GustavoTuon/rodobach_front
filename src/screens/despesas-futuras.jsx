@@ -26,10 +26,12 @@ const DfDrawer = ({ drawer, rows, onClose }) => {
 };
 
 const DespesasFuturas = () => {
-  const [empresa, setEmpresa] = React.useState(""); const [search, setSearch] = React.useState(""); const [months, setMonths] = React.useState(12);
-  const [filters, setFilters] = React.useState({ empresa: "", search: "", months: 12 });
+  const initialFilters = React.useMemo(() => readSavedFilters("despesas-futuras", { empresa: "", search: "", months: 12 }), []);
+  const [empresa, setEmpresa] = React.useState(initialFilters.empresa); const [search, setSearch] = React.useState(initialFilters.search); const [months, setMonths] = React.useState(initialFilters.months);
+  const [filters, setFilters] = React.useState(initialFilters);
   const [data, setData] = React.useState({ resumo: {}, mensal: [], financiamentos: {}, categorias: [], fornecedores: [], pontosAtencao: [], titulos: [] });
   const [loading, setLoading] = React.useState(false); const [error, setError] = React.useState(""); const [drawer, setDrawer] = React.useState(null);
+  React.useEffect(() => { saveFilters("despesas-futuras", filters); }, [JSON.stringify(filters)]);
   React.useEffect(() => { let active = true; setLoading(true); setError(""); window.RB_API.getDespesasFuturas(filters).then((payload) => active && setData(payload || {})).catch((e) => active && setError(e?.message || "Não foi possível carregar as despesas futuras.")).finally(() => active && setLoading(false)); return () => { active = false; }; }, [JSON.stringify(filters)]);
   const apply = (next = {}) => setFilters({ empresa, search, months, ...next }); const summary = data.resumo || {}; const financing = data.financiamentos || {}; const titles = data.titulos || [];
   const open = (title, filter = {}) => setDrawer({ title, filter });

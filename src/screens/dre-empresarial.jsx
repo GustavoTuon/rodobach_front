@@ -154,18 +154,19 @@ const DreEmpBar = ({ label, value, total, tone, meta }) => {
 
 const DreEmpresarial = () => {
   const defaultRange = DRE_EMP_PERIODS[2].range();
-  const [periodo, setPeriodo] = React.useState("month");
-  const [dataInicio, setDataInicio] = React.useState(defaultRange.start);
-  const [dataFim, setDataFim] = React.useState(defaultRange.end);
-  const [mesAno, setMesAno] = React.useState("");
-  const [centro, setCentro] = React.useState("");
-  const [conta, setConta] = React.useState("");
-  const [placa, setPlaca] = React.useState("");
-  const [cliente, setCliente] = React.useState("");
-  const [tipo, setTipo] = React.useState("todos");
-  const [status, setStatus] = React.useState("todos");
-  const [search, setSearch] = React.useState("");
-  const [manualFilter, setManualFilter] = React.useState(null);
+  const initialSaved = React.useMemo(() => readSavedFilters("dre-empresarial", { periodo: "month", dataInicio: defaultRange.start, dataFim: defaultRange.end, mesAno: "", centro: "", conta: "", placa: "", cliente: "", tipo: "todos", status: "todos", search: "", appliedCustom: false }), []);
+  const [periodo, setPeriodo] = React.useState(initialSaved.periodo);
+  const [dataInicio, setDataInicio] = React.useState(initialSaved.dataInicio);
+  const [dataFim, setDataFim] = React.useState(initialSaved.dataFim);
+  const [mesAno, setMesAno] = React.useState(initialSaved.mesAno);
+  const [centro, setCentro] = React.useState(initialSaved.centro);
+  const [conta, setConta] = React.useState(initialSaved.conta);
+  const [placa, setPlaca] = React.useState(initialSaved.placa);
+  const [cliente, setCliente] = React.useState(initialSaved.cliente);
+  const [tipo, setTipo] = React.useState(initialSaved.tipo);
+  const [status, setStatus] = React.useState(initialSaved.status);
+  const [search, setSearch] = React.useState(initialSaved.search);
+  const [manualFilter, setManualFilter] = React.useState(initialSaved.appliedCustom ? initialSaved : null);
   const [data, setData] = React.useState(() => dreEmpNormalize(null));
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
@@ -289,6 +290,7 @@ const DreEmpresarial = () => {
     setMesAno("");
     setManualFilter(null);
     setPeriodo(key);
+    saveFilters("dre-empresarial", { periodo: key, dataInicio: p?.range().start || dataInicio, dataFim: p?.range().end || dataFim, mesAno: "", centro, conta, placa, cliente, tipo, status, search, appliedCustom: false });
   };
 
   const buildFilters = () => ({
@@ -305,8 +307,10 @@ const DreEmpresarial = () => {
   });
 
   const applyFilter = () => {
+    const next = buildFilters();
     setPeriodo("custom");
-    setManualFilter(buildFilters());
+    setManualFilter(next);
+    saveFilters("dre-empresarial", { ...next, periodo: "custom", appliedCustom: true });
   };
 
   const clearFilter = () => {
@@ -323,6 +327,7 @@ const DreEmpresarial = () => {
     setSearch("");
     setManualFilter(null);
     setPeriodo("month");
+    clearSavedFilters("dre-empresarial");
   };
 
   return (
