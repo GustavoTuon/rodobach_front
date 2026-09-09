@@ -314,7 +314,36 @@ const RBCombobox = ({ value, onChange, options = [], placeholder = "Todos", getL
   );
 };
 
+// Persist only small UI preferences. Report payloads must never be stored here.
+function savedFiltersKey(key) {
+  const user = window.RB_AUTH?.getUser?.();
+  const owner = user?.id || user?.login || "local";
+  return `rodobach:filters:${owner}:${key}`;
+}
+
+function readSavedFilters(key, fallback) {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(savedFiltersKey(key)));
+    return saved && typeof saved === "object" ? { ...fallback, ...saved } : fallback;
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function saveFilters(key, filters) {
+  try {
+    window.localStorage.setItem(savedFiltersKey(key), JSON.stringify(filters));
+  } catch (_) {}
+  return filters;
+}
+
+function clearSavedFilters(key) {
+  try {
+    window.localStorage.removeItem(savedFiltersKey(key));
+  } catch (_) {}
+}
+
 Object.assign(window, {
   Icon, StatusBadge, SeverityBadge, Plate, KPI, MiniBar, Sparkline, BarChart, Tabs, RBCombobox,
-  fmtNum, fmtKm, pad,
+  fmtNum, fmtKm, pad, readSavedFilters, saveFilters, clearSavedFilters,
 });

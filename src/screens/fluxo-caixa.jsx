@@ -17,6 +17,15 @@ const FC_PERIODS = [
 
 const FcKpi = ({ label, value, sub, tone, icon }) => <div className="cv-kpi" style={{ borderLeftColor: tone }}><div className="kpi-label"><Icon name={icon}/><span>{label}</span></div><div className="kpi-value">{value}</div><div className="muted fc-kpi-sub">{sub}</div></div>;
 
+const FC_GROUPS = [["entradas-operacionais", "Entradas operacionais"], ["saidas-operacionais", "Saídas operacionais"], ["geracao-operacional", "Geração operacional de caixa"], ["financeiro", "Entradas / saídas financeiras"], ["investimentos", "Investimentos permanentes"], ["financiamentos", "Empréstimos e financiamentos"], ["nao-operacional", "Entradas / saídas não operacionais"], ["fluxo-liquido", "Fluxo de caixa líquido"]];
+
+const FcManagement = ({ analysis = {}, comparison = {}, onSelect }) => {
+  const totals = analysis.totals || {}; const revenue = Math.abs(fcNum(totals["entradas-operacionais"])) || 1;
+  const value = (key) => key === "geracao-operacional" ? analysis.geracaoOperacional : key === "fluxo-liquido" ? analysis.fluxoLiquido : totals[key];
+  const variation = (key) => key === "geracao-operacional" ? comparison.geracaoOperacional : key === "fluxo-liquido" ? comparison.saldo : comparison.grupos?.[key];
+  return <div className="fc-management-grid"><section className="card fc-management-table"><div className="section-head"><div><h2>Formação do caixa</h2><div className="muted">Separação gerencial entre operação e decisões de capital</div></div><span className="fc-auto-badge">Classificação automática</span></div><div className="table-wrap"><table className="data-table compact"><thead><tr><th>Grupo</th><th className="num">Realizado</th><th className="num">AV %</th><th className="num">AH %</th></tr></thead><tbody>{FC_GROUPS.map(([key, label]) => { const amount = fcNum(value(key)); const ah = variation(key); const total = key === "fluxo-liquido" || key === "geracao-operacional"; return <tr key={key} className={total ? "fc-total-row" : "fc-group-row"} onClick={() => !total && onSelect(key)}><td>{!total && <Icon name="chevron-right" size={11}/>}<strong>{label}</strong></td><td className={`num ${amount >= 0 ? "fc-positive" : "fc-negative"}`}>{fcBRL(amount)}</td><td className="num">{(amount / revenue * 100).toFixed(1)}%</td><td className={`num ${fcNum(ah) >= 0 ? "fc-positive" : "fc-negative"}`}>{ah === null || ah === undefined ? "—" : `${ah >= 0 ? "+" : ""}${fcNum(ah).toFixed(1)}%`}</td></tr>; })}</tbody></table></div></section><section className={`card fc-operation-health ${analysis.operacaoLucrativa ? "healthy" : "critical"}`}><span className="fc-health-label">Objetivo operacional</span><div className="fc-health-icon"><Icon name={analysis.operacaoLucrativa ? "trending-up" : "alert"} size={22}/></div><h2>{analysis.operacaoLucrativa ? "A operação gera caixa" : "A operação consome caixa"}</h2><strong>{fcBRL(analysis.geracaoOperacional)}</strong><p>Margem de caixa operacional de <b>{fcNum(analysis.margemCaixaOperacional).toFixed(1)}%</b> sobre as entradas operacionais.</p><div className="fc-health-breakdown"><span>Entradas <b>{fcBRL(totals["entradas-operacionais"])}</b></span><span>Saídas <b>{fcBRL(totals["saidas-operacionais"])}</b></span></div><small>Empréstimos, investimentos e eventos não operacionais não alteram este indicador.</small></section></div>;
+};
+
 const FcChart = ({ items }) => {
   const max = Math.max(1, ...items.flatMap((x) => [fcNum(x.entradas), fcNum(x.saidas)]));
   const minAcc = Math.min(0, ...items.map((x) => fcNum(x.acumulado))); const maxAcc = Math.max(1, ...items.map((x) => fcNum(x.acumulado))); const span = Math.max(1, maxAcc - minAcc);
@@ -25,19 +34,23 @@ const FcChart = ({ items }) => {
 };
 
 const FluxoCaixa = () => {
-  const [start, setStart] = React.useState(fcMonthStart());
-  const [end, setEnd] = React.useState(fcIso());
-  const [mode, setMode] = React.useState("ambos");
-  const [empresa, setEmpresa] = React.useState("");
-  const [search, setSearch] = React.useState("");
-  const [filters, setFilters] = React.useState({ dataInicio: fcMonthStart(), dataFim: fcIso(), mode: "ambos" });
+  const initialFilters = React.useMemo(() => readSavedFilters("fluxo-caixa", { dataInicio: fcMonthStart(), dataFim: fcIso(), mode: "ambos", empresa: "", search: "" }), []);
+  const [start, setStart] = React.useState(initialFilters.dataInicio);
+  const [end, setEnd] = React.useState(initialFilters.dataFim);
+  const [mode, setMode] = React.useState(initialFilters.mode);
+  const [empresa, setEmpresa] = React.useState(initialFilters.empresa || "");
+  const [search, setSearch] = React.useState(initialFilters.search || "");
+  const [filters, setFilters] = React.useState(initialFilters);
   const [data, setData] = React.useState({ summary: {}, evolution: [], categories: [], movements: [] });
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [page, setPage] = React.useState(1);
   const [movementFilter, setMovementFilter] = React.useState("todos");
   const [categoryFilter, setCategoryFilter] = React.useState("");
+  const [groupFilter, setGroupFilter] = React.useState("");
   const [sort, setSort] = React.useState({ key: "data", direction: "desc" });
+
+  React.useEffect(() => { saveFilters("fluxo-caixa", filters); }, [JSON.stringify(filters)]);
 
   React.useEffect(() => { let active = true; setLoading(true); setError(""); window.RB_API.getFluxoCaixa({ ...filters, limit: 2000 }).then((p) => { if (active) { setData(p || {}); setPage(1); } }).catch((e) => active && setError(e?.message || "Não foi possível carregar o fluxo de caixa.")).finally(() => active && setLoading(false)); return () => { active = false; }; }, [JSON.stringify(filters)]);
   const apply = (next = {}) => setFilters({ dataInicio: start, dataFim: end, mode, empresa, search, ...next });
@@ -48,7 +61,7 @@ const FluxoCaixa = () => {
   const overdueMovements = Array.isArray(data.overdue?.movements) ? data.overdue.movements : [];
   const showingOverdue = movementFilter.startsWith("vencido");
   const allMovements = showingOverdue ? overdueMovements : periodMovements;
-  const movements = allMovements.filter((row) => (!categoryFilter || row.categoria === categoryFilter) && (movementFilter === "todos" || movementFilter === row.tipo || movementFilter === row.natureza || (movementFilter === "vencido" && row.vencido) || (movementFilter === "vencido-receber" && row.vencido && row.tipo === "entrada") || (movementFilter === "vencido-pagar" && row.vencido && row.tipo === "saida"))).sort((a,b) => { const av = sort.key === "valor" ? fcNum(a.valor) : String(a[sort.key] || ""); const bv = sort.key === "valor" ? fcNum(b.valor) : String(b[sort.key] || ""); const result = typeof av === "number" ? av - bv : av.localeCompare(bv, "pt-BR"); return sort.direction === "asc" ? result : -result; });
+  const movements = allMovements.filter((row) => (!categoryFilter || row.categoria === categoryFilter) && (!groupFilter || row.grupoCaixa === groupFilter) && (movementFilter === "todos" || movementFilter === row.tipo || movementFilter === row.natureza || (movementFilter === "vencido" && row.vencido) || (movementFilter === "vencido-receber" && row.vencido && row.tipo === "entrada") || (movementFilter === "vencido-pagar" && row.vencido && row.tipo === "saida"))).sort((a,b) => { const av = sort.key === "valor" ? fcNum(a.valor) : String(a[sort.key] || ""); const bv = sort.key === "valor" ? fcNum(b.valor) : String(b[sort.key] || ""); const result = typeof av === "number" ? av - bv : av.localeCompare(bv, "pt-BR"); return sort.direction === "asc" ? result : -result; });
   const pages = Math.max(1, Math.ceil(movements.length / 50));
   const visible = movements.slice((page - 1) * 50, page * 50);
   const maxCategory = Math.max(1, ...categories.map((x) => fcNum(x.valor)));
@@ -68,6 +81,8 @@ const FluxoCaixa = () => {
     <div className="fc-filters card"><label>Data inicial<input type="date" value={start} onChange={(e) => setStart(e.target.value)}/></label><label>Data final<input type="date" value={end} onChange={(e) => setEnd(e.target.value)}/></label><label>Empresa<input inputMode="numeric" value={empresa} placeholder="Todas" onChange={(e) => setEmpresa(e.target.value)}/></label><label>Busca<input value={search} placeholder="Cliente, fornecedor, documento..." onChange={(e) => setSearch(e.target.value)}/></label><button className="btn primary" onClick={() => apply()}><Icon name="search"/> Aplicar</button><button className="btn" onClick={() => { setEmpresa(""); setSearch(""); setMode("ambos"); setFilters({ dataInicio: start, dataFim: end, mode: "ambos" }); }}>Limpar</button></div>
     {error && <div className="card" style={{ color: "var(--crit)", borderColor: "var(--crit)" }}>{error}</div>}{loading && <div className="card">Carregando fluxo de caixa...</div>}
     <div className="fc-kpis"><FcKpi label="Entradas do período" value={fcBRL(s.entradas)} sub={comparisonText(data.comparison?.entradas)} tone="#22c55e" icon="trending-up"/><FcKpi label="Saídas do período" value={fcBRL(s.saidas)} sub={comparisonText(data.comparison?.saidas)} tone="#ef4444" icon="money"/><FcKpi label="Movimentação líquida" value={fcBRL(s.saldo)} sub="Sem saldo bancário inicial" tone={fcNum(s.saldo) >= 0 ? "#22c55e" : "#ef4444"} icon="chart"/><FcKpi label="Carteira a receber vencida" value={fcBRL(s.vencidoReceber)} sub={`${data.overdue?.receberQuantidade || 0} títulos, sem corte por período`} tone={fcNum(s.vencidoReceber) ? "#f59e0b" : "#64748b"} icon="alert"/><FcKpi label="Carteira a pagar vencida" value={fcBRL(s.vencidoPagar)} sub={`${data.overdue?.pagarQuantidade || 0} títulos, sem corte por período`} tone={fcNum(s.vencidoPagar) ? "#ef4444" : "#64748b"} icon="clock"/></div>
+    <FcManagement analysis={data.cashAnalysis} comparison={data.comparison} onSelect={(key) => { setGroupFilter((current) => current === key ? "" : key); setCategoryFilter(""); setMovementFilter("todos"); setPage(1); }}/>
+    {groupFilter && <div className="fc-active-group"><span>Detalhando: <b>{FC_GROUPS.find(([key]) => key === groupFilter)?.[1]}</b></span><button className="btn sm" onClick={() => setGroupFilter("")}>Remover filtro</button></div>}
     {!!alerts.length && <div className="fc-alerts card"><div className="section-head"><h2>Atenção</h2></div><div>{alerts.map((alert,index) => <button key={index} className={alert.tone} onClick={alert.action}><Icon name="alert"/><span>{alert.text}</span>{alert.action && <b>Ver →</b>}</button>)}</div></div>}
     <div className="fc-analysis"><div className="card"><div className="section-head"><h2>Evolução do caixa</h2><div className="fc-legend"><span className="in">Entradas</span><span className="out">Saídas</span><span className="balance">Saldo acumulado</span></div></div>{(data.evolution || []).length ? <FcChart items={data.evolution}/> : <div className="muted">Sem movimentações no período.</div>}</div><div className="card"><div className="section-head"><h2>Maiores impactos</h2><span className="muted">Clique para filtrar</span></div><div className="fc-impact-columns"><div><h3>Entradas</h3>{categories.filter((x) => x.tipo === "entrada").slice(0,5).map((item) => <button className="fc-category" key={`in-${item.categoria}`} onClick={() => { setCategoryFilter(item.categoria); setPage(1); }}><div><strong>{item.categoria}</strong><span>{item.lancamentos} lanç.</span></div><b className="entrada">{fcBRL(item.valor)}</b><i><em style={{ width: `${fcNum(item.valor) / maxCategory * 100}%` }}/></i></button>)}</div><div><h3>Saídas</h3>{categories.filter((x) => x.tipo === "saida").slice(0,5).map((item) => <button className="fc-category" key={`out-${item.categoria}`} onClick={() => { setCategoryFilter(item.categoria); setPage(1); }}><div><strong>{item.categoria}</strong><span>{item.lancamentos} lanç.</span></div><b className="saida">{fcBRL(item.valor)}</b><i><em style={{ width: `${fcNum(item.valor) / maxCategory * 100}%` }}/></i></button>)}</div></div></div></div>
     <div className="card"><div className="section-head"><div><h2>Previsão diária de caixa</h2><div className="muted">Movimentação acumulada sem saldo bancário inicial</div></div></div><div className="table-wrap"><table className="data-table compact"><thead><tr><th>Data</th><th className="num">Entradas</th><th className="num">Saídas</th><th className="num">Saldo do dia</th><th className="num">Saldo acumulado</th></tr></thead><tbody>{(data.evolution || []).map((day) => <tr key={day.data} className={fcNum(day.acumulado) < 0 ? "fc-negative-day" : ""}><td>{fcDate(day.data)}</td><td className="num">{fcBRL(day.entradas)}</td><td className="num">{fcBRL(day.saidas)}</td><td className="num">{fcBRL(day.saldo)}</td><td className="num">{fcBRL(day.acumulado)}</td></tr>)}</tbody></table></div></div>

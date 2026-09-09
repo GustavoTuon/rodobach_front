@@ -33,11 +33,12 @@ function RvBars({ title, subtitle, rows, total, valueField, labelField, onSelect
 
 const ResultadoVeiculos = () => {
   const initialRange = rvRange("month");
-  const [period, setPeriod] = React.useState("custom");
-  const [startDate, setStartDate] = React.useState(initialRange.startDate);
-  const [endDate, setEndDate] = React.useState(initialRange.endDate);
-  const [plate, setPlate] = React.useState("all");
-  const [applied, setApplied] = React.useState({ ...initialRange, placa: "all" });
+  const initialFilters = React.useMemo(() => readSavedFilters("resultado-veiculos", { period: "month", ...initialRange, placa: "all" }), []);
+  const [period, setPeriod] = React.useState(initialFilters.period);
+  const [startDate, setStartDate] = React.useState(initialFilters.startDate);
+  const [endDate, setEndDate] = React.useState(initialFilters.endDate);
+  const [plate, setPlate] = React.useState(initialFilters.placa);
+  const [applied, setApplied] = React.useState(initialFilters);
   const [options, setOptions] = React.useState({ placas: [], veiculos: [] });
   const [costs, setCosts] = React.useState(null);
   const [revenue, setRevenue] = React.useState(null);
@@ -50,6 +51,8 @@ const ResultadoVeiculos = () => {
   const [detailFilter, setDetailFilter] = React.useState(null);
   const [selectedItem, setSelectedItem] = React.useState(null);
   const [tableSort, setTableSort] = React.useState({ key: "data", direction: "desc" });
+
+  React.useEffect(() => { saveFilters("resultado-veiculos", { ...applied, period }); }, [JSON.stringify(applied), period]);
 
   React.useEffect(() => {
     window.RB_API.getCustosVeiculosFiltros().then((data) => setOptions(data || { placas: [] })).catch(() => {});

@@ -383,6 +383,29 @@ const ScreenGroup = ({ tabs, active, onChange, children }) => {
   );
 };
 
+const FinancialScreenGroup = ({ active, onChange, visibleNav, children }) => {
+  const dreScreenIds = ["dre-empresarial", "faturamento-diario", "comparativo-faturamento"];
+  const screens = dreScreenIds
+    .map((id) => visibleNav.find((item) => item.id === id))
+    .filter(Boolean);
+  const activeItem = screens.find((item) => item.id === active);
+  return (
+    <div className="financial-screen-group">
+      <div className="financial-screen-switcher">
+        <div><span>Financeiro</span><strong>{activeItem?.label || "DRE Empresarial"}</strong></div>
+        <label>
+          <Icon name="chart" size={15} />
+          <select value={active} onChange={(event) => onChange(event.target.value)} aria-label="Escolher tela financeira">
+            {screens.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+          </select>
+          <Icon name="chevron-down" size={14} />
+        </label>
+      </div>
+      <div className="financial-screen-content">{children}</div>
+    </div>
+  );
+};
+
 function getNavForUser(user) {
   return filterNavForUser(BASE_NAV, user);
 }
@@ -573,6 +596,11 @@ const App = () => {
     ));
 
   let body = null;
+  const financialBody = (screen) => (
+    <FinancialScreenGroup active={currentScreen} onChange={onNavigate} visibleNav={visibleNav}>
+      {screen}
+    </FinancialScreenGroup>
+  );
   switch (currentScreen) {
     case "diretoria":
       body = <Diretoria onNavigate={onNavigate} />;
@@ -596,7 +624,7 @@ const App = () => {
       body = <Trafegus onNavigate={onNavigate} />;
       break;
     case "dre-empresarial":
-      body = <DreEmpresarial onNavigate={onNavigate} />;
+      body = financialBody(<DreEmpresarial onNavigate={onNavigate} />);
       break;
     case "fluxo-caixa":
       body = <FluxoCaixa onNavigate={onNavigate} />;
@@ -634,10 +662,10 @@ const App = () => {
       );
       break;
     case "faturamento-diario":
-      body = <FaturamentoDiario onNavigate={onNavigate} />;
+      body = financialBody(<FaturamentoDiario onNavigate={onNavigate} />);
       break;
     case "comparativo-faturamento":
-      body = <ComparativoFaturamento onNavigate={onNavigate} />;
+      body = financialBody(<ComparativoFaturamento onNavigate={onNavigate} />);
       break;
     case "resultado-veiculos":
       body = <ResultadoVeiculos onNavigate={onNavigate} />;
@@ -838,10 +866,7 @@ const App = () => {
                       const rect = event.currentTarget.getBoundingClientRect();
                       setFinanceiroMenu({
                         left: rect.right + 7,
-                        top: Math.max(
-                          8,
-                          Math.min(rect.top, window.innerHeight - 180),
-                        ),
+                        top: Math.max(8, Math.min(rect.top, window.innerHeight - 180)),
                       });
                     }}
                   >
@@ -963,21 +988,11 @@ const App = () => {
 
       {financeiroMenu && (
         <>
-          <button
-            className="nav-flyout-dismiss"
-            aria-label="Fechar opções financeiras"
-            onClick={() => setFinanceiroMenu(null)}
-          />
-          <div
-            className="nav-flyout"
-            style={{ left: financeiroMenu.left, top: financeiroMenu.top }}
-          >
-            <div className="nav-flyout-title">
-              <Icon name="chart" size={14} />
-              <span>Financeiro</span>
-            </div>
+          <button className="nav-flyout-dismiss" aria-label="Fechar opções financeiras" onClick={() => setFinanceiroMenu(null)} />
+          <div className="nav-flyout" style={{ left: financeiroMenu.left, top: financeiroMenu.top }}>
+            <div className="nav-flyout-title"><Icon name="chart" size={14} /><span>Financeiro</span></div>
             {renderNavItems(
-              sidebarNav.filter((item) => item.subgroup === "financeiro"),
+              sidebarNav.filter((item) => item.subgroup === "financeiro" && !["faturamento-diario", "comparativo-faturamento"].includes(item.id)),
             )}
           </div>
         </>

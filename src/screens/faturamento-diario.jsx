@@ -137,18 +137,21 @@ const FdChart = ({ rows, metric = "faturamento" }) => {
 };
 
 const FaturamentoDiario = () => {
-  const [periodo, setPeriodo] = React.useState("30d");
-  const [dataInicial, setDataInicial] = React.useState(fdDaysAgoISO(29));
-  const [dataFinal, setDataFinal] = React.useState(fdTodayISO());
-  const [cliente, setCliente] = React.useState("");
-  const [placa, setPlaca] = React.useState("");
-  const [tipoVeiculo, setTipoVeiculo] = React.useState("todos");
-  const [filters, setFilters] = React.useState({ periodo: "30d", tipoVeiculo: "todos" });
+  const initialFilters = React.useMemo(() => readSavedFilters("faturamento-diario", { periodo: "30d", dataInicial: fdDaysAgoISO(29), dataFinal: fdTodayISO(), cliente: "", placa: "", tipoVeiculo: "todos" }), []);
+  const [periodo, setPeriodo] = React.useState(initialFilters.periodo || "custom");
+  const [dataInicial, setDataInicial] = React.useState(initialFilters.dataInicial);
+  const [dataFinal, setDataFinal] = React.useState(initialFilters.dataFinal);
+  const [cliente, setCliente] = React.useState(initialFilters.cliente || "");
+  const [placa, setPlaca] = React.useState(initialFilters.placa || "");
+  const [tipoVeiculo, setTipoVeiculo] = React.useState(initialFilters.tipoVeiculo);
+  const [filters, setFilters] = React.useState(initialFilters);
   const [data, setData] = React.useState(() => fdNormalize(null));
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [search, setSearch] = React.useState("");
   const [metric, setMetric] = React.useState("faturamento");
+
+  React.useEffect(() => { saveFilters("faturamento-diario", filters); }, [JSON.stringify(filters)]);
 
   React.useEffect(() => {
     let active = true;

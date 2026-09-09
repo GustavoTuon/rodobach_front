@@ -1459,6 +1459,19 @@ textarea {
   height: 14px;
 }
 
+.financial-screen-group { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.financial-screen-switcher { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--surface-1); }
+.financial-screen-switcher > div { display: grid; gap: 2px; }
+.financial-screen-switcher > div span { color: var(--text-3); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.financial-screen-switcher > div strong { font-size: 13px; font-weight: 600; }
+.financial-screen-switcher label { min-width: 230px; height: 38px; display: flex; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-2); color: var(--text-2); cursor: pointer; }
+.financial-screen-switcher select { flex: 1; border: 0; outline: 0; background: transparent; color: var(--text); font: inherit; cursor: pointer; appearance: none; color-scheme: dark; }
+.financial-screen-switcher select option { background: #111827; color: #f8fafc; }
+[data-theme="light"] .financial-screen-switcher select { color-scheme: light; }
+[data-theme="light"] .financial-screen-switcher select option { background: #ffffff; color: #172033; }
+.financial-screen-content { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+@media (max-width: 640px) { .financial-screen-switcher { padding: 10px 14px; } .financial-screen-switcher > div { display: none; } .financial-screen-switcher label { width: 100%; min-width: 0; } }
+
 .view {
   flex: 1;
   overflow: auto;
@@ -2329,6 +2342,31 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.fc-management-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(280px, .8fr); gap: 14px; align-items: stretch; }
+.fc-management-table { padding-bottom: 8px; overflow: hidden; }
+.fc-auto-badge { border: 1px solid var(--accent-border); border-radius: 999px; padding: 4px 8px; background: var(--accent-soft); color: var(--brand-blue-2); font-size: 9.5px; white-space: nowrap; }
+.fc-management-table table { margin-top: 8px; }
+.fc-management-table td:first-child { display: flex; align-items: center; gap: 7px; }
+.fc-group-row { cursor: pointer; }
+.fc-group-row:hover { background: var(--surface-2); }
+.fc-total-row { background: color-mix(in srgb, var(--brand-blue) 8%, transparent); }
+.fc-total-row td { border-top: 1px solid var(--border-strong); }
+.fc-positive { color: var(--ok); font-weight: 650; }
+.fc-negative { color: var(--crit); font-weight: 650; }
+.fc-operation-health { position: relative; padding: 22px; overflow: hidden; border-top: 3px solid var(--health-tone); --health-tone: var(--crit); }
+.fc-operation-health.healthy { --health-tone: var(--ok); }
+.fc-operation-health::after { content: ""; position: absolute; width: 150px; height: 150px; right: -60px; top: -65px; border-radius: 50%; background: color-mix(in srgb, var(--health-tone) 12%, transparent); }
+.fc-health-label { color: var(--text-3); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.fc-health-icon { position: absolute; z-index: 1; right: 19px; top: 18px; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: color-mix(in srgb, var(--health-tone) 15%, var(--surface-2)); color: var(--health-tone); }
+.fc-operation-health h2 { margin: 22px 0 8px; font-size: 17px; }
+.fc-operation-health > strong { display: block; color: var(--health-tone); font: 700 27px var(--font-mono); }
+.fc-operation-health > p { margin: 10px 0 18px; color: var(--text-2); font-size: 12px; line-height: 1.55; }
+.fc-health-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fc-health-breakdown span { padding: 9px; border: 1px solid var(--border); border-radius: 7px; color: var(--text-3); font-size: 10px; }
+.fc-health-breakdown b { display: block; margin-top: 4px; color: var(--text); font: 600 11px var(--font-mono); }
+.fc-operation-health > small { display: block; margin-top: 13px; color: var(--text-4); font-size: 9.5px; line-height: 1.45; }
+.fc-active-group { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border: 1px solid var(--accent-border); border-radius: 8px; background: var(--accent-soft); color: var(--text-2); font-size: 11px; }
+@media (max-width: 980px) { .fc-management-grid { grid-template-columns: 1fr; } }
 .fc-analysis {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
