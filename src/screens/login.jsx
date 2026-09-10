@@ -50,11 +50,10 @@ const LoginScreen = ({ onLogin }) => {
 
         {/* Logotipo */}
         <div style={{ textAlign: "center", marginBottom: 28 }}>
-          <img
-            src="uploads/WhatsApp Image 2026-05-21 at 11.02.31.jpeg"
-            alt="Norte"
-            style={{ maxWidth: 180, maxHeight: 100, objectFit: "contain", marginBottom: 8 }}
-          />
+          <div className="norte-login-brand">
+            <img className="norte-theme-light" src="/brand/norte-01.png" alt="Norte - Gestão Inteligente" />
+            <img className="norte-theme-dark" src="/brand/norte-03.png" alt="Norte - Gestão Inteligente" />
+          </div>
         </div>
 
         {/* Card do formulário */}

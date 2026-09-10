@@ -18,6 +18,7 @@ const SCREEN_SCRIPTS = [
   "src/screens/analise-frota.jsx",
   "src/screens/precos-combustivel.jsx",
   "src/screens/resultado-veiculos.jsx",
+  "src/screens/evolucao-custos.jsx",
   "src/screens/manutencoes-veiculos.jsx?v=20260803-bi-redesign",
   "src/screens/analise-clientes.jsx",
   "src/screens/rentabilidade-clientes.jsx",
@@ -121,6 +122,7 @@ const NAV = [
     subgroup: "financeiro",
     section: "financeiro",
   },
+  { id: "evolucao-custos", label: "Análise de custos", icon: "chart", title: "Análise de custos", subgroup: "financeiro", section: "financeiro", permission: "custos-veiculos" },
   {
     id: "resultado-veiculos",
     label: "Resultado por Veículo",
@@ -545,15 +547,10 @@ const App = () => {
           gap: 16,
         }}
       >
-        <img
-          src="uploads/LOGO NORTE-03.png"
-          alt="Norte"
-          style={{
-            maxWidth: 160,
-            opacity: 0.7,
-            filter: "invert(var(--logo-invert, 0))",
-          }}
-        />
+        <div className="norte-loading-brand">
+          <img className="norte-theme-light" src="/brand/norte-01.png" alt="Norte - Gestão Inteligente" />
+          <img className="norte-theme-dark" src="/brand/norte-03.png" alt="Norte - Gestão Inteligente" />
+        </div>
         <div style={{ color: "var(--muted)", fontSize: 13 }}>
           Carregando o sistema…
         </div>
@@ -666,6 +663,9 @@ const App = () => {
       break;
     case "comparativo-faturamento":
       body = financialBody(<ComparativoFaturamento onNavigate={onNavigate} />);
+      break;
+    case "evolucao-custos":
+      body = <EvolucaoCustos />;
       break;
     case "resultado-veiculos":
       body = <ResultadoVeiculos onNavigate={onNavigate} />;
@@ -823,8 +823,8 @@ const App = () => {
       >
         <div className="sidebar-brand">
           <img
-            src="uploads/LOGO NORTE-03.png"
-            alt="Norte"
+            src={sidebarExpanded ? "/brand/norte-03.png" : "/brand/norte-06.png"}
+            alt="Norte - Gestão Inteligente"
             className="sidebar-logo"
           />
           <button

@@ -271,6 +271,9 @@ window.RB_API = {
     apiRequest(`/frota/status-carga${buildQuery(filters || {})}`),
   getOciosidadeFrota: (filters = {}) =>
     apiRequest(`/frota/ociosidade${buildQuery(filters || {})}`),
+  getParadasOciosidade: (filters) => apiRequest(`/frota/ociosidade/paradas${buildQuery(filters)}`),
+  saveConferenciaOciosidade: (body) => apiRequest("/frota/ociosidade/confirmacoes", { method: "POST", body: JSON.stringify(body) }),
+  removeConferenciaOciosidade: (id) => apiRequest(`/frota/ociosidade/confirmacoes/${encodeURIComponent(id)}`, { method: "DELETE" }),
   listMultasFrota: (filters = {}) =>
     apiRequest(`/frota/multas${buildQuery(filters || {})}`),
   saveControleMultaFrota: (empresa, codigo, payload) =>
@@ -282,6 +285,8 @@ window.RB_API = {
     apiRequest(
       `/frota/multas/${encodeURIComponent(empresa)}/${encodeURIComponent(codigo)}/auditoria`,
     ),
+  getCustoRastreabilidade: (id) => apiRequest(`/financeiro/custos-veiculos/rastreabilidade${buildQuery({id})}`),
+  getEvolucaoCustos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos/evolucao${buildQuery(filters)}`),
   getCustosVeiculos: (filters = {}) =>
     apiRequest(`/financeiro/custos-veiculos${buildQuery(filters || {})}`),
   getResultadoVeiculos: (filters = {}) =>
