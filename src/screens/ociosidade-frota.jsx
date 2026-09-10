@@ -14,6 +14,7 @@ const ofNumber = (value, digits = 1) =>
     Number(value || 0),
   );
 const ofBRL = (value) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value || 0));
+const ofLocalInput = (value) => value ? new Date(new Date(value).getTime() - 3 * 3600000).toISOString().slice(0,16) : "";
 const ofDateTime = (value) =>
   value
     ? new Intl.DateTimeFormat("pt-BR", {
@@ -32,7 +33,23 @@ const ofDuration = (hours) => {
     .join(" ");
 };
 
-function OfKpi({ label, value, sub, tone, help }) {
+function ofSort(rows, sort) {
+  return [...rows].sort((a, b) => {
+    const x = a[sort.key], y = b[sort.key];
+    const result = typeof x === "number" || typeof y === "number"
+      ? Number(x || 0) - Number(y || 0)
+      : String(x || "").localeCompare(String(y || ""), "pt-BR", { numeric: true });
+    return sort.direction === "asc" ? result : -result;
+  });
+}
+function OfSortHeader({ label, field, sort, onSort, numeric }) {
+  const active = sort.key === field;
+  return <th className={numeric ? "num" : undefined} aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}>
+    <button type="button" className="of-sort" onClick={() => onSort({ key: field, direction: active && sort.direction === "asc" ? "desc" : "asc" })}>{label} <span aria-hidden="true">{active ? (sort.direction === "asc" ? "\u2191" : "\u2193") : "\u2195"}</span></button>
+  </th>;
+}
+
+function OfKpi({ label, value, sub, tone, help, pending = false }) {
   return (
     <div
       className="card"
@@ -58,10 +75,10 @@ function OfKpi({ label, value, sub, tone, help }) {
           letterSpacing: "-.02em",
         }}
       >
-        {value}
+        {pending ? "A conciliar" : value}
       </div>
       <div className="muted" style={{ fontSize: 11, marginTop: 5 }}>
-        {sub}
+        {pending ? "Sem resultado suficiente para esta classificação" : sub}
       </div>
     </div>
   );
@@ -71,6 +88,11 @@ const OciosidadeFrota = ({ onNavigate }) => {
   const [startDate, setStartDate] = useStateOciosidade(ofDaysAgo(29));
   const [endDate, setEndDate] = useStateOciosidade(ofToday());
   const [placa, setPlaca] = useStateOciosidade("");
+
+  const [conference, setConference] = useStateOciosidade(null);
+  const [stops, setStops] = useStateOciosidade([]);
+  const [conferenceError, setConferenceError] = useStateOciosidade("");
+  const [conferenceBusy, setConferenceBusy] = useStateOciosidade(false);
   const [data, setData] = useStateOciosidade({
     summary: {},
     rows: [],
@@ -79,12 +101,15 @@ const OciosidadeFrota = ({ onNavigate }) => {
   const [loading, setLoading] = useStateOciosidade(true);
   const [error, setError] = useStateOciosidade("");
   const [selected, setSelected] = useStateOciosidade(null);
+  const [rankingSort, setRankingSort] = useStateOciosidade({ key: "horasParadoVazio", direction: "desc" });
+  const [intervalSort, setIntervalSort] = useStateOciosidade({ key: "horasParadoVazio", direction: "desc" });
 
   const load = async (overrides = {}) => {
     setLoading(true);
     setError("");
     try {
       setData(await window.RB_API.getOciosidadeFrota({
+        modo: "sms",
         startDate: overrides.startDate || startDate,
         endDate: overrides.endDate || endDate,
         placa: overrides.placa === undefined ? placa : overrides.placa,
@@ -99,9 +124,18 @@ const OciosidadeFrota = ({ onNavigate }) => {
     load();
   }, []);
   const summary = data.summary || {};
+  const openConference = (doc) => {
+    setStops([]); setConferenceError("");
+    setConference({ placa: doc.placa, documentos: doc.confirmacaoId ? data.documentosDetalhados.filter((d) => d.confirmacaoId === doc.confirmacaoId).map((d) => d.documentKey) : [doc.documentKey], inicio: doc.confirmacaoId ? ofLocalInput(doc.emissao) : "", fim: doc.confirmacaoId ? ofLocalInput(doc.entrega) : "", confirmacaoId: doc.confirmacaoId,
+      buscaInicio: ofLocalInput(doc.emissao).slice(0,10), buscaFim: endDate });
+  };
+  const conferenceAction = async (action) => {
+    setConferenceBusy(true); setConferenceError("");
+    try { await action(); } catch (e) { setConferenceError(e.message); } finally { setConferenceBusy(false); }
+  };
   const movingEmptyHours = Math.max(
     0,
-    Number(summary.horasVazio || 0) - Number(summary.horasParadoVazio || 0),
+    Number(summary.horasEmMovimento || 0),
   );
   const classifiedKm =
     Number(summary.kmCarregado || 0) +
@@ -112,7 +146,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
     : 0;
   const emptyPercent = Number(summary.percentualKmVazio || 0);
   const quality = data.qualidade || {};
-  const intervalRows = [...(data.rows || [])].sort((a, b) => Number(b.horasParadoVazio || 0) - Number(a.horasParadoVazio || 0));
+  const intervalRows = ofSort(data.rows || [], intervalSort);
   const quickPeriod = (start, end = ofToday()) => {
     setStartDate(start); setEndDate(end); load({ startDate: start, endDate: end });
   };
@@ -120,7 +154,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
   return (
     <div className="page-content of-page">
       <style>{`
-      .of-page{width:100%;height:100%;min-height:0;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;padding:20px clamp(16px,2vw,32px) 56px;max-width:1720px;margin:0 auto}
+      .of-sort{background:none;border:0;color:inherit;font:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer;padding:8px 0}.of-sort:focus-visible{outline:2px solid #2563eb}.of-page{width:100%;height:100%;min-height:0;box-sizing:border-box;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable;padding:20px clamp(16px,2vw,32px) 56px;max-width:1720px;margin:0 auto}
       .of-filters{display:grid;grid-template-columns:150px 150px minmax(150px,220px) auto 1fr;gap:12px;align-items:end}
       .of-filters label{display:grid;gap:6px;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
       .of-filters input,.of-filters select{width:100%;height:40px;box-sizing:border-box;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);padding:0 11px;color-scheme:dark}
@@ -160,7 +194,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
                 fontWeight: 800,
               }}
             >
-              SM + TELEMETRIA
+              {summary.modo === "documentos" ? "TESTE: DOCUMENTOS + TELEMETRIA" : "SM + TELEMETRIA"}
             </span>
           </div>
           <p>
@@ -291,7 +325,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
           label="Em movimento vazio"
           value={ofDuration(movingEmptyHours)}
           sub="Deslocamento vazio efetivamente rodando"
-          help="Cálculo: tempo vazio total − tempo parado vazio. Indica quanto tempo a frota esteve rodando sem carga em reposicionamentos ou retornos vazios."
+          help="Soma dos trechos com velocidade de pelo menos 5 km/h e intervalo entre amostras de até 2h. Paradas na base e lacunas não contam como movimento."
           tone="#0891b2"
         />
         <OfKpi
@@ -325,6 +359,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
           tone="#a855f7"
         />
         <OfKpi
+
           label="Descartado dentro da base"
           value={ofDuration(summary.horasDescartadasBase)}
           sub={data.cercaBase?.aplicada ? `Cerca ${data.cercaBase.nome} aplicada` : "Cerca da base não localizada"}
@@ -335,9 +370,9 @@ const OciosidadeFrota = ({ onNavigate }) => {
       <div className="card" style={{ padding: 18, marginBottom: 14 }}>
         <div style={{ marginBottom: 14 }}><h3 style={{ margin: 0 }}>Quando ocorreram as paradas</h3><div className="muted" style={{ fontSize: 11 }}>Horas paradas fora da base, separadas pelo calendário</div></div>
         <div className="of-calendar-grid">
-          <div><span>Dias úteis</span><strong>{ofDuration(summary.horasParadoDiaUtil)}</strong><small>{summary.horasParadoVazio ? ofNumber(summary.horasParadoDiaUtil / summary.horasParadoVazio * 100, 1) : 0}% das paradas</small></div>
-          <div><span>Finais de semana</span><strong>{ofDuration(summary.horasParadoFimSemana)}</strong><small>{summary.horasParadoVazio ? ofNumber(summary.horasParadoFimSemana / summary.horasParadoVazio * 100, 1) : 0}% das paradas</small></div>
-          <div><span>Feriados nacionais</span><strong>{ofDuration(summary.horasParadoFeriado)}</strong><small>{(data.calendario?.feriadosNacionais || []).length} feriado(s) no período</small></div>
+          <div><span>Dias úteis</span><strong>{ofDuration(summary.horasParadoDiaUtilObservadas)}</strong><small>{summary.horasParadoObservadas ? ofNumber(summary.horasParadoDiaUtilObservadas / summary.horasParadoObservadas * 100, 1) : 0}% das paradas</small></div>
+          <div><span>Finais de semana</span><strong>{ofDuration(summary.horasParadoFimSemanaObservadas)}</strong><small>{summary.horasParadoObservadas ? ofNumber(summary.horasParadoFimSemanaObservadas / summary.horasParadoObservadas * 100, 1) : 0}% das paradas</small></div>
+          <div><span>Feriados nacionais</span><strong>{ofDuration(summary.horasParadoFeriadoObservadas)}</strong><small>{(data.calendario?.feriadosNacionais || []).length} feriado(s) no período</small></div>
         </div>
       </div>
       <div className="of-two">
@@ -490,27 +525,15 @@ const OciosidadeFrota = ({ onNavigate }) => {
               Veículos que precisam de atenção
             </h3>
             <div className="muted" style={{ fontSize: 11 }}>
-              Ordenado pelo maior tempo parado fora da base
+              Clique nos cabeçalhos para ordenar os dados
             </div>
           </div>
         </div>
         <div className="table-wrap">
           <table className="data-table tbl">
-            <thead>
-              <tr>
-                <th>Placa</th>
-                <th className="num">KM total</th>
-                <th className="num">KM vazio</th>
-                <th className="num">% vazio</th>
-                <th className="num">Tempo parado</th>
-                <th className="num">% do período</th>
-                <th className="num">Custo estimado</th>
-                <th className="num">Não classificado</th>
-                <th>Qualidade</th>
-              </tr>
-            </thead>
+            <thead><tr><OfSortHeader label="Placa" field="placa" sort={rankingSort} onSort={setRankingSort} numeric={false} /><OfSortHeader label="KM total" field="kmTotal" sort={rankingSort} onSort={setRankingSort} numeric={true} /><OfSortHeader label="KM vazio" field="kmVazio" sort={rankingSort} onSort={setRankingSort} numeric={true} /><OfSortHeader label="% vazio" field="percentualVazio" sort={rankingSort} onSort={setRankingSort} numeric={true} /><OfSortHeader label="Tempo parado" field="horasParadoVazio" sort={rankingSort} onSort={setRankingSort} numeric={true} /><OfSortHeader label="% do período" field="percentualParadoPeriodo" sort={rankingSort} onSort={setRankingSort} numeric={true} /><OfSortHeader label="Custo estimado" field="custoOciosidadeEstimado" sort={rankingSort} onSort={setRankingSort} numeric={true} /><OfSortHeader label="Não classificado" field="kmNaoClassificado" sort={rankingSort} onSort={setRankingSort} numeric={true} /><OfSortHeader label="Qualidade" field="coberturaPercentual" sort={rankingSort} onSort={setRankingSort} numeric={true} /></tr></thead>
             <tbody>
-              {[...(data.ranking || [])].sort((a, b) => Number(b.horasParadoVazio || 0) - Number(a.horasParadoVazio || 0)).map((row) => (
+              {ofSort(data.ranking || [], rankingSort).map((row) => (
                 <tr key={row.placa}>
                   <td>
                     <Plate value={row.placa} />
@@ -531,7 +554,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
                     {ofNumber(row.kmNaoClassificado, 0)} km
                   </td>
                   <td>
-                    {row.coberturaPercentual >= 80
+                    {row.requerConciliacao ? "A conciliar" : row.coberturaPercentual >= 80
                       ? "Alta"
                       : row.coberturaPercentual >= 50
                         ? "Média"
@@ -543,31 +566,63 @@ const OciosidadeFrota = ({ onNavigate }) => {
           </table>
         </div>
       </div>
+      {summary.modo === "documentos" && <div className="card card-flush" style={{ marginBottom: 14 }}>
+        {conference && <div style={{ padding: 18, borderBottom: "1px solid var(--border)" }}>
+          <h3>Conferir carregamento e última descarga — {conference.placa}</h3>
+          <p className="muted">Selecione os documentos da mesma viagem e confirme os horários reais (Brasília). Paradas sugerem eventos, mas não comprovam carga ou descarga. Use o fim da parada como sugestão de conclusão.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 12 }}>
+            {(data.documentosDetalhados || []).filter((d) => d.placa === conference.placa && (!d.confirmacaoId || d.confirmacaoId === conference.confirmacaoId)).map((d) => <label key={d.documentKey}><input type="checkbox" disabled={conferenceBusy || !!conference.confirmacaoId} checked={conference.documentos.includes(d.documentKey)} onChange={(e) => setConference({ ...conference, documentos: e.target.checked ? [...conference.documentos,d.documentKey] : conference.documentos.filter((key) => key !== d.documentKey) })} /> {d.documento} · {d.cliente}</label>)}
+          </div>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "end" }}>
+            <label>Carregamento concluído<br /><input type="datetime-local" value={conference.inicio} disabled={conferenceBusy || !!conference.confirmacaoId} onChange={(e) => setConference({ ...conference, inicio: e.target.value })} /></label>
+            <label>Última descarga concluída<br /><input type="datetime-local" value={conference.fim} disabled={conferenceBusy || !!conference.confirmacaoId} onChange={(e) => setConference({ ...conference, fim: e.target.value })} /></label>
+            {!conference.confirmacaoId && <button className="btn primary" disabled={conferenceBusy || !conference.inicio || !conference.fim || !conference.documentos.length} onClick={() => conferenceAction(async () => {
+              await window.RB_API.saveConferenciaOciosidade({ placa: conference.placa, documentos: conference.documentos, inicio: `${conference.inicio}:00-03:00`, fim: `${conference.fim}:00-03:00` });
+              setConference(null); await load();
+            })}>Confirmar horários e recalcular</button>}
+            {conference.confirmacaoId && <button className="btn" disabled={conferenceBusy} onClick={() => conferenceAction(async () => { await window.RB_API.removeConferenciaOciosidade(conference.confirmacaoId); setConference(null); await load(); })}>Desfazer confirmação e recalcular</button>}
+            <button className="btn" disabled={conferenceBusy} onClick={() => setConference(null)}>Fechar</button>
+          </div>
+          {!conference.confirmacaoId && <><div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
+            <label>Buscar paradas de <input type="date" value={conference.buscaInicio} onChange={(e) => setConference({ ...conference, buscaInicio: e.target.value })} /></label>
+            <label>até <input type="date" value={conference.buscaFim} onChange={(e) => setConference({ ...conference, buscaFim: e.target.value })} /></label>
+            <button className="btn" disabled={conferenceBusy} onClick={() => conferenceAction(async () => setStops(await window.RB_API.getParadasOciosidade({ placa: conference.placa, inicio: `${conference.buscaInicio}T00:00:00-03:00`, fim: `${conference.buscaFim}T23:59:59-03:00` })))}>Buscar paradas do rastreador</button>
+          </div><p className="muted">Paradas de pelo menos 15 minutos, sem lacunas superiores a 10 minutos; busca de até 31 dias. A lista pode incluir filas e descansos. Limite de 300 sugestões.</p>
+          {stops.map((stop, i) => <div key={i} style={{ padding: 8, borderTop: "1px solid var(--border)" }}>
+            <b>{stop.municipio || "Município não informado"}</b> · {ofDateTime(stop.inicio)} até {ofDateTime(stop.fim)} · Odômetro {ofNumber(stop.odometro_minimo)} a {ofNumber(stop.odometro_maximo)} km · Coordenadas {Number(stop.latitude).toFixed(5)}, {Number(stop.longitude).toFixed(5)} {" "}
+            <button className="btn" onClick={() => setConference({ ...conference, inicio: ofLocalInput(stop.fim) })}>Usar como carregamento</button> {" "}
+            <button className="btn" onClick={() => setConference({ ...conference, fim: ofLocalInput(stop.fim) })}>Usar como última descarga</button>
+          </div>)}</>}
+          {conferenceBusy && <p role="status">Consultando / salvando…</p>}
+          {conferenceError && <p role="alert" style={{ color: "#fca5a5" }}>{conferenceError}</p>}
+        </div>}
+        <div className="card-header"><div><h3>Documentos e KM vazio até o próximo</h3>
+          <p className="muted">Todos os documentos emitidos no filtro, em ordem de emissão. Orçamento e CT-e podem ser da mesma viagem. Datas sobrepostas não representam zero km; precisam de conferência. Entrega sem horário considera o fim do dia.</p>
+        </div><span>{data.documentosDetalhados?.length || 0} documentos</span></div>
+        <div className="table-wrap"><table className="data-table tbl">
+          <thead><tr><th>Placa</th><th>Documento / cliente</th><th>Destino</th><th>Emissão</th><th>Entrega ERP</th><th>Próximo documento</th><th className="num">KM entre emissões</th><th className="num">KM vazio estimado</th><th>Situação</th></tr></thead>
+          <tbody>{(data.documentosDetalhados || []).map((doc) => <tr key={doc.id}>
+            <td><Plate value={doc.placa} /></td><td><b>{doc.documento}</b><div className="muted">{doc.cliente}</div></td>
+            <td>{doc.destino}</td><td>{ofDateTime(doc.emissao)}{doc.confirmacaoId && <div className="muted">Carga confirmada<br />Emissão ERP: {ofDateTime(doc.emissaoOriginal)}</div>}</td>
+            <td>{doc.entrega ? ofDateTime(doc.entrega) : "Não informada"}{doc.entrega && !doc.entregaPrecisa && <div className="muted">Horário não confirmado</div>}</td>
+            <td>{doc.proximoDocumento || "—"}{doc.proximaEmissao && <div className="muted">{ofDateTime(doc.proximaEmissao)}</div>}</td>
+            <td className="num">{doc.kmEntreEmissoes == null ? "—" : `${ofNumber(doc.kmEntreEmissoes)} km`}<div className="muted">Pode incluir carga</div></td><td className="num"><b>{doc.kmVazio == null ? "A conferir" : `${ofNumber(doc.kmVazio)} km`}</b></td><td>{doc.status}<div>{doc.confirmacaoId ? "Horários confirmados" : "Horários ERP"}</div><button className="btn" onClick={() => openConference(doc)}>{doc.confirmacaoId ? "Ver confirmação" : "Conferir viagem"}</button></td>
+          </tr>)}{!data.documentosDetalhados?.length && <tr><td colSpan={9}>Nenhum documento emitido no filtro.</td></tr>}</tbody>
+        </table></div>
+      </div>}
       <div className="card card-flush">
         <div className="card-header">
           <div>
-            <h3 style={{ marginBottom: 2 }}>Maiores intervalos parados</h3>
+            <h3 style={{ marginBottom: 2 }}>{summary.modo === "documentos" ? "Intervalos entre documentos (teste)" : "Intervalos entre operações"}</h3>
             <div className="muted" style={{ fontSize: 11 }}>
-              Do encerramento de uma operação ao início da seguinte
+              {summary.modo === "documentos" ? "Da entrega registrada à próxima emissão. Horários de carga e descarga são estimados; entregas sem horário consideram o dia inteiro." : "Do encerramento de uma SM ao início da seguinte · paradas exibidas fora da base; condição de carga depende da conciliação"}
             </div>
           </div>
           <span className="meta muted">{data.rows?.length || 0} períodos</span>
         </div>
         <div className="table-wrap">
           <table className="data-table tbl">
-            <thead>
-              <tr>
-                <th>Placa</th>
-                <th>Operação encerrada</th>
-                <th>Início do vazio</th>
-                <th>Próxima operação</th>
-                <th className="num">Tempo total</th>
-                <th className="num">Tempo parado</th>
-                <th className="num">KM vazio</th>
-                <th>Qualidade</th>
-                <th></th>
-              </tr>
-            </thead>
+            <thead><tr><OfSortHeader label="Placa" field="placa" sort={intervalSort} onSort={setIntervalSort} numeric={false} /><OfSortHeader label="Operação encerrada" field="documento" sort={intervalSort} onSort={setIntervalSort} numeric={false} /><OfSortHeader label="Início do vazio" field="inicio" sort={intervalSort} onSort={setIntervalSort} numeric={false} /><OfSortHeader label="Próxima operação" field="proximoDocumento" sort={intervalSort} onSort={setIntervalSort} numeric={false} /><OfSortHeader label="Tempo total" field="horasVazio" sort={intervalSort} onSort={setIntervalSort} numeric={true} /><OfSortHeader label="Tempo parado" field="horasParadoVazio" sort={intervalSort} onSort={setIntervalSort} numeric={true} /><OfSortHeader label="KM vazio" field="kmVazio" sort={intervalSort} onSort={setIntervalSort} numeric={true} /><OfSortHeader label="Qualidade" field="coberturaPercentual" sort={intervalSort} onSort={setIntervalSort} numeric={true} /><th></th></tr></thead>
             <tbody>
               {intervalRows.map((row) => {
                 const stoppedPercent = row.horasVazio
@@ -592,6 +647,9 @@ const OciosidadeFrota = ({ onNavigate }) => {
                       {row.proximaOperacaoAt ? (
                         <>
                           <b>{row.proximoDocumento || "Nova operação"}</b>
+                          <div className="muted" style={{ fontSize: 11, maxWidth: 260 }}>
+                            {row.proximaOrigem || "Local de carregamento não informado"}
+                          </div>
                           <div className="muted" style={{ fontSize: 11 }}>
                             {ofDateTime(row.fim)}
                           </div>
@@ -607,6 +665,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
                     </td>
                     <td className="num">
                       <b>{ofDuration(row.horasParadoVazio)}</b>
+                      {row.requerConciliacao && <div className="muted" style={{ fontSize: 10 }}>Condição de carga a conciliar</div>}
                       <div
                         style={{
                           height: 4,
@@ -632,7 +691,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
                     </td>
                     <td className="num">
                       <b style={{ color: "#2563eb" }}>
-                        {ofNumber(row.kmVazio)} km
+                        {`${ofNumber(row.kmVazio)} km`}
                       </b>
                     </td>
                     <td>
@@ -642,11 +701,11 @@ const OciosidadeFrota = ({ onNavigate }) => {
                           padding: "3px 7px",
                           borderRadius: 999,
                           background:
-                            row.coberturaPercentual >= 80
+                            !row.requerConciliacao && !row.regressoesOdometro && !row.saltosOdometro && row.coberturaPercentual >= 80
                               ? "#dcfce7"
                               : "#fef3c7",
                           color:
-                            row.coberturaPercentual >= 80
+                            !row.requerConciliacao && !row.regressoesOdometro && !row.saltosOdometro && row.coberturaPercentual >= 80
                               ? "#166534"
                               : "#92400e",
                           fontSize: 10,
@@ -659,7 +718,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
                         className="muted"
                         style={{ fontSize: 10, marginTop: 4 }}
                       >
-                        Vazio provável
+                        {row.requerConciliacao ? "Documentos ERP: a conciliar" : row.regressoesOdometro || row.saltosOdometro ? "Odômetro a conferir · vazio provável" : "Vazio provável"}
                       </div>
                     </td>
                     <td>
@@ -738,13 +797,13 @@ const OciosidadeFrota = ({ onNavigate }) => {
               }}
             >
               <OfKpi
-                label="Tempo vazio"
+                label={selected.requerConciliacao ? "Tempo do intervalo" : "Tempo vazio"}
                 value={ofDuration(selected.horasVazio)}
                 sub="Entre operações"
                 tone="#7c3aed"
               />
               <OfKpi
-                label="Tempo parado"
+                label={selected.requerConciliacao ? "Parado fora da base" : "Tempo parado"}
                 value={ofDuration(selected.horasParadoVazio)}
                 sub={`${selected.horasVazio ? Math.round((selected.horasParadoVazio / selected.horasVazio) * 100) : 0}% do intervalo`}
                 tone="#dc2626"
@@ -752,20 +811,44 @@ const OciosidadeFrota = ({ onNavigate }) => {
               <OfKpi
                 label="Em movimento"
                 value={ofDuration(
-                  Math.max(0, selected.horasVazio - selected.horasParadoVazio),
+                  Number(selected.horasEmMovimento || 0),
                 )}
-                sub="Condição vazia"
+                sub={selected.requerConciliacao ? "Carga a conciliar" : "Condição vazia"}
                 tone="#0891b2"
               />
               <OfKpi
-                label="KM vazio"
-                value={`${ofNumber(selected.kmVazio)} km`}
-                sub="Variação do odômetro"
+                label={selected.requerConciliacao ? "KM do intervalo" : "KM vazio"}
+                value={`${ofNumber(selected.kmIntervalo ?? selected.kmVazio)} km`}
+                sub={selected.requerConciliacao ? "Incluído como estimativa entre SMs" : "Variação do odômetro"}
                 tone="#2563eb"
               />
             </div>
             <div className="card" style={{ padding: 16, marginTop: 12 }}>
               <div>
+                {selected.requerConciliacao && <div style={{ marginBottom: 16 }}>
+                  <b style={{ color: "#fcd34d" }}>Carga possível sem correspondência com SM</b>
+                  <p className="muted">Existem documentos da mesma placa sobrepostos ao intervalo. Seus quilômetros e horas entram nos indicadores como estimativas entre SMs, ainda sujeitas a conferência. Emissão não confirma carregamento; entrega sem horário não confirma descarga. Conferir com a operação antes de dividir em trechos carregados e vazios.</p>
+                  {selected.documentosERP?.map((doc) => <div key={`${doc.documento}-${doc.codigo}`} style={{ borderTop: "1px solid var(--border)", padding: "10px 0", fontSize: 12 }}>
+                    <b>Documento ERP {doc.documento}</b><br />
+                    {doc.cliente} · {doc.destino}<br />
+                    Registro: {ofDateTime(doc.emissao)}<br />
+                    Entrega: {doc.entrega ? ofDateTime(doc.entrega) : "Não registrada"} {doc.entrega && !doc.entregaPrecisa ? "(horário não confirmado)" : ""}
+                  </div>)}
+                </div>}
+                <b>Conferência do cálculo</b>
+                <div className="muted" style={{ fontSize: 12, lineHeight: 1.7 }}>
+                  Parado na base (excluído): {ofDuration(selected.horasDescartadasBase)}<br />
+                  Cerca: {data.cercaBase?.aplicada ? data.cercaBase.nome : "Não aplicada"}<br />
+                  Menor odômetro: {ofNumber(selected.odometroMinimo)} km<br />
+                  Maior odômetro: {ofNumber(selected.odometroMaximo)} km<br />
+                  Incrementos filtrados: {ofNumber(selected.kmIncrementosValidos)} km<br />
+                  Amostras: {ofNumber(selected.amostras, 0)}<br />
+                  Primeira: {ofDateTime(selected.primeiraAmostra)}<br />
+                  Última: {ofDateTime(selected.ultimaAmostra)}<br />
+                  KM vazio = maior menos menor odômetro. A base desconta horas paradas, sem descontar quilômetros. Ausência de carga entre SMs é uma inferência. A cobertura mede a abrangência das amostras, sem garantir continuidade.
+                </div>
+                {(selected.regressoesOdometro > 0 || selected.saltosOdometro > 0) && <p style={{ color: "#fcd34d", fontSize: 12 }}>Odômetro inconsistente: {selected.regressoesOdometro} regressões e {selected.saltosOdometro} saltos entre leituras positivas. A distância exige conferência; os incrementos filtrados também não confirmam o total real.</p>}
+                <hr style={{ opacity: 0.15, margin: "14px 0" }} />
                 <b>Última entrega</b>
                 <div className="muted">
                   {selected.destino || "Destino não informado"}
@@ -776,6 +859,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
                 <b>Próxima operação</b>
                 <div className="muted">
                   {selected.proximoDocumento} · {ofDateTime(selected.fim)}
+                  <div>{selected.proximaOrigem || "Local de carregamento não informado"}</div>
                 </div>
               </div>
               <hr style={{ opacity: 0.15, margin: "14px 0" }} />
@@ -783,7 +867,7 @@ const OciosidadeFrota = ({ onNavigate }) => {
                 <b>Qualidade</b>
                 <div className="muted">
                   {selected.coberturaPercentual}% de cobertura da telemetria ·
-                  vazio provável
+                  {selected.requerConciliacao ? "documentos ERP conflitantes · a conciliar" : "vazio provável"}
                 </div>
               </div>
             </div>

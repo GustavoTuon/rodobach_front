@@ -729,10 +729,12 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
           { label:"Maior concentração", value:maiorPosto ? afPct(maiorPosto.participacao) : "0,0%", hint:maiorPosto?.fornecedor || "Sem posto", icon:"fuel", tone:"#d68a31" },
           { label:"Litros", value:afPlain(fuel.litros, 0), hint:"diesel abastecido", icon:"fuel", tone:"#f0c84b" },
           { label:"Preço médio ponderado", value:afBRL(precoReferenciaFrota), hint:`média simples ${afBRL(fuel.precoMedio)}/l`, icon:"chart", tone:"#4d8fe8" },
-          { label:"R$/km", value:afBRL(fuel.reaisKm), hint:"valor / km", icon:"speedometer", tone:"#2f8f5b" },
+          { label:"R$/km", value:fuel.reaisKm == null ? "A conferir" : afBRL(fuel.reaisKm), hint:"valor dos veículos com km / km", icon:"speedometer", tone:"#2f8f5b" },
           { label:"Pago acima da média", value:afBRL(sobreprecoTotal), hint:`${afPct(percentualSobrepreco)} · média ${afBRL(medioExtraAbastecimento)}/abast.`, icon:"trending-up", tone:"#e74b4b" },
         ])}
         <div className="fb-method-note"><Icon name="alert" size={15}/><span><strong>Preços líquidos após descontos.</strong> O preço efetivo é calculado por <strong>total pago ÷ litros</strong>; o campo de desconto não é subtraído novamente porque já está incorporado no total. A média ponderada dá o peso correto aos abastecimentos maiores. Referência: <strong>{afBRL(precoReferenciaFrota)}/l ponderada</strong>; comparação: <strong>{afBRL(fuel.precoMedio)}/l simples</strong>.</span></div>
+        <div className="fb-method-note"><span>Quilômetros no período: {fuel.fontesKm?.telemetria || 0} veículos por telemetria, {fuel.fontesKm?.erp || 0} pelo ERP e {fuel.fontesKm?.indisponivel || 0} sem leitura válida. O ERP usa a diferença entre o primeiro e o último odômetro de abastecimento disponível no filtro; pode cobrir apenas parte do período. Km/l é uma estimativa pelos litros abastecidos. Veículos sem km válido ficam fora das médias.</span></div>
+        <details><summary>Conferir quilômetros por veículo</summary><table className="table"><thead><tr><th>Placa</th><th>Fonte</th><th>Km</th><th>Odômetro inicial</th><th>Odômetro final</th><th>Início da leitura</th><th>Fim da leitura</th></tr></thead><tbody>{afRows(abastecimento.ranking).map(r => <tr key={r.placa}><td>{r.placa}</td><td>{r.origemConsumo}</td><td>{r.km == null ? "A conferir" : afPlain(r.km, 0)}</td><td>{r.leitura?.odometroInicial ?? "—"}</td><td>{r.leitura?.odometroFinal ?? "—"}</td><td>{r.leitura?.inicio ? new Date(r.leitura.inicio).toLocaleString("pt-BR", {timeZone:"America/Sao_Paulo"}) : "—"}</td><td>{r.leitura?.fim ? new Date(r.leitura.fim).toLocaleString("pt-BR", {timeZone:"America/Sao_Paulo"}) : "—"}</td></tr>)}</tbody></table></details>
         <div className="fb-view-toggle">
           <button className={`btn${fuelView === "graficos" ? " primary" : ""}`} onClick={() => setFuelView("graficos")}><Icon name="chart" size={13}/> Gráficos</button>
           <button className={`btn${fuelView === "tabela" ? " primary" : ""}`} onClick={() => setFuelView("tabela")}><Icon name="file" size={13}/> Tabela de postos</button>
@@ -767,7 +769,7 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
           </div>
         ) : <div className="fb-grid fuel">
           <BIPanel title="Média geral da frota" meta="km/l em destaque" className="hero">
-            <BIGauge value={fuel.mediaFrota} max={4} label="km/l médio" sub="Meta visual: quanto maior, melhor" color="#2f8f5b"/>
+            {fuel.mediaFrota == null ? <p>Sem quilometragem válida para calcular a média.</p> : <BIGauge value={fuel.mediaFrota} max={4} label="km/l estimado" sub="Somente veículos com km disponível; ERP pode cobrir parte do período" color="#2f8f5b"/>}
           </BIPanel>
           <BIPanel title="Preço diesel por mês" className="fb-span-2">
             <BILine data={abastecimento.monthly} series={[{ key:"precoMedio", label:"Preço médio/litro", color:"#4d8fe8" }]} format={(v) => afBRL(v)} emptyMessage="Sem histórico de preço no período."/>
