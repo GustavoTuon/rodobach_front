@@ -3,10 +3,36 @@ import React from 'react';
 import {describe,it,expect,vi,afterEach} from 'vitest';
 import {render,screen,fireEvent,cleanup,waitFor} from '@testing-library/react';
 import './screens/evolucao-custos.jsx';
-import {ecEvents,ecGroups,ecCategory,ecAlerts,ecSum,ecColor} from './screens/cost-analysis-model.js';
+import {ecEvents,ecGroups,ecCategory,ecAlerts,ecSum,ecColor,ecDocumentRows} from './screens/cost-analysis-model.js';
 import {CostEvolutionChart,CostTransactionsTable,VehicleCostDrawer,ExecutiveSummary} from './screens/cost-analysis-components.jsx';
 globalThis.React=React;
 afterEach(cleanup);
+describe('documentos consolidados',()=>{
+ it('mostra tres parcelas em uma linha e preserva o valor e os itens',async()=>{
+   const rows=[1,2,3].map(parcela=>row(`pagar:2:1:937:${parcela}:753:170:120`,83.33,{documento:''}));
+   const query=vi.fn().mockResolvedValue({documentos:[],itens:[],aviso:'Itens da nota completa.',financeiro:{valor_parcela:83.33},rateios:[]});
+   window.RB_API={getCustoRastreabilidade:query};
+   render(<CostTransactionsTable rows={rows}/>);
+   expect(screen.getAllByRole('row')).toHaveLength(2);
+   expect(screen.getByText('Duplicata 1/937')).toBeTruthy();
+   expect(ecDocumentRows(rows)[0].valor).toBe(249.99);
+   expect(ecEvents(rows)).toBe(1);
+   expect(rows.map(r=>r.valor)).toEqual([83.33,83.33,83.33]);
+   fireEvent.click(screen.getByRole('button',{name:'Detalhar itens'}));
+   await screen.findByText('Itens da nota completa.');
+   expect(query).toHaveBeenCalledOnce();
+   expect(query).toHaveBeenCalledWith(rows[0].id);
+   expect(screen.queryByText(/Valor integral da parcela/)).toBeNull();
+ });
+ it('separa empresa, serie, fornecedor e placa e soma estornos no documento',()=>{
+   const rows=[row('pagar:2:1:937:1:753:170:120',100),row('pagar:2:1:937:2:753:170:120',-20),
+     row('pagar:3:1:937:1:753:170:120'),row('pagar:2:2:937:1:753:170:120'),
+     row('pagar:2:1:937:1:754:170:120'),row('pagar:2:1:937:1:753:170:120',100,{placa:'SXY5D26'})];
+   const documents=ecDocumentRows(rows);
+   expect(documents).toHaveLength(5);expect(documents[0].valor).toBe(80);
+   expect(ecSum(documents)).toBe(ecSum(rows));
+ });
+});
 const row=(id,valor=100,extra={})=>({id,data:'2026-08-02',placa:'RXO6C18',empresa:1,fornecedorCodigo:20,fornecedor:'Oficina',tipoCusto:'Manutencao',documento:'OS-12',valor,descricao:'Reparo',...extra});
 describe('preservação dos valores e alertas',()=>{
  it('preserva estornos e conta itens da mesma OS uma vez',()=>{const rows=[row('1',100),row('2',-20),row('3',50,{documento:'OS-13'})];expect(ecSum(rows)).toBe(130);expect(ecGroups(rows,ecCategory)).toEqual([{name:'Manutenção',value:130}]);expect(ecEvents(rows)).toBe(2);});
@@ -18,7 +44,7 @@ describe('interações da análise',()=>{
    const query=vi.fn().mockResolvedValue({documentos:[],itens:[{codigo:'1',descricao:'Balanceamento',quantidade:2,unitario:45,total:90,documento:'NF 1/961'}],aviso:'Itens da nota completa.'});
    window.RB_API={getCustoRastreabilidade:query};
    render(<CostTransactionsTable rows={[row('pagar:2:1:961:1:753:10:20',90,{documento:''})]}/>);
-   expect(screen.getByText('Duplicata 1/961 · parcela 1')).toBeTruthy();expect(query).not.toHaveBeenCalled();
+   expect(screen.getByText('Duplicata 1/961')).toBeTruthy();expect(query).not.toHaveBeenCalled();
    fireEvent.click(screen.getByRole('button',{name:'Detalhar itens'}));
    expect(await screen.findByText('1 · Balanceamento')).toBeTruthy();
    expect(query).toHaveBeenCalledWith('pagar:2:1:961:1:753:10:20');

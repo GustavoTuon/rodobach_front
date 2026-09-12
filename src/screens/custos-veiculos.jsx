@@ -405,7 +405,7 @@ const CustosVeiculos = () => {
       <div className="page-head">
         <div>
           <h1>Custos por Veículo</h1>
-          <div className="sub">Entenda quanto a frota custa e de onde vem cada despesa.</div>
+          <div className="sub">Custos do contas a pagar, pelo vencimento e rateados por veículo.</div>
         </div>
         <div className="actions">
           <div className="cv-tabs">
@@ -556,7 +556,7 @@ const CustosVeiculos = () => {
 
       <div className="card">
         <div className="section-head">
-          <div><h2>Lançamentos</h2><div className="muted" style={{ fontSize: 12 }}>Extrato completo de financeiro, rateios e abastecimentos sem duplicidade</div></div>
+          <div><h2>Lançamentos</h2><div className="muted" style={{ fontSize: 12 }}>Contas a pagar, rateado por veículo e filtrado pelo vencimento</div></div>
           <div className="muted" style={{ fontSize: 12 }}>{data.launches.length} registros · Página {launchPage} de {launchPages}</div>
         </div>
         <div className="table-wrap">
@@ -623,7 +623,7 @@ const CustosVeiculos = () => {
 
       <div className="card">
         <div className="section-head">
-          <div><h2>Lucro por veiculo</h2><div className="muted" style={{ fontSize: 12 }}>Receita de logistica.conhecimentos; custos de financeiro.pagar/rateios e abastecimentos operacionais</div></div>
+          <div><h2>Lucro por veiculo</h2><div className="muted" style={{ fontSize: 12 }}>Receita dos CT-es e custos do contas a pagar, rateados por veículo</div></div>
           <div className="muted" style={{ fontSize: 12 }}>{profitVehicles.length} veiculos</div>
         </div>
         <div className="table-wrap">

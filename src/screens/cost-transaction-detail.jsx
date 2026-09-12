@@ -2,10 +2,13 @@ import {ecMoney} from './cost-analysis-model.js';
 export function costReference(row) {
   if(row.documento)return row.documento;
   const parts=String(row.id||'').split(':');
-  return parts[0]==='pagar'?`Duplicata ${parts[2]}/${parts[3]} · parcela ${parts[4]}`:'Documento não informado';
+  return parts[0]==='pagar'?`Duplicata ${parts[2]}/${parts[3]}${row.documentGrouped?'':` · parcela ${parts[4]}`}`:'Documento não informado';
 }
 export function CostTransactionDetail({row}) {
-  const [data,setData]=React.useState(null),[error,setError]=React.useState('');
+  const [rawData,setData]=React.useState(null),[error,setError]=React.useState('');
+  // A consulta de itens usa a chave original de uma parcela; seus valores de
+  // pagamento nao representam o documento agrupado e nao devem ser exibidos como tal.
+  const data=rawData && row.sourceRows?.length>1 ? {...rawData,financeiro:null,rateios:[]} : rawData;
   React.useEffect(()=>{let active=true;window.RB_API.getCustoRastreabilidade(row.id).then(r=>{if(active)setData(r);}).catch(e=>{if(active)setError(e.message||'Não foi possível consultar os itens.');});return()=>{active=false;};},[row.id]);
   return <div className="ec-trace"><h3>Rastreabilidade · {costReference(row)}</h3><p>Veículo: <b>{row.placa}</b> · Valor desta linha: <b>{ecMoney(row.valor)}</b> · Origem: {row.origem}</p><p className="ec-footnote">Identificador ERP: {row.id}</p>{error?<p role="alert">{error}</p>:!data?<p role="status">Consultando documentos e itens no ERP…</p>:<><p>{data.aviso}</p>{data.financeiro&&<p>Valor da parcela: <b>{ecMoney(data.financeiro.valor_parcela)}</b> · Em aberto: {ecMoney(data.financeiro.aberto)}{data.financeiro.historico&&` · Histórico: ${data.financeiro.historico}`}</p>}{data.documentos.map((d,i)=><p key={i}><b>NF {d.serie}/{d.numero} · {ecMoney(d.total)}</b><br/>{d.vinculo}{d.observacao&&<><br/><span style={{whiteSpace:"pre-wrap"}}>{d.observacao}</span></>}</p>)}{data.itens.length?<div className="ec-table-scroll"><table className="ec-table"><thead><tr><th>Documento</th><th>Produto / serviço</th><th>Placa do item</th><th>Quantidade</th><th>Unitário</th><th>Total do item</th></tr></thead><tbody>{data.itens.map((item,i)=><tr key={i}><td>{item.documento}</td><td>{item.codigo} · {item.descricao}</td><td>{item.placa||'Não informada'}</td><td>{item.quantidade??'—'}</td><td>{item.unitario==null?'—':ecMoney(item.unitario)}</td><td>{item.total==null?'—':ecMoney(item.total)}</td></tr>)}</tbody></table></div>:<p>Não foram encontrados itens por vínculo ou correspondência de chave para este lançamento. Isso não confirma que o serviço não tenha produtos registrados em outra origem.</p>}{data.rateios?.length>0&&<details><summary>Rateios desta parcela ({data.rateios.length})</summary><table className="ec-table"><thead><tr><th>Centro de custo</th><th>Conta financeira</th><th>Valor rateado</th></tr></thead><tbody>{data.rateios.map((r,i)=><tr key={i}><td>{r.centro}</td><td>{r.conta}</td><td>{ecMoney(r.valor)}</td></tr>)}</tbody></table></details>}</>}</div>;
 }
