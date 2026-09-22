@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 import React from 'react';
-import {it,expect,vi,afterEach} from 'vitest';
+import {it,expect,vi,beforeEach,afterEach} from 'vitest';
 import {render,screen,fireEvent,cleanup,act} from '@testing-library/react';
 globalThis.React=React;
 await import('./screens/painel-tv.jsx');
-afterEach(()=>{cleanup();vi.useRealTimers();delete window.RB_API;});
+beforeEach(()=>vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){}}));
+afterEach(()=>{cleanup();vi.useRealTimers();vi.unstubAllGlobals();delete window.RB_API;});
 it('mostra correção somente para administrador fora do modo consulta',async()=>{
  window.RB_API={getPainelTv:vi.fn().mockResolvedValue({dia:'2026-09-16',atualizadoEm:new Date().toISOString(),confirmacoesDisponiveis:true,itens:[]})};
  const {rerender}=await act(async()=>render(React.createElement(window.PainelTv,{user:{admin:true,readOnly:false}})));
