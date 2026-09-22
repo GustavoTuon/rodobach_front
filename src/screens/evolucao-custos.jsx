@@ -1,6 +1,7 @@
 import {CostMultiSelect} from './cost-multiselect.jsx';
 import {FuelDistance} from './cost-fuel-distance.jsx';
 import {CostDeviations} from './cost-deviations.jsx';
+import {LargestCosts} from './cost-largest.jsx';
 import {ecCategory,ecMonth,ecDate} from './cost-analysis-model.js';
 import {ExecutiveSummary,CostAlerts,CostEvolutionChart,VehicleCostRanking,CostCategoryRanking,SupplierRanking,VehicleCostTable,VehicleCostDrawer,CostTransactionsTable,ServiceActivity} from './cost-analysis-components.jsx';
 function EvolucaoCustos() {
@@ -16,6 +17,7 @@ function EvolucaoCustos() {
   const [payload,setPayload]=React.useState(null), [busy,setBusy]=React.useState(false),[error,setError]=React.useState('');
   const [owner,setOwner]=React.useState(initial.owner),[plate,setPlate]=React.useState(initial.plate),[category,setCategory]=React.useState(initial.category),[supplier,setSupplier]=React.useState(initial.supplier),[center,setCenter]=React.useState(initial.center),[month,setMonth]=React.useState(initial.month);
   const [drawer,setDrawer]=React.useState('');
+  const [analysisTab,setAnalysisTab]=React.useState('overview');
   const closeDrawer=React.useCallback(()=>setDrawer(''),[]);
   const [catalog,setCatalog]=React.useState([]),[vehicleSearch,setVehicleSearch]=React.useState(''),[advanced,setAdvanced]=React.useState(false);
   React.useEffect(()=>{let active=true;window.RB_API.getCustosVeiculosFiltros().then(r=>{if(active)setCatalog(r.veiculos || []);}).catch(()=>{});return()=>{active=false;};},[]);
@@ -41,6 +43,8 @@ function EvolucaoCustos() {
     {error&&<p role="alert">{error}</p>}{busy&&<div className="ec-skeleton" role="status" aria-label="Carregando custos"><span/><span/><span/></div>}
     {payload&&<div className="ec-dashboard" aria-busy={busy}>
       <p className="ec-period-caption">{ecDate(payload.period.startDate)} a {ecDate(payload.period.endDate)} · Comparativo: {ecDate(payload.prior.startDate)} a {ecDate(payload.prior.endDate)}{month&&` · Mês selecionado: ${ecMonth(month)}`}</p>
+      <nav aria-label="Visões da análise de custos" style={{display:'flex',gap:8,margin:'16px 0'}}>{[['overview','Visão geral'],['largest','Maiores gastos']].map(([value,label])=><button className={`btn ${analysisTab===value?'primary':''}`} key={value} aria-pressed={analysisTab===value} onClick={()=>{setAnalysisTab(value);setDrawer('');}}>{label}</button>)}</nav>
+      {analysisTab==='largest'?<LargestCosts key={JSON.stringify([payload.period,owner,plate,category,supplier,center,month])} rows={rows} monthCount={month?1:months.length} onOpenVehicle={setDrawer}/>:<>
       <ExecutiveSummary rows={rows} previous={previous} month={month}/>
       <CostAlerts rows={rows} previous={previous} month={month}/>
       <CostDeviations rows={rows} previous={previous} months={months} distance={payload.distance} month={month} onOpen={setDrawer}/>
@@ -51,6 +55,7 @@ function EvolucaoCustos() {
       <ServiceActivity rows={rows} months={month?months.filter(m=>m.key===month):months}/>
       <CostTransactionsTable rows={rows}/>
       <details className="ec-method"><summary>Como os valores são apresentados</summary><p>Base conciliada de custos do ERP, por data do lançamento de origem. Itens do mesmo documento, empresa, fornecedor e veículo contam uma vez; sem documento, contam como lançamento. A quantidade é estimada, não representa necessariamente serviços físicos. Borracharia é identificada pela descrição (borracharia, vulcanização ou recapagem). R$/km depende de cobertura confiável no mesmo período. Ausência de lançamentos não comprova ausência de custos.</p></details>
+      </>}
       {drawer&&<VehicleCostDrawer plate={drawer} rows={rows} months={month?months.filter(m=>m.key===month):months} onClose={closeDrawer} onFilter={value=>setPlate([value])}/>}
     </div>}
   </div>;

@@ -51,9 +51,9 @@ export function SupplierRanking({rows,onSelect}) {const total=ecSum(rows);return
 
 export function VehicleCostTable({rows,monthCount,onOpen}) {const groups=ecGroups(rows,r=>r.placa),total=ecSum(rows),average=groups.length?total/groups.length:0;return <section className="ec-panel"><div className="ec-panel-head"><div><h2>Comparativo de veículos</h2><p>Abra uma placa para conferir categorias, fornecedores e documentos.</p></div></div><div className="ec-table-scroll"><table className="ec-table"><thead><tr>{['Veículo','Custo total','Média mensal¹','Principal categoria','Participação','Atendimentos²','Comparação de gasto'].map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{groups.map(g=>{const related=rows.filter(r=>r.placa===g.name);return <tr key={g.name}><td><button className="ec-link" onClick={()=>onOpen(g.name)}>{g.name} ↗</button></td><td>{ecMoney(g.value)}</td><td>{ecMoney(g.value/Math.max(1,monthCount))}</td><td>{ecGroups(related,ecCategory)[0]?.name}</td><td>{total>0?ecPct(g.value/total*100):'—'}</td><td>{ecEvents(ecServices(related))}</td><td>{groups.length<2||average<=0?'Sem comparação':`${ecPct(Math.abs(g.value/average-1)*100)} ${g.value>=average?'acima':'abaixo'} da média`}</td></tr>;})}</tbody></table></div>{!groups.length&&<p>Sem veículos nos filtros selecionados.</p>}<p className="ec-footnote">¹ Meses selecionados, incluindo meses parciais e sem lançamentos. ² Estimativa por documento. Comparação de gasto não mede eficiência nem ajusta por tipo de veículo ou distância.</p></section>;}
 
-export function CostTransactionsTable({rows}) {
+export function CostTransactionsTable({rows,initialSort={key:'data',direction:-1}}) {
   const [expanded,setExpanded]=React.useState(null);
-  const [search,setSearch]=React.useState(''),[size,setSize]=React.useState(25),[page,setPage]=React.useState(0),[sort,setSort]=React.useState({key:'data',direction:-1});
+  const [search,setSearch]=React.useState(''),[size,setSize]=React.useState(25),[page,setPage]=React.useState(0),[sort,setSort]=React.useState(initialSort);
   React.useEffect(()=>setPage(0),[rows,search,size]);
   const documents=React.useMemo(()=>ecDocumentRows(rows),[rows]);
   const filtered=documents.filter(r=>`${r.fornecedor} ${r.descricao} ${r.documento} ${costReference(r)}`.toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR')));

@@ -1,4 +1,5 @@
 import React from 'react';
+import {ClientProfitRanking} from './client-profit-ranking.jsx';
 
 const money = value => value == null ? 'Não apurado' : Number(value).toLocaleString('pt-BR', {style: 'currency', currency: 'BRL'});
 const percent = value => value == null ? 'Não apurada' : `${Number(value).toLocaleString('pt-BR', {maximumFractionDigits: 2})}%`;
@@ -60,15 +61,17 @@ export function ClientMargin() {
       <Summary value={payload.resumo}/>
       {payload.resumo.documentosSemReceita > 0 && <p role="alert">{payload.resumo.documentosSemReceita} documentos sem valor de receita válido. Os totais de receita estão incompletos.</p>}
       <section className="card" style={{marginBottom: 16}}>
-        <div className="row between" style={{gap: 12, flexWrap: 'wrap'}}><div className="actions"><button className="btn" aria-pressed={tab === 'clientes'} onClick={() => {setTab('clientes'); setSelected(null);}}>Por cliente</button><button className="btn" aria-pressed={tab === 'rotas'} onClick={() => {setTab('rotas'); setSelected(null);}}>Por rota</button></div>
+        <div className="row between" style={{gap: 12, flexWrap: 'wrap'}}><div className="actions"><button className="btn primary" aria-pressed={tab === 'ranking'} onClick={() => {setTab('ranking'); setSelected(null);}}>Ranking de clientes</button><button className="btn" aria-pressed={tab === 'clientes'} onClick={() => {setTab('clientes'); setSelected(null);}}>Por cliente</button><button className="btn" aria-pressed={tab === 'rotas'} onClick={() => {setTab('rotas'); setSelected(null);}}>Por rota</button></div>
           <label>Buscar<input type="search" value={search} onChange={event => setSearch(event.target.value)}/></label>
           {tab === 'clientes' && <button className="btn" disabled={!rows.length} onClick={download}>Exportar clientes CSV</button>}</div>
         <p className="muted">Resumo acima considera todos os clientes do período. A busca filtra somente esta tabela. Empresas são mantidas separadas por cadastro. Variação da margem em pontos percentuais só aparece com custo identificado em todos os documentos dos dois períodos.</p>
+        {tab === 'ranking' ? <ClientProfitRanking clients={payload.clientes} payload={payload} search={search} onSelect={setSelected}/> : <>
         <div className="table-wrap"><table className="data-table compact"><thead><tr><th>{tab === 'clientes' ? 'Cliente / empresa' : 'Origem → destino'}</th><th>Receita</th><th>Cobertura</th><th>Receita sem custo</th><th>Custo direto</th><th>Saldo parcial</th><th>Margem parcial</th><th>Variação (p.p.)</th><th>Investigar</th></tr></thead>
           <tbody>{rows.map(row => <tr key={row.id}><td>{tab === 'clientes' ? `${row.cliente} · ${row.empresa}` : `${row.origem} → ${row.destino}`}</td>
             <td>{money(row.atual.receita)}</td><td>{row.atual.documentosComCusto}/{row.atual.documentos} documentos</td><td>{money(row.atual.receitaSemCusto)}</td><td>{money(row.atual.custoDireto)}</td><td>{money(row.atual.saldoParcial)}</td><td>{percent(row.atual.margemParcial)}</td><td>{row.variacaoMargemPp == null ? 'Sem base comparável' : row.variacaoMargemPp.toLocaleString('pt-BR')}</td>
             <td><button className="btn" onClick={() => setSelected({...row, type: tab})}>Ver documentos</button></td></tr>)}</tbody></table></div>
         {!rows.length && <p>Nenhum documento encontrado para esta seleção.</p>}
+        </>}
       </section>
       {selected && <section className="card" style={{marginBottom: 16}} aria-label="Documentos da seleção">
         <div className="row between"><h2>{selected.type === 'clientes' ? selected.cliente : `${selected.origem} → ${selected.destino}`}</h2><button className="btn" onClick={() => setSelected(null)}>Fechar detalhes</button></div>
