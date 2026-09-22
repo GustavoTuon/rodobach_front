@@ -1,72 +1,10 @@
-﻿// Norte Telemetria — App shell, router, sidebar, Tweaks
+import { createScreenLoader } from "./screen-loader.js";
+// Norte Telemetria — App shell, router, sidebar, Tweaks
 import { getNavForUser as filterNavForUser } from "./permissions.js";
 
 const { useState, useEffect } = React;
 
-const SCREEN_SCRIPTS = [
-  "src/screens/diretoria.jsx",
-  "src/screens/simulador.jsx",
-  "src/screens/cargas-viagens-v2.jsx?v=20260824-tema-claro-5",
-  "src/screens/folgas-motoristas.jsx?v=20260803-corte-marco",
-  "src/screens/status-carga.jsx",
-  "src/screens/ociosidade-frota.jsx",
-  "src/screens/trafegus.jsx",
-  "src/screens/oportunidades-retorno.jsx",
-  "src/screens/dre-empresarial.jsx",
-  "src/screens/fluxo-caixa.jsx",
-  "src/screens/despesas-futuras.jsx",
-  "src/screens/analise-frota.jsx",
-  "src/screens/precos-combustivel.jsx",
-  "src/screens/resultado-veiculos.jsx",
-  "src/screens/evolucao-custos.jsx",
-  "src/screens/manutencoes-veiculos.jsx?v=20260803-bi-redesign",
-  "src/screens/analise-clientes.jsx",
-  "src/screens/rentabilidade-clientes.jsx",
-  "src/screens/lucro-viagens.jsx",
-  "src/screens/resultado-fretes.jsx",
-  "src/screens/faturamento-diario.jsx",
-  "src/screens/comparativo-faturamento.jsx",
-  "src/screens/manutencao.jsx?v=20260803-km-fallback-5",
-  "src/screens/manutencao-posicoes.jsx",
-  "src/screens/pneus.jsx?v=20260803-km-fallback",
-  "src/screens/multas-frota.jsx",
-  "src/screens/automacoes.jsx",
-  "src/screens/consulta-cte.jsx?v=20260819-ncm-rateio",
-  "src/screens/controle-canhotos.jsx?v=20260803-3",
-];
-
-const SCREEN_GLOBALS = [
-  "Diretoria",
-  "SimuladorFrete",
-  "CargasViagensV2",
-  "FolgasMotoristas",
-  "StatusCargaFrota",
-  "OciosidadeFrota",
-  "Trafegus",
-  "OportunidadesRetorno",
-  "DreEmpresarial",
-  "FluxoCaixa",
-  "DespesasFuturas",
-  "AnaliseClientes",
-  "RankingClientes",
-  "RentabilidadeClientes",
-  "LucroViagens",
-  "ResultadoFretes",
-  "ResultadoVeiculos",
-  "FaturamentoDiario",
-  "ComparativoFaturamento",
-  "ManutencaoMensagens",
-  "ManutencaoPosicoesScreen",
-  "Pneus",
-  "MultasFrota",
-  "ManutencoesVeiculos",
-  "AnaliseFrota",
-  "PrecosCombustivel",
-  "AutomacoesN8n",
-  "ConsultaCte",
-  "ControleCanhotos",
-];
-const SCREEN_MODULES = import.meta.glob("./screens/*.jsx");
+const loadScreen = createScreenLoader(import.meta.glob(["./screens/*.jsx", "!./screens/*.test.jsx"]));
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/ {
   theme: "auto",
@@ -164,6 +102,15 @@ const NAV = [
     title: "Rentabilidade Clientes",
     group: "clientes",
     section: "financeiro",
+  },
+  {
+    id: "clientes-embarques",
+    label: "Embarques",
+    icon: "route",
+    title: "Embarques por Cliente",
+    group: "clientes",
+    section: "financeiro",
+    permission: "clientes",
   },
   {
     id: "abastecimentos",
@@ -285,6 +232,7 @@ const NAV = [
     title: "Automações n8n",
     section: "ferramentas",
   },
+  {id:"painel-tv",label:"Painel TV",icon:"dashboard",title:"Painel TV da Frota",section:"ferramentas",permission:"status-carga"},
   {
     id: "settings",
     label: "Configurações",
@@ -428,7 +376,13 @@ const App = () => {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [route, setRouteState] = useState(readRoute());
   const [auth, setAuth] = useState({ checking: true, user: null });
-  const [screensReady, setScreensReady] = useState(false);
+  const [authError, setAuthError] = useState(null);
+  const [authAttempt, setAuthAttempt] = useState(0);
+  const [loadedScreen, setLoadedScreen] = useState(null);
+  const [screenError, setScreenError] = useState(null);
+  const [screenAttempt, setScreenAttempt] = useState(0);
+  const visibleNav = getNavForUser(auth.user);
+  const currentScreen = visibleNav.some(n => n.id === route.screen) ? route.screen : visibleNav[0]?.id;
   const [sidebarExpanded, setSidebarExpanded] = useState(
     () => window.innerWidth > 960,
   );
@@ -437,19 +391,22 @@ const App = () => {
 
   // Verificar sessÃ£o existente ao carregar
   useEffect(() => {
+    setAuthError(null);
+    setAuth({ checking: true, user: null });
     const token = RB_AUTH.getToken();
     const cachedUser = RB_AUTH.getUser();
     if (token && cachedUser) {
       RB_AUTH.me()
         .then((data) => setAuth({ checking: false, user: data.user }))
-        .catch(() => {
-          RB_AUTH.logout();
+        .catch((error) => {
+          if (!RB_AUTH.getToken()) RB_AUTH.logout();
+          else setAuthError(error.message || "Não foi possível verificar sua sessão.");
           setAuth({ checking: false, user: null });
         });
     } else {
       setAuth({ checking: false, user: null });
     }
-  }, []);
+  }, [authAttempt]);
 
   // Ouvir evento de sessÃ£o expirada
   useEffect(() => {
@@ -482,24 +439,18 @@ const App = () => {
     }
   }, [t.theme, t.density]);
 
-  // Carrega as telas apÃ³s autenticaÃ§Ã£o via fetch + Babel.transform
+  // Load only the authorized active screen; ignore results after navigation.
   useEffect(() => {
-    if (!auth.user || screensReady) return;
-    (async () => {
-      try {
-        for (const src of SCREEN_SCRIPTS) {
-          const cleanSrc = src.split("?")[0].replace(/^src\//, "./");
-          const load = SCREEN_MODULES[cleanSrc];
-          if (!load) throw new Error(`Modulo nao encontrado: ${cleanSrc}`);
-          await load();
-        }
-        setScreensReady(true);
-      } catch (e) {
-        console.error("Erro ao carregar telas:", e);
-        setScreensReady(true); // mostra o app mesmo assim
-      }
-    })();
-  }, [auth.user]);
+    if (!auth.user || !currentScreen) return;
+    let cancelled = false;
+    setScreenError(null);
+    loadScreen(currentScreen).then(() => {
+      if (!cancelled) setLoadedScreen(currentScreen);
+    }).catch(() => {
+      if (!cancelled) setScreenError("Não foi possível carregar esta tela. Tente novamente.");
+    });
+    return () => { cancelled = true; };
+  }, [auth.user, currentScreen, screenAttempt]);
 
   const handleLogin = ({ user }) => {
     setAuth({ checking: false, user });
@@ -531,10 +482,13 @@ const App = () => {
   }
 
   if (!auth.user) {
+    if (authError) return <div style={{ padding: 32 }}><p>{authError}</p><button className="btn" onClick={() => setAuthAttempt(value => value + 1)}>Tentar novamente</button><button className="btn" onClick={() => { setAuthError(null); handleLogout(); }}>Sair</button></div>;
     return <LoginScreen onLogin={handleLogin} />;
   }
 
-  if (!screensReady) {
+  if (!currentScreen) return <div style={{ padding: 32 }}><p>Seu usuário ainda não possui telas liberadas. Solicite acesso ao administrador.</p><button className="btn" onClick={handleLogout}>Sair</button></div>;
+
+  if (loadedScreen !== currentScreen) {
     return (
       <div
         style={{
@@ -552,20 +506,15 @@ const App = () => {
           <img className="norte-theme-dark" src="/brand/norte-03.png" alt="Norte - Gestão Inteligente" />
         </div>
         <div style={{ color: "var(--muted)", fontSize: 13 }}>
-          Carregando o sistema…
+          {screenError || "Carregando a tela…"}
+          {screenError && <div><button className="btn" onClick={() => setScreenAttempt(value => value + 1)}>Tentar novamente</button><button className="btn" onClick={handleLogout}>Sair</button></div>}
         </div>
       </div>
     );
   }
 
   // â”€â”€ App autenticado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  const visibleNav = getNavForUser(auth.user);
   const sidebarNav = getSidebarNav(visibleNav);
-
-  // Se a tela atual nÃ£o estÃ¡ acessÃ­vel ao usuÃ¡rio, cair na primeira disponÃ­vel
-  const currentScreen = visibleNav.some((n) => n.id === route.screen)
-    ? route.screen
-    : visibleNav[0]?.id || DEFAULT_SCREEN;
 
   const go = (screen) => setRoute({ screen });
   const onNavigate = (screen) => {
@@ -592,7 +541,7 @@ const App = () => {
       </button>
     ));
 
-  let body = null;
+  let body;
   const financialBody = (screen) => (
     <FinancialScreenGroup active={currentScreen} onChange={onNavigate} visibleNav={visibleNav}>
       {screen}
@@ -613,6 +562,9 @@ const App = () => {
       break;
     case "status-carga":
       body = <StatusCargaFrota onNavigate={onNavigate} />;
+      break;
+    case "painel-tv":
+      body = <PainelTv user={auth.user} />;
       break;
     case "ociosidade-frota":
       body = <OciosidadeFrota onNavigate={onNavigate} />;
@@ -692,6 +644,7 @@ const App = () => {
               label: "Lucro",
               available: hasScreen("clientes-lucro"),
             },
+            { id: "clientes-embarques", label: "Embarques", available: hasScreen("clientes-embarques") },
           ]}
           active={currentScreen}
           onChange={onNavigate}
@@ -719,6 +672,7 @@ const App = () => {
               label: "Lucro",
               available: hasScreen("clientes-lucro"),
             },
+            { id: "clientes-embarques", label: "Embarques", available: hasScreen("clientes-embarques") },
           ]}
           active={currentScreen}
           onChange={onNavigate}
@@ -746,11 +700,28 @@ const App = () => {
               label: "Lucro",
               available: hasScreen("clientes-lucro"),
             },
+            { id: "clientes-embarques", label: "Embarques", available: hasScreen("clientes-embarques") },
           ]}
           active={currentScreen}
           onChange={onNavigate}
         >
           <RentabilidadeClientes onNavigate={onNavigate} />
+        </ScreenGroup>
+      );
+      break;
+    case "clientes-embarques":
+      body = (
+        <ScreenGroup
+          tabs={[
+            { id: "clientes", label: "Análise", available: hasScreen("clientes") },
+            { id: "clientes-ranking", label: "Ranking e evolução", available: hasScreen("clientes-ranking") },
+            { id: "clientes-lucro", label: "Lucro", available: hasScreen("clientes-lucro") },
+            { id: "clientes-embarques", label: "Embarques", available: hasScreen("clientes-embarques") },
+          ]}
+          active={currentScreen}
+          onChange={onNavigate}
+        >
+          <EmbarquesClientes onNavigate={onNavigate} />
         </ScreenGroup>
       );
       break;
@@ -798,7 +769,7 @@ const App = () => {
       break;
   }
 
-  const userLogin = auth.user.login || "Usuário";
+  const userLogin = (auth.user.login || "Usuário") + (auth.user.readOnly ? " · Consulta" : "");
   const userInitials =
     userLogin
       .split(".")

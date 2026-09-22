@@ -223,7 +223,14 @@ const DreEmpresarial = () => {
     .slice()
     .sort(dreEmpSortByDate);
   const cteAuditValue = dreEmpNum(data.cteAudit.value);
-  const tableRows = data.rows.slice(0, 160);
+  const [launchSort, setLaunchSort] = React.useState({ key: 'data', direction: 'desc' });
+  const tableRows = React.useMemo(() => [...data.rows].sort((a,b) => {
+    const {key,direction}=launchSort;
+    const comparison=key==='valor' ? dreEmpNum(a[key])-dreEmpNum(b[key])
+      : String(a[key] ?? '').localeCompare(String(b[key] ?? ''),'pt-BR',{numeric:true,sensitivity:'base'});
+    return direction==='asc' ? comparison : -comparison;
+  }).slice(0,160), [data.rows,launchSort]);
+  const launchColumns = [['data','Data'],['centroCusto','Centro de custo'],['contaFinanceira','Conta financeira'],['categoriaDre','Categoria DRE'],['tipo','Tipo'],['placa','Placa'],['pessoaNome','Cliente/Fornecedor'],['documento','Documento'],['status','Status'],['origem','Origem'],['valor','Valor']];
   const isTerceiro = (manualFilter?.tipo || tipo) === "terceiro";
   const dreLabel = (label) => isTerceiro ? String(label).replace("CUSTOS COM FROTA", "CUSTOS") : label;
   const selectedPlateDetail = React.useMemo(() => {
@@ -614,17 +621,11 @@ const DreEmpresarial = () => {
         <table className="tbl">
           <thead>
             <tr>
-              <th>Data</th>
-              <th>Centro de custo</th>
-              <th>Conta financeira</th>
-              <th>Categoria DRE</th>
-              <th>Tipo</th>
-              <th>Placa</th>
-              <th>Cliente/Fornecedor</th>
-              <th>Documento</th>
-              <th>Status</th>
-              <th>Origem</th>
-              <th className="num">Valor</th>
+              {launchColumns.map(([key,label]) => <th key={key} className={key==='valor'?'num':undefined} aria-sort={launchSort.key===key?(launchSort.direction==='asc'?'ascending':'descending'):'none'}>
+                <button type="button" style={{background:'none',border:0,color:'inherit',font:'inherit',cursor:'pointer',padding:0,textAlign:'inherit'}} onClick={()=>setLaunchSort(previous=>({key,direction:previous.key===key&&previous.direction==='asc'?'desc':'asc'}))}>
+                  {label} {launchSort.key===key?(launchSort.direction==='asc'?'▲':'▼'):'↕'}
+                </button>
+              </th>)}
             </tr>
           </thead>
           <tbody>

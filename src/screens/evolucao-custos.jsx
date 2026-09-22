@@ -1,4 +1,6 @@
 import {CostMultiSelect} from './cost-multiselect.jsx';
+import {FuelDistance} from './cost-fuel-distance.jsx';
+import {CostDeviations} from './cost-deviations.jsx';
 import {ecCategory,ecMonth,ecDate} from './cost-analysis-model.js';
 import {ExecutiveSummary,CostAlerts,CostEvolutionChart,VehicleCostRanking,CostCategoryRanking,SupplierRanking,VehicleCostTable,VehicleCostDrawer,CostTransactionsTable,ServiceActivity} from './cost-analysis-components.jsx';
 function EvolucaoCustos() {
@@ -41,7 +43,9 @@ function EvolucaoCustos() {
       <p className="ec-period-caption">{ecDate(payload.period.startDate)} a {ecDate(payload.period.endDate)} · Comparativo: {ecDate(payload.prior.startDate)} a {ecDate(payload.prior.endDate)}{month&&` · Mês selecionado: ${ecMonth(month)}`}</p>
       <ExecutiveSummary rows={rows} previous={previous} month={month}/>
       <CostAlerts rows={rows} previous={previous} month={month}/>
+      <CostDeviations rows={rows} previous={previous} months={months} distance={payload.distance} month={month} onOpen={setDrawer}/>
       <CostEvolutionChart months={months} selected={month} onSelect={setMonth}/>
+      {category.length===1&&category[0]==='Combustível'&&<FuelDistance months={months} plates={plate.length&&!supplier&&!center?plate:[...new Set(current.map(row=>row.placa))]} distance={payload.distance} selected={month}/>}
       <div className="ec-ranking-grid"><VehicleCostRanking rows={rows} previous={previous} month={month} onSelect={value=>setPlate([value])}/><CostCategoryRanking rows={rows} onSelect={value=>setCategory([value])}/><SupplierRanking rows={rows} onSelect={setSupplier}/></div>
       <VehicleCostTable rows={rows} monthCount={month?1:months.length} onOpen={setDrawer}/>
       <ServiceActivity rows={rows} months={month?months.filter(m=>m.key===month):months}/>

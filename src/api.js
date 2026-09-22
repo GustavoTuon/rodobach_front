@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "./http.js";
 const LOCAL_API_BASE = "http://localhost:3333/api";
 const PRODUCTION_API_BASE =
   "https://rodobach-rodobach-back-consultoria.eupgpd.easypanel.host/api";
@@ -27,13 +28,13 @@ function buildQuery(params = {}) {
 async function apiRequest(path, options = {}) {
   const token = localStorage.getItem(TOKEN_KEY);
 
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetchWithTimeout(`${API_BASE}${path}`, {
+    ...options,
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
-    ...options,
   });
 
   if (response.status === 401) {
@@ -55,7 +56,7 @@ async function apiRequest(path, options = {}) {
         "Nao foi possivel carregar este modulo. Verifique se o backend esta atualizado e acessivel.",
       );
     }
-    throw new Error(message + detail);
+    throw Object.assign(new Error(message + detail), { status: response.status });
   }
 
   return data;
@@ -74,7 +75,7 @@ window.RB_AUTH = {
   },
 
   login: async (login, senha) => {
-    const response = await fetch(`${API_BASE}/auth/login`, {
+    const response = await fetchWithTimeout(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ login, senha }),
@@ -269,6 +270,10 @@ window.RB_API = {
     ),
   getStatusCargaFrota: (filters = {}) =>
     apiRequest(`/frota/status-carga${buildQuery(filters || {})}`),
+  getPainelTv: () => apiRequest('/frota/painel-tv'),
+  getPainelCargaHistorico: placa => apiRequest(`/frota/painel-tv/confirmacoes${buildQuery({placa})}`),
+  savePainelCarga: body => apiRequest('/frota/painel-tv/confirmacoes', {method:'POST',body:JSON.stringify(body)}),
+  cancelPainelCarga: id => apiRequest(`/frota/painel-tv/confirmacoes/${encodeURIComponent(id)}`, {method:'DELETE'}),
   getOciosidadeFrota: (filters = {}) =>
     apiRequest(`/frota/ociosidade${buildQuery(filters || {})}`),
   getParadasOciosidade: (filters) => apiRequest(`/frota/ociosidade/paradas${buildQuery(filters)}`),
@@ -350,7 +355,7 @@ window.RB_API = {
     }),
   downloadOportunidadesModelo: async () => {
     const token = localStorage.getItem(TOKEN_KEY);
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${API_BASE}/oportunidades-retorno/modelo.xlsx`,
       {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -364,8 +369,12 @@ window.RB_API = {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/analise-clientes${buildQuery(params)}`);
   },
+  getClienteCarteira: (filters = {}) => apiRequest(`/financeiro/analise-clientes/carteira${buildQuery(filters)}`),
+  getEmbarquesClientes: (filters = {}) =>
+    apiRequest(`/financeiro/embarques-clientes${buildQuery(filters)}`),
   getRentabilidadeClientes: (filters = {}) =>
     apiRequest(`/clientes/rentabilidade${buildQuery(filters || {})}`),
+  getClienteMargem: (filters = {}) => apiRequest(`/clientes/rentabilidade/analise${buildQuery(filters)}`),
   getLucroViagens: (filters = {}) =>
     apiRequest(`/financeiro/lucro-viagens${buildQuery(filters || {})}`),
   getResultadoFretes: (filters = {}) =>
@@ -413,6 +422,7 @@ window.RB_API = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  listManutencaoAuditoria: (filters = {}) => apiRequest(`/manutencao/auditoria?${new URLSearchParams(filters)}`),
   listManutencao: () => apiRequest("/manutencao"),
   listRegistrosManutencao: (placa = "") =>
     apiRequest(`/manutencao/registros${buildQuery(placa ? { placa } : {})}`),

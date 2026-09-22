@@ -1,6 +1,9 @@
 ﻿// Análise de Clientes — faturamento real via financeiro.receber
 
 // ── Helpers de data ───────────────────────────────────────────────────────────
+import { summarizeClients, csvCell } from './client-analysis-model.js';
+import { ClientPortfolio } from './client-portfolio.jsx';
+
 function acTodayISO() {
   const d = new Date();
   return [d.getFullYear(), String(d.getMonth()+1).padStart(2,"0"), String(d.getDate()).padStart(2,"0")].join("-");
@@ -32,7 +35,7 @@ function acBRL(v) {
 function acNum(v) { const n=Number(v); return Number.isFinite(n)?n:0; }
 function acPct(v) { return `${acNum(v).toFixed(1)}%`; }
 function acSignedPct(v) {
-  if (v === null || v === undefined) return "—";
+  if (v === null || v === undefined) return "Sem base de comparação";
   const n = acNum(v);
   return `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
 }
@@ -538,7 +541,7 @@ const AcClienteModal = ({ row, onClose }) => {
 };
 
 // ── Componente principal ──────────────────────────────────────────────────────
-const AnaliseClientes = () => {
+const AnaliseFaturamentoClientes = () => {
   const defaultRange = AC_PERIODS[3].getRange(); // 12 meses
 
   const viewMode = "clientes";
@@ -559,6 +562,7 @@ const AnaliseClientes = () => {
   const [hoveredClient,setHoveredClient]= React.useState(null);
   const [selectedRow,  setSelectedRow]  = React.useState(null);
   const [tableSearch,  setTableSearch]  = React.useState("");
+  const [tableView, setTableView] = React.useState('resumo');
   const [sortCol,      setSortCol]      = React.useState("totalPeriodo");
   const [sortDir,      setSortDir]      = React.useState("desc");
   const [tablePage,    setTablePage]    = React.useState(0);
@@ -617,6 +621,7 @@ const AnaliseClientes = () => {
     setManualFilter(null); setPeriodo("12m"); setStatusFilter("todos"); setInactiveRange("todos");
     setEmpresa("todas");
     setClienteSearch("");
+    setTableSearch(""); setTablePage(0);
     setSelectedMonth(""); setDrillOrigin(null);
   };
   const selectShortcut = (key) => {
@@ -673,10 +678,14 @@ const AnaliseClientes = () => {
   };
 
   // ── Dados derivados ─────────────────────────────────────────────────────────
-  const summary  = data?.summary  || {};
+  const clients = React.useMemo(() => (data?.clients || []).filter(c => {
+    const q = tableSearch.trim().toLocaleLowerCase('pt-BR');
+    const name = String(c.nome || '').toLocaleLowerCase('pt-BR');
+    return (!q || name.includes(q) || String(c.documento || '').includes(q)) && (!clienteSearch.trim() || name.includes(clienteSearch.trim().toLocaleLowerCase('pt-BR')));
+  }), [data, tableSearch, clienteSearch]);
+  const summary = { ...data?.summary, ...summarizeClients(clients) };
   const monthly  = data?.monthly  || [];
   const topCli   = data?.topClientesMonthly || [];
-  const clients  = data?.clients  || [];
 
   const totalFaturado   = acNum(summary.totalFaturado);
   const totalRecebido   = acNum(summary.totalRecebido);
@@ -714,7 +723,7 @@ const AnaliseClientes = () => {
     [clients]);
   const rankDecline = React.useMemo(()=>
     [...clients].filter(c=>c.crescimento!==null&&acNum(c.crescimento)<0&&acNum(c.totalAnterior)>0)
-      .sort((a,b)=>acNum(a.crescimento)-acNum(b.crescimento)).slice(0,8),
+      .sort((a,b)=>(acNum(a.totalPeriodo)-acNum(a.totalAnterior))-(acNum(b.totalPeriodo)-acNum(b.totalAnterior))).slice(0,8),
     [clients]);
   const rankLow = React.useMemo(()=>
     [...clients].filter(c=>acNum(c.totalPeriodo)>0)
@@ -731,7 +740,7 @@ const AnaliseClientes = () => {
     { key:"top",        label:"Top faturamento" },
     { key:"baixo",      label:"Menor faturamento" },
     { key:"crescimento",label:"Maior crescimento" },
-    { key:"queda",      label:"Maior queda" },
+    { key:"queda",      label:"Maior perda em R$" },
     { key:"parados",    label:"Mais tempo parado" },
   ];
 
@@ -821,7 +830,7 @@ const AnaliseClientes = () => {
       STATUS_LABELS[c.statusComercial]||c.statusComercial,
       ACAO_LABELS[c.acaoSugerida]||c.acaoSugerida,
     ]);
-    const csv=[header,...lines].map(l=>l.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(";")).join("\n");
+    const csv=[header,...lines].map(l=>l.map(csvCell).join(";")).join("\n");
     const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
     const a=document.createElement("a");
     a.href=url; a.download=`analise-clientes-${periodLabel.replace(/\s+/g,"-")}.csv`;
@@ -845,13 +854,26 @@ const AnaliseClientes = () => {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="view">
+      <style>{`
+.ac-client-table { overflow:auto; max-height:640px; }
+.ac-client-table thead th { position:sticky; top:0; z-index:2; background:var(--surface-2); }
+.ac-client-table th:first-child,.ac-client-table td:first-child { position:sticky; left:0; background:var(--surface-2); z-index:1; }
+.ac-client-table thead th:first-child { z-index:3; }
+.ac-client-table.resumo :is(th,td):nth-child(5),
+.ac-client-table.resumo :is(th,td):nth-child(6),
+.ac-client-table.resumo :is(th,td):nth-child(7),
+.ac-client-table.resumo :is(th,td):nth-child(8),
+.ac-client-table.resumo :is(th,td):nth-child(9),
+.ac-client-table.resumo :is(th,td):nth-child(10),
+.ac-client-table.resumo :is(th,td):nth-child(14) { display:none; }
+`}</style>
       <AcClienteModal row={selectedRow} onClose={()=>setSelectedRow(null)}/>
 
       {/* ── Cabeçalho ── */}
       <div className="page-head">
         <div>
           <h1>Análise de Clientes</h1>
-          <div className="sub">{`financeiro.receber - ${periodLabel}`}</div>
+          <div className="sub">Faturamento, relacionamento e recebimentos · {periodLabel}</div>
         </div>
         <div className="actions">
           {viewMode==="clientes" && AC_PERIODS.map(p=>(
@@ -910,9 +932,16 @@ const AnaliseClientes = () => {
         <button className="btn primary" onClick={applyManualFilter}>Aplicar</button>
         <button className="btn" onClick={clearFilter}><Icon name="x" size={12}/> Limpar</button>
         {manualFilter && <span className="badge info">Filtro personalizado ativo</span>}
-        <span className="muted" style={{marginLeft:"auto",fontSize:11.5}}>Base: dataemissaorec · financeiro.receber · {empresa==="todas"?"todas as empresas":empresa==="2"?"RB Transportes":"empresa "+empresa}</span>
+        <span className="muted" style={{marginLeft:"auto",fontSize:11.5}}>Faturamento por emissão · {empresa==="todas"?"todas as empresas":empresa==="2"?"RB Transportes":"empresa "+empresa}</span>
       </div>
 
+      <details className="card" style={{padding:16,marginBottom:16}}>
+        <summary style={{cursor:'pointer',fontWeight:600}}>Como calculamos</summary>
+        <p>Os totais e a distribuição acompanham os clientes selecionados. Evolução mensal e inatividade mostram a carteira geral da empresa e têm identificação própria.</p>
+        <p>Faturado considera a emissão dos títulos; recebido considera a data da baixa, incluindo faturas anteriores. Em aberto e vencido são saldos atuais dos títulos emitidos no período, não a carteira completa nem uma fotografia histórica.</p>
+        <p>O vencido exclui vencimentos anteriores a 2025. Atraso relevante significa mais de 5 dias. Títulos financeiros não equivalem a viagens ou CT-es.</p>
+        <p>A situação comercial é atual: ativo até 30 dias sem faturar, atenção entre 31 e 90 dias e parado acima de 90 dias. Estratégico representa pelo menos 8% do faturamento geral. Filiais são consolidadas pela raiz do CNPJ.</p>
+      </details>
       <div className="ac-quick card">
         <div className="ac-quick-search">
           <div><h2>O faturamento deste cliente aumentou?</h2><span>Digite o nome e veja uma resposta simples.</span></div>
@@ -948,21 +977,23 @@ const AnaliseClientes = () => {
           <span className="kpi-delta flat" title="Soma das baixas pela data de recebimento; pode incluir títulos faturados antes do período selecionado">inclui faturas de períodos anteriores</span>
         </div>
         <div className="kpi" style={{borderLeft:"3px solid #818cf8"}}>
-          <div className="kpi-label"><Icon name="clock"/><span>Em aberto</span></div>
+          <div className="kpi-label"><Icon name="clock"/><span>Saldo dos títulos do período</span></div>
           <div className="kpi-value">{acBRL(totalAberto)}</div>
           <span className="kpi-delta flat" title="financeiro.receber.valorabertorec nos títulos emitidos no período">a receber</span>
         </div>
         <div className="kpi" style={{borderLeft:"3px solid #ef4444"}}>
-          <div className="kpi-label"><Icon name="alert"/><span>Vencido</span></div>
+          <div className="kpi-label"><Icon name="alert"/><span>Vencido dos títulos do período</span></div>
           <div className="kpi-value">{acBRL(totalVencido)}</div>
           <span className="kpi-delta down" title="Aberto com vencimento anterior a hoje">Inadimplente: {acBRL(totalInadimplente)}</span>
         </div>
       </div>
 
+      <details className="card" style={{padding:16,marginBottom:16}}>
+      <summary style={{cursor:'pointer',fontWeight:600}}>Indicadores comerciais e comparação anual</summary>
       {/* ── KPIs — Linha 2 (comercial) ── */}
       <div className="grid cols-4" style={{marginBottom:16}}>
         <div className="kpi" style={{borderLeft:"3px solid #38bdf8"}}>
-          <div className="kpi-label"><Icon name="user"/><span>Clientes ativos</span></div>
+          <div className="kpi-label"><Icon name="user"/><span>Clientes com faturamento</span></div>
           <div className="kpi-value">{clientesAtivos}</div>
           <span className="kpi-delta flat">faturaram no período</span>
         </div>
@@ -993,14 +1024,14 @@ const AnaliseClientes = () => {
           <span className={acNum(summary.variacaoAnoAnterior)>=0?"kpi-delta up":"kpi-delta down"}>Atual x AA: {acSignedPct(summary.variacaoAnoAnterior)}</span>
         </div>
         <div className="kpi" style={{borderLeft:"3px solid #38bdf8"}}>
-          <div className="kpi-label"><Icon name="file"/><span>Documentos</span></div>
+          <div className="kpi-label"><Icon name="file"/><span>Títulos financeiros</span></div>
           <div className="kpi-value">{documentosPeriodo}</div>
           <span className="kpi-delta flat">AA: {documentosAnoAnterior} · {acSignedPct(summary.variacaoDocumentosAnoAnterior)}</span>
         </div>
         <div className="kpi" style={{borderLeft:"3px solid #818cf8"}}>
-          <div className="kpi-label"><Icon name="gauge"/><span>Ticket por doc.</span></div>
+          <div className="kpi-label"><Icon name="gauge"/><span>Ticket por título</span></div>
           <div className="kpi-value">{acBRL(documentosPeriodo>0?totalFaturado/documentosPeriodo:0)}</div>
-          <span className="kpi-delta flat">por documento emitido</span>
+          <span className="kpi-delta flat">por lançamento financeiro</span>
         </div>
         <div className="kpi" style={{borderLeft:"3px solid #f97316"}}>
           <div className="kpi-label"><Icon name="arrow-down"/><span>Menor faturamento</span></div>
@@ -1011,6 +1042,9 @@ const AnaliseClientes = () => {
         </div>
       </div>
 
+      </details>
+      <details className="card" style={{padding:16,marginBottom:16}}>
+      <summary style={{cursor:'pointer',fontWeight:600}}>Relacionamento hoje · carteira geral da empresa</summary>
       {/* ── KPIs — Linha 3 (inativos) ── */}
       <div className="grid cols-4" style={{marginBottom:16}}>
         {[
@@ -1032,13 +1066,14 @@ const AnaliseClientes = () => {
         ))}
       </div>
 
+      </details>
       {/* ── Gráfico mensal + Distribuição ── */}
       <div className="grid cols-2-1" style={{marginBottom:16}}>
 
         {/* Faturamento mensal */}
         <div className="card card-flush chart-card">
           <div className="card-header">
-            <h3>Faturamento por mês</h3>
+            <h3>Faturamento por mês · geral da empresa</h3>
             <div className="row" style={{gap:8,fontSize:11.5}}>
               {selectedMonth && <button className="btn sm" onClick={clearChartMonth}><Icon name="x" size={11}/> Voltar ao período anterior</button>}
               <span className="muted">{monthly.length} meses</span>
@@ -1116,8 +1151,8 @@ const AnaliseClientes = () => {
         {/* Distribuição do faturamento */}
         <div className="card card-flush">
           <div className="card-header">
-            <h3>Distribuição</h3>
-            <span className="meta muted">{clients.filter(c=>acNum(c.totalPeriodo)>0).length} clientes</span>
+            <h3>Concentração nos clientes selecionados</h3>
+            <span className="meta muted">Top 5: {summary.concentracaoTop5 == null ? 'sem base' : `${summary.concentracaoTop5.toFixed(1)}%`}</span>
           </div>
           <div className="card-body">
             {distribData.length===0&&(
@@ -1203,7 +1238,7 @@ const AnaliseClientes = () => {
         {/* Clientes sem faturamento — distribuição por faixa */}
         <div className="card card-flush">
           <div className="card-header">
-            <h3>Inatividade de clientes</h3>
+            <h3>Inatividade hoje · carteira geral</h3>
             <span className="meta muted">por faixa de dias sem faturar</span>
           </div>
           <div className="card-body">
@@ -1282,12 +1317,12 @@ const AnaliseClientes = () => {
             const maxVal=rankTab==="top"?acNum(rankTop[0]?.totalPeriodo)||1
               :rankTab==="baixo"?Math.max(1,...rankLow.map(x=>acNum(x.totalPeriodo)))
               :rankTab==="crescimento"?Math.max(1,...rankGrowth.map(x=>acNum(x.crescimento)))
-              :rankTab==="queda"?Math.abs(Math.min(-1,...rankDecline.map(x=>acNum(x.crescimento))))
+              :rankTab==="queda"?Math.max(1,...rankDecline.map(x=>acNum(x.totalAnterior)-acNum(x.totalPeriodo)))
               :acNum(rankInactive[0]?.diasSemFaturar)||1;
             const rawVal=rankTab==="top"?acNum(c.totalPeriodo)
               :rankTab==="baixo"?acNum(c.totalPeriodo)
               :rankTab==="crescimento"?acNum(c.crescimento)
-              :rankTab==="queda"?Math.abs(acNum(c.crescimento))
+              :rankTab==="queda"?acNum(c.totalAnterior)-acNum(c.totalPeriodo)
               :acNum(c.diasSemFaturar);
             const pct=rawVal/maxVal*100;
             const barColor=rankTab==="crescimento"?AC_COLORS.estrategico
@@ -1307,7 +1342,7 @@ const AnaliseClientes = () => {
                     {rankTab==="top"?acBRL(c.totalPeriodo)
                     :rankTab==="baixo"?acBRL(c.totalPeriodo)
                     :rankTab==="crescimento"?`+${acNum(c.crescimento).toFixed(1)}%`
-                    :rankTab==="queda"?`${acNum(c.crescimento).toFixed(1)}%`
+                    :rankTab==="queda"?acBRL(acNum(c.totalPeriodo)-acNum(c.totalAnterior))
                     :`${acNum(c.diasSemFaturar)}d`}
                   </span>
                 </div>
@@ -1320,7 +1355,8 @@ const AnaliseClientes = () => {
       {/* ── Tabela de clientes ── */}
       <div className="card card-flush" style={{marginBottom:16}}>
         <div className="card-header">
-          <h3>Clientes</h3>
+          <h3>Clientes selecionados</h3>
+          <button className="btn" onClick={()=>setTableView(v=>v==='resumo'?'financeiro':'resumo')}>{tableView==='resumo'?'Ver financeiro completo':'Ver resumo'}</button>
           <div className="row" style={{gap:8}}>
             <button
               className={`btn sm ${statusFilter==="sem-faturamento"?"primary":""}`}
@@ -1338,6 +1374,7 @@ const AnaliseClientes = () => {
           </div>
         </div>
 
+        <div className={`ac-client-table ${tableView}`}>
         <table className="tbl">
           <thead>
             <tr>
@@ -1393,6 +1430,7 @@ const AnaliseClientes = () => {
             ))}
           </tbody>
         </table>
+        </div>
 
         {totalPages>1&&(
           <div className="tbl-footer">
@@ -1527,5 +1565,12 @@ const RankingClientes = () => {
   );
 };
 
+const AnaliseClientes = () => {
+  const [view,setView] = React.useState('faturamento');
+  return <><nav aria-label="Visão de clientes" style={{display:'flex',gap:8,padding:'12px 24px',flexWrap:'wrap'}}>
+    <button className={`btn${view==='faturamento'?' primary':''}`} aria-pressed={view==='faturamento'} onClick={()=>setView('faturamento')}>Faturamento do período</button>
+    <button className={`btn${view==='carteira'?' primary':''}`} aria-pressed={view==='carteira'} onClick={()=>setView('carteira')}>Carteira completa / cobrança</button>
+  </nav>{view==='carteira'?<ClientPortfolio/>:<AnaliseFaturamentoClientes/>}</>;
+};
 window.AnaliseClientes = AnaliseClientes;
 window.RankingClientes = RankingClientes;
