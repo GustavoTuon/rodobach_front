@@ -1,4 +1,12 @@
 export const ecMoney = v => Number(v || 0).toLocaleString('pt-BR', {style:'currency',currency:'BRL'});
+export function ecDistanceMonths(months,plates,distance) {
+  const unique=[...new Set(plates)];
+  return months.map(({key})=>{
+    const values=unique.map(placa=>distance?.monthly?.find(row=>row.placa===placa&&row.mes===key));
+    const complete=distance?.available&&values.length>0&&values.every(row=>row&&Number.isFinite(row.km));
+    return {mes:key,km:complete?values.reduce((sum,row)=>sum+row.km,0):null,covered:values.filter(row=>row&&Number.isFinite(row.km)).length,vehicles:unique.length};
+  });
+}
 export const ecCategory = r => /borrach|vulcan|recap/i.test(`${r.descricao} ${r.historico}`) ? 'Borracharia' : ({Abastecimento:'Combustível',Manutencao:'Manutenção',Pneus:'Pneus',Lavacao:'Lavagem'}[r.tipoCusto] || r.tipoCusto);
 export const ecSum = rows => rows.reduce((sum,r)=>sum+r.valor,0);
 export function ecGroups(rows,key) {

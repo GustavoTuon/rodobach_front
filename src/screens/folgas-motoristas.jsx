@@ -1,207 +1,88 @@
-const fmDateTimeLocal = (value) => {
-  const date = value ? new Date(value) : new Date();
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 16);
-};
-const fmDate = (value) => value ? new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "—";
-const fmStatus = {
-  fora: { label: "Viajando", color: "#2563eb", bg: "#eff6ff" },
-  em_folga: { label: "Em folga", color: "#1d4ed8", bg: "#eff6ff" },
-  disponivel: { label: "Disponível", color: "#047857", bg: "#ecfdf5" },
-};
-const fmValidation = {
-  confirmado: { label: "Confirmado", color: "#059669", bg: "rgba(5,150,105,.12)" },
-  provavel: { label: "Provável", color: "#d97706", bg: "rgba(217,119,6,.12)" },
-  revisar: { label: "Revisar", color: "#dc2626", bg: "rgba(220,38,38,.12)" },
-  sem_dados: { label: "Sem telemetria", color: "#71717a", bg: "rgba(113,113,122,.12)" },
-};
-const fmIsoDay = (date) => {
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
-};
-const fmHours = (value) => {
-  const minutes = Math.round(Number(value || 0) * 60);
-  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}min`;
+import {formatOutsideDuration, planDriverRest} from './folgas-model.js';
+const fmDate = value => value ? new Date(value).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short',timeZone:'America/Sao_Paulo'}) : '—';
+const fmState = {fora:'Fora da base',na_base:'Já voltou',sem_dados:'Sem informação'};
+const fmDuration = hours => {
+  if(hours==null||!Number.isFinite(Number(hours)))return {main:'Sem informação',detail:''};
+  const minutes=Math.max(0,Math.round(Number(hours)*60)),days=Math.floor(minutes/1440),h=Math.floor(minutes%1440/60),m=minutes%60;
+  return {main:days ? `${days} ${days===1?'dia':'dias'}` : h ? `${h} ${h===1?'hora':'horas'}` : `${m} ${m===1?'minuto':'minutos'}`,detail:days ? `${h}h e ${m}min` : h ? `${m} minutos` : ''};
 };
 
-const FolgasMotoristas = () => {
-  const [data, setData] = React.useState({ itens: [], resumo: {}, total: 0 });
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState("");
-  const [busca, setBusca] = React.useState("");
-  const [status, setStatus] = React.useState("");
-  const [pagina, setPagina] = React.useState(1);
-  const [modal, setModal] = React.useState(null);
-  const [saving, setSaving] = React.useState(false);
-  const [updatedAt, setUpdatedAt] = React.useState(null);
-  const initialMacroEnd = React.useMemo(() => new Date(), []);
-  const initialMacroStart = React.useMemo(() => new Date(initialMacroEnd.getTime() - 7 * 86400000), [initialMacroEnd]);
-  const [macroFilters, setMacroFilters] = React.useState({ placa: "SXY5D26", inicio: fmIsoDay(initialMacroStart), fim: fmIsoDay(initialMacroEnd) });
-  const [macroData, setMacroData] = React.useState(null);
-  const [macroLoading, setMacroLoading] = React.useState(true);
-  const [macroError, setMacroError] = React.useState("");
-  const limite = 50;
-
-  const load = React.useCallback(async () => {
-    setLoading(true); setError("");
-    try {
-      setData(await RB_API.listMotoristasFolgas({ busca, status, pagina, limite }));
-      setUpdatedAt(new Date());
-    } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
-  }, [busca, status, pagina]);
-
-  React.useEffect(() => { const timer = setTimeout(load, 250); return () => clearTimeout(timer); }, [load]);
-
-  const loadMacros = React.useCallback(async () => {
-    setMacroLoading(true); setMacroError("");
-    try { setMacroData(await RB_API.getJornadaMacros(macroFilters)); }
-    catch (e) { setMacroError(e.message); }
-    finally { setMacroLoading(false); }
-  }, [macroFilters]);
-  React.useEffect(() => { loadMacros(); }, []); // carrega o teste inicial do SXY
-
-  const save = async (event) => {
-    event.preventDefault(); setSaving(true); setError("");
-    try {
-      if (modal.tipo === "saida") {
-        await RB_API.registrarSaidaMotorista({
-          empresa: modal.item.empresa, codigo: modal.item.codigo,
-          saidaEm: new Date(modal.saidaEm).toISOString(),
-          retornoPrevistoEm: modal.retornoPrevistoEm ? new Date(modal.retornoPrevistoEm).toISOString() : null,
-          observacoes: modal.observacoes,
-        });
-      } else if (modal.tipo === "retorno") {
-        await RB_API.registrarRetornoMotorista(modal.item.jornada.id, {
-          retornoEm: new Date(modal.retornoEm).toISOString(), observacoes: modal.observacoes,
-        });
-      } else {
-        await RB_API.registrarMovimentoFolga({
-          empresa: modal.item.empresa, codigo: modal.item.codigo, tipo: "uso",
-          quantidade: Number(modal.quantidade), dataMovimento: modal.dataMovimento,
-          observacoes: modal.observacoes,
-        });
-      }
-      setModal(null); await load();
-    } catch (e) { setError(e.message); }
-    finally { setSaving(false); }
+function FolgasMotoristas(){
+  const [data,setData]=React.useState({itens:[],resumo:{},total:0});
+  const [loading,setLoading]=React.useState(true);
+  const [error,setError]=React.useState('');
+  const [busca,setBusca]=React.useState('');
+  const [status,setStatus]=React.useState('');
+  const [pagina,setPagina]=React.useState(1);
+  const [updatedAt,setUpdatedAt]=React.useState(null);
+  const [modal,setModal]=React.useState(null);
+  const [saving,setSaving]=React.useState(false);
+  const [saveError,setSaveError]=React.useState('');
+  const limite=50;
+  const dialogRef=React.useRef(null);
+  const returnFocus=React.useRef(null);
+  React.useEffect(()=>{
+    if(!modal)return;
+    dialogRef.current?.focus();
+    const keyboard=event=>{
+      if(event.key==='Escape'&&!saving){setModal(null);return;}
+      if(event.key!=='Tab')return;
+      const elements=[...(dialogRef.current?.querySelectorAll('button:not(:disabled),input,select,textarea,a[href],summary')||[])];
+      const first=elements[0],last=elements.at(-1);
+      if(event.shiftKey&&(document.activeElement===first||document.activeElement===dialogRef.current)){event.preventDefault();last?.focus();}
+      else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
+    };
+    document.addEventListener('keydown',keyboard);
+    return()=>{document.removeEventListener('keydown',keyboard);returnFocus.current?.focus();};
+  },[modal?.tipo,saving]);
+  const displayed=[...data.itens].sort((a,b)=>(a.status==='fora'?0:1)-(b.status==='fora'?0:1)||(b.horasFora??-1)-(a.horasFora??-1));
+  const requestId=React.useRef(0);
+  const load=React.useCallback(async()=>{
+    const id=++requestId.current;setLoading(true);setError('');
+    try{const result=await RB_API.listMotoristasFolgas({busca,status,pagina,limite});if(id===requestId.current){setData(result);setUpdatedAt(new Date());}}
+    catch(e){if(id===requestId.current)setError(e.message);}
+    finally{if(id===requestId.current)setLoading(false);}
+  },[busca,status,pagina]);
+  React.useEffect(()=>{const timer=setTimeout(load,250);return()=>{clearTimeout(timer);requestId.current++;};},[load]);
+  const plan=modal?.tipo==='planejar'?planDriverRest(modal.fimTrabalho,modal.descanso):null;
+  const open=(tipo,item)=>{if(!modal)returnFocus.current=document.activeElement;setSaveError('');setModal({tipo,item,fimTrabalho:'',descanso:'weekly',quantidade:'1',dataMovimento:new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()),observacoes:''});};
+  const save=async event=>{
+    event.preventDefault();setSaving(true);setSaveError('');
+    try{await RB_API.registrarMovimentoFolga({empresa:modal.item.empresa,codigo:modal.item.codigo,tipo:'uso',quantidade:Number(modal.quantidade),dataMovimento:modal.dataMovimento,observacoes:modal.observacoes});setModal(null);await load();}
+    catch(e){setSaveError(e.message);}finally{setSaving(false);}
   };
+  const metric=(label,value,tone)=><div className="fm-metric"><span>{label}</span><strong style={{color:tone||'var(--text)'}}>{value??0}</strong></div>;
+  return <div className="fm-page">
+    <style>{`
+      .fm-page{padding:24px;overflow:auto;height:100%;box-sizing:border-box;color:var(--text)}.fm-header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.fm-header h1{font-size:24px;margin:0}.fm-page p{line-height:1.6}.fm-subtitle,.fm-muted{color:var(--muted);font-size:12px}.fm-summary{display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:12px;margin:22px 0}.fm-metric{border:1px solid var(--border);background:var(--surface);border-radius:12px;padding:18px}.fm-metric span{display:block;color:var(--muted);font-size:12px}.fm-metric strong{display:block;font-size:28px;margin-top:8px}.fm-info{padding:16px 18px;border:1px solid var(--border);background:var(--surface);border-radius:12px;margin:16px 0}.fm-info summary{cursor:pointer;font-weight:600}.fm-info a{color:#60a5fa}.fm-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin:20px 0 12px}.fm-toolbar input{max-width:420px;flex:1;min-width:220px}.fm-page input,.fm-page select,.fm-page textarea{padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);box-sizing:border-box}.fm-table-wrap{overflow:auto;border:1px solid var(--border);border-radius:12px;background:var(--surface)}.fm-table{width:100%;min-width:1100px;border-collapse:collapse;text-align:left;font-size:12px}.fm-table th{background:var(--surface-2);padding:13px 16px;color:var(--muted);font-size:11px;font-weight:600;white-space:nowrap}.fm-table td{padding:16px;border-top:1px solid var(--border);vertical-align:top}.fm-table td small{display:block;color:var(--muted);font-size:11px;margin-top:6px;line-height:1.5}.fm-table tbody tr:hover{background:var(--surface-2)}.fm-driver{font-size:13px;display:block;max-width:210px}.fm-badge{display:inline-block;border:1px solid var(--border);padding:5px 8px;border-radius:20px;font-size:10px;white-space:nowrap}.fm-out{color:#60a5fa;background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3)}.fm-duration{font-size:19px;white-space:nowrap;color:#60a5fa;font-variant-numeric:tabular-nums}.fm-actions{display:flex;gap:7px;flex-direction:column}.fm-history{margin-top:10px}.fm-history summary{cursor:pointer;color:#60a5fa}.fm-history table{font-size:11px;margin-top:8px}.fm-history td,.fm-history th{padding:8px}.fm-pager{display:flex;justify-content:space-between;align-items:center;margin-top:14px}.fm-pager div{display:flex;gap:8px}.fm-overlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.6);display:grid;place-items:center;padding:20px}.fm-dialog{width:min(520px,100%);max-height:90vh;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px;box-sizing:border-box}.fm-dialog h2{margin:0}.fm-dialog label{display:grid;gap:7px;font-size:12px;margin:16px 0}.fm-result{padding:16px;border:1px solid #3b82f6;border-radius:10px;margin:18px 0}.fm-result strong{display:block;font-size:20px;margin:8px 0}.fm-dialog footer{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}.fm-error{padding:12px;background:rgba(220,38,38,.1);color:#ef4444;border-radius:8px;margin:12px 0}@media(max-width:750px){.fm-page{padding:14px}.fm-summary{grid-template-columns:repeat(2,1fr)}.fm-header{flex-wrap:wrap}}
 
-  const card = (label, value, color) => (
-    <div style={{background:"var(--surface)",border:"1px solid var(--border)",borderRadius:10,padding:"16px 18px"}}>
-      <div style={{fontSize:12,color:"var(--muted)",marginBottom:7}}>{label}</div>
-      <div style={{fontSize:25,fontWeight:700,color:color || "var(--text)"}}>{value ?? 0}</div>
+      .fm-page{max-width:1600px;margin:0 auto;width:100%;font-size:16px}.fm-header h1{font-size:28px}.fm-subtitle{font-size:16px;margin-top:8px}.fm-muted{font-size:13px;color:var(--text-2,var(--muted))}.fm-page .btn{min-height:44px;padding:10px 16px;font-size:14px;border-radius:9px}.fm-page button:focus-visible,.fm-page input:focus-visible,.fm-page summary:focus-visible{outline:3px solid #60a5fa;outline-offset:3px}.fm-toolbar{margin:28px 0;gap:18px;align-items:end}.fm-search{display:grid;gap:9px;flex:1;max-width:430px;font-size:14px;font-weight:600}.fm-search input{min-height:48px;font-size:16px;max-width:none;width:100%;font-weight:400}.fm-filter{display:flex;gap:6px;flex-wrap:wrap}.fm-list-heading{display:flex;justify-content:space-between;gap:12px;align-items:center;margin:24px 0 14px}.fm-list-heading h2{font-size:18px;margin:0}.fm-list-heading p{margin:5px 0 0}.fm-driver-list{display:grid;gap:10px}.fm-person{display:grid;grid-template-columns:minmax(220px,1.7fr) minmax(125px,.8fr) minmax(180px,1.1fr) 155px;gap:22px;align-items:center;border:1px solid var(--border);border-radius:12px;padding:22px;background:var(--surface)}.fm-person h3{font-size:17px;line-height:1.4;margin:9px 0 5px}.fm-person .fm-badge{font-size:12px;font-weight:600;padding:5px 9px}.fm-person-time{display:grid;gap:5px}.fm-person-time strong{font-size:30px;line-height:1.2;color:#60a5fa}.fm-label{font-size:13px;color:var(--text-2,var(--muted))}.fm-person-dates{display:grid;gap:6px}.fm-person-dates b{font-size:15px;font-weight:500}.fm-person-dates small{font-size:12px;line-height:1.5;margin-top:4px}.fm-empty{padding:36px;text-align:center;border:1px solid var(--border);border-radius:12px}.fm-footnote{margin:20px 0}.fm-info{background:transparent;margin-top:16px;padding:14px 0;border-width:1px 0 0;border-radius:0}.fm-info>summary{font-size:14px;color:var(--text-2)}.fm-detail-dialog{width:min(740px,100%)}.fm-dialog .fm-subtitle{font-size:16px}.fm-dialog label{font-size:15px}.fm-dialog input,.fm-dialog select,.fm-dialog textarea{font-size:16px;min-height:44px}.fm-dialog .fm-muted{font-size:14px}.fm-detail-summary{padding:18px;background:var(--surface-2);border-radius:10px;margin:18px 0}.fm-detail-summary>strong{display:block;font-size:27px;margin-top:8px;color:#60a5fa}.fm-detail-summary small{font-size:16px;font-weight:400}.fm-detail-summary p{font-size:14px;margin-bottom:0}.fm-detail-actions{display:grid;gap:10px}.fm-history{margin-top:22px}.fm-history summary{padding:12px 0;font-size:15px}.fm-detail-dialog .fm-table{min-width:480px;font-size:14px}.fm-detail-dialog .fm-table th{font-size:13px}.fm-detail-dialog .fm-table td{font-size:13px}.fm-dialog:focus{outline:none}@media(max-width:1050px){.fm-person{grid-template-columns:minmax(170px,1.4fr) 130px minmax(170px,1fr);gap:16px}.fm-details-button{grid-column:1/-1;justify-self:end}.fm-filter .btn{padding:10px}.fm-list-heading{align-items:flex-start;flex-direction:column}}@media(max-width:600px){.fm-person{grid-template-columns:1fr 115px;padding:18px;gap:18px}.fm-person-dates{grid-column:1/-1}.fm-details-button{width:100%}.fm-header h1{font-size:24px}.fm-search{max-width:none;width:100%}.fm-toolbar{align-items:stretch}.fm-dialog{padding:20px}.fm-person-time strong{font-size:28px}.fm-dialog footer{flex-wrap:wrap}}
+    `}</style>
+    <header className="fm-header"><div><h1>Motoristas fora da base</h1><p className="fm-subtitle">Veja quem saiu e há quanto tempo está fora.</p></div><button className="btn" disabled={loading} onClick={load}>{loading?'Atualizando…':'Atualizar lista'}</button></header>
+    <div className="fm-toolbar"><label className="fm-search">Procurar motorista<input value={busca} onChange={e=>{setBusca(e.target.value);setPagina(1);}} placeholder="Digite o nome ou a placa"/></label><div className="fm-filter" role="group" aria-label="Mostrar motoristas">{[['','Todos'],['fora','Fora da base'],['na_base','Já voltaram'],['sem_dados','Sem informação']].map(([value,label])=><button key={value} className={`btn ${status===value?'primary':''}`} aria-pressed={status===value} onClick={()=>{setStatus(value);setPagina(1);}}>{label}</button>)}</div></div>
+    <div className="fm-list-heading"><div><h2>{status==='na_base'?'Motoristas que já voltaram':status==='sem_dados'?'Motoristas sem informação':'Quem está fora há mais tempo'}</h2><p className="fm-muted">{loading?'Buscando…':`${data.total||0} motoristas encontrados`}</p></div>{updatedAt&&<span className="fm-muted">Última atualização: {fmDate(updatedAt)}</span>}</div>
+    {error&&<div className="fm-error" role="alert">{error}</div>}
+    <div className="fm-driver-list" aria-label="Lista de motoristas" aria-busy={loading}>
+      {loading?<p role="status" className="fm-empty">Carregando motoristas…</p>:displayed.map(item=>{const duration=fmDuration(item.horasFora);return <article className="fm-person" key={`${item.empresa}-${item.codigo}-${item.placa}`} aria-label={item.nome}>
+        <div className="fm-person-name"><span className={`fm-badge ${item.status==='fora'?'fm-out':''}`}>{fmState[item.status]||'Sem informação'}</span><h3>{item.nome}</h3><span className="fm-muted">Placa {item.placa||'não informada'}</span></div>
+        <div className="fm-person-time"><span className="fm-label">{item.status==='fora'?'Está fora há':item.jornada?'Ficou fora por':'Tempo fora'}</span><strong>{duration.main}</strong>{duration.detail&&<span className="fm-muted">{duration.detail}</span>}</div>
+        <div className="fm-person-dates"><span className="fm-label">Saiu em</span><b>{fmDate(item.jornada?.saidaEm)}</b>{item.jornada?.retornoEm&&<><span className="fm-label">Voltou em</span><b>{fmDate(item.jornada.retornoEm)}</b></>}{item.status==='fora'&&<small className="fm-muted">Última informação do veículo: {fmDate(item.jornada?.telemetriaAte)}</small>}</div>
+        <button className="btn fm-details-button" onClick={()=>open('detalhes',item)} aria-label={`Ver detalhes de ${item.nome}`}>Ver detalhes →</button>
+      </article>;})}
+      {!loading&&!data.itens.length&&<div className="fm-empty"><h3>Nenhum motorista encontrado</h3><p>Confira o nome ou tente mostrar todos os motoristas.</p><button className="btn" onClick={()=>{setBusca('');setStatus('');setPagina(1);}}>Limpar busca e filtros</button></div>}
     </div>
-  );
-
-  return (
-    <div style={{padding:"22px 24px",overflow:"auto",height:"100%",boxSizing:"border-box"}}>
-      <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"flex-start",marginBottom:20}}>
-        <div>
-          <h1 style={{fontSize:22,margin:0,color:"var(--text)"}}>Jornada e folgas</h1>
-          <p style={{fontSize:13,color:"var(--muted)",margin:"6px 0 10px"}}>Dias trabalhados calculados pela saída e pelo retorno na cerca eletrônica da base, com confirmação pelas macros.</p>
-          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-            <span title="Os dias completos fora são somados. A cada 6 dias, uma folga é gerada; o restante continua no próximo ciclo." style={{padding:"5px 9px",border:"1px solid var(--border)",borderRadius:999,fontSize:11.5,color:"var(--text-2)",background:"var(--surface)"}}>ⓘ 1 dia de folga a cada 6 dias fora</span>
-            <span style={{padding:"5px 9px",border:"1px solid var(--border)",borderRadius:999,fontSize:11.5,color:"var(--muted)"}}>Desde {data.regra?.dataInicioApuracao ? new Date(`${data.regra.dataInicioApuracao}T12:00:00`).toLocaleDateString("pt-BR") : "—"} · cerca: {data.regra?.cercaBase || "não cadastrada"}</span>
-            <span style={{padding:"5px 9px",border:"1px solid var(--border)",borderRadius:999,fontSize:11.5,color:"var(--muted)"}}>Saída: {data.regra?.minutosSaida || 10} min fora · retorno: {data.regra?.minutosRetorno || 15} min dentro</span>
-          </div>
-        </div>
-        <div style={{textAlign:"right"}}><button className="btn" onClick={load} disabled={loading}><Icon name="refresh" size={14}/> {loading?"Atualizando…":"Atualizar"}</button>{updatedAt&&<div style={{fontSize:10.5,color:"var(--muted)",marginTop:6}}>Atualizado às {updatedAt.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}</div>}</div>
-      </div>
-
-      <div className="fm-summary-grid" style={{display:"grid",gridTemplateColumns:"repeat(5,minmax(130px,1fr))",gap:12,marginBottom:16}}>
-        {card("Total de motoristas", data.total)}
-        {card("Viajando", data.resumo?.fora, "#2563eb")}
-        {card("Em folga", data.resumo?.emFolga, "#1d4ed8")}
-        {card("Disponíveis", data.resumo?.disponiveis, "#047857")}
-        {card("Saldo calculado de folgas", (data.itens||[]).reduce((s,x)=>s+(x.retroativo?.folgasDisponiveis||0),0), "#7c3aed")}
-      </div>
-
-      <section style={{border:"1px solid var(--border)",borderRadius:11,background:"var(--surface)",padding:18,marginBottom:18}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:16,marginBottom:14}}>
-          <div><h2 style={{fontSize:16,margin:0}}>Tempo trabalhado pelas macros</h2><p style={{fontSize:12,color:"var(--muted)",margin:"5px 0 0"}}>Início e reinício abrem um trecho; parada, refeição, abastecimento, chegada e fim encerram o trecho.</p></div>
-          <span style={{fontSize:10.5,color:"#b45309",background:"rgba(217,119,6,.1)",padding:"6px 9px",borderRadius:999}}>Controle operacional</span>
-        </div>
-        <div style={{display:"grid",gridTemplateColumns:"minmax(150px,1fr) 150px 150px auto",gap:9,alignItems:"end",marginBottom:14}}>
-          <label style={{fontSize:11,color:"var(--muted)"}}>Veículo<select value={macroFilters.placa} onChange={e=>setMacroFilters(current=>({...current,placa:e.target.value}))} style={{display:"block",width:"100%",height:36,marginTop:5,background:"var(--surface-2)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:7,padding:"0 9px"}}>{(macroData?.veiculos || [{placa:"SXY5D26",motorista:""}]).map(item=><option key={item.placa} value={item.placa}>{item.placa}{item.motorista?` · ${item.motorista}`:""}</option>)}</select></label>
-          <label style={{fontSize:11,color:"var(--muted)"}}>Início<input type="date" value={macroFilters.inicio} onChange={e=>setMacroFilters(current=>({...current,inicio:e.target.value}))} style={{display:"block",width:"100%",height:36,marginTop:5,boxSizing:"border-box",background:"var(--surface-2)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:7,padding:"0 9px"}}/></label>
-          <label style={{fontSize:11,color:"var(--muted)"}}>Fim<input type="date" value={macroFilters.fim} onChange={e=>setMacroFilters(current=>({...current,fim:e.target.value}))} style={{display:"block",width:"100%",height:36,marginTop:5,boxSizing:"border-box",background:"var(--surface-2)",color:"var(--text)",border:"1px solid var(--border)",borderRadius:7,padding:"0 9px"}}/></label>
-          <button className="btn primary" onClick={loadMacros} disabled={macroLoading} style={{height:36}}>{macroLoading?"Calculando…":"Calcular período"}</button>
-        </div>
-        {macroError && <div style={{padding:11,background:"rgba(220,38,38,.1)",color:"#ef4444",borderRadius:7,marginBottom:12,fontSize:12}}>{macroError}</div>}
-        {macroData && <>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(4,minmax(120px,1fr))",gap:9,marginBottom:14}}>
-            {card("Tempo trabalhado", fmHours(macroData.resumo?.horasTrabalhadas), "#2563eb")}
-            {card("Tempo em paradas", fmHours(macroData.resumo?.horasParadas), "#d97706")}
-            {card("Trechos trabalhados", macroData.resumo?.trechosTrabalhados)}
-            {card("Maior trecho contínuo", fmHours(macroData.resumo?.maiorTrechoHoras), "#7c3aed")}
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-            <div style={{border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}><div style={{padding:"9px 11px",background:"var(--surface-2)",fontSize:11,fontWeight:600}}>Trechos trabalhados</div><div style={{maxHeight:260,overflow:"auto"}}>{(macroData.sessoes||[]).slice().reverse().map((item,index)=><div key={`${item.inicio}-${index}`} style={{padding:"10px 11px",borderTop:"1px solid var(--border)",display:"flex",justifyContent:"space-between",gap:10,fontSize:11.5}}><div><strong>{fmDate(item.inicio)} → {fmDate(item.fim)}</strong><span style={{display:"block",color:"var(--muted)",marginTop:3}}>{item.inicioMacro} → {item.fimMacro || "Em andamento"}</span></div><b style={{color:"#60a5fa",whiteSpace:"nowrap"}}>{fmHours(item.duracaoHoras)}</b></div>)}{!macroData.sessoes?.length&&<div style={{padding:18,color:"var(--muted)",fontSize:12}}>Nenhum trecho completo no período.</div>}</div></div>
-            <div style={{border:"1px solid var(--border)",borderRadius:8,overflow:"hidden"}}><div style={{padding:"9px 11px",background:"var(--surface-2)",fontSize:11,fontWeight:600}}>Macros recebidas</div><div style={{maxHeight:260,overflow:"auto"}}>{(macroData.eventos||[]).slice(0,50).map(item=><div key={item.id} style={{padding:"9px 11px",borderTop:"1px solid var(--border)",display:"grid",gridTemplateColumns:"110px 1fr auto",gap:9,fontSize:11.5}}><span style={{color:"var(--muted)"}}>{fmDate(item.dataHora)}</span><strong>{item.descricao}</strong><span style={{color:"var(--muted)"}}>{[item.municipio,item.uf].filter(Boolean).join("/")}</span></div>)}{!macroData.eventos?.length&&<div style={{padding:18,color:"var(--muted)",fontSize:12}}>Nenhuma macro recebida no período.</div>}</div></div>
-          </div>
-          <p style={{fontSize:10.5,color:"var(--muted)",margin:"11px 0 0"}}>ⓘ {macroData.aviso}</p>
-        </>}
-      </section>
-
-      <div style={{display:"flex",gap:10,marginBottom:14}}>
-        <div style={{position:"relative",flex:1,maxWidth:430}}>
-          <Icon name="search" size={15} style={{position:"absolute",left:11,top:10,color:"var(--muted)"}}/>
-          <input value={busca} onChange={e=>{setBusca(e.target.value);setPagina(1)}} placeholder="Buscar motorista, apelido ou placa"
-            style={{width:"100%",height:36,padding:"0 12px 0 34px",border:"1px solid var(--border)",borderRadius:7,background:"var(--surface)",color:"var(--text)",boxSizing:"border-box"}}/>
-        </div>
-        <select value={status} onChange={e=>{setStatus(e.target.value);setPagina(1)}}
-          style={{height:36,padding:"0 30px 0 10px",border:"1px solid var(--border)",borderRadius:7,background:"var(--surface)",color:"var(--text)"}}>
-          <option value="">Todos os status</option><option value="fora">Fora</option><option value="em_folga">Em folga</option><option value="disponivel">Disponíveis</option>
-        </select>
-      </div>
-
-      {error && <div style={{padding:12,background:"#fef2f2",color:"#b91c1c",borderRadius:7,marginBottom:12,fontSize:13}}>{error}</div>}
-      <div style={{border:"1px solid var(--border)",borderRadius:9,overflow:"hidden",background:"var(--surface)"}}>
-        <div className="fm-table-row fm-table-head" style={{display:"grid",gridTemplateColumns:"minmax(180px,1.6fr) 82px 100px minmax(190px,1.4fr) 105px 120px 145px 110px",gap:9,padding:"10px 14px",background:"var(--surface-2)",color:"var(--muted)",fontSize:11,fontWeight:600,textTransform:"uppercase"}}>
-          <span>Motorista</span><span>Veículo</span><span>Situação</span><span>Último ciclo detectado</span><span>Tempo fora</span><span>Histórico</span><span>Saldo de folga</span><span>Ações</span>
-        </div>
-        {loading ? <div style={{padding:32,textAlign:"center",color:"var(--muted)"}}>Carregando motoristas…</div> :
-          data.itens.map(item => {
-            const sit = fmStatus[item.status] || fmStatus.disponivel;
-            const progresso = item.retroativo?.saldoDias || 0;
-            return <div key={`${item.empresa}-${item.codigo}`} className="fm-table-row" style={{display:"grid",gridTemplateColumns:"minmax(180px,1.6fr) 82px 100px minmax(190px,1.4fr) 105px 120px 145px 110px",gap:9,padding:"14px",alignItems:"center",borderTop:"1px solid var(--border)",fontSize:12.5}}>
-              <div style={{display:"flex",gap:10,alignItems:"center"}}><span style={{width:32,height:32,borderRadius:"50%",display:"grid",placeItems:"center",background:"rgba(59,130,246,.12)",color:"#60a5fa",fontWeight:700,fontSize:11}}>{item.nome.split(" ").slice(0,2).map(x=>x[0]).join("")}</span><div><strong style={{display:"block",color:"var(--text)"}}>{item.nome}</strong><span style={{color:"var(--muted)",fontSize:11.5}}>{item.telefone || `Código ${item.codigo}`}</span></div></div>
-              <span style={{fontFamily:"Geist Mono",color:"var(--text-2)",padding:"4px 7px",border:"1px solid var(--border)",borderRadius:5,justifySelf:"start"}}>{item.placa || "Sem veículo"}</span>
-              <div><span style={{display:"inline-block",padding:"4px 8px",borderRadius:999,color:sit.color,background:sit.bg,fontSize:11,fontWeight:600}}>{sit.label}</span>{item.jornada && <div style={{fontSize:10,color:"var(--muted)",marginTop:4}}>{item.jornada.macrosConfirmacao || 0} macros no ciclo</div>}</div>
-              <div>{item.jornada ? <><strong style={{display:"block"}}>Cerca eletrônica + macros</strong><span style={{display:"block",fontSize:10.5,color:"var(--muted)",marginTop:3}}>Saiu: {fmDate(item.jornada.saidaEm)}</span><span style={{display:"block",fontSize:10.5,color:"var(--muted)",marginTop:2}}>{item.jornada.retornoEm ? `Retornou: ${fmDate(item.jornada.retornoEm)}` : "Retorno ainda não detectado"}</span></> : <span style={{color:"var(--muted)"}}>Nenhum ciclo detectado</span>}</div>
-              <div title="Cada 24 horas completas fora da cerca contam como um dia trabalhado"><strong style={{fontSize:17,color:item.status==="fora"?"#60a5fa":"var(--text)"}}>{item.diasFora || 0} dias</strong><div style={{fontSize:10.5,color:"var(--muted)",marginTop:3}}>{fmHours(item.horasFora || 0)} no ciclo</div></div>
-              <div title="Ciclos e dias apurados exclusivamente pela cerca eletrônica"><strong>{item.retroativo?.viagensCompletas || 0} ciclos</strong><div style={{color:item.retroativo?.viagensPendentes?"#b45309":"var(--muted)",fontSize:10.5,marginTop:3}}>{item.retroativo?.diasFora || 0} dias trabalhados</div><div style={{color:"var(--muted)",fontSize:10}}>{item.retroativo?.viagensPendentes || 0} em andamento</div></div>
-              <div title="Saldo calculado com os usos registrados nesta tela. Folgas usufruídas antes desta implantação ainda precisam ser lançadas."><strong style={{fontSize:15,color:item.retroativo?.folgasDisponiveis>0?"#a78bfa":"var(--text)"}}>{item.retroativo?.folgasDisponiveis||0} dias calculados</strong><div style={{fontSize:10.5,color:"var(--muted)",marginTop:3}}>Geradas {item.retroativo?.diasFolga||0} • usadas {item.retroativo?.folgasUtilizadas||0}</div><div style={{height:4,background:"var(--border)",borderRadius:4,marginTop:7,overflow:"hidden"}}><div style={{height:"100%",width:`${progresso/6*100}%`,background:"#60a5fa"}}/></div><div style={{fontSize:9.5,color:"var(--muted)",marginTop:3}}>Próxima folga: {progresso} de 6 dias</div></div>
-              <div style={{display:"flex",flexDirection:"column",gap:5}}><span style={{fontSize:10,color:"var(--muted)",textAlign:"center"}}>Jornada automática</span>
-                <button className="btn" disabled={!item.retroativo?.folgasDisponiveis} onClick={()=>setModal({tipo:"folga",item,quantidade:"1",dataMovimento:new Date().toISOString().slice(0,10),observacoes:""})}>Registrar folga</button></div>
-            </div>;
-          })}
-        {!loading && !data.itens.length && <div style={{padding:32,textAlign:"center",color:"var(--muted)"}}>Nenhum motorista encontrado.</div>}
-      </div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:12,fontSize:12,color:"var(--muted)"}}>
-        <span>Página {pagina} • {data.total || 0} registros</span>
-        <div style={{display:"flex",gap:8}}><button className="btn" disabled={pagina===1} onClick={()=>setPagina(p=>p-1)}>Anterior</button><button className="btn" disabled={pagina*limite>=data.total} onClick={()=>setPagina(p=>p+1)}>Próxima</button></div>
-      </div>
-
-      {modal && <div style={{position:"fixed",inset:0,background:"rgba(15,23,42,.45)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}}>
-        <form onSubmit={save} style={{width:"100%",maxWidth:470,background:"var(--surface)",borderRadius:12,padding:22,boxShadow:"0 20px 50px rgba(0,0,0,.25)"}}>
-          <h2 style={{fontSize:18,margin:"0 0 4px"}}>{modal.tipo==="saida"?"Registrar saída":modal.tipo==="retorno"?"Confirmar retorno":"Registrar folga utilizada"}</h2>
-          <p style={{margin:"0 0 18px",fontSize:13,color:"var(--muted)"}}>{modal.item.nome}{modal.item.placa?` • ${modal.item.placa}`:""}</p>
-          {modal.tipo!=="folga"&&<><label style={{display:"block",fontSize:12,marginBottom:5}}>{modal.tipo==="saida"?"Data e hora da saída":"Data e hora do retorno"}</label>
-          <input type="datetime-local" required value={modal.tipo==="saida"?modal.saidaEm:modal.retornoEm} onChange={e=>setModal({...modal,[modal.tipo==="saida"?"saidaEm":"retornoEm"]:e.target.value})}
-            style={{width:"100%",height:38,padding:"0 10px",boxSizing:"border-box",border:"1px solid var(--border)",borderRadius:7,background:"var(--surface)",color:"var(--text)",marginBottom:14}}/></>}
-          {modal.tipo==="saida" && <><label style={{display:"block",fontSize:12,marginBottom:5}}>Retorno previsto (opcional)</label><input type="datetime-local" value={modal.retornoPrevistoEm} onChange={e=>setModal({...modal,retornoPrevistoEm:e.target.value})}
-            style={{width:"100%",height:38,padding:"0 10px",boxSizing:"border-box",border:"1px solid var(--border)",borderRadius:7,background:"var(--surface)",color:"var(--text)",marginBottom:14}}/></>}
-          {modal.tipo==="folga"&&<div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}><div><label style={{display:"block",fontSize:12,marginBottom:5}}>Dias utilizados</label><input type="number" min="0.5" step="0.5" max={modal.item.retroativo?.folgasDisponiveis} required value={modal.quantidade} onChange={e=>setModal({...modal,quantidade:e.target.value})} style={{width:"100%",height:38,padding:"0 10px",boxSizing:"border-box",border:"1px solid var(--border)",borderRadius:7,background:"var(--surface)",color:"var(--text)",marginBottom:14}}/></div><div><label style={{display:"block",fontSize:12,marginBottom:5}}>Data</label><input type="date" required value={modal.dataMovimento} onChange={e=>setModal({...modal,dataMovimento:e.target.value})} style={{width:"100%",height:38,padding:"0 10px",boxSizing:"border-box",border:"1px solid var(--border)",borderRadius:7,background:"var(--surface)",color:"var(--text)",marginBottom:14}}/></div></div>}
-          <label style={{display:"block",fontSize:12,marginBottom:5}}>Observações</label>
-          <textarea value={modal.observacoes} onChange={e=>setModal({...modal,observacoes:e.target.value})} rows="3"
-            style={{width:"100%",padding:10,boxSizing:"border-box",border:"1px solid var(--border)",borderRadius:7,background:"var(--surface)",color:"var(--text)",resize:"vertical"}}/>
-          <div style={{display:"flex",justifyContent:"flex-end",gap:8,marginTop:18}}><button type="button" className="btn" onClick={()=>setModal(null)}>Cancelar</button><button type="submit" className="btn primary" disabled={saving}>{saving?"Salvando…":"Salvar"}</button></div>
-        </form>
-      </div>}
-    </div>
-  );
-};
-
-window.FolgasMotoristas = FolgasMotoristas;
+    {data.total>limite&&<div className="fm-pager"><span className="fm-muted">Página {pagina}</span><div><button className="btn" disabled={loading||pagina===1} onClick={()=>setPagina(p=>p-1)}>Anterior</button><button className="btn" disabled={loading||pagina*limite>=data.total} onClick={()=>setPagina(p=>p+1)}>Próxima</button></div></div>}
+    <p className="fm-muted fm-footnote">O tempo é observado pelo veículo associado ao motorista. Se houve troca de motorista, confira em “Ver detalhes”.</p>
+    <details className="fm-info"><summary>Como são calculados o tempo fora e o descanso?</summary><p className="fm-muted">A referência geral para motorista empregado CLT é 11h entre jornadas e 35h no descanso semanal (24h + 11h). O saldo devido depende da jornada, dos repousos já realizados e da convenção coletiva. Use “Planejar descanso” para calcular o término de um intervalo informado.</p><details><summary>Ver critérios e base legal</summary><p className="fm-muted">Estar fora da base não significa trabalhar continuamente. O repouso semanal não deve ser tratado como um banco gerado a cada seis dias fora para ser utilizado apenas no retorno. A convenção coletiva e o vínculo CLT ainda precisam ser confirmados.</p><p className="fm-muted">O histórico abaixo é do veículo atualmente associado ao motorista; trocas de condutor precisam ser conferidas. Retorno à cerca não comprova folga ou disponibilidade para trabalhar. Ciclos abertos são medidos até a última posição observada, sem prolongar o tempo quando não há telemetria.</p><p><a href="https://www.planalto.gov.br/ccivil_03/decreto-lei/del5452compilado.htm" target="_blank" rel="noreferrer">CLT, arts. 66, 67 e 235-C/D</a> · <a href="https://portal.stf.jus.br/noticias/verNoticiaDetalhe.asp?idConteudo=510120" target="_blank" rel="noreferrer">STF — ADI 5322</a></p></details></details>
+    {modal&&<div className="fm-overlay" onClick={e=>{if(e.target===e.currentTarget&&!saving)setModal(null);}}><section ref={dialogRef} tabIndex={-1} className={`fm-dialog ${modal.tipo==='detalhes'?'fm-detail-dialog':''}`} role="dialog" aria-modal="true" aria-labelledby="fm-modal-title"><h2 id="fm-modal-title">{modal.tipo==='detalhes'?'Detalhes do motorista':modal.tipo==='planejar'?'Planejar descanso':'Registrar folga utilizada'}</h2><p className="fm-subtitle">{modal.item.nome} · {modal.item.placa}</p>
+      {modal.tipo==='detalhes'?<>
+        <div className="fm-detail-summary"><span className="fm-label">{modal.item.status==='fora'?'Tempo fora até a última informação':'Tempo fora na última saída'}</span><strong>{fmDuration(modal.item.horasFora).main} <small>{fmDuration(modal.item.horasFora).detail}</small></strong><p>Saiu: {fmDate(modal.item.jornada?.saidaEm)}<br/>{modal.item.jornada?.retornoEm?`Voltou: ${fmDate(modal.item.jornada.retornoEm)}`:'A volta ainda não foi identificada.'}</p></div>
+        <h3>O que você quer fazer?</h3><div className="fm-detail-actions"><button className="btn primary" onClick={()=>open('planejar',modal.item)}>Calcular horário de fim do descanso</button><button className="btn" onClick={()=>open('folga',modal.item)}>Registrar uma folga já tirada</button></div>
+        <p className="fm-muted">Dias fora não viram folgas automaticamente. Para saber o saldo devido, é preciso conferir a jornada e os descansos já feitos.</p><p className="fm-muted">Folgas registradas: <b>{modal.item.retroativo?.folgasUtilizadas||0} dias</b>.</p>
+        <details className="fm-history"><summary>Ver histórico de saídas e retornos ({modal.item.ciclos?.length||0})</summary><p className="fm-muted">Histórico do veículo {modal.item.placa}. Confira quem estava dirigindo em cada período.</p><div className="fm-table-wrap"><table className="fm-table"><thead><tr><th>Saiu em</th><th>Voltou em</th><th>Tempo fora</th></tr></thead><tbody>{(modal.item.ciclos||[]).map(c=><tr key={c.id}><td>{fmDate(c.saidaEm)}</td><td>{c.retornoEm?fmDate(c.retornoEm):`Sem retorno · última informação: ${fmDate(c.telemetriaAte)}`}</td><td>{fmDuration(c.horasFora).main} {fmDuration(c.horasFora).detail}</td></tr>)}</tbody></table></div>{!modal.item.ciclos?.length&&<p>Nenhuma saída identificada.</p>}</details>
+        <footer><button className="btn primary" onClick={()=>setModal(null)}>Fechar detalhes</button></footer>
+      </>:modal.tipo==='planejar'?<><p className="fm-muted">Informe quando o motorista terminou de trabalhar, incluindo a descarga. O cálculo mostra quando o intervalo termina; não calcula saldo de folgas.</p><label>Fim efetivo da jornada (Brasília)<input type="datetime-local" value={modal.fimTrabalho} onChange={e=>setModal({...modal,fimTrabalho:e.target.value})}/></label><label>Intervalo a planejar<select value={modal.descanso} onChange={e=>setModal({...modal,descanso:e.target.value})}><option value="weekly">Semanal + diário — 35 horas</option><option value="daily">Entre jornadas — 11 horas</option></select></label>{plan?<div className="fm-result" role="status"><span>Intervalo planejado: {plan.hours} horas contínuas</span><strong>Término: {fmDate(plan.end)}</strong><small>Considerando descanso efetivo, sem interrupções. Não é autorização automática para nova jornada.</small></div>:<p className="fm-muted">Informe uma data e hora válidas para calcular.</p>}<footer><button className="btn" onClick={()=>open('detalhes',modal.item)}>← Voltar aos detalhes</button><button className="btn" onClick={()=>setModal(null)}>Fechar</button></footer></>:<form onSubmit={save}><p className="fm-muted">Registre somente uma folga que o motorista já tirou. Este registro em dias não comprova as horas de descanso e não desconta um saldo automático.</p><label>Dias utilizados<input type="number" min="0.5" step="0.5" required value={modal.quantidade} onChange={e=>setModal({...modal,quantidade:e.target.value})}/></label><label>Data da folga<input type="date" required value={modal.dataMovimento} onChange={e=>setModal({...modal,dataMovimento:e.target.value})}/></label><label>Observações<textarea rows={3} value={modal.observacoes} onChange={e=>setModal({...modal,observacoes:e.target.value})}/></label>{saveError&&<div role="alert" className="fm-error">{saveError}</div>}<footer><button type="button" className="btn" disabled={saving} onClick={()=>open('detalhes',modal.item)}>Voltar</button><button className="btn primary" disabled={saving}>{saving?'Salvando…':'Salvar registro'}</button></footer></form>}
+    </section></div>}
+  </div>;
+}
+window.FolgasMotoristas=FolgasMotoristas;

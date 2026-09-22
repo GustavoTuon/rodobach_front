@@ -94,6 +94,7 @@ const Trafegus = () => {
         </button>
       </div>
 
+      {data.incompleto && <div className="card" role="status" style={{padding:12,marginBottom:16}}>Consulta parcial: há mais SMs na origem do que os registros carregados. Confira a operação no Trafegus antes de concluir que um veículo está sem viagem.</div>}
       {error && (
         <div className="card" style={{padding:"11px 14px",marginBottom:16,borderColor:"var(--crit-border)",color:"var(--crit)"}}>
           {error}

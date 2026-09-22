@@ -5,8 +5,23 @@ import {render,screen,fireEvent,cleanup,waitFor} from '@testing-library/react';
 import './screens/evolucao-custos.jsx';
 import {ecEvents,ecGroups,ecCategory,ecAlerts,ecSum,ecColor,ecDocumentRows} from './screens/cost-analysis-model.js';
 import {CostEvolutionChart,CostTransactionsTable,VehicleCostDrawer,ExecutiveSummary} from './screens/cost-analysis-components.jsx';
+import {FuelDistance} from './screens/cost-fuel-distance.jsx';
 globalThis.React=React;
 afterEach(cleanup);
+describe('quilometragem por mes',()=>{
+ it('soma placas uma vez e respeita o mes selecionado',()=>{
+   render(<FuelDistance months={[{key:'2026-08'},{key:'2026-09'}]} selected="2026-09" plates={['A','B','A']} distance={{available:true,monthly:[{mes:'2026-08',placa:'A',km:900},{mes:'2026-09',placa:'A',km:100},{mes:'2026-09',placa:'B',km:200}]}}/>);
+   expect(screen.getAllByText('300 km')).toHaveLength(2);
+   expect(screen.getByText('2 de 2')).toBeTruthy();
+   expect(screen.queryByText('900 km')).toBeNull();
+ });
+ it('nao apresenta soma parcial como total nem confunde zero com ausencia',()=>{
+   render(<FuelDistance months={[{key:'2026-09'}]} plates={['A','B']} distance={{available:true,monthly:[{mes:'2026-09',placa:'A',km:0},{mes:'2026-09',placa:'B',km:null}]}}/>);
+   expect(screen.getByText('KM total indisponível')).toBeTruthy();
+   expect(screen.getByText('1 de 2')).toBeTruthy();
+   expect(screen.queryByText('0 km')).toBeNull();
+ });
+});
 describe('documentos consolidados',()=>{
  it('mostra tres parcelas em uma linha e preserva o valor e os itens',async()=>{
    const rows=[1,2,3].map(parcela=>row(`pagar:2:1:937:${parcela}:753:170:120`,83.33,{documento:''}));

@@ -1,3 +1,4 @@
+import MaintenanceAudit from "./maintenance-audit.jsx";
 const EMPTY_FORM = {
   selecionadas: [], // [{ placa, km_atual }]
   titulo: "",
@@ -230,7 +231,7 @@ function agruparPorVeiculo(automacoes) {
     });
 }
 
-function mensagemPreview(item) {
+export function mensagemPreview(item) {
   const placa = normalizarPlaca(item.placa);
   const titulo = item.titulo || "Manutencao programada";
   const info = kmInfo(item);
@@ -243,10 +244,19 @@ function mensagemPreview(item) {
     : item.planoAutorizado
       ? `Plano autorizado em ${dataBR(item.planoAutorizado.data)} - ${item.planoAutorizado.fornecedor || "fornecedor nao informado"} - sem KM de execucao`
       : "Sem manutencao com KM encontrada para este servico.";
+  let acao = item.mensagem || "Verifique e programe a manutenção antes de liberar o veículo.";
+  if (info.status !== "vencido") {
+    acao = acao.replace(/atingiu o marco/giu, info.status === "perto" ? "está próximo do marco" : "tem um marco");
+  }
+  if (isDate) {
+    acao = acao.replace(/está próxim([oa]) do vencimento/giu, (texto, genero) =>
+      info.status === "vencido" ? `está vencid${genero}` : info.status === "perto" ? texto : "tem validade a conferir na data informada");
+  }
   return [
     info.status === "vencido"
       ? "🔴 *MANUTENÇÃO VENCIDA*"
-      : "🟡 *MANUTENÇÃO PRÓXIMA*",
+      : info.status === "perto" ? "🟡 *MANUTENÇÃO PRÓXIMA*"
+        : info.status === "ok" ? "🟢 *MANUTENÇÃO PROGRAMADA*" : "⚪ *MANUTENÇÃO A CONFERIR*",
     "",
     `🚛 *Placa:* ${placa}`,
     item.modelo ? `🚚 *Veículo:* ${item.modelo}` : null,
@@ -260,12 +270,15 @@ function mensagemPreview(item) {
           `⏳ *Validade:* ${dataBR(item.data_proximo_envio)}`,
         ]
       : [
-          `📏 *KM atual:* ${kmAtual}`,
+          `📏 *${item.km_fonte === "abastecimento" ? "Último KM registrado" : "KM atual"}:* ${kmAtual}`,
+          item.km_data ? `🧾 *Referência do KM:* ${item.km_fonte === "abastecimento" ? "Abastecimento" : "Telemetria"} — ${dataBR(item.km_data)}` : null,
+          item.km_fonte === "abastecimento" ? "KM registrado nessa data; não inclui o percurso posterior." : null,
+          item.telemetria_descartada ? "Telemetria divergente desconsiderada no cálculo do alerta." : null,
           `🎯 *Próximo marco:* ${kmProgramado}`,
           `🧾 *Último registro:* ${ultimoRegistro}`,
         ]),
     "",
-    `✅ *Ação recomendada:* ${item.mensagem || "Verifique e programe a manutenção antes de liberar o veículo."}`,
+    `✅ *Ação recomendada:* ${acao}`,
   ]
     .filter((line) => line !== null && line !== undefined)
     .join("\n");
@@ -1187,6 +1200,15 @@ function CheckBox({ checked, indeterminate }) {
 
 // ── Tela principal ────────────────────────────────────────────────────────────
 function ManutencaoMensagens() {
+  const [showAudit, setShowAudit] = React.useState(false);
+  const [auditPlan, setAuditPlan] = React.useState(null);
+  const [auditRevision, setAuditRevision] = React.useState(0);
+  const auditRef = React.useRef(null);
+  function openAudit(plan = null) {
+    setAuditPlan(plan);
+    setShowAudit(true);
+    requestAnimationFrame(() => auditRef.current?.scrollIntoView({behavior: "smooth", block: "start"}));
+  }
   const [automacoes, setAutomacoes] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [erro, setErro] = React.useState(null);
@@ -1268,6 +1290,7 @@ function ManutencaoMensagens() {
     try {
       const data = await RB_API.listManutencao();
       setAutomacoes(data.automacoes || []);
+      setAuditRevision(value => value + 1);
     } catch (e) {
       setErro(e.message);
     } finally {
@@ -1618,7 +1641,9 @@ function ManutencaoMensagens() {
 
   function abrirRegistroParaPlano(automacao) {
     const titulo = String(automacao?.titulo || "").toLowerCase();
-    const tipo = titulo.includes("filtro de ar")
+    const tipo = /[óo]leo.*motor|troca.*[óo]leo/.test(titulo) && !/c[âa]mbio|diferencial|intermedi/.test(titulo)
+      ? "troca_oleo_motor"
+      : titulo.includes("filtro de ar")
       ? "filtro_ar"
       : titulo.includes("filtro")
         ? "filtro_combustivel"
@@ -1697,6 +1722,9 @@ function ManutencaoMensagens() {
           </div>
         </div>
         <div className="row" style={{ gap: 8 }}>
+          <button className="btn" onClick={() => showAudit ? setShowAudit(false) : openAudit()}>
+            {showAudit ? "Fechar auditoria" : "Auditoria e envios"}
+          </button>
           <button className="btn" onClick={abrirRegistro}>
             <Icon name="wrench" size={14} /> Registrar serviço
           </button>
@@ -1706,6 +1734,9 @@ function ManutencaoMensagens() {
         </div>
       </div>
 
+      <div ref={auditRef}>
+        {showAudit && <MaintenanceAudit api={RB_API} revision={auditRevision} plan={auditPlan} onClearPlan={() => setAuditPlan(null)} />}
+      </div>
       <div className="card" style={{ padding: "9px 12px", marginBottom: 12 }}>
         <button
           type="button"
@@ -2084,7 +2115,7 @@ function ManutencaoMensagens() {
                       className="muted"
                       style={{ fontSize: 12, marginTop: 5 }}
                     >
-                      KM atual:{" "}
+                      KM de referência:{" "}
                       <strong style={{ color: "var(--text)" }}>
                         {fmtKm(veiculo.kmAtual)}
                       </strong>{" "}
@@ -2283,7 +2314,7 @@ function ManutencaoMensagens() {
                                     <strong>{fmtKm(a.intervalo_km)}</strong>
                                   </div>
                                   <div style={{ fontSize: 12 }}>
-                                    <span className="muted">KM atual</span>
+                                    <span className="muted">{a.km_fonte === "abastecimento" ? "Último KM registrado" : "KM atual"}</span>
                                     <br />
                                     <strong>{fmtKm(a.km_atual)}</strong>
                                     <br />
@@ -2291,13 +2322,14 @@ function ManutencaoMensagens() {
                                       {a.km_fonte === "telemetria"
                                         ? "Telemetria"
                                         : a.km_fonte === "abastecimento"
-                                          ? "Sistema · abastecimento"
+                                          ? `Abastecimento de ${dataBR(a.km_data)}`
                                           : a.km_fonte === "viagem"
                                             ? "Sistema · viagem"
                                             : a.km_fonte === "ordem_servico"
                                               ? "Sistema · ordem de serviço"
                                               : "Sem referência"}
                                     </small>
+                                    {a.km_fonte === "abastecimento" && <div className="muted" style={{fontSize: 11}}>Não inclui o percurso posterior ao abastecimento.</div>}
                                     {a.telemetria_descartada && (
                                       <>
                                         <br />
@@ -2335,9 +2367,11 @@ function ManutencaoMensagens() {
                                   className="muted"
                                   style={{ fontWeight: 700 }}
                                 >
-                                  Ultimo registro:{" "}
+                                  {a.tipo_controle === "data" ? "Último serviço por data:" : "Último registro do serviço:"}{" "}
                                 </span>
-                                {ultimaPlano ? (
+                                {a.tipo_controle === "data" ? (
+                                  <strong>{dataBR(a.data_ultimo_servico)} — {a.titulo}</strong>
+                                ) : ultimaPlano ? (
                                   <>
                                     <strong>
                                       {dataBR(ultimaPlano.data)} -{" "}
@@ -2346,7 +2380,7 @@ function ManutencaoMensagens() {
                                     <span className="muted">
                                       {" "}
                                       |{" "}
-                                      {ultimaPlano.descricao || "Sem descricao"}
+                                      {ultimaPlano.descricao || "Sem descrição"}
                                     </span>
                                     {ultimaPlano.tipoDocumento && (
                                       <span className="muted">
@@ -2366,7 +2400,7 @@ function ManutencaoMensagens() {
                                   <span className="muted">
                                     {a.planoAutorizado
                                       ? `plano autorizado encontrado em ${dataBR(a.planoAutorizado.data)} (${a.planoAutorizado.fornecedor}, NF ${a.planoAutorizado.documento}), sem KM informado.`
-                                      : "nao encontrei manutencao com KM para este tipo."}
+                                      : "Não foi encontrada manutenção com KM para este serviço."}
                                   </span>
                                 )}
                               </div>
@@ -2430,6 +2464,7 @@ function ManutencaoMensagens() {
                                   );
                                 })()}
 
+                              <button className="btn" style={{marginBottom: 8}} onClick={() => openAudit(a)}>Histórico de alterações e envios</button>
                               <details>
                                 <summary
                                   style={{
@@ -2690,7 +2725,7 @@ function ManutencaoMensagens() {
                             fontWeight: 500,
                           }}
                         >
-                          KM atual / fonte
+                          KM de referência / fonte
                         </span>
                         <span
                           style={{
@@ -2837,9 +2872,9 @@ function ManutencaoMensagens() {
                         className="muted"
                         style={{ fontSize: 11, marginTop: 8 }}
                       >
-                        O KM atual é somente leitura: usa a telemetria e, quando
-                        ela estiver indisponível, o lançamento mais recente do
-                        sistema. A última troca será salva no histórico do
+                        O KM de referência é somente leitura: usa a telemetria e,
+                        quando ela estiver indisponível ou incompatível, o último
+                        abastecimento validado. A última troca será salva no histórico do
                         veículo.
                       </div>
                     </div>
@@ -3664,6 +3699,9 @@ function ManutencaoMensagens() {
                   }}
                 />
               </label>
+              {registroForm.tipo_movimento === "troca_oleo_motor" && (
+                <p className="muted">A troca completa do óleo do motor também renova os planos de filtros intermediários deste veículo, com a mesma data e KM. Cada plano mantém seu intervalo. Registros anteriores a uma referência mais recente não recuam o vencimento.</p>
+              )}
               {registroForm.automacao_id && registroForm.km_servico && (
                 <div
                   style={{
