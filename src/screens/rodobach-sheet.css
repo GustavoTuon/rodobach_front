@@ -1,0 +1,397 @@
+.rs-sheet {
+  font-variant-numeric: tabular-nums;
+}
+.rs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.rs-head h1 {
+  font-size: 23px;
+  letter-spacing: -0.5px;
+  margin: 0;
+}
+.rs-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-bottom: 10px;
+}
+.rs-section-head h2 {
+  font-size: 14px;
+  margin: 0;
+}
+.rs-section-head > span {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.rs-travel {
+  border: 1px solid var(--ql-border);
+  background: var(--surface);
+  padding: 12px 14px;
+  border-radius: 5px;
+}
+.rs-selects {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1.1fr;
+  gap: 14px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+.rs-selects label {
+  font-size: 12px;
+  font-weight: 600;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.rs-selects select {
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--ql-border);
+  border-radius: 4px;
+  padding: 0 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+}
+.rs-active {
+  border-left: 2px solid var(--ql-input-border);
+  padding-left: 12px;
+  display: grid;
+  gap: 2px;
+  font-size: 12px;
+}
+.rs-active span,
+.rs-active small {
+  color: var(--text-2);
+  font-size: 11px;
+}
+.rs-travel-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1.25fr 0.7fr;
+  gap: 12px;
+}
+.rs-input {
+  display: block;
+  min-width: 0;
+}
+.rs-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+.rs-label small {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-2);
+}
+.rs-input-box {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--ql-input-border);
+  border-radius: 4px;
+  padding: 0 8px;
+  gap: 5px;
+}
+.rs-input-box input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: right;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  outline: none;
+}
+.rs-input-box:focus-within {
+  outline: 2px solid var(--ql-accent);
+  outline-offset: 2px;
+}
+.rs-input-box input::placeholder {
+  font-weight: 400;
+  color: var(--text-2);
+  opacity: 0.8;
+}
+.rs-input-box > span {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.rs-hint {
+  display: block;
+  font-size: 10px;
+  color: var(--text-2);
+  line-height: 1.4;
+  margin-top: 5px;
+}
+.rs-status {
+  font-size: 11px;
+  color: var(--text-2);
+  line-height: 1.4;
+  margin-top: 8px;
+}
+.rs-error {
+  color: var(--ql-danger-text);
+}
+.rs-reference {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 22px;
+  padding: 8px 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.rs-reference strong {
+  margin-left: 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+.rs-reference > span:first-child {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.rs-scenarios-heading {
+  margin: 6px 0 9px;
+}
+.rs-scenarios {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.rs-scenario {
+  min-width: 0;
+  border: 1px solid var(--ql-border);
+  border-radius: 4px;
+  background: var(--ql-cell);
+  color: var(--ql-cell-text);
+  overflow: hidden;
+}
+.rs-scenario > header {
+  min-height: 73px;
+  padding: 10px 12px;
+  background: var(--ql-section);
+  border-bottom: 1px solid var(--ql-border);
+}
+.rs-scenario h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+.rs-scenario header p {
+  font-size: 12px;
+  color: var(--text-2);
+  margin: 0;
+  line-height: 1.4;
+}
+.rs-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.rs-pair > div {
+  min-width: 0;
+  padding: 10px;
+}
+.rs-pair > div + div {
+  border-left: 1px solid var(--ql-border);
+}
+.rs-prices {
+  min-height: 116px;
+  border-bottom: 1px solid var(--ql-border);
+}
+.rs-driver {
+  background: var(--ql-driver);
+}
+.rs-client {
+  background: var(--ql-client);
+}
+.rs-driver .rs-label,
+.rs-driver .rs-calculated > strong {
+  color: var(--ql-input-text);
+}
+.rs-client .rs-label,
+.rs-client .rs-calculated > strong {
+  color: var(--ql-client-text);
+}
+.rs-calculated > strong {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: 16px;
+  font-weight: 700;
+}
+.rs-results {
+  background: var(--ql-profit);
+  color: var(--ql-profit-text);
+  border-bottom: 1px solid var(--ql-border);
+}
+.rs-results > div {
+  display: grid;
+  gap: 4px;
+}
+.rs-results span {
+  font-size: 12px;
+  font-weight: 600;
+}
+.rs-results strong {
+  font-size: 20px;
+  text-align: right;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.rs-results small {
+  font-size: 10px;
+}
+.rs-results.rs-loss {
+  background: var(--ql-danger);
+  color: var(--ql-danger-text);
+}
+.rs-pending .rs-results {
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.rs-meta {
+  min-height: 75px;
+  padding: 10px;
+  border-bottom: 1px solid var(--ql-border);
+  display: flex;
+  align-items: center;
+}
+.rs-meta > label {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 90px;
+  align-items: center;
+  gap: 10px;
+}
+.rs-meta .rs-label {
+  flex-direction: column;
+  margin: 0;
+}
+.rs-meta p {
+  font-size: 12px;
+  color: var(--text-2);
+  margin: 0;
+  line-height: 1.5;
+}
+.rs-costs {
+  padding: 10px;
+  font-size: 12px;
+}
+.rs-costs summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: 2px 0 6px;
+}
+.rs-costs dl {
+  margin: 0 0 6px;
+}
+.rs-costs dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  border-top: 1px solid var(--ql-border);
+}
+.rs-costs dd {
+  margin: 0;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.rs-cost-part dt,
+.rs-cost-part dd,
+.rs-costs > small {
+  color: var(--text-2);
+}
+.rs-cost-total {
+  font-weight: 600;
+}
+.rs-scenario > .ql-warning {
+  margin: 0 10px 10px;
+}
+.rs-scenario > .ql-warning strong,
+.rs-scenario > .ql-warning span {
+  display: block;
+}
+.rs-scenario > .ql-warning span {
+  margin-top: 4px;
+}
+.rs-actions {
+  padding: 12px 0 0;
+}
+.rs-sheet select:focus-visible,
+.rs-sheet summary:focus-visible {
+  outline: 2px solid var(--ql-accent);
+  outline-offset: 2px;
+}
+@container (max-width:850px) {
+  .rs-scenarios {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rs-scenario > header,
+  .rs-prices,
+  .rs-meta {
+    min-height: 0;
+  }
+  .rs-selects {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .rs-active {
+    grid-column: 1/-1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .rs-travel-fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container (max-width:500px) {
+  .rs-selects,
+  .rs-travel-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .rs-selects > label:first-child {
+    grid-column: 1/-1;
+  }
+  .rs-travel-fields > label:nth-child(4) {
+    grid-column: 1/-1;
+    grid-row: 3;
+  }
+  .rs-input-box input,
+  .rs-selects select {
+    min-height: 44px;
+  }
+  .rs-scenario > header {
+    padding: 12px;
+  }
+  .rs-results strong {
+    font-size: 18px;
+  }
+  .rs-head h1 {
+    font-size: 21px;
+  }
+  .rs-reference {
+    gap: 8px 12px;
+  }
+  .rs-prices .rs-label {
+    flex-wrap: wrap;
+  }
+}

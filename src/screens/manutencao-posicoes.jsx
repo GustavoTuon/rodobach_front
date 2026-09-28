@@ -1,3 +1,5 @@
+import { confirmedVehicleLayout } from '../vehicle-layout-overrides.js';
+
 const COMPONENTS = [
   "Lona de freio",
   "Graxa",
@@ -31,7 +33,9 @@ const STATUS = {
   overdue: { color: "#dc2626", label: "Vencido", icon: "×", rank: 3 },
 };
 
-function inferMaintenanceLayout(vehicle) {
+export function inferMaintenanceLayout(vehicle) {
+  const confirmed = confirmedVehicleLayout(vehicle);
+  if (confirmed) return confirmed;
   const text = `${vehicle?.modelo || ""} ${vehicle?.marca || ""}`.toUpperCase();
   const axles = Number(vehicle?.eixos) || 3;
   if (axles >= 4 || /BITRUCK|BI.?TRUCK|8X2|8X4/.test(text)) return "BITRUCK";

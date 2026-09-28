@@ -1,7 +1,15 @@
+import { QuoteLayoutPicker, QuoteLayouts, QUOTE_LAYOUTS } from './quote-layouts.jsx';
 // Calculadora de Frete ANTT - Rodobach
 const SimuladorFrete = ({ onNavigate }) => {
   const D = window.NT_DATA || {};
   const { useEffect, useMemo, useRef, useState } = React;
+  const [layout, setLayout] = useState(() => {
+    try { const saved = localStorage.getItem('rodobach_quote_layout'); return QUOTE_LAYOUTS.some(([id]) => id === saved) ? saved : 'original'; } catch { return 'original'; }
+  });
+  const changeLayout = (value) => {
+    setLayout(value);
+    try { localStorage.setItem('rodobach_quote_layout', value); } catch { /* Storage may be unavailable. */ }
+  };
 
   const [anttTabela, setAnttTabela] = useState(() => D.ANTT_TABELA || []);
   const [eixos, setEixos] = useState(6);
@@ -9,6 +17,7 @@ const SimuladorFrete = ({ onNavigate }) => {
   const [operacao, setOperacao] = useState("etc");
   const [km, setKm] = useState("");
   const [pedagio, setPedagio] = useState("");
+  const [valorNota, setValorNota] = useState("");
   const [seguro, setSeguro] = useState("");
   const [icms, setIcms] = useState("12");
   const [simMotorista, setSimMotorista] = useState("");
@@ -63,7 +72,7 @@ const SimuladorFrete = ({ onNavigate }) => {
   const integerInput = (setter) => (event) => setter(onlyDigits(event.target.value));
   const formatMoneyOnBlur = (value, setter) => {
     const amount = parseMoneyNumber(value);
-    setter(amount > 0 ? fmtR(amount) : "");
+    setter(String(value).trim() ? fmtR(amount) : "");
   };
   const formatIntegerOnBlur = (value, setter) => {
     const amount = parseBRNumber(value);
@@ -81,14 +90,17 @@ const SimuladorFrete = ({ onNavigate }) => {
   }, []);
 
   useEffect(() => {
+    let active = true;
     clearTimeout(debounceRef.current);
+    setCalc(null);
     const kmNum = parseBRNumber(km);
     if (!kmNum) {
       setCalc(null);
       setCalcError(false);
+      setCalcLoading(false);
       return;
     }
-
+    setCalcLoading(true);
     debounceRef.current = setTimeout(() => {
       setCalcLoading(true);
       setCalcError(false);
@@ -98,17 +110,18 @@ const SimuladorFrete = ({ onNavigate }) => {
         operacao,
         km: kmNum,
         pedagio: parseMoneyNumber(pedagio),
+        valorNota: parseMoneyNumber(valorNota),
         seguroRCManual: seguro.trim() ? parseMoneyNumber(seguro) : "",
         margem: 30,
         icms: parseBRNumber(icms) || 12,
       })
-        .then((data) => { setCalc(data); setCalcError(false); })
-        .catch((err) => { console.warn("Falha ao calcular frete:", err); setCalc(null); setCalcError(true); })
-        .finally(() => setCalcLoading(false));
+        .then((data) => { if (active) { setCalc(data); setCalcError(false); } })
+        .catch((err) => { if (active) { console.warn("Falha ao calcular frete:", err); setCalc(null); setCalcError(true); } })
+        .finally(() => { if (active) setCalcLoading(false); });
     }, 400);
 
-    return () => clearTimeout(debounceRef.current);
-  }, [eixos, tipoCarga, operacao, km, pedagio, seguro, icms]);
+    return () => { active = false; clearTimeout(debounceRef.current); };
+  }, [eixos, tipoCarga, operacao, km, pedagio, seguro, icms, valorNota]);
 
   const tabRow = useMemo(
     () => anttTabela.find((row) => row.eixos === eixos) || anttTabela[0] || (D.ANTT_TABELA || [])[0] || {},
@@ -318,6 +331,7 @@ const SimuladorFrete = ({ onNavigate }) => {
         <div className="quote-main-fields">
           <label><span>Distância da viagem</span><div className="quote-unit"><input inputMode="numeric" value={km} onChange={integerInput(setKm)} onBlur={() => formatIntegerOnBlur(km, setKm)} placeholder="Ex.: 1.600"/><b>km</b></div></label>
           <label><span>Pedágio</span><input inputMode="decimal" value={pedagio} onChange={moneyInput(setPedagio)} onBlur={() => formatMoneyOnBlur(pedagio, setPedagio)} placeholder="R$ 0,00"/></label>
+          <label><span>Valor NF-e</span><input inputMode="decimal" value={valorNota} onChange={moneyInput(setValorNota)} onBlur={() => formatMoneyOnBlur(valorNota, setValorNota)} placeholder="R$ 0,00"/></label>
           <label><span>Seguro adicional</span><input inputMode="decimal" value={seguro} onChange={moneyInput(setSeguro)} onBlur={() => formatMoneyOnBlur(seguro, setSeguro)} placeholder="Automático"/></label>
           <label><span>ICMS</span><div className="quote-unit"><input inputMode="decimal" value={icms} onChange={percentInput(setIcms)}/><b>%</b></div></label>
           <label><span>Margem desejada</span><div className="quote-unit"><input inputMode="decimal" value={simMargem} onChange={percentInput(setSimMargem)} onBlur={() => formatPercentOnBlur(simMargem, setSimMargem)}/><b>%</b></div></label>
@@ -390,7 +404,40 @@ const SimuladorFrete = ({ onNavigate }) => {
   );
 
   // ── Render ───────────────────────────────────────────────────────────────────
-  return SimpleQuote();
+  const field = (label, value, setter, unit, mode = 'decimal') => ({
+    label, value, unit, mode,
+    onChange: mode === 'numeric' ? integerInput(setter) : moneyInput(setter),
+    onBlur: unit === '%' ? undefined : () => {
+      if (mode === 'numeric') return formatIntegerOnBlur(value, setter);
+      const amount = parseMoneyNumber(value);
+      setter(value.trim() ? amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '');
+    },
+  });
+  const vm = {
+    money: fmtR, percent: fmtPct, ready: hasKm && !!calc && !calcLoading,
+    loading: calcLoading, error: calcError, calc, simulation, pedagioNum,
+    vehicles: anttTabela, eixos, setEixos, tipoCarga, setTipoCarga, operacao, setOperacao,
+    vehicleLabel: tipoVeiculoLabel,
+    fields: [
+      field('Quilometragem', km, setKm, 'km', 'numeric'),
+      field('Pedágio', pedagio, setPedagio, 'R$'),
+      field('Valor NF-e', valorNota, setValorNota, 'R$'),
+      { ...field('Seguro terceiros', seguro, setSeguro, 'R$'), placeholder: 'Automático' },
+      field('ICMS', icms, setIcms, '%'),
+    ],
+    negotiation: [
+      { ...field('Valor do motorista', simMotorista, setSimMotorista, 'R$'), placeholder: calc ? fmtR(official.valorMotorista) : 'Padrão' },
+      { ...field('Valor do cliente', simCliente, setSimCliente, 'R$'), placeholder: calc ? fmtR(official.valorCliente) : 'Padrão' },
+      field('Margem desejada', simMargem, setSimMargem, '%'),
+    ],
+    scenarios: [
+      { title: 'Cotação padrão', short: 'Padrão', description: 'Referência da tabela ANTT', data: official },
+      { title: 'Alterar motorista', short: 'Motorista', description: 'Cliente calculado pela margem desejada', data: driverScenario },
+      { title: 'Motorista + cliente', short: 'Negociação', description: 'Resultado dos valores combinados', data: simulation },
+    ],
+    copy: copiarResumo, copied, useQuote: usarComoCotacao, goTrips: () => onNavigate('viagens'),
+  };
+  return <div className="quote-workspace"><QuoteLayoutPicker value={layout} onChange={changeLayout}/>{layout === 'original' ? SimpleQuote() : <QuoteLayouts model={layout} vm={vm}/>}</div>;
 };
 
 window.SimuladorFrete = SimuladorFrete;
