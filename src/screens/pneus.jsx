@@ -4,6 +4,8 @@
 // Banco do cliente → somente SELECT (via backend).
 // MovimentaÃ§Ãµes → somente no banco prÃ³prio (tabela movimentacoes_pneus).
 
+import { confirmedVehicleLayout } from '../vehicle-layout-overrides.js';
+
 const { useState, useEffect, useRef } = React;
 
 // â”€â”€ Constantes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -326,7 +328,9 @@ function normalizeLayoutText(value) {
     .trim();
 }
 
-function inferLayoutKey(veiculo, pneusNoVeiculo = []) {
+export function inferLayoutKey(veiculo, pneusNoVeiculo = []) {
+  const confirmed = confirmedVehicleLayout(veiculo);
+  if (confirmed) return confirmed;
   const text = normalizeLayoutText([veiculo?.tipo, veiculo?.modelo, veiculo?.nome, veiculo?.label].filter(Boolean).join(" "));
   const mountedPositions = pneusNoVeiculo.map((pneu) => normalizeLayoutText(pneu.posicao)).join(" ");
   if (/4ET/.test(mountedPositions)) return "CARRETA_4_EIXOS";

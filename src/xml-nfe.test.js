@@ -15,6 +15,13 @@ const xml = `<?xml version="1.0"?>
 </infNFe></NFe></nfeProc>`;
 
 describe("XML de NF-e", () => {
+  it("uses liquid weight when gross weight is absent and sums multiple volumes", () => {
+    const input = xml.replace('<pesoB>10.000</pesoB>', '').replace('</transp>', '<vol><pesoL>2.500</pesoL></vol></transp>');
+    expect(parseNfeXml(input, 'liquido.xml', Parser).pesoConsiderado).toBe(10.5);
+  });
+  it("rejects malformed XML", () => {
+    expect(() => parseNfeXml('<nfeProc><broken>', 'broken.xml', Parser)).toThrow(/malformado/);
+  });
   it("extrai nota, produtos, NCM e peso com namespace", () => {
     const note = parseNfeXml(xml, "nota.xml", Parser);
     expect(note).toMatchObject({ numero: "42", serie: "1", valorNota: 440, pesoConsiderado: 10, cliente: "Cliente Teste", clienteDocumento: "12345678000190", modalidadeFrete: "0", tomadorCte: "Fornecedor Teste" });
