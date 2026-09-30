@@ -1,3 +1,4 @@
+import { QuoteHistoryGrid } from './quote-history-grid.jsx';
 const { useEffect, useState } = React;
 
 const CV2_STATUS = {
@@ -21,7 +22,6 @@ const CV2_FINANCIAL = {
 };
 
 const CV2_TODAY = () => new Date().toISOString().slice(0, 10);
-const CV2_UFS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"];
 const cv2Money = (value) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const cv2Weight = (value) => `${Number(value || 0).toLocaleString("pt-BR")} kg`;
 const cv2Date = (value) => value ? new Date(`${String(value).slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR") : "—";
@@ -88,10 +88,10 @@ function Cv2TripBilling({ financeiro }) {
   </section>;
 }
 
-function Cv2Modal({ title, subtitle, onClose, children, wide = false }) {
+function Cv2Modal({ title, subtitle, onClose, children, wide = false, className = "" }) {
   return (
     <div className="cv2-overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className={`cv2-modal ${wide ? "wide" : ""}`} role="dialog" aria-modal="true">
+      <section className={`cv2-modal ${wide ? "wide" : ""} ${className}`} role="dialog" aria-modal="true">
         <header><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="cv2-icon-btn" onClick={onClose} aria-label="Fechar">×</button></header>
         {children}
       </section>
@@ -103,94 +103,27 @@ function Cv2Field({ label, required, hint, children, className = "" }) {
   return <label className={`cv2-field ${className}`}><span>{label}{required && <b> *</b>}</span>{children}{hint && <small>{hint}</small>}</label>;
 }
 
-function Cv2QuoteModal({ onClose, user, sellers = [] }) {
-  const userCommercial = cv2CommercialForUser(user);
-  const activeUserCommercial = sellers.includes(userCommercial) ? userCommercial : "";
-  const [form, setForm] = useState({ ufOrigem: "SC", municipioOrigem: "", ufDestino: "", municipioDestino: "", placa: "", material: "", vendedor: activeUserCommercial, meses: "24" });
+export function Cv2QuoteModal({ onClose }) {
   const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [sort, setSort] = useState({ field: "data", direction: "desc" });
-  const defaultColumnOrder = ["data", "origem", "destino", "clienteInicial", "material", "peso", "placa", "km", "valor", "valorMotorista", "clienteFinal"];
-  const [columnOrder, setColumnOrder] = useState(() => cv2StoredArray("cv2-quote-column-order-v2", defaultColumnOrder));
-  const [hiddenColumns, setHiddenColumns] = useState(() => cv2StoredArray("cv2-quote-hidden-columns-v2", []));
-  const [dragColumn, setDragColumn] = useState("");
-  const [compact, setCompact] = useState(true);
-  const update = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const [attempt, setAttempt] = useState(0);
+  const [paging, setPaging] = useState({ page: 1, pageSize: 25, filters: {}, sort: { field: "data", direction: "desc" } });
   useEffect(() => {
-    if (!form.ufOrigem || !form.ufDestino) { setResult(null); setLoading(false); return undefined; }
     let active = true;
-    const timer = setTimeout(async () => {
-      setError(""); setLoading(true);
-      try {
-        const data = await window.RB_API.consultarCotacaoFretesV2(form);
-        if (active) setResult(data);
-      } catch (err) {
-        if (active) { setResult(null); setError(cv2Error(err)); }
-      } finally {
-        if (active) setLoading(false);
-      }
-    }, 400);
-    return () => { active = false; clearTimeout(timer); };
-  }, [form.ufOrigem, form.municipioOrigem, form.ufDestino, form.municipioDestino, form.placa, form.material, form.vendedor, form.meses]);
-  useEffect(() => { window.localStorage.setItem("cv2-quote-column-order-v2", JSON.stringify(columnOrder)); }, [columnOrder]);
-  useEffect(() => { window.localStorage.setItem("cv2-quote-hidden-columns-v2", JSON.stringify(hiddenColumns)); }, [hiddenColumns]);
-  const changeSort = (field) => setSort((current) => ({ field, direction: current.field === field && current.direction === "asc" ? "desc" : "asc" }));
-  const sortedFreights = [...(result?.fretes || [])].sort((a, b) => {
-    const left = ["valor", "valorMotorista", "peso", "km"].includes(sort.field) ? Number(a[sort.field] || 0) : String(a[sort.field] || "").toLocaleLowerCase("pt-BR");
-    const right = ["valor", "valorMotorista", "peso", "km"].includes(sort.field) ? Number(b[sort.field] || 0) : String(b[sort.field] || "").toLocaleLowerCase("pt-BR");
-    const comparison = left < right ? -1 : left > right ? 1 : 0;
-    return sort.direction === "asc" ? comparison : -comparison;
-  });
-  const heading = (label, field) => <button type="button" onClick={() => changeSort(field)}>{label}<span>{sort.field === field ? (sort.direction === "asc" ? "▲" : "▼") : "↕"}</span></button>;
-  const columns = {
-    data: { label: "Data", render: (frete) => cv2Date(frete.data) },
-    origem: { label: "Origem", render: (frete) => frete.origem || "—" },
-    destino: { label: "Destino", render: (frete) => frete.destino || "—" },
-    clienteInicial: { label: "Cliente inicial", render: (frete) => frete.clienteInicial || "Não informado" },
-    clienteFinal: { label: "Cliente final", render: (frete) => frete.clienteFinal || "Não informado" },
-    material: { label: "Material", render: (frete) => frete.material || "Não informado" },
-    peso: { label: "Peso", render: (frete) => Number(frete.peso || 0) > 0 ? cv2Weight(frete.peso) : "—" },
-    placa: { label: "Placa", render: (frete) => <span className="cv2-plate">{frete.placa || "—"}</span> },
-    km: { label: "KM", render: (frete) => Number(frete.km || 0) > 0 ? `${Number(frete.km).toLocaleString("pt-BR")} km` : "—" },
-    valor: { label: "Valor do frete", render: (frete) => <strong>{cv2Money(frete.valor)}</strong> },
-    valorMotorista: { label: "Valor motorista", render: (frete) => Number(frete.valorMotorista || 0) > 0 ? <strong>{cv2Money(frete.valorMotorista)}</strong> : "—" },
-  };
-  const visibleColumns = columnOrder.filter((id) => !hiddenColumns.includes(id));
-  const moveColumn = (target) => {
-    if (!dragColumn || dragColumn === target) return;
-    setColumnOrder((current) => {
-      const next = current.filter((id) => id !== dragColumn);
-      next.splice(next.indexOf(target), 0, dragColumn);
-      return next;
-    });
-    setDragColumn("");
-  };
-  const toggleColumn = (id) => setHiddenColumns((current) => current.includes(id) ? current.filter((item) => item !== id) : visibleColumns.length > 1 ? [...current, id] : current);
-  const resumo = result?.resumo || {};
-  return <Cv2Modal wide title="Histórico para cotação" subtitle="Filtre e ordene os fretes como em uma planilha. A lista é atualizada automaticamente." onClose={onClose}>
-    <form onSubmit={(event) => event.preventDefault()}>
-      <div className="cv2-modal-body cv2-quote-body">
-        <div className="cv2-quote-filters">
-          <Cv2Field label="UF de origem" required><select value={form.ufOrigem} onChange={(event) => update("ufOrigem", event.target.value)} required><option value="">Selecione</option>{CV2_UFS.map((uf) => <option key={uf}>{uf}</option>)}</select></Cv2Field>
-          <Cv2Field label="Município de origem"><input value={form.municipioOrigem} placeholder="Ex.: Morro da Fumaça" onChange={(event) => update("municipioOrigem", event.target.value)} /></Cv2Field>
-          <Cv2Field label="UF de destino" required><select value={form.ufDestino} onChange={(event) => update("ufDestino", event.target.value)} required><option value="">Selecione</option>{CV2_UFS.map((uf) => <option key={uf}>{uf}</option>)}</select></Cv2Field>
-          <Cv2Field label="Município de destino"><input value={form.municipioDestino} placeholder="Ex.: São Paulo" onChange={(event) => update("municipioDestino", event.target.value)} /></Cv2Field>
-          <Cv2Field label="Placa" hint="Opcional: deixe em branco para consultar toda a frota."><input value={form.placa} maxLength="7" placeholder="Ex.: ABC1D23" onChange={(event) => update("placa", event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} /></Cv2Field>
-          <Cv2Field label="Material carregado"><input value={form.material} placeholder="Todos os materiais" onChange={(event) => update("material", event.target.value)} /></Cv2Field>
-          <Cv2Field label="Vendedor" hint={activeUserCommercial ? "Preenchido pelo usuário logado." : "Sem vendedor selecionado, consulta todos."}><select value={form.vendedor} onChange={(event) => update("vendedor", event.target.value)}><option value="">Todos os vendedores</option>{sellers.map((item) => <option key={item} value={item}>{item}</option>)}</select></Cv2Field>
-          <Cv2Field label="Período"><select value={form.meses} onChange={(event) => update("meses", event.target.value)}><option value="6">Últimos 6 meses</option><option value="12">Últimos 12 meses</option><option value="24">Últimos 24 meses</option><option value="36">Últimos 36 meses</option></select></Cv2Field>
-        </div>
-        {error && <div className="cv2-alert error">{error}</div>}
-        {loading && <div className="cv2-quote-loading">Atualizando a lista...</div>}
-        {result && <section className="cv2-quote-sheet">
-          <div className="cv2-quote-sheet-head"><div><b>{resumo.quantidade || 0} frete(s)</b><span>Valor médio: {cv2Money(resumo.media)}</span></div><div className="cv2-quote-view-actions"><small>Arraste as colunas para reorganizar.</small><button type="button" className="btn" onClick={() => setCompact((value) => !value)}>{compact ? "Visual confortável" : "Visual compacto"}</button><details><summary>Colunas</summary><div>{defaultColumnOrder.map((id) => <label key={id}><input type="checkbox" checked={!hiddenColumns.includes(id)} onChange={() => toggleColumn(id)} />{columns[id].label}</label>)}<button type="button" onClick={() => { setColumnOrder(defaultColumnOrder); setHiddenColumns([]); }}>Restaurar padrão</button></div></details></div></div>
-          {!sortedFreights.length ? <div className="cv2-empty small"><b>Nenhum frete encontrado</b><span>Altere os filtros acima para ampliar a consulta.</span></div> : <div className={`cv2-quote-history ${compact ? "compact" : "comfortable"}`}><table><thead><tr>{visibleColumns.map((id) => <th key={id} draggable onDragStart={() => setDragColumn(id)} onDragOver={(event) => event.preventDefault()} onDrop={() => moveColumn(id)} className={dragColumn === id ? "dragging" : ""}>{heading(columns[id].label, id)}</th>)}</tr></thead><tbody>{sortedFreights.map((frete, index) => <tr key={`${frete.id}-${index}`}>{visibleColumns.map((id) => <td key={id}>{columns[id].render(frete)}</td>)}</tr>)}</tbody></table></div>}
-        </section>}
-        {!result && !loading && !error && <div className="cv2-empty small"><b>Selecione a UF de destino</b><span>Assim que os filtros forem preenchidos, a lista será carregada automaticamente.</span></div>}
-      </div>
-      <footer className="cv2-modal-actions"><span>{loading ? "Atualizando..." : result ? `${resumo.quantidade || 0} frete(s) localizado(s)` : "Aguardando os filtros"}</span><button type="button" className="btn primary" onClick={onClose}>Fechar</button></footer>
-    </form>
+    setLoading(true); setError(""); setResult(null);
+    window.RB_API.consultarCotacaoFretesV2({ meses: "24", ...paging })
+      .then(data => { if (active) setResult(data); })
+      .catch(err => { if (active) setError(cv2Error(err)); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [attempt, paging]);
+  return <Cv2Modal wide className="cv2-quote-modal" title="Histórico para cotação" onClose={onClose}>
+    <div className="cv2-modal-body cv2-quote-body">
+      {loading && <div role="status" className="cv2-quote-loading">Carregando histórico de fretes...</div>}
+      {error && <div role="alert" className="cv2-alert error">{error} <button type="button" className="btn" onClick={() => setAttempt(value => value + 1)}>Tentar novamente</button></div>}
+      <QuoteHistoryGrid fretes={result?.fretes || []} loading={loading || Boolean(error)} paging={{ ...paging, hasMore: Boolean(result?.hasMore) }} onPagingChange={update => setPaging(current => ({ ...current, ...update }))} />
+    </div>
   </Cv2Modal>;
 }
 
@@ -264,22 +197,22 @@ function Cv2CargaForm({ initial, user, onClose, onSaved }) {
     finally { setSaving(false); }
   };
   return (
-    <Cv2Modal title={initial?.id ? `Editar ${initial.codigo}` : "Cadastrar carga"} subtitle="Registre as informações comerciais. O veículo será definido na próxima etapa." onClose={onClose} wide>
+    <Cv2Modal title={initial?.id ? `Editar ${initial.codigo}` : "Cadastrar carga"} subtitle="Preencha o que tiver disponível. Você pode salvar e completar os dados depois." onClose={onClose} wide>
       <form onSubmit={save}>
         <div className="cv2-modal-body">
           {error && <div className="cv2-alert error">{error}</div>}
           <div className="cv2-section-title"><span>1</span><div><b>Clientes e negociação</b><small>Informe onde a carga começa, onde será entregue e quem pagará o frete.</small></div></div>
           <div className="cv2-grid four">
-            <Cv2Field label="Data" required><input type="date" value={form.data} onChange={(e) => set("data", e.target.value)} required /></Cv2Field>
-            <Cv2Autocomplete label="Cliente inicial" hint="Onde a carga começa" required value={form.cliente} onChange={(value) => set("cliente", value)}
+            <Cv2Field label="Data"><input type="date" value={form.data} onChange={(e) => set("data", e.target.value)} /></Cv2Field>
+            <Cv2Autocomplete label="Cliente inicial" hint="Onde a carga começa" value={form.cliente} onChange={(value) => set("cliente", value)}
               search={window.RB_API.searchViagemClientes} placeholder="Onde a carga começa"
               onSelect={(item) => setForm((current) => ({ ...current, cliente: item.nome, origem: item.cidade || current.origem, ufOrigem: item.uf || current.ufOrigem, condicaoPagamento: item.condicaoPagamento || current.condicaoPagamento, vendedor: userCommercial || item.vendedor || current.vendedor }))}
               renderOption={(item) => <><strong>{item.nome}</strong><span>{[item.documento, item.cidade, item.uf].filter(Boolean).join(" · ")}</span></>} />
-            <Cv2Autocomplete label="Cliente final" hint="Onde a carga será entregue" required value={form.clienteFinal} onChange={(value) => set("clienteFinal", value)}
+            <Cv2Autocomplete label="Cliente final" hint="Onde a carga será entregue" value={form.clienteFinal} onChange={(value) => set("clienteFinal", value)}
               search={window.RB_API.searchViagemClientes} placeholder="Onde a carga será entregue"
               onSelect={(item) => setForm((current) => ({ ...current, clienteFinal: item.nome, destino: item.cidade || current.destino, ufDestino: item.uf || current.ufDestino }))}
               renderOption={(item) => <><strong>{item.nome}</strong><span>{[item.documento, item.cidade, item.uf].filter(Boolean).join(" · ")}</span></>} />
-            <Cv2Autocomplete label="Tomador do serviço" hint="Quem vai pagar o frete" required value={form.tomadorServico} onChange={(value) => set("tomadorServico", value)}
+            <Cv2Autocomplete label="Tomador do serviço" hint="Quem vai pagar o frete" value={form.tomadorServico} onChange={(value) => set("tomadorServico", value)}
               search={window.RB_API.searchViagemClientes} placeholder="Quem vai pagar o frete"
               onSelect={(item) => setForm((current) => ({ ...current, tomadorServico: item.nome, condicaoPagamento: item.condicaoPagamento || current.condicaoPagamento, vendedor: userCommercial || item.vendedor || current.vendedor }))}
               renderOption={(item) => <><strong>{item.nome}</strong><span>{[item.documento, item.cidade, item.uf].filter(Boolean).join(" · ")}</span></>} />
@@ -289,20 +222,20 @@ function Cv2CargaForm({ initial, user, onClose, onSaved }) {
                 search={window.RB_API.searchViagemVendedores} placeholder="Selecione ou digite o vendedor"
                 onSelect={(item) => set("vendedor", item.nome)} renderOption={(item) => <><strong>{item.nome}</strong>{item.fantasia && <span>{item.fantasia}</span>}</>} />}
             <Cv2Field label="Condição de pagamento"><input value={form.condicaoPagamento} onChange={(e) => set("condicaoPagamento", e.target.value)} placeholder="Ex.: 30 dias" /></Cv2Field>
-            <Cv2Field label="Valor do cliente (R$)" required><input type="number" min="0" step="0.01" value={form.valorCliente} onChange={(e) => set("valorCliente", e.target.value)} required /></Cv2Field>
+            <Cv2Field label="Valor do cliente (R$)"><input type="number" min="0" step="0.01" value={form.valorCliente} onChange={(e) => set("valorCliente", e.target.value)} /></Cv2Field>
           </div>
           <div className="cv2-section-title"><span>2</span><div><b>Rota e mercadoria</b><small>Esses dados alimentarão a consulta de fretes já realizados.</small></div></div>
           <div className="cv2-grid four">
-            <Cv2Autocomplete label="Cidade de origem" required value={form.origem} onChange={(value) => set("origem", value)}
+            <Cv2Autocomplete label="Cidade de origem" value={form.origem} onChange={(value) => set("origem", value)}
               search={window.RB_API.searchCidades} placeholder="Selecione ou digite a cidade"
               onSelect={(item) => setForm((current) => ({ ...current, origem: item.nome, ufOrigem: item.uf || current.ufOrigem }))}
               renderOption={(item) => <><strong>{item.nome}</strong><span>{item.uf || "UF não informada"}</span></>} />
-            <Cv2Field label="UF origem" required><input maxLength="2" value={form.ufOrigem} onChange={(e) => set("ufOrigem", e.target.value.toUpperCase())} required /></Cv2Field>
-            <Cv2Autocomplete label="Cidade de destino" required value={form.destino} onChange={(value) => set("destino", value)}
+            <Cv2Field label="UF origem"><input maxLength="2" value={form.ufOrigem} onChange={(e) => set("ufOrigem", e.target.value.toUpperCase())} /></Cv2Field>
+            <Cv2Autocomplete label="Cidade de destino" value={form.destino} onChange={(value) => set("destino", value)}
               search={window.RB_API.searchCidades} placeholder="Selecione ou digite a cidade"
               onSelect={(item) => setForm((current) => ({ ...current, destino: item.nome, ufDestino: item.uf || current.ufDestino }))}
               renderOption={(item) => <><strong>{item.nome}</strong><span>{item.uf || "UF não informada"}</span></>} />
-            <Cv2Field label="UF destino" required><input maxLength="2" value={form.ufDestino} onChange={(e) => set("ufDestino", e.target.value.toUpperCase())} required /></Cv2Field>
+            <Cv2Field label="UF destino"><input maxLength="2" value={form.ufDestino} onChange={(e) => set("ufDestino", e.target.value.toUpperCase())} /></Cv2Field>
             <Cv2Field label="Material"><input value={form.material} onChange={(e) => set("material", e.target.value)} placeholder="Mercadoria transportada" /></Cv2Field>
             <Cv2Field label="Peso (kg)"><input type="number" min="0" step="0.001" value={form.peso} onChange={(e) => set("peso", e.target.value)} /></Cv2Field>
           </div>
@@ -328,12 +261,23 @@ function Cv2CargaForm({ initial, user, onClose, onSaved }) {
   );
 }
 
-function Cv2ViagemForm({ initial, initialCargaId, cargas, onClose, onSaved, onCreateCarga }) {
+export function Cv2ViagemForm({ initial, initialCargaId, cargas, onClose, onSaved, onCreateCarga }) {
   const [form, setForm] = useState(() => initial
     ? { ...emptyViagem(), ...initial, cargaIds: (initial.cargas || []).map((carga) => carga.id), docs: { ...emptyViagem().docs, ...(initial.docs || {}) } }
     : { ...emptyViagem(), cargaIds: initialCargaId ? [initialCargaId] : [] });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [numberAttempt, setNumberAttempt] = useState(0);
+  const [numberError, setNumberError] = useState("");
+  useEffect(() => {
+    if (initial?.id) return;
+    let active = true;
+    setNumberError("");
+    window.RB_API.reservarNumeroViagemV2()
+      .then(result => { if (active) setForm(current => ({ ...current, numero: result.numero, reservaNumero: result.reservaNumero })); })
+      .catch(err => { if (active) setNumberError(cv2Error(err)); });
+    return () => { active = false; };
+  }, [initial?.id, numberAttempt]);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const isFrota = String(form.tipoPropriedade).toUpperCase() === "FROTA";
   const chooseVehicle = (item) => setForm((current) => ({ ...current, placa: item.placa, tipoPropriedade: item.ownershipType,
@@ -343,20 +287,23 @@ function Cv2ViagemForm({ initial, initialCargaId, cargas, onClose, onSaved, onCr
     cnh: item.cnh || "", antt: item.antt || current.antt, contaDeposito: item.contaDeposito || "", chavePix: item.chavePix || "" }));
   const toggleCarga = (id) => set("cargaIds", form.cargaIds.includes(id) ? form.cargaIds.filter((item) => item !== id) : [...form.cargaIds, id]);
   const save = async (event) => {
-    event.preventDefault(); setError(""); setSaving(true);
+    event.preventDefault();
+    if (!initial?.id && !form.reservaNumero) return;
+    setError(""); setSaving(true);
     try { onSaved(initial?.id ? await window.RB_API.updateViagemV2(initial.id, form) : await window.RB_API.createViagemV2(form)); }
     catch (err) { setError(cv2Error(err)); }
     finally { setSaving(false); }
   };
-  return <Cv2Modal title={initial?.id ? `Editar viagem ${initial.numero}` : "Programar veículo"} subtitle={initial?.id ? "Atualize os dados operacionais e organize as cargas desta viagem." : "Escolha o veículo e vincule uma ou mais cargas disponíveis."} onClose={onClose} wide>
+  return <Cv2Modal title={initial?.id ? `Editar viagem ${initial.numero}` : "Programar veículo"} subtitle="Todos os campos são opcionais. Salve agora e complete os dados quando estiverem disponíveis." onClose={onClose} wide>
     <form onSubmit={save}>
       <div className="cv2-modal-body">
         {error && <div className="cv2-alert error">{error}</div>}
-        <div className="cv2-section-title"><span>1</span><div><b>Viagem e veículo</b><small>O identificador é criado automaticamente se ficar em branco.</small></div></div>
+        {numberError && <div role="alert" className="cv2-alert error">{numberError} <button type="button" className="btn" onClick={() => setNumberAttempt(value => value + 1)}>Tentar gerar novamente</button></div>}
+        <div className="cv2-section-title"><span>1</span><div><b>Viagem e veículo</b><small>O identificador é gerado automaticamente e não pode ser alterado.</small></div></div>
         <div className="cv2-grid four">
-          <Cv2Field label="Identificador da viagem"><input value={form.numero} onChange={(e) => set("numero", e.target.value)} placeholder="Automático: V-ANO-NÚMERO" /></Cv2Field>
-          <Cv2Field label="Data" required><input type="date" value={form.data} onChange={(e) => set("data", e.target.value)} required /></Cv2Field>
-          <Cv2Autocomplete label="Placa do veículo" required value={form.placa} onChange={(value) => set("placa", value.toUpperCase())}
+          <Cv2Field label="Identificador da viagem"><input value={form.numero} readOnly aria-readonly="true" placeholder={numberError ? "Número indisponível" : "Gerando número..."} /></Cv2Field>
+          <Cv2Field label="Data"><input type="date" value={form.data} onChange={(e) => set("data", e.target.value)} /></Cv2Field>
+          <Cv2Autocomplete label="Placa do veículo" value={form.placa} onChange={(value) => set("placa", value.toUpperCase())}
             search={window.RB_API.searchViagemPlacas} onSelect={chooseVehicle} placeholder="Digite a placa"
             renderOption={(item) => <div className="cv2-vehicle-option"><strong>{item.placa}</strong><span>{item.ownershipType === "FROTA" ? "FROTA" : "TERCEIRO"}</span><em>{item.motorista || item.veiculo || "Sem motorista vinculado"}</em></div>} />
           <Cv2Field label="KM previsto"><input type="number" min="0" step="0.1" value={form.km} onChange={(e) => set("km", e.target.value)} /></Cv2Field>
@@ -364,7 +311,7 @@ function Cv2ViagemForm({ initial, initialCargaId, cargas, onClose, onSaved, onCr
         {form.tipoPropriedade && <div className={`cv2-alert ${isFrota ? "success" : "info"}`}><b>Veículo {isFrota ? "de frota" : "terceiro"}.</b> {isFrota ? "Motorista contratado: valor do motorista não é necessário." : "Informe os dados e o valor do motorista."}</div>}
         <div className="cv2-section-title"><span>2</span><div><b>Motorista, ANTT e pagamento</b><small>Ao escolher a placa, os dados cadastrados são preenchidos automaticamente.</small></div></div>
         <div className="cv2-grid three">
-          <Cv2Autocomplete label="Motorista" required={!isFrota} value={form.motorista} onChange={(value) => set("motorista", value)}
+          <Cv2Autocomplete label="Motorista" value={form.motorista} onChange={(value) => set("motorista", value)}
             search={window.RB_API.searchViagemMotoristas} onSelect={chooseDriver} placeholder="Nome do motorista"
             renderOption={(item) => <><strong>{item.nome}</strong><span>{[item.cnh && `CNH ${item.cnh}`, item.numeroMotorista].filter(Boolean).join(" · ")}</span></>} />
           <Cv2Field label="Celular / número"><input value={form.numeroMotorista} onChange={(e) => set("numeroMotorista", e.target.value)} /></Cv2Field>
@@ -372,12 +319,12 @@ function Cv2ViagemForm({ initial, initialCargaId, cargas, onClose, onSaved, onCr
           <Cv2Field label="ANTT / RNTRC"><input value={form.antt} onChange={(e) => set("antt", e.target.value)} /></Cv2Field>
           <Cv2Field label="Conta para depósito"><input value={form.contaDeposito} onChange={(e) => set("contaDeposito", e.target.value)} /></Cv2Field>
           <Cv2Field label="Chave Pix"><input value={form.chavePix} onChange={(e) => set("chavePix", e.target.value)} /></Cv2Field>
-          {!isFrota && <Cv2Field label="Valor do motorista (R$)" required><input type="number" min="0" step="0.01" value={form.valorMotorista} onChange={(e) => set("valorMotorista", e.target.value)} required /></Cv2Field>}
+          {!isFrota && <Cv2Field label="Valor do motorista (R$)"><input type="number" min="0" step="0.01" value={form.valorMotorista} onChange={(e) => set("valorMotorista", e.target.value)} /></Cv2Field>}
           <Cv2Field label="Link da rota no Google Maps"><input value={form.rotaMapsUrl} onChange={(e) => set("rotaMapsUrl", e.target.value)} /></Cv2Field>
         </div>
         <div className="cv2-section-title cv2-section-title-action"><span>3</span><div><b>Cargas desta viagem</b><small>Selecione todas as cargas que irão no mesmo veículo.</small></div>{initial?.id && <button type="button" className="btn" onClick={() => onCreateCarga(initial)}>+ Cadastrar carga nesta viagem</button>}</div>
         <div className="cv2-load-picker">
-          {!cargas.length && <div className="cv2-empty small"><b>Nenhuma carga aguardando veículo.</b><span>Cadastre uma carga antes de programar a viagem.</span></div>}
+          {!cargas.length && <div className="cv2-empty small"><b>Nenhuma carga aguardando veículo.</b><span>Você pode salvar a viagem e vincular as cargas depois.</span></div>}
           {cargas.map((carga) => <label key={carga.id} className={form.cargaIds.includes(carga.id) ? "selected" : ""}>
             <input type="checkbox" checked={form.cargaIds.includes(carga.id)} onChange={() => toggleCarga(carga.id)} />
             <div><strong>{carga.codigo} · {carga.cliente}</strong><span>{carga.origem}/{carga.ufOrigem} → {carga.destino}/{carga.ufDestino}</span></div>
@@ -390,12 +337,12 @@ function Cv2ViagemForm({ initial, initialCargaId, cargas, onClose, onSaved, onCr
         </div></details>
         <Cv2Field label="Observações"><textarea rows="3" value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} /></Cv2Field>
       </div>
-      <footer className="cv2-modal-actions"><span>{form.cargaIds.length} carga(s) selecionada(s)</span><div><button type="button" className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={saving || !form.cargaIds.length}>{saving ? "Salvando..." : initial?.id ? "Salvar alterações" : "Criar viagem"}</button></div></footer>
+      <footer className="cv2-modal-actions"><span>{form.cargaIds.length} carga(s) selecionada(s)</span><div><button type="button" className="btn" onClick={onClose}>Cancelar</button><button className="btn primary" disabled={saving || (!initial?.id && !form.reservaNumero)}>{saving ? "Salvando..." : initial?.id ? "Salvar alterações" : "Criar viagem"}</button></div></footer>
     </form>
   </Cv2Modal>;
 }
 
-function Cv2CteModal({ carga, onClose, onSaved }) {
+export function Cv2CteModal({ carga, onClose, onSaved }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [documents, setDocuments] = useState(carga.documentos || []);
@@ -411,7 +358,20 @@ function Cv2CteModal({ carga, onClose, onSaved }) {
   const select = (item) => {
     const next = [{ tipo: "CT-e", numero: item.numero, chave: item.chave, observacoes: item.observacoes }];
     (item.notasDocumentos || []).forEach((nota) => next.push({ tipo: "NF-e", numero: String(nota.numero || ""), chave: nota.chave || "", observacoes: `Vinculada ao CT-e ${item.numero}` }));
-    setDocuments(next); setResults([]);
+    setDocuments(current => {
+      const merged = [...current];
+      for (const doc of next) {
+        const exists = merged.some(existing => {
+          const type = value => String(value || "").toUpperCase().replace(/[^A-Z]/g, "");
+          if (type(existing.tipo) !== type(doc.tipo)) return false;
+          if (existing.chave && doc.chave) return existing.chave === doc.chave;
+          return Boolean(doc.numero) && String(existing.numero) === String(doc.numero);
+        });
+        if (!exists) merged.push(doc);
+      }
+      return merged;
+    });
+    setResults([]); setQuery("");
   };
   const save = async () => {
     setSaving(true); setError("");
@@ -419,18 +379,18 @@ function Cv2CteModal({ carga, onClose, onSaved }) {
     catch (err) { setError(cv2Error(err)); }
     finally { setSaving(false); }
   };
-  return <Cv2Modal title={`Vincular CT-e · ${carga.codigo}`} subtitle={`${carga.cliente} · ${carga.origem}/${carga.ufOrigem} → ${carga.destino}/${carga.ufDestino}`} onClose={onClose}>
+  return <Cv2Modal title={`Vincular CT-es · ${carga.codigo}`} subtitle={`${carga.cliente} · ${carga.origem}/${carga.ufOrigem} → ${carga.destino}/${carga.ufDestino}`} onClose={onClose}>
     <div className="cv2-modal-body">
       {error && <div className="cv2-alert error">{error}</div>}
-      <Cv2Field label="Número do CT-e no ERP" hint="A nota fiscal vinculada ao CT-e também será adicionada.">
+      <Cv2Field label="Número do CT-e no ERP" hint="Pesquise e adicione quantos CT-es precisar. Os documentos já vinculados serão mantidos, e as NF-es serão incluídas automaticamente.">
         <div className="cv2-search-row"><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); search(); } }} placeholder="Ex.: 4030" /><button type="button" className="btn" onClick={search} disabled={loading}>{loading ? "Buscando..." : "Pesquisar"}</button></div>
       </Cv2Field>
       {results.map((item) => <button type="button" className="cv2-cte-result" key={`${item.serie}-${item.numero}`} onClick={() => select(item)}>
         <div><strong>CT-e {item.numero}</strong><span>{item.cliente}</span></div><div><span>{item.placa || "Sem placa"}</span><b>{(item.notas || []).length} NF-e</b></div>
       </button>)}
-      <div className="cv2-doc-list"><b>Documentos que serão vinculados</b>
+      <div className="cv2-doc-list"><b>Documentos da carga · {documents.filter(doc => String(doc.tipo).toUpperCase().replace(/[^A-Z]/g, "") === "CTE").length} CT-e(s)</b>
         {!documents.length && <span>Nenhum documento selecionado.</span>}
-        {documents.map((doc, index) => <div key={`${doc.tipo}-${doc.numero}-${index}`}><span className="cv2-doc-type">{doc.tipo}</span><strong>{doc.numero || "Sem número"}</strong><small>{doc.chave ? `Chave ${doc.chave}` : doc.observacoes}</small><button type="button" onClick={() => setDocuments(documents.filter((_, i) => i !== index))}>×</button></div>)}
+        {documents.map((doc, index) => <div key={`${doc.tipo}-${doc.numero}-${index}`}><span className="cv2-doc-type">{doc.tipo}</span><strong>{doc.numero || "Sem número"}</strong><small>{doc.chave ? `Chave ${doc.chave}` : doc.observacoes}</small><button type="button" aria-label={`Remover ${doc.tipo} ${doc.numero}`} onClick={() => setDocuments(current => current.filter((_, i) => i !== index))}>×</button></div>)}
       </div>
     </div>
     <footer className="cv2-modal-actions"><button type="button" className="btn" onClick={onClose}>Cancelar</button><button type="button" className="btn primary" onClick={save} disabled={saving || !documents.length}>{saving ? "Salvando..." : "Vincular documentos"}</button></footer>
@@ -531,7 +491,7 @@ function Cv2TripDetails({ viagem, onClose, onLinkCte }) {
       <div className="cv2-detail-grid"><div><span>Operação</span><Cv2Status value={viagem.situacao} vehicleLinked={Boolean(viagem.placa)} /></div><div><span>Financeiro</span><Cv2FinancialStatus value={viagem.financeiro} /></div><div><span>Motorista</span><b>{viagem.motorista || "—"}</b></div><div><span>KM previsto</span><b>{viagem.km ?? "—"}</b></div><div><span>ANTT / RNTRC</span><b>{viagem.antt || "—"}</b></div><div><span>Celular / CNH</span><b>{[viagem.numeroMotorista, viagem.cnh].filter(Boolean).join(" · ") || "—"}</b></div></div>
       <Cv2TripBilling financeiro={viagem.financeiro} />
       <h3 className="cv2-subtitle">Cargas vinculadas</h3>
-      <div className="cv2-linked-loads">{viagem.cargas.map((carga) => { const hasCte = (carga.documentos || []).some((doc) => String(doc.tipo || "").toUpperCase().includes("CT")); return <div key={carga.id}><div><strong>{carga.codigo} · {carga.cliente}</strong><span>{carga.origem}/{carga.ufOrigem} → {carga.destino}/{carga.ufDestino}</span></div><div className="cv2-linked-statuses"><Cv2Status value={carga.status} /><Cv2FinancialStatus value={carga.financeiro} /><button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => onLinkCte(carga)}><Icon name="file" size={13} /> {hasCte ? "Documentos / CT-e" : "Vincular CT-e"}</button><button className="btn" onClick={() => cv2PrintLoad(carga)}>Imprimir carga</button></div></div>; })}</div>
+      <div className="cv2-linked-loads">{viagem.cargas.map((carga) => { const hasCte = (carga.documentos || []).some((doc) => String(doc.tipo || "").toUpperCase().includes("CT")); return <div key={carga.id}><div><strong>{carga.codigo} · {carga.cliente}</strong><span>{carga.origem}/{carga.ufOrigem} → {carga.destino}/{carga.ufDestino}</span><small>CT-es: {cv2CteNumbers(carga) || "Nenhum vinculado"}</small></div><div className="cv2-linked-statuses"><Cv2Status value={carga.status} /><Cv2FinancialStatus value={carga.financeiro} /><button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => onLinkCte(carga)}><Icon name="file" size={13} /> {hasCte ? "Adicionar / ver CT-es" : "Vincular CT-e"}</button><button className="btn" onClick={() => cv2PrintLoad(carga)}>Imprimir carga</button></div></div>; })}</div>
     </div>
     <footer className="cv2-modal-actions"><button className="btn" onClick={onClose}>Fechar</button><button className="btn primary" onClick={() => cv2PrintTrip(viagem)}>Imprimir folha da viagem</button></footer>
   </Cv2Modal>;
@@ -672,7 +632,7 @@ const CargasViagensV2 = ({ user }) => {
     const hasCte = carga.documentos.some((doc) => doc.tipo.toUpperCase().includes("CT"));
     return <div className="cv2-row-actions">
       {carga.status === "aguardando_viagem" && <button className="btn primary" onClick={() => openViagemForm(carga.id)}>Programar veículo</button>}
-      {carga.viagemId && <button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => setModal({ type: "cte", item: carga })}>{hasCte ? "Documentos / CT-e" : "Vincular CT-e"}</button>}
+      {carga.viagemId && <button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => setModal({ type: "cte", item: carga })}>{hasCte ? "Adicionar / ver CT-es" : "Vincular CT-e"}</button>}
       <details className="cv2-more"><summary aria-label="Mais ações">•••</summary><div>
         <button onClick={() => cv2PrintLoad(carga)}><Icon name="file" size={13} /> Imprimir folha da carga</button>
         <button onClick={() => setModal({ type: "carga", item: carga })}>Editar carga</button>
@@ -698,9 +658,9 @@ const CargasViagensV2 = ({ user }) => {
       <button className="cv2-kpi delivered" onClick={() => useStatusShortcut("entregue")}><span>Entregues</span><b>{summary.viagens_entregues || 0}</b></button>
       <button className="cv2-kpi paid" onClick={() => useStatusShortcut("", "quitado")}><span>Quitadas</span><b>{summary.viagens_quitadas || 0}</b></button>
     </div>}
-    <div className="cv2-tabbar"><div className="cv2-tabs"><button className={tab === "cargas" ? "active" : ""} onClick={() => { setTab("cargas"); setPage(1); setStatus("aguardando_viagem"); setFinancialStatus(""); setQuery(""); }}>Cargas <small>{summary.cargas || 0}</small></button><button className={tab === "viagens" ? "active" : ""} onClick={() => { setTab("viagens"); setPage(1); setStatus("aguardando_cte"); setFinancialStatus(""); setQuery(""); }}>Viagens <small>{summary.viagens || 0}</small></button></div></div>
+    <div className="cv2-tabbar"><div className="cv2-tabs"><button className={tab === "cargas" ? "active" : ""} onClick={() => { setTab("cargas"); setPage(1); setStatus("aguardando_viagem"); setFinancialStatus(""); setQuery(""); }}>Cargas <small>{summary.cargas || 0}</small></button><button className={tab === "viagens" ? "active" : ""} onClick={() => { setTab("viagens"); setPage(1); setStatus(""); setFinancialStatus(""); setQuery(""); }}>Viagens <small>{summary.viagens || 0}</small></button></div></div>
     <div className="cv2-seller-bar"><label><span>Vendedor exibido</span><select value={seller} onChange={(event) => { setPage(1); setSeller(event.target.value); }}><option value="">Todos os vendedores ativos</option>{(filterOptions.vendedores || []).map((item) => <option key={item} value={item}>{item}</option>)}</select></label>{seller ? <small>A tela está mostrando somente cargas e viagens de <b>{seller}</b>.</small> : <small>A tela está mostrando cargas e viagens de <b>todos os vendedores ativos</b>.</small>}</div>
-    <div className="cv2-toolbar"><div className="cv2-search"><Icon name="search" /><input value={query} onChange={(e) => { setPage(1); setQuery(e.target.value); }} placeholder={tab === "cargas" ? "Buscar carga, cliente, cidade, placa..." : "Buscar viagem, placa ou motorista..."} /></div><div className="cv2-filters">
+    <div className="cv2-toolbar"><div className="cv2-search"><Icon name="search" /><input value={query} onChange={(e) => { setPage(1); setQuery(e.target.value); }} placeholder={tab === "cargas" ? "Buscar carga, cliente, cidade, placa..." : "Buscar viagem, placa, motorista ou CT-e..."} /></div><div className="cv2-filters">
       <button className={!status && !financialStatus ? "active" : ""} onClick={() => { setPage(1); setStatus(""); setFinancialStatus(""); }}>Todas</button>
       {tab === "cargas" && <button className={status === "aguardando_viagem" ? "active" : ""} onClick={() => { setPage(1); setStatus("aguardando_viagem"); setFinancialStatus(""); }}>Somente carga</button>}
       <button className={status === "aguardando_cte" ? "active warning" : ""} onClick={() => { setPage(1); setStatus("aguardando_cte"); setFinancialStatus(""); }}>Aguardando CT-e</button>
@@ -733,8 +693,16 @@ const CargasViagensV2 = ({ user }) => {
     {modal?.type === "carga" && <Cv2CargaForm initial={modal.item} user={user} onClose={() => setModal(null)} onSaved={(item) => saved("carga", item)} />}
     {modal?.type === "viagem" && <Cv2ViagemForm initial={modal.item} initialCargaId={modal.initialCargaId} cargas={modal.cargas || []} onClose={() => setModal(null)} onCreateCarga={(viagem) => setModal({ type: "cargaViagem", viagem })} onSaved={(item) => { setModal(modal.item ? null : { type: "tripDone", item }); load(true); }} />}
     {modal?.type === "cargaViagem" && <Cv2CargaForm user={user} onClose={() => setModal({ type: "details", item: modal.viagem })} onSaved={(carga) => saveCargaInViagem(modal.viagem, carga).catch((err) => { setError(cv2Error(err)); setModal(null); })} />}
-    {modal?.type === "cte" && <Cv2CteModal carga={modal.item} onClose={() => setModal(null)} onSaved={() => { setModal(null); load(true); }} />}
-    {modal?.type === "details" && <Cv2TripDetails viagem={modal.item} onClose={() => setModal(null)} onLinkCte={(carga) => setModal({ type: "cte", item: carga })} />}
+    {modal?.type === "cte" && <Cv2CteModal carga={modal.item} onClose={() => setModal(modal.viagem ? { type: "details", item: modal.viagem } : null)} onSaved={async (carga) => {
+      setStatus(""); setFinancialStatus(""); setPage(1);
+      const viagemId = modal.viagem?.id || carga.viagemId;
+      if (viagemId) {
+        try { setModal({ type: "details", item: await window.RB_API.getViagemV2(viagemId) }); }
+        catch { setModal(null); setError("Documentos salvos. Não foi possível atualizar os detalhes da viagem; consulte a aba Viagens."); }
+      } else setModal(null);
+      load(true);
+    }} />}
+    {modal?.type === "details" && <Cv2TripDetails viagem={modal.item} onClose={() => setModal(null)} onLinkCte={(carga) => setModal({ type: "cte", item: carga, viagem: modal.item })} />}
     {modal?.type === "deleteCarga" && <Cv2DeleteModal type="carga" item={modal.item} onClose={() => setModal(null)} onDeleted={removeDone} />}
     {modal?.type === "deleteViagem" && <Cv2DeleteModal type="viagem" item={modal.item} onClose={() => setModal(null)} onDeleted={removeDone} />}
     {modal?.type === "tripDone" && <Cv2Modal title="Viagem criada com sucesso" subtitle={`${modal.item.numero} está aguardando a vinculação do CT-e.`} onClose={() => setModal(null)}><div className="cv2-modal-body"><div className="cv2-alert success"><b>{modal.item.placa}</b> · {modal.item.motorista || "Motorista não informado"}<br />{modal.item.cargas.length} carga(s) vinculada(s).</div></div><footer className="cv2-modal-actions"><button className="btn" onClick={() => setModal(null)}>Fechar</button><button className="btn primary" onClick={() => cv2PrintTrip(modal.item)}>Imprimir folha da viagem</button></footer></Cv2Modal>}

@@ -216,6 +216,7 @@ window.RB_API = {
   listViagensV2: (filters = {}) =>
     apiRequest(`/cargas-viagens-v2/viagens${buildQuery(filters)}`),
   getViagemV2: (id) => apiRequest(`/cargas-viagens-v2/viagens/${id}`),
+  reservarNumeroViagemV2: () => apiRequest("/cargas-viagens-v2/viagens/numero", { method: "POST" }),
   createViagemV2: (payload) =>
     apiRequest("/cargas-viagens-v2/viagens", {
       method: "POST",
