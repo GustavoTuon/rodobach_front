@@ -41,149 +41,89 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
 });
-const choose = (name) =>
-  fireEvent.click(screen.getByRole("button", { name: new RegExp(name) }));
-const change = (name, value) =>
-  fireEvent.change(screen.getByLabelText(name), { target: { value } });
 
-it("preserves quote inputs and calculated scenarios across all layouts, including original", async () => {
+const change = (name, value) => fireEvent.change(screen.getByLabelText(name), { target: { value } });
+const ready = () => screen.findByText('Cotação atualizada · valores em reais');
+
+it('reproduz a planilha com impostos nos custos e percentual bruto separado do líquido', async () => {
+  window.RB_API.calcularFrete.mockImplementation(async ({ tipoCarga }) => ({
+    ...response(tipoCarga === 'normal' ? 8928.42 : 7064.67), encargos: { seguroCarga: 0, seguroRC: 141.91 },
+  }));
   render(<window.SimuladorFrete onNavigate={vi.fn()} />);
-  choose("Planilha Rodobach");
-  change("Quilometragem", "1600");
-  change("Valor NF-e", "150000");
-  change("Valor do motorista", "9000");
-  change("Valor do cliente", "18000");
-  await screen.findByText("Cotação atualizada · valores em reais");
-  expect(window.RB_API.calcularFrete.mock.lastCall[0]).toMatchObject({
-    km: 1600,
-    valorNota: 150000,
-  });
-  const result = screen.getAllByText(/6\.740,38/);
-  expect(result.length).toBeGreaterThan(0);
-  choose("Comparativo");
-  expect(screen.getByLabelText("Quilometragem").value).toBe("1600");
-  expect(screen.getAllByText(/6\.740,38/).length).toBeGreaterThan(0);
-  choose("Cotação");
-  choose("Continuar");
-  expect(screen.getByLabelText("Valor NF-e").value).toBe("150000");
-  choose("Continuar");
-  expect(screen.getByLabelText("Valor do cliente").value).toBe("18000");
-  choose("Original");
-  expect(screen.getByLabelText("Valor NF-e").value).toBe("150000");
-  choose("Planilha Rodobach");
-  expect(screen.getByLabelText("Valor do motorista").value).toBe("9000");
-  expect(window.RB_API.calcularFrete).toHaveBeenCalledTimes(1);
-  expect(localStorage.getItem("rodobach_quote_layout")).toBe("sheet");
+  change('Quilometragem', '1000');
+  await ready();
+  const normal = screen.getByRole('region', { name: 'Cotação padrão · Normal' });
+  const high = screen.getByRole('region', { name: 'Cotação padrão · Alto desempenho' });
+  for (const amount of ['12.754,89', '247,76', '367,05', '9.543,22', '2.153,97', '1.539,17', '16,89%', '12,07%']) expect(normal.textContent).toContain(amount);
+  for (const amount of ['12.754,89', '196,04', '290,43', '7.551,14', '4.017,72', '3.531,25']) expect(high.textContent).toContain(amount);
+  change('Valor do motorista', '9000');
+  change('Percentual bruto', '25');
+  expect(screen.getByRole('region', { name: 'Alterar motorista · Normal' }).textContent).toContain('12.000,00');
+  change('Percentual bruto', '0');
+  expect(screen.getByRole('region', { name: 'Alterar motorista · Normal' }).textContent).toContain('9.000,00');
+  change('Percentual bruto', '100');
+  expect(screen.getByRole('button', { name: 'Copiar negociação' }).disabled).toBe(true);
 });
 
-it("disables quote actions on failure and recovers when the input changes", async () => {
-  vi.spyOn(console, "warn").mockImplementation(() => {});
-  window.RB_API.calcularFrete.mockRejectedValueOnce(new Error("offline"));
+it('uses only the approved layout despite an old stored preference and shows all four combinations', async () => {
+  localStorage.setItem('rodobach_quote_layout', 'sheet');
+  window.RB_API.calcularFrete.mockImplementation(async ({tipoCarga, operacao}) => response((tipoCarga === 'normal' ? 8700 : 7000) + (operacao === 'tac' ? 100 : 0)));
   render(<window.SimuladorFrete onNavigate={vi.fn()} />);
-  choose("Planilha Rodobach");
-  change("Quilometragem", "1600");
+  expect(screen.queryByRole('group', {name: 'Modelo da calculadora'})).toBeNull();
+  change('Quilometragem', '1600');
+  await ready();
+  expect(window.RB_API.calcularFrete).toHaveBeenCalledTimes(4);
+  const normal = screen.getByRole('region', {name: 'Cotação padrão · Normal'});
+  const high = screen.getByRole('region', {name: 'Cotação padrão · Alto desempenho'});
+  expect(normal.textContent).toContain('8.700,00');
+  expect(normal.textContent).toContain('8.800,00');
+  expect(high.textContent).toContain('7.000,00');
+  expect(high.textContent).toContain('7.100,00');
+  expect(normal.querySelector('details').open).toBe(false);
+  expect(within(normal).getAllByRole('article')).toHaveLength(2);
+  expect(normal.querySelectorAll('.ql-contract-prices dd')).toHaveLength(4);
+  expect(within(normal).queryByRole('button', { name: /Selecionar/ })).toBeNull();
+  fireEvent.click(within(normal).getByText('Ver impostos e demais custos'));
+  expect(normal.querySelector('details').open).toBe(true);
+  expect(within(normal).getAllByRole('cell').map(el => el.textContent)).toContain('R$ 361,77');
+});
+
+it('selects the combination for the trip without recalculating or losing input', async () => {
+  const navigate = vi.fn();
+  window.RB_API.calcularFrete.mockImplementation(async ({tipoCarga}) => response(tipoCarga === 'normal' ? 8700 : 7000));
+  render(<window.SimuladorFrete onNavigate={navigate} />);
+  change('Quilometragem', '1600');
+  change('Valor do cliente', '18000');
+  await ready();
+  change('Preço ANTT', 'alto_desempenho');
+  change('Contratação', 'tac');
+  expect(screen.getByLabelText('Valor do cliente').value).toBe('18000');
+  fireEvent.click(screen.getByRole('button', {name: 'Usar negociação na viagem'}));
+  expect(window.NT_SIM).toMatchObject({valorMotorista: 7000, valorCliente: 18000, tipoCarga: 'alto_desempenho', operacao: 'tac'});
+  expect(navigate).toHaveBeenCalledWith('viagens');
+  expect(window.RB_API.calcularFrete).toHaveBeenCalledTimes(4);
+});
+
+it('blocks incomplete comparisons and recovers on an input change', async () => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
+  window.RB_API.calcularFrete.mockRejectedValueOnce(new Error('offline'));
+  render(<window.SimuladorFrete onNavigate={vi.fn()} />);
+  change('Quilometragem', '1600');
   await screen.findByText(/Não foi possível calcular/);
-  expect(
-    screen.getByRole("button", { name: "Usar negociação na viagem" }).disabled,
-  ).toBe(true);
-  change("Quilometragem", "1700");
-  await screen.findByText("Cotação atualizada · valores em reais");
-  expect(
-    screen.getByRole("button", { name: "Copiar negociação" }).disabled,
-  ).toBe(false);
+  expect(screen.getByRole('button', {name: 'Usar negociação na viagem'}).disabled).toBe(true);
+  change('Quilometragem', '1700');
+  await ready();
+  expect(screen.getByRole('button', {name: 'Copiar negociação'}).disabled).toBe(false);
 });
 
-it("ignores a late API result for a previous distance", async () => {
-  let resolveOld;
-  window.RB_API.calcularFrete.mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        resolveOld = resolve;
-      }),
-  );
+it('ignores late results from the previous distance', async () => {
+  const resolvers = [];
+  window.RB_API.calcularFrete.mockImplementation(({km}) => km === 1600 ? new Promise(resolve => resolvers.push(resolve)) : Promise.resolve(response(9900)));
   render(<window.SimuladorFrete onNavigate={vi.fn()} />);
-  choose("Planilha Rodobach");
-  change("Quilometragem", "1600");
-  await waitFor(() => expect(resolveOld).toBeTruthy());
-  change("Quilometragem", "1700");
-  await screen.findByText("Cotação atualizada · valores em reais");
-  await act(async () => resolveOld(response(99999)));
-  expect(screen.queryByText(/99\.999,00/)).toBeNull();
-  expect(screen.getAllByText(/8\.700,00/).length).toBeGreaterThan(0);
-});
-
-it('keeps the standard quote independent and shares only the negotiated driver', async () => {
-  render(<window.SimuladorFrete onNavigate={vi.fn()}/>);
-  choose('Planilha Rodobach'); change('Quilometragem', '1600');
-  await screen.findByText('Cotação atualizada · valores em reais');
-  const standard = screen.getByRole('article', {name:'Cotação padrão'});
-  const baseline = standard.textContent;
-  expect(within(standard).queryAllByRole('textbox')).toHaveLength(0);
-  change('Valor do motorista', '9000'); change('Valor do cliente', '18000');
-  const deal = screen.getByRole('article', {name:'Motorista + cliente'});
-  expect(deal.textContent).toContain('9.000,00');
-  expect(deal.textContent).toContain('6.740,38');
-  const second = screen.getByRole('article', {name:'Alterar motorista'});
-  expect(second.textContent).toContain('15.689,00');
-  change('Margem desejada', '25');
-  expect(second.textContent).toContain('14.443,84');
-  expect(deal.textContent).toContain('6.740,38');
-  expect(standard.textContent).toBe(baseline);
-  expect(window.RB_API.calcularFrete).toHaveBeenCalledTimes(1);
-});
-
-it('keeps zero distinct from automatic values when blurring and switching layouts', async () => {
-  render(<window.SimuladorFrete onNavigate={vi.fn()}/>);
-  choose('Planilha Rodobach'); change('Quilometragem', '1600');
-  await screen.findByText('Cotação atualizada · valores em reais');
-  change('Valor do motorista', '0');
-  fireEvent.blur(screen.getByLabelText('Valor do motorista'));
-  expect(screen.getByLabelText('Valor do motorista').value).toBe('0,00');
-  expect(screen.getByRole('article', {name:'Motorista + cliente'}).textContent).toContain('R$ 0,00');
-  choose('Original');
-  fireEvent.blur(screen.getByLabelText('Valor pago ao motorista'));
-  choose('Planilha Rodobach');
-  expect(screen.getByLabelText('Valor do motorista').value).toBe('0,00');
-  change('Valor do motorista', '');
-  expect(screen.getByRole('article', {name:'Alterar motorista'}).textContent).toContain('Automático: R$ 8.700,00');
-});
-
-it('preserves insurance mode, vehicle, contract and ANTT selection across layouts', async () => {
-  render(<window.SimuladorFrete onNavigate={vi.fn()}/>);
-  choose('Planilha Rodobach'); change('Quilometragem', '1600');
-  change('Seguro terceiros', '0');
-  fireEvent.blur(screen.getByLabelText('Seguro terceiros'));
-  fireEvent.change(screen.getByLabelText('Contratação'), {target:{value:'tac'}});
-  fireEvent.change(screen.getByLabelText('Preço ANTT'), {target:{value:'alto_desempenho'}});
-  fireEvent.change(screen.getByLabelText('Veículo'), {target:{value:'3'}});
-  await screen.findByText('Cotação atualizada · valores em reais');
-  expect(window.RB_API.calcularFrete.mock.lastCall[0]).toMatchObject({eixos:3, operacao:'tac', tipoCarga:'alto_desempenho', seguroRCManual:0, margem:30});
-  expect(screen.getByText('Manual')).toBeTruthy();
-  expect(screen.getAllByText('↳ INSS patronal')).toHaveLength(3);
-  choose('Comparativo'); choose('Cotação guiada'); choose('Continuar');
-  expect(screen.getByLabelText('Seguro terceiros').value).toBe('0,00');
-  choose('Planilha Rodobach');
-  change('Seguro terceiros', '');
-  await screen.findByText('Cotação atualizada · valores em reais');
-  expect(window.RB_API.calcularFrete.mock.lastCall[0].seguroRCManual).toBe('');
-  expect(screen.getByText('Automático')).toBeTruthy();
-});
-
-it('copies and sends the negotiated scenario to trips', async () => {
-  const onNavigate=vi.fn();
-  const writeText=vi.fn().mockResolvedValue(undefined);
-  vi.stubGlobal('navigator', {...navigator, clipboard:{writeText}});
-  render(<window.SimuladorFrete onNavigate={onNavigate}/>);
-  choose('Planilha Rodobach'); change('Quilometragem', '1600');
-  change('Pedágio','50'); change('Valor do motorista','9000'); change('Valor do cliente','18000');
-  await screen.findByText('Cotação atualizada · valores em reais');
-  choose('Copiar negociação');
-  await screen.findByText('Copiado!');
-  expect(writeText.mock.calls[0][0]).toContain('Valor motorista simulado: R$ 9.000,00');
-  expect(writeText.mock.calls[0][0]).toContain('Valor cliente simulado: R$ 18.000,00');
-  expect(writeText.mock.calls[0][0]).toContain('Lucro real: R$ 6.690,38');
-  choose('Usar negociação na viagem');
-  expect(onNavigate).toHaveBeenCalledWith('viagens');
-  expect(window.NT_SIM).toMatchObject({km:1600,pedagio:50,valorMotorista:9000,valorCliente:18000,eixos:6});
-  vi.unstubAllGlobals();
+  change('Quilometragem', '1600');
+  await waitFor(() => expect(resolvers).toHaveLength(4));
+  change('Quilometragem', '1800');
+  await ready();
+  await act(async () => resolvers.forEach(resolve => resolve(response(100))));
+  expect(screen.getByRole('region', {name: 'Cotação padrão · Normal'}).textContent).toContain('9.900,00');
 });

@@ -59,7 +59,9 @@ export function QuoteLayouts({ model, vm }) {
     ["Valor cliente / CT-e", "valorCliente", "client"],
     ["ICMS", "icmsValor"],
     ["Taxas + seguros + pedágio", "taxasSemMotorista"],
+    ["RPA (incluído nas taxas)", "taxaRpa"],
     ["INSS patronal (incluído nas taxas)", "inssPatronal"],
+    ["Custo total com impostos", "custoTotal"],
     ["Resultado líquido", "lucro", "profit"],
     ["Margem líquida", "margemReal", "margin"],
   ];
@@ -117,14 +119,15 @@ export function QuoteLayouts({ model, vm }) {
         <Field key={field.label} field={field} />
       ))}
       <p>
-        Em branco, os valores de motorista e cliente usam a cotação padrão. A
-        margem desejada orienta o cenário “Alterar motorista”.
+        O cliente padrão usa Normal ETC como referência para comparar as quatro combinações. Os valores
+        digitados são aplicados às quatro combinações. O percentual bruto orienta
+        o cenário “Alterar motorista”.
       </p>
     </div>
   );
   const status = (
     <div className="ql-live" role="status">
-      {vm.error
+      {vm.inputError ? vm.inputError : vm.error
         ? "Não foi possível calcular. Altere um campo para tentar novamente."
         : vm.loading
           ? "Atualizando cotação…"
@@ -136,9 +139,9 @@ export function QuoteLayouts({ model, vm }) {
   const reference = (
     <div className="ql-reference">
       <span>
-        Tabela atual
+        Referência selecionada
         <strong>
-          {vm.vehicleLabel} · {vm.eixos} eixos
+          {vm.vehicleLabel} · {vm.eixos} eixos · {vm.tipoCarga === 'normal' ? 'Normal' : 'Alto desempenho'} · {vm.operacao.toUpperCase()}
         </strong>
       </span>
       <span>
@@ -184,7 +187,7 @@ export function QuoteLayouts({ model, vm }) {
   const actions = (
     <footer className="ql-actions">
       <span>
-        Regras de cálculo do sistema · referência padrão com margem de 30%
+        Cliente = motorista Normal ETC ÷ 70%. Impostos e demais custos são descontados no resultado líquido.
       </span>
       <button className="btn" disabled={!ready} onClick={vm.copy}>
         {vm.copied ? "Copiado!" : "Copiar negociação"}
@@ -322,7 +325,6 @@ export function QuoteLayouts({ model, vm }) {
               Escolha a tabela <span>Campos azuis são editáveis</span>
             </div>
             {vehicles}
-            {options}
             {fields}
             {status}
           </section>
@@ -346,18 +348,52 @@ export function QuoteLayouts({ model, vm }) {
                     <h2>{scenario.title}</h2>
                     <p>{scenario.description}</p>
                   </header>
-                  <div
-                    className={`ql-outcome ${ready && scenario.data.lucro < 0 ? "negative" : ""}`}
-                  >
-                    <span>Resultado líquido</span>
-                    <strong>{amount(scenario.data.lucro)}</strong>
-                    <small>
-                      {ready ? percent(scenario.data.margemReal) : "—"} de
-                      margem líquida
-                    </small>
-                  </div>
-                  {resultTable(scenario)}
-                  {warning(scenario)}
+                  {vm.comparison ? vm.comparison.map((group) => (
+                    <section className="ql-rate-group" key={group.type} aria-label={`${scenario.title} · ${group.label}`}>
+                      <div className="ql-rate-heading"><h3>{group.label}</h3><span>Referência ANTT</span></div>
+                      <div className="ql-contracts">
+                        {group.options.map(option => {
+                          const data = option.results[index];
+                          const loss = ready && data.lucro < 0;
+                          return <article className="ql-contract" key={option.operation} aria-label={`${group.label} ${option.operation.toUpperCase()}`}>
+                            <div className="ql-contract-heading"><strong>{option.operation.toUpperCase()}</strong><span>{option.operation === 'etc' ? 'Empresa' : 'Autônomo'}</span></div>
+                            <dl className="ql-contract-prices">
+                              <div className="driver"><dt>A pagar ao motorista</dt><dd>{amount(data.valorMotorista)}</dd></div>
+                              <div className="client"><dt>A cobrar do cliente</dt><dd>{amount(data.valorCliente)}</dd></div>
+                            </dl>
+                            <div className={`ql-contract-result${loss ? ' loss' : ''}`}>
+                              <span>{loss ? 'Prejuízo líquido' : 'Lucro líquido'}</span>
+                              <strong>{amount(data.lucro)}</strong>
+                              <div><span>Margem líquida</span><b>{ready ? percent(data.margemReal) : '—'}</b></div>
+                            </div>
+                          </article>;
+                        })}
+                      </div>
+                      <details className="ql-rate-details"><summary>Ver impostos e demais custos</summary>
+                        <table className="ql-rate-table ql-cost-table">
+                          <thead><tr><th scope="col">Detalhamento</th>{group.options.map(option => <th scope="col" key={option.operation}>{option.operation.toUpperCase()}</th>)}</tr></thead>
+                          <tbody>{[
+                            ['ICMS', 'icmsValor'],
+                            ['Taxas + seguros + pedágio', 'taxasSemMotorista'],
+                            ['RPA (incluído nas taxas)', 'taxaRpa'],
+                            ['INSS patronal (incluído nas taxas)', 'inssPatronal'],
+                            ['Motorista + taxas TAC', 'custoMotorista'],
+                            ['Custo total com impostos', 'custoTotal'],
+                          ].map(([label, key]) => <tr key={key}><th scope="row">{label}</th>{group.options.map(option => <td key={option.operation}>{amount(option.results[index][key])}</td>)}</tr>)}</tbody>
+                        </table>
+                        <p>O custo total inclui motorista, taxas, seguros, pedágio e ICMS. RPA e INSS patronal já estão incluídos nas taxas.</p>
+                        {group.options.map((option) => {
+                          const data = option.results[index];
+                          return <div key={option.operation}><strong>{option.operation.toUpperCase()}</strong>
+                            <p>Carga e descarga: {amount(option.source?.tabela?.cargaDescarga)} · Por km: {amount(option.source?.tabela?.kmValor)}</p>
+                            <p>RPA assumido pela empresa: {amount(data.rpa.totalDescontos)} · Líquido ao motorista: {amount(data.rpa.valorLiquidoMot)}</p>
+                            {warning({ data })}
+                          </div>;
+                        })}
+                      </details>
+                    </section>
+                  )) : <>{resultTable(scenario)}{warning(scenario)}</>}
+
                 </section>
               ))}
             </div>
@@ -365,6 +401,12 @@ export function QuoteLayouts({ model, vm }) {
         </>
       )}
       {model === "guided" && reference}
+      {model === "compare" && <section className="ql-panel ql-selection">
+        <strong>Opção para copiar ou usar na viagem</strong>
+        <p>Normal e Alto desempenho estão calculados acima. ETC = empresa; TAC = autônomo. Escolha abaixo a opção que será usada na viagem.</p>
+        {options}
+        <small>As ações usam “Motorista + cliente” · {vm.tipoCarga === 'normal' ? 'Normal' : 'Alto desempenho'} · {vm.operacao.toUpperCase()}.</small>
+      </section>}
       {actions}
     </div>
   );

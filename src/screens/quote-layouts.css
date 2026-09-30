@@ -823,3 +823,74 @@
     padding: 12px;
   }
 }
+
+/* Four combinations remain visible within each commercial scenario. */
+.ql-compare .ql-vehicles + .ql-fields { margin-top: 16px; }
+.ql-rate-group { margin: 16px; border-top: 1px solid var(--ql-border); padding-top: 12px; }
+.ql-rate-reference { font-size: 11px; color: var(--text-2); line-height: 1.6; }
+.ql-rate-group h3 { font-size: 14px; margin: 0 0 12px; }
+.ql-rate-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12px; font-variant-numeric: tabular-nums; }
+.ql-rate-table th, .ql-rate-table td { padding: 10px 5px; border-bottom: 1px solid var(--ql-border); text-align: right; overflow-wrap: anywhere; }
+.ql-rate-table th:first-child { text-align: left; width: 38%; font-weight: 400; }
+.ql-rate-table .driver td { color: var(--ql-input-text); }
+.ql-rate-table .client td { background: var(--ql-client); color: var(--ql-client-text); font-weight: 600; }
+.ql-rate-table .profit { background: var(--ql-profit); color: var(--ql-profit-text); font-weight: 700; }
+.ql-rate-table td.negative { background: var(--ql-danger); color: var(--ql-danger-text); }
+.ql-rate-details { font-size: 12px; margin-top: 12px; }
+.ql-rate-details summary { cursor: pointer; }
+.ql-rate-details p { line-height: 1.6; }
+.ql-selection { margin-top: 20px; }
+.ql-selection p { color: var(--muted); font-size: 12px; line-height: 1.6; }
+@container (max-width: 1250px) { .ql-compare .ql-cards { grid-template-columns: 1fr; } }
+
+.ql-rate-details { border: 1px solid var(--ql-border); border-radius: 8px; overflow: hidden; }
+.ql-rate-details > summary { padding: 12px; color: var(--text-2); font-weight: 500; }
+.ql-rate-details[open] > summary { border-bottom: 1px solid var(--ql-border); }
+.ql-rate-details > p, .ql-rate-details > div { margin: 12px; }
+.ql-cost-table { font-size: 11px; }
+.ql-cost-table td { font-weight: 400; }
+
+/* Commercial comparison: prices first, net result grouped below. */
+.ql-compare .ql-cards { gap: 20px; align-items: start; }
+.ql-compare .ql-scenario { border-radius: 16px; box-shadow: 0 4px 18px #00000006; }
+.ql-compare .ql-scenario > header { padding: 20px; border-top-width: 3px; min-height: 112px; }
+.ql-compare .ql-scenario > header > span { float: left; display: grid; place-items: center; width: 32px; height: 32px; margin: 0 12px 24px 0; border-radius: 10px; letter-spacing: 0; background: var(--surface-2); color: var(--text-2); font-size: 12px; }
+.ql-compare .ql-scenario > header h2 { margin: 0 0 7px; font-size: 17px; letter-spacing: -.3px; }
+.ql-compare .ql-scenario > header p { margin: 0; font-size: 11px; line-height: 1.6; }
+.ql-compare .ql-rate-group { margin: 0 18px 20px; padding-top: 18px; }
+.ql-rate-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.ql-rate-heading h3 { margin: 0; font-size: 13px; }
+.ql-rate-heading > span { color: var(--text-2); font-size: 10px; }
+.ql-contracts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.ql-contract { min-width: 0; border: 1px solid var(--ql-border); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.ql-contract-heading { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+.ql-contract-heading strong { font-size: 12px; letter-spacing: .04em; }
+.ql-contract-heading > span { color: var(--text-2); font-size: 10px; }
+.ql-contract-prices { margin: 0; padding: 14px; display: grid; gap: 16px; }
+.ql-contract-prices dt { font-size: 10px; color: var(--text-2); margin-bottom: 6px; }
+.ql-contract-prices dd { margin: 0; font-size: clamp(16px,1.15vw,20px); font-weight: 650; line-height: 1.2; font-variant-numeric: tabular-nums; letter-spacing: -.4px; overflow-wrap: anywhere; }
+.ql-contract-prices .driver dd { color: var(--ql-input-text); }
+.ql-contract-prices .client dd { color: var(--text); font-weight: 750; }
+.ql-contract-result { padding: 14px; background: color-mix(in srgb,var(--ql-profit) 65%,var(--surface)); color: var(--ql-profit-text); border-top: 1px solid color-mix(in srgb,var(--ql-profit-text) 15%,transparent); }
+.ql-contract-result > span { display: block; font-size: 10px; font-weight: 600; }
+.ql-contract-result > strong { display: block; margin: 7px 0 12px; font-size: clamp(19px,1.4vw,24px); line-height: 1.2; letter-spacing: -.6px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ql-contract-result > div { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; padding-top: 10px; border-top: 1px solid color-mix(in srgb,currentColor 15%,transparent); }
+.ql-contract-result > div > span { font-size: 10px; }
+.ql-contract-result b { font-size: 13px; font-variant-numeric: tabular-nums; }
+.ql-contract-result.loss { background: var(--ql-danger); color: var(--ql-danger-text); }
+.ql-rate-details { border: 0; border-radius: 0; margin-top: 8px; }
+.ql-rate-details > summary { padding: 10px 2px; font-size: 11px; }
+.ql-rate-details[open] { border: 1px solid var(--ql-border); border-radius: 8px; }
+.ql-rate-details[open] > summary { padding: 12px; }
+@container (min-width:700px) and (max-width:1250px) {
+  .ql-compare .ql-scenario { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .ql-compare .ql-scenario > header { grid-column: 1 / -1; min-height: 90px; }
+}
+@media(max-width:600px) {
+  .ql-compare .ql-scenario > header { padding: 16px; }
+  .ql-compare .ql-rate-group { margin: 0 12px 16px; }
+  .ql-contract-heading, .ql-contract-prices, .ql-contract-result { padding: 12px 10px; }
+  .ql-contracts { gap: 8px; }
+  .ql-contract-prices dd { font-size: 16px; }
+  .ql-contract-result > strong { font-size: 19px; }
+}
