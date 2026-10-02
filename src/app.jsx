@@ -4,6 +4,15 @@ import { getNavForUser as filterNavForUser } from "./permissions.js";
 
 const { useState, useEffect } = React;
 
+const MainContent = React.memo(
+  ({ children }) => (
+    <main className="main">
+      <div className="main-content">{children}</div>
+    </main>
+  ),
+  (previous, next) => previous.renderKey === next.renderKey,
+);
+
 const loadScreen = createScreenLoader(import.meta.glob(["./screens/*.jsx", "!./screens/*.test.jsx"]));
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/ {
@@ -790,21 +799,29 @@ const App = () => {
         />
       )}
       <aside
+        id="app-sidebar-navigation"
         className={`sidebar ${sidebarExpanded ? "expanded" : "collapsed"}`}
       >
         <div className="sidebar-brand">
           <img
-            src={sidebarExpanded ? "/brand/norte-03.png" : "/brand/norte-06.png"}
+            src="/brand/norte-03.png"
             alt="Norte - Gestão Inteligente"
-            className="sidebar-logo"
+            className="sidebar-logo sidebar-logo-full"
+          />
+          <img
+            src="/brand/norte-06.png"
+            alt="Norte - Gestão Inteligente"
+            className="sidebar-logo sidebar-logo-compact"
           />
           <button
             className="sidebar-toggle"
             onClick={() => setSidebarExpanded((v) => !v)}
             title={sidebarExpanded ? "Recolher menu" : "Expandir menu"}
             aria-label={sidebarExpanded ? "Recolher menu" : "Expandir menu"}
+            aria-controls="app-sidebar-navigation"
+            aria-expanded={sidebarExpanded}
           >
-            <Icon name={sidebarExpanded ? "x" : "chevron-right"} size={17} />
+            <Icon name="chevron-right" size={17} />
           </button>
         </div>
 
@@ -969,18 +986,11 @@ const App = () => {
         </>
       )}
 
-      <main className="main">
-        <div
-          style={{
-            flex: 1,
-            overflow: "hidden",
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          {body}
-        </div>
-      </main>
+      <MainContent
+        renderKey={`${currentScreen}:${t.theme}:${t.density}:${auth.user.id || auth.user.login || "user"}`}
+      >
+        {body}
+      </MainContent>
 
       <TweaksPanel title="Tweaks">
         <TweakSection title="Aparência">

@@ -30,6 +30,8 @@ const Icon = ({ name, size = 16, strokeWidth = 1.6, ...rest }) => {
       return <svg {...common}><path d="M4 5h16l-6 8v6l-4-2v-4z"/></svg>;
     case "chevron-right":
       return <svg {...common}><path d="m9 6 6 6-6 6"/></svg>;
+    case "chevron-left":
+      return <svg {...common}><path d="m15 6-6 6 6 6"/></svg>;
     case "chevron-down":
       return <svg {...common}><path d="m6 9 6 6 6-6"/></svg>;
     case "arrow-up":
