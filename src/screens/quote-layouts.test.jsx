@@ -50,6 +50,11 @@ it('reproduz a planilha com impostos nos custos e percentual bruto separado do l
     ...response(tipoCarga === 'normal' ? 8928.42 : 7064.67), encargos: { seguroCarga: 0, seguroRC: 141.91 },
   }));
   render(<window.SimuladorFrete onNavigate={vi.fn()} />);
+  expect(screen.getByLabelText('Pedágio').value).toBe('50,00');
+  expect(screen.getByLabelText('Seguro terceiros').value).toBe('91,91');
+  // Esta referência de cálculo usa seguro de 141,91 e pedágio zero.
+  change('Pedágio', '0');
+  change('Seguro terceiros', '141,91');
   change('Quilometragem', '1000');
   await ready();
   const normal = screen.getByRole('region', { name: 'Cotação padrão · Normal' });

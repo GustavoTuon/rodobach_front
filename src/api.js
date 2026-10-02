@@ -354,6 +354,12 @@ window.RB_API = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  sendOportunidadesSelecionados: (payload) =>
+    apiRequest("/oportunidades-retorno/enviar-selecionados", {
+      method: "POST",
+      body: JSON.stringify(payload),
+      timeoutMs: 600000,
+    }),
   downloadOportunidadesModelo: async () => {
     const token = localStorage.getItem(TOKEN_KEY);
     const response = await fetchWithTimeout(

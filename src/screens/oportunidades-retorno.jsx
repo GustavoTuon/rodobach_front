@@ -1,12 +1,12 @@
-const OR_PAGE_SIZE = 5;
+const OR_PAGE_SIZE = 10;
+const orMaterialKey = (value) => String(value || "").trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
+const orMaterials = (client) => (client.materiais?.length ? client.materiais : [client.tipoCarga || client.material]).filter((value) => String(value || "").trim()).map((value) => String(value).trim());
 
-const orMoney = (value) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-const orDate = (value) => value ? new Date(value).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "-";
 const orDaysAgo = (value) => value ? Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86400000)) : null;
 const orNormalizePlate = (value) => String(value || "").replace(/[^a-z0-9]/gi, "").toUpperCase();
 
 function opportunityScore(client, radiusKm, currentPlate) {
-  const distance = Math.max(0, 40 * (1 - Number(client.distanciaKm || radiusKm) / Math.max(radiusKm, 1)));
+  const distance = Math.max(0, 40 * (1 - Number(client.distanciaKm ?? radiusKm) / Math.max(radiusKm, 1)));
   const freights = Math.min(20, Math.log2(Number(client.quantidadeFretes || 0) + 1) * 5);
   const revenue = Math.min(15, Number(client.faturamento || 0) / 15000);
   const days = orDaysAgo(client.ultimoFrete);
@@ -15,19 +15,9 @@ function opportunityScore(client, radiusKm, currentPlate) {
   return Math.max(0, Math.min(100, Math.round(distance + freights + revenue + recency + samePlate)));
 }
 
-function scoreLabel(score) {
-  if (score >= 85) return "Excelente";
-  if (score >= 70) return "Boa";
-  if (score >= 50) return "Média";
-  return "Baixa";
-}
-
-const ReturnSummaryCards = ({ vehicles, opportunities, priority, best }) => (
+const ReturnSummaryCards = ({ vehicles, imported, opportunities, selected }) => (
   <div className="or-kpis">
-    <div className="kpi"><div className="kpi-label"><Icon name="truck"/> Veículos disponíveis</div><div className="kpi-value">{vehicles}</div><span className="kpi-delta flat">SMs e posições da telemetria</span></div>
-    <div className="kpi"><div className="kpi-label"><Icon name="route"/> Oportunidades encontradas</div><div className="kpi-value">{opportunities}</div><span className="kpi-delta flat">dentro do raio analisado</span></div>
-    <div className="kpi"><div className="kpi-label"><Icon name="trending-up"/> Clientes prioritários</div><div className="kpi-value">{priority}</div><span className="kpi-delta up">score bom ou excelente</span></div>
-    <div className="kpi"><div className="kpi-label"><Icon name="map"/> Melhor oportunidade</div><div className="kpi-value">{best === null ? "–" : `${best.toFixed(0)} km`}</div><span className="kpi-delta flat">cliente mais próximo</span></div>
+    {[["truck", "Veículos disponíveis", vehicles, "Escolha a placa para buscar"], ["file", "Contatos importados", imported, "Cadastro da planilha"], ["map", "Contatos no raio", opportunities ?? "—", "Resultado da última análise"], ["check", "Selecionados", selected, "Para revisar a mensagem"]].map(([icon, label, value, detail]) => <div className="or-stat" key={label}><span className="or-stat-icon"><Icon name={icon}/></span><div><span>{label}</span><strong>{value}</strong><small>{detail}</small></div></div>)}
   </div>
 );
 
@@ -57,7 +47,7 @@ const VehicleSearchSelect = ({ data, value, onChange }) => {
   }, []);
 
   return <div className="or-vehicle" ref={rootRef}>
-    <label>Veículo disponível</label>
+    <label>1. Selecionar placa / veículo</label>
     <button type="button" className={`or-combobox ${open ? "active" : ""}`} onClick={() => setOpen(!open)}>
       <span>{selected ? <><strong>{selected.plate}</strong><small>{selected.location}</small></> : <span className="muted">Selecione um veículo</span>}</span>
       <Icon name="chevron-down"/>
@@ -89,66 +79,42 @@ const RadiusSelector = ({ value, onChange, onAnalyze, disabled }) => {
   </div>;
 };
 
-const OpportunityFilters = ({ filters, onChange, onClear, currentPlate }) => (
+const OpportunityFilters = ({ filters, onChange, onClear, currentPlate, fonte }) => (
   <div className="or-filters">
     <div className="or-filter-order"><Icon name="filter"/><select value={filters.sort} onChange={(event) => onChange({ ...filters, sort: event.target.value })}>
-      <option value="score">Melhor oportunidade</option><option value="distance">Mais próximo</option><option value="revenue">Maior faturamento</option><option value="freights">Mais fretes</option><option value="recent">Frete mais recente</option>
+      <option value="score">Melhor oportunidade</option><option value="distance">Mais próximo</option>{fonte === "sistema" && <><option value="revenue">Maior faturamento</option><option value="freights">Mais fretes</option><option value="recent">Frete mais recente</option></>}
     </select></div>
-    <button className={filters.samePlate ? "active" : ""} onClick={() => onChange({ ...filters, samePlate: !filters.samePlate })}>Esta placa já carregou</button>
-    {[3, 6, 12].map((months) => <button key={months} className={filters.months === months ? "active" : ""} onClick={() => onChange({ ...filters, months: filters.months === months ? 0 : months })}>Últimos {months} meses</button>)}
+    {fonte === "sistema" && <><button className={filters.samePlate ? "active" : ""} onClick={() => onChange({ ...filters, samePlate: !filters.samePlate })}>Esta placa já carregou</button>
+    {[3, 6, 12].map((months) => <button key={months} className={filters.months === months ? "active" : ""} onClick={() => onChange({ ...filters, months: filters.months === months ? 0 : months })}>Últimos {months} meses</button>)}</>}
     <button className={filters.hasPhone ? "active" : ""} onClick={() => onChange({ ...filters, hasPhone: !filters.hasPhone })}>Possui telefone</button>
-    <button className={filters.notContacted ? "active" : ""} onClick={() => onChange({ ...filters, notContacted: !filters.notContacted })}>Não contatados</button>
     <button className="or-clear" onClick={onClear}>Limpar filtros</button>
     <span className="or-filter-context">Placa atual: {currentPlate || "–"}</span>
   </div>
 );
 
-const OpportunityScore = ({ score }) => <div className={`or-score s${Math.floor(score / 10)}`} title="Pontuação indicativa baseada em distância, histórico de fretes, faturamento, recência e relacionamento com a placa."><strong>{score}</strong><span>{scoreLabel(score)}</span></div>;
-
-const OpportunityCard = ({ client, rank, currentPlate, selected, contactStatus, onToggle, onHistory, onContact, onWhy }) => {
-  const samePlate = (client.placas || []).some((plate) => orNormalizePlate(plate) === orNormalizePlate(currentPlate));
-  const days = orDaysAgo(client.ultimoFrete);
-  return <article className={`or-card ${selected ? "selected" : ""}`}>
-    <input className="or-check" type="checkbox" checked={selected} onChange={() => onToggle(client.id)} aria-label={`Selecionar ${client.nome}`}/>
-    <OpportunityScore score={client.score}/>
-    <div className="or-card-main">
-      <div className="or-card-title"><span className="or-rank">#{rank}</span><div><h3>{client.nome}</h3><p>{client.cidade}/{client.uf}</p></div><strong className={`or-distance ${client.distanciaKm <= 50 ? "near" : ""}`}>{client.distanciaKm.toFixed(0)} km</strong></div>
-      <div className="or-badges"><span>Cliente {client.quantidadeFretes >= 5 ? "recorrente" : "do histórico"}</span>{samePlate && <span className="good">Esta placa já carregou aqui</span>}{days !== null && days <= 180 && <span className="recent">Frete recente</span>}<span className="status">{contactStatus || "Não contatado"}</span></div>
-      <div className="or-metrics"><span><b>{client.quantidadeFretes || 0}</b> frete{client.quantidadeFretes === 1 ? "" : "s"}</span><span><b>{orMoney(client.faturamento)}</b> faturados</span><span><b>{orDate(client.ultimoFrete)}</b> último frete</span>{days !== null && <span>há {days} dias</span>}</div>
-      <div className="or-contact-line"><Icon name="whatsapp"/><span>{client.telefone || "Telefone não informado"}</span>{client.contato && <span>· {client.contato}</span>}</div>
-      <div className="or-card-actions"><a className="btn" href={client.mapsUrl} target="_blank" rel="noreferrer"><Icon name="map"/> Localização</a><button className="btn" onClick={() => onHistory(client)}><Icon name="truck"/> {client.placas?.length || 0} placa{client.placas?.length === 1 ? " anterior" : "s anteriores"}</button><button className="btn" onClick={() => onWhy(client)}><Icon name="info"/> Por que?</button><button className="btn primary" onClick={() => onContact(client)}><Icon name="whatsapp"/> Contatar</button></div>
-    </div>
-  </article>;
-};
-
-const ContactDrawer = ({ client, recipient, message, config, working, onRecipient, onMessage, onClose, onCopy, onSend }) => {
-  if (!client) return null;
-  return <div className="or-drawer-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><aside className="or-drawer">
-    <div className="or-drawer-head"><div><span>Contato comercial</span><h2>{client.nome}</h2><p>{client.cidade}/{client.uf} · {client.distanciaKm.toFixed(0)} km</p></div><button className="btn" onClick={onClose} aria-label="Fechar"><Icon name="x"/></button></div>
-    <label>Telefone / WhatsApp<input value={recipient} onChange={(event) => onRecipient(event.target.value)} placeholder="Ex.: 5519999999999"/></label>
-    <label>Mensagem<textarea value={message} onChange={(event) => onMessage(event.target.value)}/></label>
-    {!config?.envioHabilitado && <div className="or-validation"><Icon name="lock"/><div><strong>Envio bloqueado — modo de validação</strong><span>A mensagem pode ser revisada e copiada, mas não será enviada enquanto a validação estiver ativa.</span></div></div>}
-    <div className="or-drawer-actions"><button className="btn" disabled={!message} onClick={onCopy}><Icon name="copy"/> Copiar</button><button className="btn primary" disabled={!config?.envioHabilitado || !config?.n8nConfigurado || !recipient || working} onClick={onSend}><Icon name="whatsapp"/> Enviar WhatsApp</button></div>
-  </aside></div>;
-};
-
-const HistoryModal = ({ client, currentPlate, onClose }) => {
-  if (!client) return null;
-  return <div className="or-modal-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className="or-modal"><div className="or-modal-head"><div><span>Histórico de relacionamento</span><h3>{client.nome}</h3></div><button className="btn" onClick={onClose}><Icon name="x"/></button></div><p className="muted">Placas identificadas nos CT-es desde 2023.</p><div className="or-plate-list">{(client.placas || []).map((plate) => <span className={orNormalizePlate(plate) === orNormalizePlate(currentPlate) ? "current" : ""} key={plate}>{plate}{orNormalizePlate(plate) === orNormalizePlate(currentPlate) && <small>placa atual</small>}</span>)}{!client.placas?.length && <div className="muted">Nenhuma placa identificada.</div>}</div></div></div>;
-};
-
-const WhyModal = ({ client, currentPlate, onClose }) => {
-  if (!client) return null;
-  const days = orDaysAgo(client.ultimoFrete);
-  const samePlate = (client.placas || []).some((plate) => orNormalizePlate(plate) === orNormalizePlate(currentPlate));
-  return <div className="or-modal-layer" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><div className="or-modal"><div className="or-modal-head"><div><span>Por que esta oportunidade?</span><h3>{client.nome}</h3></div><button className="btn" onClick={onClose}><Icon name="x"/></button></div><div className="or-why"><span><Icon name="map"/><b>{client.distanciaKm.toFixed(0)} km</b> do veículo</span><span><Icon name="route"/><b>{client.quantidadeFretes || 0} fretes</b> anteriores</span><span><Icon name="money"/><b>{orMoney(client.faturamento)}</b> faturados</span><span><Icon name="clock"/>Último frete <b>{days === null ? "não informado" : `há ${days} dias`}</b></span>{samePlate && <span><Icon name="check"/><b>Esta placa já carregou aqui</b></span>}</div></div></div>;
-};
-
-const BulkActionBar = ({ count, onMessage, onCopy, onClear }) => count ? <div className="or-bulk"><strong>{count} cliente{count > 1 ? "s" : ""} selecionado{count > 1 ? "s" : ""}</strong><button className="btn" onClick={onMessage}><Icon name="copy"/> Preparar mensagem consolidada</button><button className="btn" onClick={onCopy}><Icon name="whatsapp"/> Copiar contatos</button><button className="btn" onClick={onClear}><Icon name="x"/> Limpar seleção</button></div> : null;
+const OpportunityTable = ({ clients, selectedIds, onToggle, catalog }) => (
+  <div className="or-table-wrap">
+    <table className="or-table">
+      <caption>{catalog ? "Todos os contatos importados · sem filtro de distância" : "Contatos disponíveis para a carga de retorno"}</caption>
+      <thead><tr><th scope="col">Selecionar</th><th scope="col">Nome / empresa</th><th scope="col">Contato</th><th scope="col">Localização</th><th scope="col">Material carregado</th><th scope="col">Distância</th></tr></thead>
+      <tbody>{clients.map((client) => <tr key={client.id} className={selectedIds.includes(client.id) ? "selected" : ""}>
+        <td><input type="checkbox" disabled={catalog} checked={selectedIds.includes(client.id)} onChange={() => onToggle(client.id)} aria-label={`Selecionar ${client.nome}`}/></td>
+        <td><strong>{client.nome}</strong><small>{client.fonte === "planilha" ? "Contato da planilha" : "Fretes do sistema"}</small></td>
+        <td><span>{client.contato || "Responsável não informado"}</span><small>{client.telefone || "Telefone não informado"}</small></td>
+        <td>{client.mapsUrl ? <a href={client.mapsUrl} target="_blank" rel="noreferrer">{client.cidade}/{client.uf}</a> : <span>{client.cidade}/{client.uf}</span>}{client.endereco && <small>{client.endereco}</small>}</td>
+        <td><div className="or-material-tags">{orMaterials(client).length ? orMaterials(client).map((material) => <span key={material}>{material}</span>) : <span className="muted">Não informado</span>}</div></td>
+        <td>{Number.isFinite(client.distanciaKm) ? `${client.distanciaKm.toFixed(0)} km` : "—"}</td>
+      </tr>)}</tbody>
+    </table>
+  </div>
+);
 
 const OportunidadesRetorno = () => {
   const [data, setData] = React.useState({ clientes: [], sms: [], veiculosTelemetria: [], configuracao: {} });
   const [smId, setSmId] = React.useState("");
+  const [fonte, setFonte] = React.useState("sistema");
+  const [vehicleType, setVehicleType] = React.useState("carreta 4 eixos");
+  const [messageTemplate, setMessageTemplate] = React.useState("Olá, tudo bem?\n\nTenho um veículo {tipoVeiculo} próximo de você, na região de {localizacao}. Teria alguma carga disponível?\n\nPode me informar o destino, produto, peso e previsão de carregamento?");
   const [raioKm, setRaioKm] = React.useState(200);
   const [analysis, setAnalysis] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
@@ -158,12 +124,9 @@ const OportunidadesRetorno = () => {
   const [page, setPage] = React.useState(1);
   const [filters, setFilters] = React.useState({ sort: "score", samePlate: false, months: 0, hasPhone: false, notContacted: false });
   const [selectedIds, setSelectedIds] = React.useState([]);
-  const [drawerClient, setDrawerClient] = React.useState(null);
-  const [historyClient, setHistoryClient] = React.useState(null);
-  const [whyClient, setWhyClient] = React.useState(null);
-  const [message, setMessage] = React.useState("");
-  const [recipient, setRecipient] = React.useState("");
-  const [contactStatuses, setContactStatuses] = React.useState({});
+  const [material, setMaterial] = React.useState("");
+  const materialQuery = orMaterialKey(React.useDeferredValue(material));
+  const [showCatalog, setShowCatalog] = React.useState(false);
 
   const selectedVehicle = React.useMemo(() => {
     if (smId.startsWith("sm:")) {
@@ -175,13 +138,24 @@ const OportunidadesRetorno = () => {
   }, [data, smId]);
 
   const scoredClients = React.useMemo(() => (analysis?.potenciais || analysis?.clientes || []).map((client) => ({ ...client, score: opportunityScore(client, analysis?.raioKm || raioKm, analysis?.sm?.placa) })), [analysis, raioKm]);
+  const visibleClients = React.useMemo(() => showCatalog ? (data.clientes || []).map((client) => ({ ...client, id: `planilha:${client.id}`, fonte: "planilha" })) : scoredClients, [showCatalog, data.clientes, scoredClients]);
+  const showResults = Boolean(analysis || showCatalog);
+  const materialOptions = React.useMemo(() => {
+    const options = new Map();
+    visibleClients.forEach((client) => orMaterials(client).forEach((value) => {
+      const key = orMaterialKey(value);
+      if (!options.has(key)) options.set(key, value);
+    }));
+    return [...options].sort((a, b) => a[1].localeCompare(b[1], "pt-BR"));
+  }, [visibleClients]);
   const filteredClients = React.useMemo(() => {
     const cutoff = filters.months ? new Date(new Date().setMonth(new Date().getMonth() - filters.months)) : null;
-    const result = scoredClients.filter((client) => {
+    const result = visibleClients.filter((client) => {
+      const materials = orMaterials(client);
+      if (["__missing__", "nao informado"].includes(materialQuery) ? materials.length > 0 : materialQuery && !materials.some((value) => orMaterialKey(value).includes(materialQuery))) return false;
       if (filters.samePlate && !(client.placas || []).some((plate) => orNormalizePlate(plate) === orNormalizePlate(analysis?.sm?.placa))) return false;
       if (cutoff && (!client.ultimoFrete || new Date(client.ultimoFrete) < cutoff)) return false;
       if (filters.hasPhone && !String(client.telefone || "").replace(/\D/g, "")) return false;
-      if (filters.notContacted && contactStatuses[client.id] && contactStatuses[client.id] !== "Não contatado") return false;
       return true;
     });
     return result.sort((a, b) => filters.sort === "distance" ? a.distanciaKm - b.distanciaKm
@@ -189,12 +163,18 @@ const OportunidadesRetorno = () => {
         : filters.sort === "freights" ? b.quantidadeFretes - a.quantidadeFretes
           : filters.sort === "recent" ? String(b.ultimoFrete || "").localeCompare(String(a.ultimoFrete || ""))
             : b.score - a.score || a.distanciaKm - b.distanciaKm);
-  }, [scoredClients, filters, analysis, contactStatuses]);
+  }, [visibleClients, filters, analysis, materialQuery]);
   const totalPages = Math.max(1, Math.ceil(filteredClients.length / OR_PAGE_SIZE));
   const pagedClients = filteredClients.slice((page - 1) * OR_PAGE_SIZE, page * OR_PAGE_SIZE);
-  const selectedClients = scoredClients.filter((client) => selectedIds.includes(client.id));
+  const selectedSet = React.useMemo(() => new Set(selectedIds), [selectedIds]);
+  const selectedClients = React.useMemo(() => filteredClients.filter((client) => selectedSet.has(client.id)), [filteredClients, selectedSet]);
+  const campaignMessage = messageTemplate.replace(/\{(tipoVeiculo|localizacao|placa)\}/g, (_, key) => ({ tipoVeiculo: vehicleType, localizacao: analysis?.destino?.descricao || selectedVehicle?.location || "sua região", placa: analysis?.sm?.placa || selectedVehicle?.plate || "" })[key]);
+  const resetAnalysis = () => { setAnalysis(null); setSelectedIds([]); setMaterial(""); setShowCatalog(false); };
+  const openCatalog = () => { setShowCatalog(true); setSelectedIds([]); setMaterial(""); setFilters({ sort: "distance", samePlate: false, months: 0, hasPhone: false }); };
+  const changeFilters = (next) => { setFilters(next); setSelectedIds([]); };
+  const clearFilters = () => { changeFilters({ sort: fonte === "planilha" ? "distance" : "score", samePlate: false, months: 0, hasPhone: false }); setMaterial(""); };
 
-  React.useEffect(() => { setPage(1); }, [filters, analysis]);
+  React.useEffect(() => { setPage(1); }, [filters, analysis, material, showCatalog]);
 
   const load = React.useCallback(async () => {
     setLoading(true); setError("");
@@ -213,57 +193,68 @@ const OportunidadesRetorno = () => {
   const importFile = async (event) => {
     const file = event.target.files?.[0]; event.target.value = ""; if (!file) return;
     setWorking(true); setError(""); setNotice("");
-    try { const arquivoBase64 = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || "").split(",").pop()); reader.onerror = () => reject(new Error("Não foi possível ler a planilha.")); reader.readAsDataURL(file); }); const result = await window.RB_API.importOportunidadesClientes({ arquivoBase64, substituir: true }); setNotice(`${result.importados} clientes importados. ${result.semCoordenadas} sem coordenadas.`); await load(); }
+    try { const arquivoBase64 = await new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || "").split(",").pop()); reader.onerror = () => reject(new Error("Não foi possível ler a planilha.")); reader.readAsDataURL(file); }); const result = await window.RB_API.importOportunidadesClientes({ arquivoBase64, substituir: false }); setNotice(`${result.novos ?? result.importados} novos contatos; ${result.atualizados || 0} atualizados; ${result.duplicadosConsolidados || 0} repetições consolidadas. ${result.ignorados} linhas sem dados suficientes. Todas as abas reconhecidas foram lidas.`); setFonte("planilha"); resetAnalysis(); setShowCatalog(true); setFilters({ sort: "distance", samePlate: false, months: 0, hasPhone: false, notContacted: false }); await load(); }
     catch (err) { setError(err?.message || "Falha ao importar a planilha."); } finally { setWorking(false); }
   };
   const analyze = async () => {
     if (!smId) return setError("Selecione um veículo.");
-    setWorking(true); setError(""); setNotice(""); setAnalysis(null); setSelectedIds([]);
-    try { const result = await window.RB_API.analyzeOportunidadesRetorno({ smId, raioKm }); setAnalysis(result); setPage(1); }
+    setWorking(true); setError(""); setNotice(""); setAnalysis(null); setSelectedIds([]); setMaterial(""); setShowCatalog(false);
+    try { const result = await window.RB_API.analyzeOportunidadesRetorno({ smId, raioKm, fonte }); setAnalysis(result); setPage(1); }
     catch (err) { setError(err?.message || "Falha ao analisar clientes próximos."); } finally { setWorking(false); }
   };
-  const prepareClient = (client) => { setDrawerClient(client); setRecipient(client.telefone || ""); setMessage(client.mensagemContato || ""); setContactStatuses((current) => ({ ...current, [client.id]: "Mensagem preparada" })); };
-  const sendClient = async () => {
-    if (!drawerClient) return; setWorking(true); setError(""); setNotice("");
-    try { const result = await window.RB_API.sendOportunidadeCliente({ smId, raioKm, clienteId: drawerClient.id, destinatario: recipient, mensagem: message }); setNotice(`Mensagem enviada para ${result.cliente}.`); setContactStatuses((current) => ({ ...current, [drawerClient.id]: "Enviado" })); }
-    catch (err) { setError(err?.message || "Falha ao enviar mensagem para o cliente."); } finally { setWorking(false); }
-  };
-  const buildBulkMessage = () => { const text = [`Oportunidades de retorno - ${analysis?.sm?.placa}`, `Disponível em ${analysis?.destino?.descricao}`, "", ...selectedClients.map((client, index) => `${index + 1}. ${client.nome} - ${client.cidade}/${client.uf} (${client.distanciaKm.toFixed(0)} km)\n   ${client.telefone || "Sem telefone"}`)].join("\n"); navigator.clipboard.writeText(text); setNotice("Mensagem consolidada copiada."); };
-  const copyContacts = () => { navigator.clipboard.writeText(selectedClients.map((client) => `${client.nome}: ${client.telefone || "Sem telefone"}`).join("\n")); setNotice("Contatos copiados."); };
+  const buildBulkMessage = async () => { try { await navigator.clipboard.writeText(campaignMessage); setNotice("Mensagem copiada."); } catch { setError("Não foi possível copiar a mensagem."); } };
 
-  const priority = scoredClients.filter((client) => client.score >= 70).length;
-  const best = scoredClients.length ? Math.min(...scoredClients.map((client) => client.distanciaKm)) : null;
   const firstItem = (page - 1) * OR_PAGE_SIZE + 1;
   const lastItem = Math.min(page * OR_PAGE_SIZE, filteredClients.length);
 
   return <div className="view or-page"><style>{`
-    .or-page{--or-blue:#4f7fab}.or-head .sub{max-width:650px}.or-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
-    .or-search-card{padding:16px;margin-bottom:16px;display:grid;grid-template-columns:minmax(380px,1.3fr) minmax(340px,.9fr);gap:20px}.or-vehicle,.or-radius{position:relative}.or-vehicle>label,.or-radius>label,.or-drawer label{display:block;font-size:11px;color:var(--text-2);margin-bottom:7px}
-    .or-combobox{width:100%;min-height:48px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);display:flex;align-items:center;justify-content:space-between;text-align:left}.or-combobox.active{border-color:var(--brand-blue);box-shadow:0 0 0 2px var(--accent-soft)}.or-combobox span span,.or-combobox strong,.or-combobox small{display:block}.or-combobox small{color:var(--muted);margin-top:2px}
-    .or-combobox-menu{position:absolute;z-index:30;top:77px;left:0;right:0;border:1px solid var(--border);border-radius:9px;background:var(--surface);box-shadow:0 18px 50px #0009;overflow:hidden}.or-combobox-search{display:flex;align-items:center;gap:8px;padding:10px;border-bottom:1px solid var(--divider)}.or-combobox-search input{width:100%;height:36px;border:0;background:transparent;color:var(--text);outline:0}.or-combobox-options{max-height:350px;overflow:auto}.or-option-group{padding:9px 12px 5px;color:var(--text-3);font-size:9px;letter-spacing:.08em}.or-option{width:100%;display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:10px;padding:10px 12px;border:0;border-top:1px solid var(--divider);background:transparent;color:var(--text);text-align:left}.or-option:hover{background:var(--surface-2)}.or-option span strong,.or-option span small{display:block}.or-option small{color:var(--muted)}.or-option-badges{display:flex!important;gap:4px}.or-option-badges b{padding:3px 5px;border:1px solid var(--border);border-radius:4px;font-size:9px;font-weight:500}.or-no-option{padding:20px;text-align:center;color:var(--muted)}
-    .or-vehicle-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:9px}.or-vehicle-summary span{padding:7px 9px;border-radius:6px;background:var(--surface-2);font-size:10.5px}.or-vehicle-summary b{display:block;color:var(--muted);font-weight:400;margin-bottom:3px}.or-radius-buttons{display:flex;gap:6px;flex-wrap:wrap}.or-radius-buttons button,.or-filters>button{height:30px;padding:0 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface-2);color:var(--text-2);font-size:10.5px}.or-radius-buttons button.active,.or-filters>button.active{color:#dbeafe;border-color:var(--brand-blue);background:var(--accent-soft)}.or-radius-action{display:grid;grid-template-columns:90px 1fr;gap:8px;margin-top:10px}.or-radius-action input,.or-drawer input,.or-drawer textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:7px;background:var(--surface-2);color:var(--text);outline:0}.or-radius-action input{height:38px;padding:0 10px}
-    .or-filters{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:11px 13px;margin-bottom:12px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}.or-filter-order{height:30px;display:flex;align-items:center;gap:6px;padding:0 8px;border:1px solid var(--border);border-radius:6px}.or-filter-order select{border:0;background:transparent;color:var(--text);outline:0;font-size:10.5px}.or-filter-order option{background:var(--surface)}.or-filters .or-clear{border:0;background:transparent;color:var(--brand-blue)}.or-filter-context{margin-left:auto;font-size:10px;color:var(--muted)}
-    .or-list-head{display:flex;align-items:end;justify-content:space-between;margin:14px 0 9px}.or-list-head h2{font-size:15px;margin:0 0 3px}.or-list-head p{margin:0;font-size:10.5px;color:var(--muted)}.or-card{position:relative;display:grid;grid-template-columns:auto auto 1fr;gap:12px;padding:14px;margin-bottom:9px;border:1px solid var(--border);border-radius:10px;background:var(--surface);transition:.15s}.or-card:hover{border-color:#3a4355;transform:translateY(-1px)}.or-card.selected{border-color:var(--brand-blue);background:linear-gradient(90deg,var(--accent-soft),var(--surface) 35%)}.or-check{margin-top:7px;accent-color:var(--brand-blue)}.or-score{width:52px;height:52px;border-radius:9px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#172033;border:1px solid #334155}.or-score strong{font:700 19px var(--font-mono)}.or-score span{font-size:8.5px;color:var(--muted)}.or-score.s8,.or-score.s9,.or-score.s10{background:#0d2b23;border-color:#166534;color:#86efac}.or-score.s7{background:#14283c;border-color:#1d4ed8;color:#93c5fd}.or-score.s5,.or-score.s6{background:#2d2815;border-color:#854d0e;color:#fde68a}
-    .or-card-main{min-width:0}.or-card-title{display:flex;align-items:flex-start;gap:8px}.or-card-title h3{font-size:13px;margin:0 0 3px;font-weight:700}.or-card-title p{font-size:10.5px;color:var(--muted);margin:0}.or-rank{color:var(--text-3);font:500 10px var(--font-mono);padding-top:2px}.or-distance{margin-left:auto;font:700 15px var(--font-mono);white-space:nowrap}.or-distance.near{color:#4ade80}.or-badges{display:flex;gap:5px;flex-wrap:wrap;margin:9px 0}.or-badges span{padding:3px 6px;border-radius:5px;background:var(--surface-2);border:1px solid var(--border);font-size:9px;color:var(--text-2)}.or-badges .good{color:#86efac;border-color:#166534;background:#0d2b23}.or-badges .recent{color:#93c5fd;border-color:#1d4ed8;background:#14283c}.or-badges .status{color:#cbd5e1}.or-metrics{display:flex;gap:16px;flex-wrap:wrap;font-size:10.5px;color:var(--muted)}.or-metrics b{color:var(--text);font-weight:600}.or-contact-line{display:flex;align-items:center;gap:5px;margin-top:9px;color:var(--text-2);font-size:10.5px}.or-card-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.or-card-actions .btn{height:30px;padding:0 9px;font-size:10px}
-    .or-pagination{display:flex;align-items:center;justify-content:space-between;padding:12px 0 80px}.or-pagination-actions{display:flex;align-items:center;gap:8px}.or-pagination span{font-size:10.5px;color:var(--muted)}.or-empty{padding:40px;text-align:center;border:1px dashed var(--border);border-radius:10px}.or-empty h3{margin:8px 0}.or-empty-actions{display:flex;justify-content:center;gap:8px;margin-top:14px}.or-skeleton{height:150px;border-radius:10px;margin-bottom:9px;background:linear-gradient(90deg,var(--surface) 25%,var(--surface-2) 45%,var(--surface) 65%);background-size:300% 100%;animation:orShimmer 1.4s infinite}@keyframes orShimmer{to{background-position:-300% 0}}
-    .or-bulk{position:fixed;z-index:25;left:50%;bottom:22px;transform:translateX(-40%);display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #475569;border-radius:10px;background:#111827eF;box-shadow:0 16px 50px #000a}.or-bulk strong{margin-right:8px;font-size:11px}
-    .or-drawer-layer,.or-modal-layer{position:fixed;z-index:80;inset:0;background:#0008;display:flex;justify-content:flex-end}.or-drawer{width:min(480px,94vw);height:100%;box-sizing:border-box;padding:20px;background:var(--surface);border-left:1px solid var(--border);box-shadow:-20px 0 60px #0008;overflow:auto}.or-drawer-head,.or-modal-head{display:flex;justify-content:space-between;gap:12px;margin-bottom:20px}.or-drawer-head span,.or-modal-head span{font-size:9px;color:var(--brand-blue);text-transform:uppercase;letter-spacing:.08em}.or-drawer-head h2,.or-modal-head h3{margin:4px 0;font-size:18px}.or-drawer-head p{margin:0;color:var(--muted);font-size:11px}.or-drawer label{margin:0 0 14px}.or-drawer input{height:40px;padding:0 10px;margin-top:6px}.or-drawer textarea{min-height:300px;padding:11px;resize:vertical;margin-top:6px;font:11px/1.5 var(--font-mono)}.or-validation{display:flex;gap:9px;padding:11px;border:1px solid #854d0e;border-radius:8px;background:#2d2815;color:#fde68a}.or-validation strong,.or-validation span{display:block}.or-validation span{font-size:10px;margin-top:3px;color:#d6c78f}.or-drawer-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:15px}.or-modal-layer{justify-content:center;align-items:center}.or-modal{width:min(520px,92vw);max-height:80vh;overflow:auto;padding:18px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:0 20px 70px #000b}.or-plate-list{display:flex;gap:7px;flex-wrap:wrap;margin-top:15px}.or-plate-list>span{display:flex;flex-direction:column;padding:8px 11px;border:1px solid var(--border);border-radius:7px;font:600 11px var(--font-mono)}.or-plate-list .current{border-color:#166534;background:#0d2b23;color:#86efac}.or-plate-list small{font:8px var(--font-sans);margin-top:3px}.or-why{display:grid;gap:8px}.or-why span{display:flex;align-items:center;gap:8px;padding:10px;border-radius:7px;background:var(--surface-2);font-size:11px}.or-why b{font-weight:600}
-    @media(max-width:1100px){.or-kpis{grid-template-columns:repeat(2,1fr)}.or-search-card{grid-template-columns:1fr}.or-vehicle-summary{grid-template-columns:repeat(2,1fr)}}@media(max-width:700px){.or-kpis{grid-template-columns:1fr 1fr}.or-card{grid-template-columns:auto 1fr}.or-score{grid-column:2}.or-card-main{grid-column:1/-1}.or-search-card{padding:12px}.or-radius-action{grid-template-columns:80px 1fr}.or-filter-context{width:100%;margin:4px 0 0}.or-bulk{left:10px;right:10px;bottom:10px;transform:none;flex-wrap:wrap}.or-pagination{padding-bottom:120px}}@media(max-width:480px){.or-kpis{grid-template-columns:1fr}.or-vehicle-summary{grid-template-columns:1fr}.or-card-title{flex-wrap:wrap}.or-distance{margin-left:0}.or-radius-action{grid-template-columns:1fr}.or-pagination{align-items:flex-start;gap:8px;flex-direction:column}}
-  `}</style>
-    <div className="page-head or-head"><div><h1>Oportunidades de retorno</h1><div className="sub">Encontre clientes próximos ao local onde o veículo ficará disponível.</div></div><div className="actions"><button className="btn" onClick={downloadTemplate}><Icon name="download"/> Baixar modelo</button><label className="btn" style={{ cursor: "pointer" }}><Icon name="file"/> Importar planilha<input type="file" accept=".xlsx,.xls,.csv" onChange={importFile} style={{ display: "none" }}/></label></div></div>
+.or-page{max-width:1600px;margin:0 auto;--or-accent:#719de8;font-size:14px;line-height:1.5}.or-page *{box-sizing:border-box}.or-controls{border:0;padding:0;margin:0;min-width:0}.or-controls:disabled{opacity:.65}.or-page .btn{min-height:38px;padding:8px 14px;font-size:12px;border-radius:8px;cursor:pointer}.or-page button:disabled{opacity:.45;cursor:not-allowed}.or-page :is(button,input,select,textarea):focus-visible{outline:2px solid var(--or-accent);outline-offset:3px}.or-page .muted,.or-page .sub{font-size:13px;line-height:1.6}.or-head{margin-bottom:24px}.or-head h1{font-size:25px;letter-spacing:-.5px;margin-bottom:6px}.or-head .actions{display:flex;gap:8px;flex-wrap:wrap}.or-page .card{border-radius:14px}.or-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:0 0 20px}.or-stat{display:flex;gap:12px;align-items:flex-start;padding:18px;background:var(--surface);border:1px solid var(--border);border-radius:12px}.or-stat-icon{display:grid;place-items:center;flex-shrink:0;width:36px;height:36px;background:var(--accent-soft);color:var(--or-accent);border-radius:10px}.or-stat div>span{font-size:12px;color:var(--text-2)}.or-stat strong{display:block;font-size:26px;font-weight:650;line-height:1.4}.or-stat small{color:var(--muted);font-size:11px}.or-source{padding:18px 22px;margin-bottom:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}.or-source h2{font-size:14px;margin:0 auto 0 0}.or-source p{width:100%;margin:0}.or-source .or-radius-buttons button{padding:10px 18px;min-height:42px}.or-radius-buttons{display:flex;gap:6px;flex-wrap:wrap}.or-radius-buttons button,.or-filters>button{background:var(--surface-2);color:var(--text-2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer}.or-radius-buttons button.active,.or-filters>button.active{background:var(--accent-soft);border-color:var(--or-accent);color:var(--or-accent)}.or-search-card{display:grid;grid-template-columns:1.25fr 1fr;gap:26px;padding:22px;margin-bottom:20px}.or-vehicle,.or-radius{position:relative;min-width:0}.or-vehicle>label,.or-radius>label{display:block;color:var(--text-2);font-size:13px;font-weight:600;margin-bottom:10px}.or-combobox{width:100%;display:flex;align-items:center;justify-content:space-between;text-align:left;min-height:60px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);color:var(--text);padding:10px 14px;cursor:pointer}.or-combobox strong{display:block;font-size:15px}.or-combobox small{display:block;margin-top:3px;color:var(--text-2);font-size:12px}.or-combobox-menu{position:absolute;z-index:30;top:90px;left:0;right:0;border:1px solid var(--border);border-radius:10px;background:var(--surface);box-shadow:0 20px 55px #0006;overflow:hidden}.or-combobox-search{display:flex;gap:8px;align-items:center;padding:12px;border-bottom:1px solid var(--border)}.or-combobox-search input{background:transparent;border:0;color:var(--text);width:100%;padding:8px;font-size:13px}.or-combobox-options{max-height:320px;overflow:auto}.or-option-group{padding:12px;font-size:10px;color:var(--muted)}.or-option{display:flex;align-items:center;gap:10px;justify-content:space-between;width:100%;border:0;border-top:1px solid var(--border);padding:12px;background:transparent;color:var(--text);text-align:left;cursor:pointer}.or-option:hover{background:var(--surface-2)}.or-option strong,.or-option small{display:block}.or-option small{font-size:11px;color:var(--muted)}.or-option-badges{display:flex;gap:5px}.or-option-badges b{font-size:9px;font-weight:400;border:1px solid var(--border);border-radius:4px;padding:3px}.or-no-option{padding:20px}.or-vehicle-summary{display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:12px}.or-vehicle-summary span{font-size:11px;color:var(--text-2)}.or-vehicle-summary b{display:block;color:var(--muted);font-size:10px;font-weight:400}.or-radius-action{display:grid;grid-template-columns:88px 1fr;gap:10px;margin-top:12px}.or-radius-action input{width:100%;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);padding:10px;font-size:13px}.or-filters{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:16px 0}.or-filter-order{display:flex;align-items:center;gap:7px;padding:8px 10px;border:1px solid var(--border);border-radius:8px}.or-filter-order select{background:var(--surface);color:var(--text);border:0;font-size:12px}.or-filter-context{margin-left:auto;font-size:12px;color:var(--muted)}.or-clear{border:0!important;color:var(--or-accent)!important;background:transparent!important}.or-list-head{display:flex;justify-content:space-between;align-items:center;margin:26px 0 14px;gap:15px}.or-list-head h2{font-size:18px;margin:0 0 4px}.or-list-head p{font-size:12px;color:var(--text-2);margin:0}.or-material-filter{padding:16px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px}.or-material-filter label{font-size:13px;font-weight:600}.or-material-filter input{max-width:100%;padding:10px 12px;min-width:190px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);font-size:13px}.or-card-actions{display:flex;gap:8px;flex-wrap:wrap}.or-material-filter .or-card-actions{margin-left:auto}.or-table-wrap{overflow:auto;border:1px solid var(--border);border-radius:12px;background:var(--surface)}.or-table{width:100%;min-width:780px;border-collapse:collapse;text-align:left;font-size:13px}.or-table caption{text-align:left;padding:14px 20px;color:var(--muted);font-size:12px}.or-table th{padding:12px 18px;background:var(--surface-2);font-size:11px;font-weight:600;color:var(--text-2);border-bottom:1px solid var(--border)}.or-table td{padding:18px;border-bottom:1px solid var(--border);vertical-align:middle}.or-table tbody tr:last-child td{border-bottom:0}.or-table tbody tr:hover{background:var(--surface-2)}.or-table tbody tr.selected{background:var(--accent-soft)}.or-table td strong{font-size:13px}.or-table td small{display:block;margin-top:5px;color:var(--text-2);font-size:12px}.or-table input{width:17px;height:17px;accent-color:var(--or-accent)}.or-table a{color:var(--or-accent);text-decoration:none}.or-table a:hover{text-decoration:underline}.or-material-tags{display:flex;flex-wrap:wrap;gap:6px}.or-material-tags>span{padding:4px 9px;border-radius:6px;background:var(--accent-soft);color:var(--text-2);font-size:11px}.or-pagination{display:flex;justify-content:space-between;align-items:center;padding:16px 0;font-size:12px;color:var(--muted);gap:12px}.or-pagination-actions{display:flex;align-items:center;gap:12px}.or-empty{display:flex;flex-direction:column;align-items:center;padding:36px 24px;background:var(--surface);border:1px dashed var(--border);border-radius:14px;text-align:center}.or-empty-icon{display:grid;place-items:center;width:52px;height:52px;border-radius:16px;background:var(--accent-soft);color:var(--or-accent);margin-bottom:12px}.or-empty h3{font-size:17px;margin:0 0 8px}.or-empty p{max-width:600px;font-size:13px;color:var(--text-2);line-height:1.7;margin:0}.or-empty-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:20px}.or-next-step{display:flex;gap:14px;align-items:center;padding:22px;border-radius:12px;border:1px dashed var(--border);margin-top:12px;color:var(--text-2)}.or-next-step strong{font-size:13px}.or-next-step p{font-size:12px;color:var(--muted);margin:4px 0 0}.or-compose{margin-top:20px;padding:24px}.or-compose h2{font-size:18px;margin:0}.or-compose h3{font-size:13px;margin:0 0 12px}.or-recipients{border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin:16px 0;font-size:13px}.or-recipients ul{display:flex;gap:8px;flex-wrap:wrap;list-style:none;padding:0;margin:10px 0 0;max-height:140px;overflow:auto}.or-recipients li{padding:8px 12px;background:var(--surface-2);border-radius:8px}.or-recipients small{display:block;color:var(--muted);font-size:11px;margin-top:3px}.or-compose-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}.or-compose label{display:block;margin:0 0 16px;font-size:13px;font-weight:500}.or-compose input,.or-compose textarea{display:block;width:100%;border:1px solid var(--border);border-radius:9px;background:var(--surface-2);color:var(--text);padding:12px 14px;margin-top:8px;font:13px/1.7 var(--font-sans)}.or-compose textarea{min-height:190px;resize:vertical}.or-message-preview{border:1px solid var(--border);background:var(--surface-2);border-radius:12px;padding:20px;align-self:start}.or-message-preview pre{white-space:pre-wrap;overflow-wrap:anywhere;font:14px/1.8 var(--font-sans);padding:18px;background:var(--surface);border-radius:2px 12px 12px 12px;margin:0}.or-compose .or-card-actions{justify-content:flex-end;margin-top:20px}.or-validation{font-size:12px;color:var(--muted);text-align:right}.or-skeleton{height:100px;border-radius:12px;background:var(--surface-2);margin:12px 0}
+@media(max-width:1100px){.or-kpis{grid-template-columns:repeat(2,1fr)}.or-search-card{grid-template-columns:1fr}.or-compose-grid{grid-template-columns:1fr}}@media(max-width:700px){.or-page{padding:16px!important}.or-head h1{font-size:22px}.or-kpis{gap:8px}.or-stat{padding:12px;gap:8px}.or-stat-icon{display:none}.or-stat strong{font-size:23px}.or-stat small{font-size:10px}.or-source,.or-search-card,.or-compose{padding:16px}.or-source h2{width:100%}.or-source .or-radius-buttons{width:100%}.or-source .or-radius-buttons button{flex:1;padding:10px}.or-material-filter{padding:14px;align-items:stretch;flex-direction:column}.or-material-filter .or-card-actions{margin:0}.or-material-filter input{width:100%}.or-pagination{flex-wrap:wrap}.or-list-head{align-items:flex-start}.or-list-head>.meta{display:none}.or-filter-context{width:100%;margin:0}.or-option-badges{display:none}.or-compose .or-card-actions{justify-content:flex-start}.or-validation{text-align:left}}
+`}</style><fieldset className="or-controls" disabled={working}>
+    <div className="page-head or-head"><div><h1>Oportunidades de retorno</h1><div className="sub">Encontre clientes próximos ao local onde o veículo ficará disponível.</div></div><div className="actions"><button className="btn" onClick={downloadTemplate}><Icon name="download"/> Baixar modelo</button><label className="btn" style={{ cursor: "pointer" }}><Icon name="file"/> Importar planilha<input type="file" accept=".xlsx" onChange={importFile} style={{ display: "none" }}/></label></div></div>
     {(error || notice) && <div className="card" style={{ padding: "10px 14px", marginBottom: 14 }}><span className={error ? "kpi-delta down" : "kpi-delta up"}>{error || notice}</span></div>}
-    <ReturnSummaryCards vehicles={(data.sms?.length || 0) + (data.veiculosTelemetria?.length || 0)} opportunities={scoredClients.length} priority={priority} best={best}/>
-    <div className="card or-search-card"><VehicleSearchSelect data={data} value={smId} onChange={(id) => { setSmId(id); setAnalysis(null); setSelectedIds([]); }}/><RadiusSelector value={raioKm} onChange={setRaioKm} onAnalyze={analyze} disabled={working || !smId}/></div>
-    {analysis && <OpportunityFilters filters={filters} onChange={setFilters} onClear={() => setFilters({ sort: "score", samePlate: false, months: 0, hasPhone: false, notContacted: false })} currentPlate={analysis.sm?.placa}/>}
-    <div className="or-list-head"><div><h2>Oportunidades comerciais</h2><p>{analysis ? `Veículo ${analysis.sm?.placa} disponível em ${analysis.destino?.descricao} · raio de ${analysis.raioKm} km` : "Selecione um veículo e analise a região."}</p></div>{analysis && <span className="meta muted">Histórico desde 2023</span>}</div>
+    <ReturnSummaryCards vehicles={(data.sms?.length || 0) + (data.veiculosTelemetria?.length || 0)} imported={data.clientes?.length || 0} opportunities={analysis ? scoredClients.length : null} selected={selectedClients.length}/>
+    <section className="card or-source"><h2>Onde buscar oportunidades?</h2><div className="or-radius-buttons" role="group" aria-label="Fonte das oportunidades">{[["sistema", "Fretes do sistema"], ["planilha", "Contatos da planilha"]].map(([value, label]) => <button type="button" key={value} aria-pressed={fonte === value} className={fonte === value ? "active" : ""} onClick={() => { setFonte(value); resetAnalysis(); setShowCatalog(value === "planilha"); setFilters({ sort: value === "planilha" ? "distance" : "score", samePlate: false, months: 0, hasPhone: false, notContacted: false }); }}>{label}</button>)}</div><p className="muted">{fonte === "planilha" ? `${data.clientes?.length || 0} contatos cadastrados. A importação lê todas as abas e reúne registros repetidos.` : "Clientes que já carregaram na região, com histórico de fretes desde 2023."}</p>{fonte === "planilha" && data.clientes?.length > 0 && !showCatalog && <button className="btn" onClick={openCatalog}>Ver todos os contatos ({data.clientes.length})</button>}</section>
+    <div className="card or-search-card"><VehicleSearchSelect data={data} value={smId} onChange={(id) => { setSmId(id); resetAnalysis(); }}/><RadiusSelector value={raioKm} onChange={(value) => { setRaioKm(value); resetAnalysis(); }} onAnalyze={analyze} disabled={working || !smId}/></div>
+    {analysis && !showCatalog && <OpportunityFilters fonte={fonte} filters={filters} onChange={changeFilters} onClear={clearFilters} currentPlate={analysis.sm?.placa}/>}
+    {analysis?.semLocalizacao > 0 && <p role="status" className="muted">{analysis.semLocalizacao} contato(s) sem localização identificada. Confira cidade e UF ou informe latitude e longitude no modelo.</p>}
+    <div className="or-list-head"><div><h2>{showCatalog ? "Contatos da sua planilha" : "Oportunidades comerciais"}</h2><p>{showCatalog ? "Consulte o cadastro completo. Selecione um veículo e analise a região para preparar a mensagem." : analysis ? `Veículo ${analysis.sm?.placa} disponível em ${analysis.destino?.descricao} · raio de ${analysis.raioKm} km` : "Selecione um veículo e analise a região."}</p></div>{analysis && <span className="meta muted">{fonte === "planilha" ? "Contatos importados" : "Histórico desde 2023"}</span>}</div>
     {(loading || working) && !analysis && <div><div className="or-skeleton"/><div className="or-skeleton"/><div className="or-skeleton"/></div>}
-    {!loading && !working && !analysis && <div className="or-empty"><Icon name="route" size={28}/><h3>Escolha onde o veículo ficará disponível</h3><p className="muted">Selecione uma SM ou uma posição atual da telemetria para encontrar clientes próximos.</p></div>}
-    {analysis && pagedClients.map((client, index) => <OpportunityCard key={client.id} client={client} rank={(page - 1) * OR_PAGE_SIZE + index + 1} currentPlate={analysis.sm?.placa} selected={selectedIds.includes(client.id)} contactStatus={contactStatuses[client.id]} onToggle={(id) => setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])} onHistory={setHistoryClient} onContact={prepareClient} onWhy={setWhyClient}/>)}
-    {analysis && !working && !filteredClients.length && <div className="or-empty"><Icon name="search" size={28}/><h3>Nenhum cliente encontrado em um raio de {analysis.raioKm} km.</h3><p className="muted">Tente aumentar o raio, alterar os filtros ou importar novos clientes.</p><div className="or-empty-actions"><button className="btn primary" onClick={() => { setRaioKm(Math.min(1000, Math.max(300, analysis.raioKm + 100))); }}>Aumentar raio</button><button className="btn" onClick={() => setFilters({ sort: "score", samePlate: false, months: 0, hasPhone: false, notContacted: false })}>Limpar filtros</button></div></div>}
-    {analysis && filteredClients.length > 0 && <div className="or-pagination"><span>{firstItem}-{lastItem} de {filteredClients.length} oportunidades</span><div className="or-pagination-actions"><button className="btn" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Anterior</button><span>Página {page} de {totalPages}</span><button className="btn" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>Próxima</button></div></div>}
-    <BulkActionBar count={selectedIds.length} onMessage={buildBulkMessage} onCopy={copyContacts} onClear={() => setSelectedIds([])}/>
-    <ContactDrawer client={drawerClient} recipient={recipient} message={message} config={data.configuracao} working={working} onRecipient={setRecipient} onMessage={setMessage} onClose={() => setDrawerClient(null)} onCopy={() => { navigator.clipboard.writeText(message); setNotice("Mensagem copiada."); }} onSend={sendClient}/>
-    <HistoryModal client={historyClient} currentPlate={analysis?.sm?.placa} onClose={() => setHistoryClient(null)}/><WhyModal client={whyClient} currentPlate={analysis?.sm?.placa} onClose={() => setWhyClient(null)}/>
+    {!loading && !working && !showResults && <div className="or-empty"><Icon name="route" size={28}/><h3>Escolha onde o veículo ficará disponível</h3><p className="muted">Selecione uma SM ou uma posição atual da telemetria para encontrar clientes próximos.</p></div>}
+    {showResults && visibleClients.length > 0 && <section className="or-material-filter card">
+      <label htmlFor="or-material">2. Filtrar por material carregado</label>
+      <input id="or-material" type="search" list="or-material-suggestions" value={material} onChange={(event) => { setMaterial(event.target.value); setSelectedIds([]); }} placeholder="Digite o material: ferro, papel, leite…" autoComplete="off"/>
+      <datalist id="or-material-suggestions">
+        {materialOptions.filter(([key]) => !materialQuery || key.includes(materialQuery)).slice(0, 30).map(([key, label]) => <option key={key} value={label}/>)}
+        <option value="Não informado"/>
+      </datalist>
+      <span className="muted">{filteredClients.length} contato(s) encontrado(s)</span>
+      <div className="or-card-actions"><button className="btn" disabled={showCatalog || !filteredClients.length} onClick={() => setSelectedIds(filteredClients.map((client) => client.id))}>Selecionar contatos filtrados</button><button className="btn" disabled={!selectedIds.length} onClick={() => setSelectedIds([])}>Limpar seleção</button></div>
+    </section>}
+    {showResults && filteredClients.length > 0 && <OpportunityTable catalog={showCatalog} clients={pagedClients} selectedIds={selectedIds} onToggle={(id) => setSelectedIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])}/>}
+    {showResults && !loading && !working && !filteredClients.length && <div className="or-empty">
+      <span className="or-empty-icon"><Icon name={fonte === "planilha" && !data.clientes?.length ? "file" : "search"} size={28}/></span>
+      <h3>{fonte === "planilha" && !data.clientes?.length ? "Sua lista de contatos ainda está vazia" : visibleClients.length ? "Nenhum contato corresponde aos filtros" : showCatalog ? "Nenhum contato cadastrado" : `Nenhum contato em até ${analysis.raioKm} km`}</h3>
+      <p>{fonte === "planilha" && !data.clientes?.length ? "Importe sua planilha para cadastrar nomes, telefones, cidades e materiais." : visibleClients.length ? "Experimente outro material ou limpe os filtros para consultar a lista." : fonte === "planilha" ? `Você tem ${data.clientes?.length || 0} contatos cadastrados, mas nenhum foi localizado dentro deste raio. Consulte a lista completa ou busque em outra região.` : "Experimente aumentar o raio ou escolher outro veículo."}</p>
+      <div className="or-empty-actions">{fonte === "planilha" && !data.clientes?.length ? <label className="btn primary">Importar contatos<input type="file" accept=".xlsx" onChange={importFile} hidden/></label> : <>{fonte === "planilha" && !showCatalog && <button className="btn primary" onClick={openCatalog}>Ver todos os contatos</button>}{visibleClients.length > 0 && <button className="btn" onClick={clearFilters}>Limpar filtros</button>}{analysis && !showCatalog && analysis.raioKm < 1000 && <button className="btn" onClick={() => { setRaioKm(Math.min(1000, analysis.raioKm + 100)); resetAnalysis(); }}>Aumentar raio</button>}</>}</div>
+    </div>}
+    {analysis && !showCatalog && filteredClients.length > 0 && !selectedClients.length && <div className="or-next-step"><Icon name="whatsapp"/><div><strong>Selecione os contatos para preparar sua mensagem</strong><p>O editor e a prévia aparecem aqui após a seleção. O envio permanece desabilitado.</p></div></div>}
+    {showResults && filteredClients.length > 0 && <div className="or-pagination"><span>{firstItem}-{lastItem} de {filteredClients.length} oportunidades</span><div className="or-pagination-actions"><button className="btn" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Anterior</button><span>Página {page} de {totalPages}</span><button className="btn" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>Próxima</button></div></div>}
+    {analysis && !showCatalog && selectedClients.length > 0 && <section className="card or-compose">
+      <h2>3. Revisar mensagem</h2>
+      <p className="muted">Selecione os contatos na tabela e confira a mensagem antes do envio.</p>
+      <div className="or-recipients"><strong>{selectedClients.length} contato(s) selecionado(s)</strong>
+        {selectedClients.length ? <ul>{selectedClients.map((client) => <li key={client.id}><span>{client.nome}</span><small>{client.contato ? `${client.contato} · ` : ""}{client.telefone || "Telefone não informado"}</small></li>)}</ul> : <p className="muted">Nenhum contato selecionado.</p>}
+      </div>
+      <div className="or-compose-grid"><div>
+        <label>Tipo de veículo<input value={vehicleType} onChange={(event) => setVehicleType(event.target.value)} placeholder="Ex.: carreta 4 eixos"/></label>
+        <label>Modelo da mensagem<textarea value={messageTemplate} onChange={(event) => setMessageTemplate(event.target.value)}/></label>
+        <p className="muted">Use {"{tipoVeiculo}"}, {"{localizacao}"} e {"{placa}"} para preencher os dados do veículo.</p>
+      </div><div className="or-message-preview"><h3>Prévia da mensagem</h3><pre>{campaignMessage}</pre></div></div>
+      <div className="or-card-actions"><button className="btn" disabled={!campaignMessage.trim()} onClick={buildBulkMessage}><Icon name="copy"/> Copiar mensagem</button><button className="btn primary" disabled title="Envio desabilitado durante o ajuste da tela"><Icon name="whatsapp"/> Enviar para {selectedClients.length} selecionado(s)</button></div>
+      <p className="or-validation" role="status">Envio desabilitado por enquanto. Esta tela permite apenas selecionar contatos e revisar a mensagem.</p>
+    </section>}
+    </fieldset>
   </div>;
 };
 

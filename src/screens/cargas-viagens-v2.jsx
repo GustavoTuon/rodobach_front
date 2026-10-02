@@ -346,6 +346,7 @@ export function Cv2CteModal({ carga, onClose, onSaved }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [documents, setDocuments] = useState(carga.documentos || []);
+  const removedDocuments = (carga.documentos || []).filter(doc => !documents.includes(doc));
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -379,7 +380,7 @@ export function Cv2CteModal({ carga, onClose, onSaved }) {
     catch (err) { setError(cv2Error(err)); }
     finally { setSaving(false); }
   };
-  return <Cv2Modal title={`Vincular CT-es · ${carga.codigo}`} subtitle={`${carga.cliente} · ${carga.origem}/${carga.ufOrigem} → ${carga.destino}/${carga.ufDestino}`} onClose={onClose}>
+  return <Cv2Modal title={`Gerenciar CT-es · ${carga.codigo}`} subtitle={`${carga.cliente} · ${carga.origem}/${carga.ufOrigem} → ${carga.destino}/${carga.ufDestino}`} onClose={onClose}>
     <div className="cv2-modal-body">
       {error && <div className="cv2-alert error">{error}</div>}
       <Cv2Field label="Número do CT-e no ERP" hint="Pesquise e adicione quantos CT-es precisar. Os documentos já vinculados serão mantidos, e as NF-es serão incluídas automaticamente.">
@@ -390,10 +391,11 @@ export function Cv2CteModal({ carga, onClose, onSaved }) {
       </button>)}
       <div className="cv2-doc-list"><b>Documentos da carga · {documents.filter(doc => String(doc.tipo).toUpperCase().replace(/[^A-Z]/g, "") === "CTE").length} CT-e(s)</b>
         {!documents.length && <span>Nenhum documento selecionado.</span>}
-        {documents.map((doc, index) => <div key={`${doc.tipo}-${doc.numero}-${index}`}><span className="cv2-doc-type">{doc.tipo}</span><strong>{doc.numero || "Sem número"}</strong><small>{doc.chave ? `Chave ${doc.chave}` : doc.observacoes}</small><button type="button" aria-label={`Remover ${doc.tipo} ${doc.numero}`} onClick={() => setDocuments(current => current.filter((_, i) => i !== index))}>×</button></div>)}
+        {documents.map((doc, index) => <div key={`${doc.tipo}-${doc.numero}-${index}`}><span className="cv2-doc-type">{doc.tipo}</span><strong>{doc.numero || "Sem número"}</strong><small>{doc.chave ? `Chave ${doc.chave}` : doc.observacoes}</small><button type="button" disabled={saving} aria-label={`Desvincular ${doc.tipo} ${doc.numero}`} onClick={() => setDocuments(current => current.filter((_, i) => i !== index))}>Desvincular</button></div>)}
       </div>
+      {!!removedDocuments.length && <div className="cv2-alert info" role="status"><b>Vínculos que serão removidos ao salvar:</b> {removedDocuments.map(doc => `${doc.tipo} ${doc.numero || "sem número"}`).join(', ')}.<p>A carga e a viagem serão mantidas. Os documentos e títulos no ERP não serão alterados. As NF-es permanecem vinculadas até que você as remova individualmente.</p><button type="button" className="btn" disabled={saving} onClick={() => setDocuments(current => [...current, ...removedDocuments])}>Desfazer remoções</button></div>}
     </div>
-    <footer className="cv2-modal-actions"><button type="button" className="btn" onClick={onClose}>Cancelar</button><button type="button" className="btn primary" onClick={save} disabled={saving || !documents.length}>{saving ? "Salvando..." : "Vincular documentos"}</button></footer>
+    <footer className="cv2-modal-actions"><button type="button" className="btn" onClick={onClose}>Cancelar</button><button type="button" className="btn primary" onClick={save} disabled={saving || (!documents.length && !removedDocuments.length)}>{saving ? "Salvando..." : removedDocuments.length ? "Salvar alterações" : "Vincular documentos"}</button></footer>
   </Cv2Modal>;
 }
 
@@ -491,7 +493,7 @@ function Cv2TripDetails({ viagem, onClose, onLinkCte }) {
       <div className="cv2-detail-grid"><div><span>Operação</span><Cv2Status value={viagem.situacao} vehicleLinked={Boolean(viagem.placa)} /></div><div><span>Financeiro</span><Cv2FinancialStatus value={viagem.financeiro} /></div><div><span>Motorista</span><b>{viagem.motorista || "—"}</b></div><div><span>KM previsto</span><b>{viagem.km ?? "—"}</b></div><div><span>ANTT / RNTRC</span><b>{viagem.antt || "—"}</b></div><div><span>Celular / CNH</span><b>{[viagem.numeroMotorista, viagem.cnh].filter(Boolean).join(" · ") || "—"}</b></div></div>
       <Cv2TripBilling financeiro={viagem.financeiro} />
       <h3 className="cv2-subtitle">Cargas vinculadas</h3>
-      <div className="cv2-linked-loads">{viagem.cargas.map((carga) => { const hasCte = (carga.documentos || []).some((doc) => String(doc.tipo || "").toUpperCase().includes("CT")); return <div key={carga.id}><div><strong>{carga.codigo} · {carga.cliente}</strong><span>{carga.origem}/{carga.ufOrigem} → {carga.destino}/{carga.ufDestino}</span><small>CT-es: {cv2CteNumbers(carga) || "Nenhum vinculado"}</small></div><div className="cv2-linked-statuses"><Cv2Status value={carga.status} /><Cv2FinancialStatus value={carga.financeiro} /><button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => onLinkCte(carga)}><Icon name="file" size={13} /> {hasCte ? "Adicionar / ver CT-es" : "Vincular CT-e"}</button><button className="btn" onClick={() => cv2PrintLoad(carga)}>Imprimir carga</button></div></div>; })}</div>
+      <div className="cv2-linked-loads">{viagem.cargas.map((carga) => { const hasCte = (carga.documentos || []).some((doc) => String(doc.tipo || "").toUpperCase().includes("CT")); return <div key={carga.id}><div><strong>{carga.codigo} · {carga.cliente}</strong><span>{carga.origem}/{carga.ufOrigem} → {carga.destino}/{carga.ufDestino}</span><small>CT-es: {cv2CteNumbers(carga) || "Nenhum vinculado"}</small></div><div className="cv2-linked-statuses"><Cv2Status value={carga.status} /><Cv2FinancialStatus value={carga.financeiro} /><button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => onLinkCte(carga)}><Icon name="file" size={13} /> {hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button><button className="btn" onClick={() => cv2PrintLoad(carga)}>Imprimir carga</button></div></div>; })}</div>
     </div>
     <footer className="cv2-modal-actions"><button className="btn" onClick={onClose}>Fechar</button><button className="btn primary" onClick={() => cv2PrintTrip(viagem)}>Imprimir folha da viagem</button></footer>
   </Cv2Modal>;
@@ -632,7 +634,7 @@ const CargasViagensV2 = ({ user }) => {
     const hasCte = carga.documentos.some((doc) => doc.tipo.toUpperCase().includes("CT"));
     return <div className="cv2-row-actions">
       {carga.status === "aguardando_viagem" && <button className="btn primary" onClick={() => openViagemForm(carga.id)}>Programar veículo</button>}
-      {carga.viagemId && <button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => setModal({ type: "cte", item: carga })}>{hasCte ? "Adicionar / ver CT-es" : "Vincular CT-e"}</button>}
+      {carga.viagemId && <button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => setModal({ type: "cte", item: carga })}>{hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button>}
       <details className="cv2-more"><summary aria-label="Mais ações">•••</summary><div>
         <button onClick={() => cv2PrintLoad(carga)}><Icon name="file" size={13} /> Imprimir folha da carga</button>
         <button onClick={() => setModal({ type: "carga", item: carga })}>Editar carga</button>
@@ -671,6 +673,7 @@ const CargasViagensV2 = ({ user }) => {
       <button className={financialStatus === "quitado" ? "active paid" : ""} onClick={() => { setPage(1); setStatus(""); setFinancialStatus(financialStatus === "quitado" ? "" : "quitado"); }}>Quitado</button>
       {tab === "cargas" && <button className="cv2-filter-toggle" onClick={() => setFiltersOpen((value) => !value)}><Icon name="filter" size={13} /> Filtros {filtersOpen ? "▴" : "▾"}</button>}
     </div></div>
+    {tab === "viagens" && <p className="cv2-muted">Para localizar um CT-e, digite o número ou a chave na busca. Abra Detalhes → Gerenciar CT-es para conferir ou desvincular documentos.</p>}
     {tab === "cargas" && filtersOpen && <div className="cv2-advanced-filters"><div className="cv2-advanced-head"><b>Filtros avançados da carga</b><button onClick={() => { setPage(1); setCargaFilters(emptyCargaFilters()); }}>Limpar filtros</button></div><div className="cv2-filter-grid">
       <label><span>Empresa / cliente</span><input list="cv2-empresas" value={cargaFilters.empresa} onChange={(e) => setCargaFilter("empresa", e.target.value)} placeholder="Todas" /><datalist id="cv2-empresas">{filterOptions.empresas.map((item) => <option key={item} value={item} />)}</datalist></label>
       <label><span>Origem</span><input list="cv2-origens" value={cargaFilters.origem} onChange={(e) => setCargaFilter("origem", e.target.value)} placeholder="Todas as cidades" /><datalist id="cv2-origens">{filterOptions.origens.map((item) => <option key={item} value={item} />)}</datalist></label>

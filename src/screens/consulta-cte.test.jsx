@@ -28,28 +28,28 @@ async function importNotes(notes) {
 const toggle = () => fireEvent.click(screen.getByRole('checkbox'));
 const setFreight = value => fireEvent.change(screen.getByLabelText('Valor total do frete (R$)'), {target:{value}});
 
-it('uses allocated freight per kg for the 13-note batch, updates it and restores merchandise value when disabled', async () => {
+it('uses allocated freight per tonne for the 13-note batch, updates it and restores merchandise value when disabled', async () => {
   await importNotes(batch);
   const row = () => screen.getByText('NF 298770').closest('tr');
-  expect(normalized(row())).toContain(`${money(3.32)} / kg`);
+  expect(normalized(row())).toContain(`${money(3317.44)} / t`);
   toggle(); setFreight('5.600,00');
-  expect(screen.getByRole('columnheader', {name:'Frete por kg'})).toBeTruthy();
+  expect(screen.getByRole('columnheader', {name:'Frete por tonelada'})).toBeTruthy();
   expect(normalized(row())).toContain(money(3250.78));
-  expect(normalized(row())).toContain(`${money(.34)} / kg`);
+  expect(normalized(row())).toContain(`${money(341.67)} / t`);
   const rows = batch.map(([id]) => screen.getByText(`NF ${id}`).closest('tr'));
   const cents = rows.reduce((sum, r) => {
     const cells = within(r).getAllByRole('cell');
-    expect(normalized(cells[8])).toBe(`${money(.34)} / kg`);
+    expect(normalized(cells[8])).toContain(' / t');
     return sum + Math.round(Number(cells[7].textContent.replace(/[^\d,]/g,'').replace(',','.')) * 100);
   }, 0);
   expect(cents).toBe(560000);
-  expect(normalized(screen.getByText('Frete por kg', {selector:'span'}).parentElement)).toContain(`${money(.34)} / kg`);
+  expect(normalized(screen.getByText('Frete por tonelada', {selector:'span'}).parentElement)).toContain(`${money(341.67)} / t`);
   setFreight('11.200,00');
-  expect(normalized(row())).toContain(`${money(.68)} / kg`);
-  setFreight('0'); expect(normalized(row())).toContain(`${money(0)} / kg`);
+  expect(normalized(row())).toContain(`${money(683.35)} / t`);
+  setFreight('0'); expect(normalized(row())).toContain(`${money(0)} / t`);
   toggle();
-  expect(screen.getByRole('columnheader', {name:'Valor da nota por kg'})).toBeTruthy();
-  expect(normalized(row())).toContain(`${money(3.32)} / kg`);
+  expect(screen.getByRole('columnheader', {name:'Valor da nota por tonelada'})).toBeTruthy();
+  expect(normalized(row())).toContain(`${money(3317.44)} / t`);
 });
 
 it('shows no unit price when a note has no weight', async () => {

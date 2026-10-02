@@ -8,9 +8,9 @@ const SimuladorFrete = ({ onNavigate }) => {
   const [tipoCarga, setTipoCarga] = useState("normal");
   const [operacao, setOperacao] = useState("etc");
   const [km, setKm] = useState("");
-  const [pedagio, setPedagio] = useState("");
+  const [pedagio, setPedagio] = useState("50,00");
   const [valorNota, setValorNota] = useState("");
-  const [seguro, setSeguro] = useState("");
+  const [seguro, setSeguro] = useState("91,91");
   const [icms, setIcms] = useState("12");
   const [simMotorista, setSimMotorista] = useState("");
   const [simCliente, setSimCliente] = useState("");
