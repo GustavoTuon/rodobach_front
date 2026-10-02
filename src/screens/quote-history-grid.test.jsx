@@ -2,9 +2,37 @@
 import React from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { QuoteHistoryGrid, filterHistory, sortHistory } from './quote-history-grid.jsx';
+import { QuoteHistoryGrid, filterHistory, sortHistory, historyValue } from './quote-history-grid.jsx';
 afterEach(cleanup);
-it('solicita páginas e filtros globais ao servidor', () => {
+it('filtra as duas UFs no servidor preservando a busca por cidade', () => {
+  const onPagingChange = vi.fn();
+  const paging = { page: 3, pageSize: 25, filters: { origem: 'Içara', ufOrigem: 'SC' }, sort: { field: 'data', direction: 'desc' } };
+  render(<QuoteHistoryGrid fretes={[]} paging={paging} onPagingChange={onPagingChange}/>);
+  fireEvent.click(screen.getByLabelText('UF destino'));
+  fireEvent.click(screen.getByText('Desmarcar todas'));
+  fireEvent.click(screen.getByLabelText('GO'));
+  fireEvent.click(screen.getByLabelText('SP'));
+  fireEvent.click(screen.getByText('Aplicar'));
+  expect(onPagingChange).toHaveBeenLastCalledWith({ filters: { origem: 'Içara', ufOrigem: 'SC', ufDestino: ['GO', 'SP'] }, page: 1 });
+  fireEvent.click(screen.getByLabelText('UF origem'));
+  fireEvent.click(screen.getByText('Limpar filtro desta coluna'));
+  expect(onPagingChange).toHaveBeenLastCalledWith({ filters: { origem: 'Içara' }, page: 1 });
+});
+it('oculta motorista por padrão e calcula valor por tonelada com peso em kg', () => {
+  render(<QuoteHistoryGrid fretes={[{ id: 1, valor: 5000, peso: 20000 }, { id: 2, valor: 100, peso: 0 }]}/>);
+  expect(screen.queryByRole('columnheader', { name: /Motorista/ })).toBeNull();
+  expect(screen.getByRole('columnheader', { name: /Valor por tonelada/ })).toBeTruthy();
+  expect(screen.getByText(/250,00/)).toBeTruthy();
+  expect(historyValue({ valor: 5000, peso: 20000 }, 'valorTonelada')).toBe('250');
+  expect(historyValue({ valor: 100, peso: 0 }, 'valorTonelada')).toBe('');
+  fireEvent.click(screen.getByText('Colunas', {selector:'summary'}));
+  fireEvent.click(screen.getByLabelText('Motorista (R$)'));
+  expect(screen.getByRole('columnheader', {name:/Motorista/})).toBeTruthy();
+  fireEvent.click(screen.getByText('Restaurar padrão'));
+  expect(screen.queryByRole('columnheader', {name:/Motorista/})).toBeNull();
+});
+it('solicita páginas e filtros globais ao servidor', async () => {
+  window.RB_API = { consultarCotacaoFretesV2: vi.fn(async ({ optionsSearch }) => ({ options: optionsSearch === 'Içara' ? ['IÇARA/SC'] : ['SANGÃO/SC'], hasMore: false })) };
   const onPagingChange = vi.fn();
   const paging = { page: 2, pageSize: 25, hasMore: true, filters: {}, sort: { field: 'data', direction: 'desc' } };
   const { rerender } = render(<QuoteHistoryGrid fretes={[]} paging={paging} onPagingChange={onPagingChange} />);
@@ -14,8 +42,12 @@ it('solicita páginas e filtros globais ao servidor', () => {
   expect(onPagingChange).toHaveBeenLastCalledWith({ pageSize: 50, page: 1 });
   fireEvent.click(screen.getByRole('button', { name: 'Filtrar Origem' }));
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Içara' } });
+  fireEvent.click(await screen.findByLabelText('IÇARA/SC'));
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'sangao' } });
+  fireEvent.click(await screen.findByLabelText('SANGÃO/SC'));
   fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
-  expect(onPagingChange).toHaveBeenLastCalledWith({ filters: { origem: 'Içara' }, page: 1 });
+  expect(onPagingChange).toHaveBeenLastCalledWith({ filters: { origem: ['IÇARA/SC', 'SANGÃO/SC'] }, page: 1 });
+  expect(window.RB_API.consultarCotacaoFretesV2).toHaveBeenLastCalledWith(expect.objectContaining({ optionsField: 'origem', optionsSearch: 'sangao' }));
   rerender(<QuoteHistoryGrid fretes={[]} paging={{ ...paging, hasMore: false }} onPagingChange={onPagingChange} />);
   expect(screen.getByRole('button', { name: 'Próxima' }).disabled).toBe(true);
 });

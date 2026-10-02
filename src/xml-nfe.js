@@ -118,6 +118,7 @@ export function consolidateNfes(notes) {
     valorTotal,
     pesoTotal,
     valorPorKg: pesoTotal > 0 ? valorTotal / pesoTotal : null,
+    valorPorTonelada: pesoTotal > 0 ? valorTotal / (pesoTotal / 1000) : null,
     ncmPredominante: ncms[0]?.ncm || "",
     ncms,
   };

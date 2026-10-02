@@ -86,3 +86,10 @@
 .qh-pagination .btn { font-size: 14px; padding: 9px 14px; }
 .qh-pagination label { white-space: nowrap; }
 .qh-pagination select { width: auto; min-width: 70px; }
+.qh-route-filters{display:flex;gap:16px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--border)}
+.qh-route-filters label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2)}
+.qh-route-filters select{min-height:36px;padding:6px 10px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);font:inherit}
+.qh-route-filters>div{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2)}
+.qh-route-filters .btn{max-width:320px;white-space:normal;text-align:left;min-height:36px}
+.qh-filter{max-height:calc(100dvh - 16px);overflow-y:auto}
+.qh-filter small{display:block;font-size:11px;line-height:1.5;color:var(--muted);margin:8px 0}

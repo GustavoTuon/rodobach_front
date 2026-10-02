@@ -37,5 +37,6 @@ export function allocateFreight(notes, freight, weightKey = 'pesoConsiderado') {
     percentualPeso: totalWeight > 0 ? weights[index] / totalWeight * 100 : 0,
     freteRateado: cents[index] / 100,
     fretePorKg: weights[index] > 0 ? cents[index] / 100 / weights[index] : null,
+    fretePorTonelada: weights[index] > 0 ? cents[index] / 100 / (weights[index] / 1000) : null,
   }));
 }
