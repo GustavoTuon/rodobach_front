@@ -1,4 +1,4 @@
-import { confirmedVehicleLayout } from '../vehicle-layout-overrides.js';
+import { confirmedVehicleLayout } from "../vehicle-layout-overrides.js";
 
 const COMPONENTS = [
   "Lona de freio",
@@ -1238,6 +1238,24 @@ function ServiceForm({
   onCancel,
   onSave,
 }) {
+  const serviceMeta = {
+    Troca: {
+      icon: "refresh",
+      description: "Substituir uma peça ou conjunto",
+    },
+    Inspeção: {
+      icon: "search",
+      description: "Avaliar e registrar a condição atual",
+    },
+    Regulagem: {
+      icon: "settings",
+      description: "Corrigir folgas ou parâmetros",
+    },
+    Reparo: {
+      icon: "wrench",
+      description: "Recuperar o componente existente",
+    },
+  };
   const empty = {
     componentes: [initialComponent || "Lona de freio"],
     tipo_servico: "Troca",
@@ -1253,7 +1271,7 @@ function ServiceForm({
     observacao: "",
   };
   const [form, setForm] = React.useState(empty);
-  const [more, setMore] = React.useState(false);
+  const [step, setStep] = React.useState(1);
   const intervals = Object.fromEntries(
     (options.intervalos || []).map((item) => [
       item.componente,
@@ -1279,217 +1297,521 @@ function ServiceForm({
           : current.componentes.filter((item) => item !== component)
         : [...current.componentes, component],
     }));
+  const canContinue =
+    step !== 2 ||
+    (step === 2 &&
+      form.componentes.length > 0 &&
+      (form.tipo_servico !== "Inspeção" || Boolean(form.condicao)));
+  const optionalFieldsFilled = [
+    form.proximo_km,
+    form.proxima_data,
+    form.marca,
+    form.fornecedor,
+    form.valor,
+    form.observacao,
+  ].filter(Boolean).length;
+  const stepTitles = [
+    "Tipo de serviço",
+    "Componentes",
+    "Detalhes opcionais",
+    "Confirmar registro",
+  ];
   return (
     <form
       className="mp-service-form"
       onSubmit={(event) => {
         event.preventDefault();
+        if (step < 4) {
+          if (canContinue) setStep((current) => current + 1);
+          return;
+        }
         onSave(form);
       }}
     >
-      <div className="mp-step">
-        <strong>O que foi realizado?</strong>
-        <div className="mp-choice-row">
-          {SERVICES.map((service) => (
-            <button
-              type="button"
-              className={form.tipo_servico === service ? "active" : ""}
-              onClick={() => setForm({ ...form, tipo_servico: service })}
-              key={service}
-            >
-              {service}
-            </button>
-          ))}
+      <div className="mp-wizard-head">
+        <div>
+          <small>NOVO REGISTRO</small>
+          <h4>{stepTitles[step - 1]}</h4>
         </div>
+        <strong>{step} de 4</strong>
       </div>
-      <div className="mp-step">
-        <strong>
-          Componentes{" "}
-          <small className="muted">
-            · selecione um ou mais para registrar agrupado
-          </small>
-        </strong>
-        <div className="mp-choice-row mp-components-choice">
-          {COMPONENTS.map((component) => (
-            <button
-              type="button"
-              className={form.componentes.includes(component) ? "active" : ""}
-              onClick={() => toggleComponent(component)}
-              key={component}
-            >
-              <span className="mp-check">
-                {form.componentes.includes(component) ? "✓" : "+"}
-              </span>
-              {component}
-            </button>
-          ))}
-        </div>
+      <div className="mp-wizard-progress" aria-label={`Etapa ${step} de 4`}>
+        {stepTitles.map((title, index) => (
+          <button
+            type="button"
+            key={title}
+            className={
+              step === index + 1 ? "active" : step > index + 1 ? "done" : ""
+            }
+            onClick={() => index + 1 < step && setStep(index + 1)}
+            aria-label={`Etapa ${index + 1}: ${title}`}
+          >
+            <i>{step > index + 1 ? "✓" : index + 1}</i>
+            <span>{title}</span>
+          </button>
+        ))}
       </div>
-      {form.tipo_servico === "Inspeção" && (
-        <div className="mp-inspection">
-          <strong>Condição encontrada</strong>
-          <div className="mp-condition-row">
-            {INSPECTION_CONDITIONS.map((item) => (
+
+      {step === 1 && (
+        <div className="mp-wizard-stage">
+          <div className="mp-stage-copy">
+            <span>ETAPA 1</span>
+            <h3>O que foi realizado?</h3>
+            <p>Escolha a ação que melhor representa o trabalho executado.</p>
+          </div>
+          <div className="mp-service-cards">
+            {SERVICES.map((service) => (
               <button
                 type="button"
-                key={item.id}
-                className={form.condicao === item.id ? "active" : ""}
-                style={{ "--condition-color": item.color }}
-                onClick={() => setForm({ ...form, condicao: item.id })}
+                className={form.tipo_servico === service ? "active" : ""}
+                onClick={() => setForm({ ...form, tipo_servico: service })}
+                key={service}
               >
-                {item.label}
+                <span className="mp-service-icon">
+                  <Icon name={serviceMeta[service].icon} size={20} />
+                </span>
+                <strong>{service}</strong>
+                <small>{serviceMeta[service].description}</small>
+                <i>{form.tipo_servico === service ? "✓" : ""}</i>
               </button>
             ))}
           </div>
-          {form.condicao && form.condicao !== "BOM" && (
-            <label>
-              Motivo
-              <select
-                value={form.motivo}
-                onChange={(e) => setForm({ ...form, motivo: e.target.value })}
+        </div>
+      )}
+
+      {step === 2 && (
+        <div className="mp-wizard-stage">
+          <div className="mp-stage-copy">
+            <span>ETAPA 2</span>
+            <h3>Quais componentes?</h3>
+            <p>
+              Você pode selecionar vários itens e registrar tudo de uma vez.
+            </p>
+          </div>
+          <div className="mp-components-grid">
+            {COMPONENTS.map((component) => (
+              <button
+                type="button"
+                className={form.componentes.includes(component) ? "active" : ""}
+                onClick={() => toggleComponent(component)}
+                key={component}
               >
-                <option value="">Selecione...</option>
-                {INSPECTION_REASONS.map((reason) => (
-                  <option key={reason}>{reason}</option>
+                <span className="mp-check">
+                  {form.componentes.includes(component) ? "✓" : "+"}
+                </span>
+                <strong>{component}</strong>
+              </button>
+            ))}
+          </div>
+          <div className="mp-selection-feedback">
+            <span>{form.componentes.length}</span>
+            componente{form.componentes.length === 1 ? "" : "s"} selecionado
+            {form.componentes.length === 1 ? "" : "s"}
+          </div>
+          {form.tipo_servico === "Inspeção" && (
+            <div className="mp-inspection">
+              <strong>Como está a condição encontrada?</strong>
+              <div className="mp-condition-row">
+                {INSPECTION_CONDITIONS.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={form.condicao === item.id ? "active" : ""}
+                    style={{ "--condition-color": item.color }}
+                    onClick={() => setForm({ ...form, condicao: item.id })}
+                  >
+                    <i>
+                      {item.id === "BOM"
+                        ? "✓"
+                        : item.id === "ATENCAO"
+                          ? "!"
+                          : "×"}
+                    </i>
+                    {item.label}
+                  </button>
                 ))}
-              </select>
-            </label>
+              </div>
+              {form.condicao && form.condicao !== "BOM" && (
+                <label>
+                  Qual foi o principal motivo?
+                  <select
+                    value={form.motivo}
+                    onChange={(e) =>
+                      setForm({ ...form, motivo: e.target.value })
+                    }
+                  >
+                    <option value="">Selecione...</option>
+                    {INSPECTION_REASONS.map((reason) => (
+                      <option key={reason}>{reason}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {!form.condicao && (
+                <small className="mp-required-hint">
+                  Escolha uma condição para continuar.
+                </small>
+              )}
+            </div>
           )}
         </div>
       )}
-      <div className="mp-known-data">
-        <span>
-          <small>Posição</small>
-          {selected.axle.label} · {selected.side}
-        </span>
-        <span>
-          <small>Data</small>
-          <input
-            type="date"
-            required
-            value={form.data_servico}
-            onChange={(e) => setForm({ ...form, data_servico: e.target.value })}
-          />
-        </span>
-        <span>
-          <small>KM do serviço</small>
-          <input
-            type="number"
-            value={form.km_servico}
-            onChange={(e) => setForm({ ...form, km_servico: e.target.value })}
-          />
-        </span>
-      </div>
-      {form.tipo_servico === "Troca" && suggested.length > 0 && (
-        <div className="mp-km-suggestions">
-          <strong>Próximos vencimentos calculados</strong>
-          {suggested.map((item) => (
-            <span key={item.component}>
-              {item.component}: <b>{formatKm(item.next)} km</b>{" "}
-              <small>
-                (intervalo planejado de {formatKm(item.interval)} km)
-              </small>
+
+      {step === 3 && (
+        <div className="mp-wizard-stage">
+          <div className="mp-stage-copy">
+            <span>ETAPA 3</span>
+            <h3>Quer adicionar mais detalhes?</h3>
+            <p>
+              Esta etapa é opcional. Preencha somente o que ajudar no histórico
+              da manutenção.
+            </p>
+          </div>
+          <div className="mp-optional-banner">
+            <span className="mp-optional-icon">
+              <Icon name="info" size={18} />
             </span>
-          ))}
+            <div>
+              <strong>Nenhum campo é obrigatório</strong>
+              <small>
+                Se não quiser informar nada agora, clique em “Continuar sem
+                preencher”.
+              </small>
+            </div>
+            <b>OPCIONAL</b>
+          </div>
+          <div className="mp-form-grid mp-optional-fields">
+            <label>
+              Próximo KM <small>(sobrescrever cálculo)</small>
+              <input
+                type="number"
+                placeholder={
+                  suggested.length === 1
+                    ? suggested[0].next
+                    : "Automático por componente"
+                }
+                value={form.proximo_km}
+                onChange={(e) =>
+                  setForm({ ...form, proximo_km: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              Próxima data
+              <input
+                type="date"
+                value={form.proxima_data}
+                onChange={(e) =>
+                  setForm({ ...form, proxima_data: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              Marca
+              <input
+                list="mp-marcas"
+                placeholder="Ex.: Fras-le"
+                value={form.marca}
+                onChange={(e) => setForm({ ...form, marca: e.target.value })}
+              />
+              <datalist id="mp-marcas">
+                {options.marcas.map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
+            </label>
+            <label>
+              Fornecedor
+              <input
+                list="mp-fornecedores"
+                placeholder="Quem realizou ou forneceu"
+                value={form.fornecedor}
+                onChange={(e) =>
+                  setForm({ ...form, fornecedor: e.target.value })
+                }
+              />
+              <datalist id="mp-fornecedores">
+                {options.fornecedores.map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
+            </label>
+            <label>
+              Valor
+              <input
+                type="number"
+                step="0.01"
+                placeholder="R$ 0,00"
+                value={form.valor}
+                onChange={(e) => setForm({ ...form, valor: e.target.value })}
+              />
+            </label>
+            <label className="mp-observation">
+              Observação
+              <textarea
+                rows="3"
+                placeholder="Alguma informação importante sobre o serviço?"
+                value={form.observacao}
+                onChange={(e) =>
+                  setForm({ ...form, observacao: e.target.value })
+                }
+              />
+            </label>
+          </div>
         </div>
       )}
-      <button
-        type="button"
-        className="mp-more-toggle"
-        onClick={() => setMore(!more)}
-      >
-        {more
-          ? "− Ocultar informações adicionais"
-          : "+ Mais informações (opcional)"}
-      </button>
-      {more && (
-        <div className="mp-form-grid">
-          <label>
-            Próximo KM <small>(sobrescrever cálculo)</small>
-            <input
-              type="number"
-              placeholder={
-                suggested.length === 1
-                  ? suggested[0].next
-                  : "Automático por componente"
-              }
-              value={form.proximo_km}
-              onChange={(e) => setForm({ ...form, proximo_km: e.target.value })}
-            />
-          </label>
-          <label>
-            Próxima data
-            <input
-              type="date"
-              value={form.proxima_data}
-              onChange={(e) =>
-                setForm({ ...form, proxima_data: e.target.value })
-              }
-            />
-          </label>
-          <label>
-            Marca
-            <input
-              list="mp-marcas"
-              value={form.marca}
-              onChange={(e) => setForm({ ...form, marca: e.target.value })}
-            />
-            <datalist id="mp-marcas">
-              {options.marcas.map((item) => (
-                <option key={item} value={item} />
+
+      {step === 4 && (
+        <div className="mp-wizard-stage">
+          <div className="mp-stage-copy">
+            <span>ETAPA 4</span>
+            <h3>Revise e confirme</h3>
+            <p>Confira os dados antes de concluir o registro.</p>
+          </div>
+          <div className="mp-review-summary">
+            <span>
+              <small>Serviço</small>
+              <strong>{form.tipo_servico}</strong>
+            </span>
+            <span>
+              <small>Posição</small>
+              <strong>
+                {selected.axle.label} · lado{" "}
+                {selected.side === "E" ? "esquerdo" : "direito"}
+              </strong>
+            </span>
+            <span>
+              <small>Componentes</small>
+              <strong>{form.componentes.join(", ")}</strong>
+            </span>
+          </div>
+          {optionalFieldsFilled > 0 && (
+            <div className="mp-optional-review">
+              <div>
+                <Icon name="check" size={15} />
+                <strong>
+                  {optionalFieldsFilled} detalhe
+                  {optionalFieldsFilled === 1
+                    ? " opcional preenchido"
+                    : "s opcionais preenchidos"}
+                </strong>
+              </div>
+              <button type="button" onClick={() => setStep(3)}>
+                Revisar detalhes
+              </button>
+            </div>
+          )}
+          <div className="mp-known-data">
+            <span>
+              <small>Data</small>
+              <input
+                type="date"
+                required
+                value={form.data_servico}
+                onChange={(e) =>
+                  setForm({ ...form, data_servico: e.target.value })
+                }
+              />
+            </span>
+            <span>
+              <small>KM do serviço</small>
+              <input
+                type="number"
+                value={form.km_servico}
+                onChange={(e) =>
+                  setForm({ ...form, km_servico: e.target.value })
+                }
+              />
+            </span>
+            <span>
+              <small>Veículo</small>
+              <strong>{selected.plate}</strong>
+            </span>
+          </div>
+          {form.tipo_servico === "Troca" && suggested.length > 0 && (
+            <div className="mp-km-suggestions">
+              <strong>Próximos vencimentos calculados</strong>
+              {suggested.map((item) => (
+                <span key={item.component}>
+                  {item.component}: <b>{formatKm(item.next)} km</b>{" "}
+                  <small>(intervalo de {formatKm(item.interval)} km)</small>
+                </span>
               ))}
-            </datalist>
-          </label>
-          <label>
-            Fornecedor
-            <input
-              list="mp-fornecedores"
-              value={form.fornecedor}
-              onChange={(e) => setForm({ ...form, fornecedor: e.target.value })}
-            />
-            <datalist id="mp-fornecedores">
-              {options.fornecedores.map((item) => (
-                <option key={item} value={item} />
-              ))}
-            </datalist>
-          </label>
-          <label>
-            Valor
-            <input
-              type="number"
-              step="0.01"
-              value={form.valor}
-              onChange={(e) => setForm({ ...form, valor: e.target.value })}
-            />
-          </label>
-          <label className="mp-observation">
-            Observação
-            <textarea
-              rows="3"
-              value={form.observacao}
-              onChange={(e) => setForm({ ...form, observacao: e.target.value })}
-            />
-          </label>
+            </div>
+          )}
         </div>
       )}
-      <div className="mp-actions">
-        <button type="button" className="btn" onClick={onCancel}>
+
+      <div className="mp-wizard-footer">
+        <button
+          type="button"
+          className="btn mp-wizard-cancel"
+          onClick={onCancel}
+        >
           Cancelar
         </button>
-        <button
-          className="btn btn-primary"
-          disabled={
-            saving || (form.tipo_servico === "Inspeção" && !form.condicao)
-          }
-        >
-          {saving
-            ? "Salvando..."
-            : form.componentes.length > 1
-              ? `Salvar ${form.componentes.length} serviços agrupados`
-              : "Salvar serviço"}
-        </button>
+        <div>
+          {step > 1 && (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setStep((current) => current - 1)}
+            >
+              Voltar
+            </button>
+          )}
+          <button className="btn btn-primary" disabled={saving || !canContinue}>
+            {step < 4
+              ? step === 3 && optionalFieldsFilled === 0
+                ? "Continuar sem preencher"
+                : "Continuar"
+              : saving
+                ? "Salvando..."
+                : form.componentes.length > 1
+                  ? `Concluir ${form.componentes.length} registros`
+                  : "Concluir registro"}
+            {!saving && step < 4 && <Icon name="chevron-right" size={14} />}
+          </button>
+        </div>
       </div>
     </form>
+  );
+}
+
+function PositionModal({
+  selected,
+  vehicle,
+  options,
+  saving,
+  tab,
+  onTabChange,
+  formComponent,
+  onFormComponent,
+  onSave,
+  onRefresh,
+  onClose,
+}) {
+  const dialogRef = React.useRef(null);
+  React.useEffect(() => {
+    const previousFocus = document.activeElement;
+    dialogRef.current?.focus();
+    const handleKey = (event) => {
+      if (event.key === "Escape" && !saving) onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      previousFocus?.focus?.();
+    };
+  }, [onClose, saving]);
+
+  return (
+    <div
+      className="mp-position-overlay"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !saving) onClose();
+      }}
+    >
+      <section
+        ref={dialogRef}
+        className="card mp-position-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="mp-position-title"
+        tabIndex="-1"
+      >
+        <header className="mp-position-modal-head">
+          <div className="mp-position-identity">
+            <span
+              className="mp-position-status"
+              style={{ "--position-color": selected.state.color }}
+              aria-label={selected.state.label}
+            >
+              {selected.state.icon}
+            </span>
+            <div>
+              <small>
+                {selected.plate} · {vehicle?.modelo || "Veículo"}
+              </small>
+              <h2 id="mp-position-title">
+                {selected.axle.label} · lado{" "}
+                {selected.side === "E" ? "esquerdo" : "direito"}
+              </h2>
+              <span className="mp-position-subtitle">
+                {selected.state.label} · {selected.state.components.length}{" "}
+                componentes monitorados
+              </span>
+            </div>
+          </div>
+          <button
+            className="icon-btn"
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            aria-label="Fechar posição"
+          >
+            <Icon name="x" />
+          </button>
+        </header>
+
+        <div className="mp-position-modal-body">
+          {!formComponent ? (
+            <>
+              <div className="mp-position-overview">
+                <div>
+                  <strong>Pronto para registrar?</strong>
+                  <span>
+                    Escolha um componente abaixo ou registre vários em um único
+                    fluxo.
+                  </span>
+                </div>
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  onClick={() => onFormComponent("Lona de freio")}
+                >
+                  <Icon name="plus" size={14} /> Novo registro
+                </button>
+              </div>
+              <div className="mp-tabs">
+                <button
+                  className={tab === "current" ? "active" : ""}
+                  onClick={() => onTabChange("current")}
+                >
+                  Visão atual
+                </button>
+                <button
+                  className={tab === "history" ? "active" : ""}
+                  onClick={() => onTabChange("history")}
+                >
+                  Histórico <span>{selected.state.history.length}</span>
+                </button>
+              </div>
+              {tab === "current" ? (
+                <ComponentList
+                  selected={selected}
+                  onRegister={onFormComponent}
+                />
+              ) : (
+                <History selected={selected} onChanged={onRefresh} />
+              )}
+            </>
+          ) : (
+            <ServiceForm
+              key={`${selected.plate}-${selected.axle.id}-${selected.side}-${formComponent}`}
+              selected={selected}
+              vehicle={vehicle}
+              initialComponent={formComponent}
+              options={options}
+              saving={saving}
+              onCancel={() => onFormComponent(null)}
+              onSave={onSave}
+            />
+          )}
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -1550,7 +1872,12 @@ function MaintenanceCheckup({
     return acc;
   }, {});
   return (
-    <div className="mp-checkup">
+    <div
+      className="mp-checkup"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Check-up do veículo ${vehicle.placa}`}
+    >
       <div className="mp-checkup-head">
         <div>
           <small>CHECK-UP · {vehicle.placa}</small>
@@ -1558,7 +1885,12 @@ function MaintenanceCheckup({
             {inspected} de {items.length} verificados
           </h3>
         </div>
-        <button className="icon-btn" onClick={onClose}>
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={onClose}
+          aria-label="Fechar check-up"
+        >
           <Icon name="x" />
         </button>
       </div>
@@ -1649,6 +1981,10 @@ export function ManutencaoPosicoes({ vehicles, onClose, embedded = false }) {
   const layout = inferMaintenanceLayout(vehicle);
   const currentKm = Number(vehicle?.km_atual) || 0;
   const positions = allPositions(vehicle);
+  const closeSelected = React.useCallback(() => {
+    setSelected(null);
+    setFormComponent(null);
+  }, []);
   const load = React.useCallback(async (plate) => {
     if (!plate) return;
     setLoadingRecords(true);
@@ -1858,85 +2194,31 @@ export function ManutencaoPosicoes({ vehicles, onClose, embedded = false }) {
               </div>
             )}
             {checkup && (
-              <MaintenanceCheckup
-                positions={positions}
-                currentKm={currentKm}
-                vehicle={vehicle}
-                saving={saving}
-                onSave={saveBatch}
-                onClose={() => setCheckup(false)}
-              />
+              <div className="mp-position-overlay" role="presentation">
+                <MaintenanceCheckup
+                  positions={positions}
+                  currentKm={currentKm}
+                  vehicle={vehicle}
+                  saving={saving}
+                  onSave={saveBatch}
+                  onClose={() => setCheckup(false)}
+                />
+              </div>
             )}
             {selectedLive && (
-              <section className="card mp-position-panel">
-                <div className="mp-position-head">
-                  <div>
-                    <small>{selectedLive.plate}</small>
-                    <h3>
-                      {selectedLive.axle.label} · lado{" "}
-                      {selectedLive.side === "E" ? "esquerdo" : "direito"}
-                    </h3>
-                  </div>
-                  <div className="mp-position-actions">
-                    <button
-                      className="btn btn-primary"
-                      type="button"
-                      onClick={() => setFormComponent("Lona de freio")}
-                    >
-                      + Registrar serviço
-                    </button>
-                    <button
-                      className="icon-btn"
-                      type="button"
-                      onClick={() => setSelected(null)}
-                    >
-                      <Icon name="x" />
-                    </button>
-                  </div>
-                </div>
-                {!formComponent && (
-                  <>
-                    <div className="mp-tabs">
-                      <button
-                        className={tab === "current" ? "active" : ""}
-                        onClick={() => setTab("current")}
-                      >
-                        Visão atual
-                      </button>
-                      <button
-                        className={tab === "history" ? "active" : ""}
-                        onClick={() => setTab("history")}
-                      >
-                        Histórico{" "}
-                        <span>{selectedLive.state.history.length}</span>
-                      </button>
-                    </div>
-                    {tab === "current" ? (
-                      <ComponentList
-                        selected={selectedLive}
-                        onRegister={setFormComponent}
-                      />
-                    ) : (
-                      <History
-                        selected={selectedLive}
-                        onChanged={() => load(vehicle.placa)}
-                      />
-                    )}
-                  </>
-                )}
-                {formComponent && (
-                  <ServiceForm
-                    key={`${selectedLive.plate}-${selectedLive.axle.id}-${selectedLive.side}-${formComponent}`}
-                    selected={selectedLive}
-                    vehicle={vehicle}
-                    initialComponent={formComponent}
-                    options={options}
-                    saving={saving}
-                    onCancel={() => setFormComponent(null)}
-                    onSave={save}
-                  />
-                )}
-              </section>
+              <PositionModal
+                selected={selectedLive}
+                vehicle={vehicle}
+                options={options}
+                saving={saving}
+                tab={tab}
+                onTabChange={setTab}
+                formComponent={formComponent}
+                onFormComponent={setFormComponent}
+                onSave={save}
+                onRefresh={() => load(vehicle.placa)}
+                onClose={closeSelected}
+              />
             )}
           </div>
         )}

@@ -667,6 +667,110 @@ textarea {
   margin-top: 14px;
   padding: 16px;
 }
+.mp-position-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(6, 10, 24, 0.7);
+  backdrop-filter: blur(5px);
+  animation: mp-overlay-in 140ms ease-out;
+}
+.mp-position-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(940px, calc(100vw - 48px));
+  max-height: min(860px, calc(100vh - 48px));
+  padding: 0;
+  overflow: hidden;
+  border-radius: 14px;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+  animation: mp-dialog-in 180ms cubic-bezier(0.2, 0.75, 0.2, 1);
+}
+.mp-position-dialog:focus {
+  outline: none;
+}
+.mp-position-modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px;
+  background: color-mix(in srgb, var(--brand-blue) 7%, var(--surface));
+  border-bottom: 1px solid var(--border);
+}
+.mp-position-identity {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+}
+.mp-position-identity small {
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.mp-position-identity h2 {
+  margin: 2px 0;
+  font-size: 19px;
+}
+.mp-position-subtitle {
+  color: var(--text-2);
+  font-size: 11.5px;
+}
+.mp-position-status {
+  display: grid;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  color: var(--position-color);
+  background: color-mix(in srgb, var(--position-color) 13%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--position-color) 38%, var(--border));
+  border-radius: 12px;
+  font-size: 20px;
+  font-weight: 800;
+}
+.mp-position-modal-body {
+  min-height: 0;
+  padding: 20px;
+  overflow-y: auto;
+}
+.mp-position-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: color-mix(in srgb, var(--brand-blue) 8%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--brand-blue) 24%, var(--border));
+  border-radius: 10px;
+}
+.mp-position-overview > div {
+  display: grid;
+  gap: 3px;
+}
+.mp-position-overview span {
+  color: var(--text-2);
+  font-size: 11.5px;
+}
+.mp-position-overview .btn,
+.mp-wizard-footer .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+@keyframes mp-overlay-in {
+  from { opacity: 0; }
+}
+@keyframes mp-dialog-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+}
 .mp-position-head,
 .mp-position-actions {
   display: flex;
@@ -913,9 +1017,322 @@ textarea {
   word-break: break-all;
 }
 .mp-service-form {
-  margin-top: 15px;
-  padding-top: 15px;
+  margin: 0;
+}
+.mp-wizard-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.mp-wizard-head small,
+.mp-stage-copy > span {
+  color: var(--brand-blue);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+.mp-wizard-head h4 {
+  margin: 2px 0 0;
+  font-size: 16px;
+}
+.mp-wizard-head > strong {
+  padding: 5px 9px;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border-radius: 999px;
+  font-size: 11px;
+}
+.mp-wizard-progress {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 14px 0 22px;
+}
+.mp-wizard-progress button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 10px;
+  color: var(--text-3);
+  text-align: left;
+  cursor: default;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.mp-wizard-progress button.done {
+  color: var(--text-2);
+  cursor: pointer;
+}
+.mp-wizard-progress button.active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--brand-blue) 11%, var(--surface));
+  border-color: var(--brand-blue);
+}
+.mp-wizard-progress i {
+  display: grid;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  color: var(--text-2);
+  background: var(--surface);
+  border-radius: 50%;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+.mp-wizard-progress .active i,
+.mp-wizard-progress .done i {
+  color: white;
+  background: var(--brand-blue);
+}
+.mp-wizard-stage {
+  min-height: 310px;
+  animation: mp-stage-in 150ms ease-out;
+}
+@keyframes mp-stage-in {
+  from { opacity: 0; transform: translateX(7px); }
+}
+.mp-stage-copy {
+  margin-bottom: 16px;
+}
+.mp-stage-copy h3 {
+  margin: 3px 0 2px;
+  font-size: 20px;
+}
+.mp-stage-copy p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 12px;
+}
+.mp-service-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.mp-service-cards > button {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 11px;
+  min-height: 84px;
+  padding: 14px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+.mp-service-cards > button:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+}
+.mp-service-cards > button.active {
+  background: color-mix(in srgb, var(--brand-blue) 12%, var(--surface));
+  border-color: var(--brand-blue);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--brand-blue) 40%, transparent);
+}
+.mp-service-icon {
+  display: grid;
+  grid-row: 1 / span 2;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  color: var(--brand-blue);
+  background: color-mix(in srgb, var(--brand-blue) 12%, var(--surface));
+  border-radius: 9px;
+}
+.mp-service-cards strong {
+  align-self: end;
+}
+.mp-service-cards small {
+  color: var(--text-2);
+  font-size: 11px;
+}
+.mp-service-cards > button > i {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: var(--brand-blue);
+  font-style: normal;
+  font-weight: 800;
+}
+.mp-components-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.mp-components-grid button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 9px 11px;
+  color: var(--text-2);
+  text-align: left;
+  cursor: pointer;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.mp-components-grid button.active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--brand-blue) 11%, var(--surface));
+  border-color: var(--brand-blue);
+}
+.mp-selection-feedback {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  color: var(--text-2);
+  font-size: 11px;
+}
+.mp-selection-feedback > span {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  place-items: center;
+  color: white;
+  background: var(--brand-blue);
+  border-radius: 50%;
+  font-weight: 750;
+}
+.mp-required-hint {
+  color: #f59e0b;
+}
+.mp-optional-banner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 14px;
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--brand-blue) 8%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, var(--brand-blue) 24%, var(--border));
+  border-radius: 9px;
+}
+.mp-optional-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: var(--brand-blue);
+  background: color-mix(in srgb, var(--brand-blue) 13%, var(--surface));
+  border-radius: 9px;
+}
+.mp-optional-banner > div {
+  display: grid;
+  gap: 2px;
+}
+.mp-optional-banner strong {
+  color: var(--text);
+  font-size: 12px;
+}
+.mp-optional-banner small {
+  font-size: 11px;
+}
+.mp-optional-banner > b {
+  padding: 4px 7px;
+  color: var(--brand-blue);
+  background: color-mix(in srgb, var(--brand-blue) 12%, transparent);
+  border-radius: 999px;
+  font-size: 9px;
+  letter-spacing: 0.07em;
+}
+.mp-optional-fields {
+  margin-top: 14px;
+}
+.mp-optional-fields label > small {
+  color: var(--text-3);
+  font-weight: 400;
+}
+.mp-optional-review {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 9px 11px;
+  color: #16a34a;
+  background: color-mix(in srgb, #16a34a 8%, var(--surface-2));
+  border: 1px solid color-mix(in srgb, #16a34a 22%, var(--border));
+  border-radius: 8px;
+}
+.mp-optional-review > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.mp-optional-review button {
+  padding: 3px 0;
+  color: var(--brand-blue);
+  background: transparent;
+  border: 0;
+  font-size: 11px;
+}
+.mp-condition-row button i {
+  margin-right: 6px;
+  color: var(--condition-color);
+  font-style: normal;
+  font-weight: 850;
+}
+.mp-review-summary {
+  display: grid;
+  grid-template-columns: 0.7fr 1fr 1.3fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.mp-review-summary > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 11px;
+  background: var(--surface-2);
+  border-radius: 8px;
+}
+.mp-review-summary small {
+  color: var(--text-3);
+  font-size: 10px;
+}
+.mp-review-summary strong {
+  overflow: hidden;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+}
+.mp-wizard-footer {
+  position: sticky;
+  bottom: -20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 18px -20px -20px;
+  padding: 13px 20px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
   border-top: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+}
+.mp-wizard-footer > div {
+  display: flex;
+  gap: 8px;
+}
+.mp-wizard-cancel {
+  color: var(--text-2);
+  background: transparent;
+  border-color: transparent;
+}
+.mp-position-overlay > .mp-checkup {
+  width: min(760px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  margin: 0;
+  overflow-y: auto;
+  animation: mp-dialog-in 180ms cubic-bezier(0.2, 0.75, 0.2, 1);
 }
 .mp-step {
   margin-bottom: 14px;
@@ -1276,6 +1693,15 @@ textarea {
   .mp-consult-filter-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+  .mp-components-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .mp-review-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+  .mp-review-summary > span:last-child {
+    grid-column: 1 / -1;
+  }
 }
 @media (max-width: 600px) {
   .mp-content {
@@ -1324,6 +1750,100 @@ textarea {
   }
   .mp-position-panel {
     padding: 12px;
+  }
+  .mp-position-overlay {
+    align-items: end;
+    padding: 0;
+  }
+  .mp-position-dialog {
+    width: 100%;
+    max-height: 96vh;
+    border-radius: 16px 16px 0 0;
+  }
+  .mp-position-modal-head {
+    padding: 14px;
+  }
+  .mp-position-identity {
+    gap: 9px;
+  }
+  .mp-position-status {
+    flex-basis: 36px;
+    width: 36px;
+    height: 36px;
+  }
+  .mp-position-identity h2 {
+    font-size: 16px;
+  }
+  .mp-position-subtitle {
+    display: none;
+  }
+  .mp-position-modal-body {
+    padding: 14px;
+  }
+  .mp-position-overview {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .mp-wizard-progress {
+    margin-bottom: 17px;
+  }
+  .mp-wizard-progress button {
+    justify-content: center;
+    padding: 8px 5px;
+  }
+  .mp-wizard-progress button span {
+    display: none;
+  }
+  .mp-wizard-stage {
+    min-height: 0;
+  }
+  .mp-service-cards,
+  .mp-components-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .mp-service-cards > button {
+    grid-template-columns: 1fr;
+    gap: 5px;
+    min-height: 116px;
+  }
+  .mp-service-icon {
+    grid-row: auto;
+  }
+  .mp-review-summary {
+    grid-template-columns: 1fr;
+  }
+  .mp-review-summary > span:last-child {
+    grid-column: auto;
+  }
+  .mp-optional-banner {
+    grid-template-columns: auto 1fr;
+  }
+  .mp-optional-banner > b {
+    grid-column: 2;
+    justify-self: start;
+  }
+  .mp-optional-review {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .mp-wizard-footer {
+    bottom: -14px;
+    margin: 16px -14px -14px;
+    padding: 11px 14px;
+  }
+  .mp-wizard-cancel {
+    display: none;
+  }
+  .mp-wizard-footer > div {
+    width: 100%;
+  }
+  .mp-wizard-footer > div .btn {
+    flex: 1;
+  }
+  .mp-position-overlay > .mp-checkup {
+    width: 100%;
+    max-height: 96vh;
+    border-radius: 16px 16px 0 0;
   }
   .mp-checkup {
     padding: 12px;
