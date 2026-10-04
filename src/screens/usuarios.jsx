@@ -1,5 +1,6 @@
 ﻿const { useState, useEffect, useRef } = React;
 
+import { EXTRA_SCREEN_PERMISSIONS } from "../screen-permissions.js";
 const TELAS_GRUPOS = [
   {
     id: "direcao",
@@ -11,7 +12,7 @@ const TELAS_GRUPOS = [
       { id: "perm_comparativo_faturamento", label: "Comparativo Mensal" },
       { id: "perm_abastecimentos", label: "Abastecimentos" },
       { id: "perm_precos_combustivel", label: "Preços Postos" },
-      { id: "perm_lucro_viagens", label: "Resultado por Viagem" },
+      { id: "perm_lucro_viagens", label: "Viagens — região e consulta" },
       { id: "perm_custos_veiculos", label: "Resultado por Veículo" },
       { id: "perm_clientes", label: "Análise de Clientes" },
       { id: "perm_clientes_lucro", label: "Rentabilidade de Clientes" },
@@ -52,9 +53,13 @@ const TELAS_GRUPOS = [
     ],
   },
 ];
+for (const item of EXTRA_SCREEN_PERMISSIONS) {
+  TELAS_GRUPOS.find(group => group.id === item.group).telas.push({id: item.column, label: item.label});
+}
 const TELAS = TELAS_GRUPOS.flatMap((grupo) => grupo.telas);
 
 const FORM_VAZIO = {
+  ...Object.fromEntries(EXTRA_SCREEN_PERMISSIONS.map(item => [item.column, false])),
   login: "",
   senha: "",
   email: "",
@@ -100,9 +105,15 @@ const Toggle = ({ value, onChange, label }) => (
       userSelect: "none",
     }}
   >
-    <div
+    <button
+      type="button"
+      role="switch"
+      aria-label={label}
+      aria-checked={Boolean(value)}
       onClick={() => onChange(!value)}
       style={{
+        border: 0,
+        padding: 0,
         width: 36,
         height: 20,
         borderRadius: 10,
@@ -126,7 +137,7 @@ const Toggle = ({ value, onChange, label }) => (
           boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
         }}
       />
-    </div>
+    </button>
     {label && (
       <span style={{ fontSize: 12.5, color: "var(--text)" }}>{label}</span>
     )}
@@ -170,6 +181,7 @@ const GerenciarUsuarios = ({ onNavigate }) => {
 
   const abrirEdicao = (u) => {
     setForm({
+      ...Object.fromEntries(EXTRA_SCREEN_PERMISSIONS.map(item => [item.column, u[item.column] === true])),
       login: u.login,
       senha: "",
       email: u.email || "",
@@ -695,7 +707,9 @@ const GerenciarUsuarios = ({ onNavigate }) => {
                     color: "var(--muted)",
                   }}
                 >
-                  Telas desativadas ficam ocultas no menu do usuário.
+                  Telas desativadas ficam ocultas no menu do usuário. Conferência
+                  de manutenção tem liberação independente do lançamento.
+                  Administradores têm acesso a todas as telas.
                 </div>
               </div>
 

@@ -190,6 +190,9 @@ window.RB_API = {
       body: JSON.stringify(payload),
     }),
   getViagemAuditoria: (id) => apiRequest(`/viagens/${id}/auditoria`),
+  listConsultaViagens: (filters = {}) => apiRequest(`/financeiro/consulta-viagens${buildQuery(filters)}`),
+  getConsultaViagem: (empresa,numero) => apiRequest(`/financeiro/consulta-viagens/${encodeURIComponent(empresa)}/${encodeURIComponent(numero)}`),
+  getConsultaViagemIndicadores: (empresa,numero) => apiRequest(`/financeiro/consulta-viagens/${encodeURIComponent(empresa)}/${encodeURIComponent(numero)}/indicadores`),
 
   getCargasViagensV2Resumo: () => apiRequest("/cargas-viagens-v2/resumo"),
   getCargasViagensV2Filtros: () => apiRequest("/cargas-viagens-v2/filtros"),
@@ -395,6 +398,11 @@ window.RB_API = {
 
   // ── Manutenção ────────────────────────────────────────────────────────────
   listVeiculosManutencao: () => apiRequest("/manutencao/veiculos"),
+  listVeiculosPlantao: () => apiRequest("/manutencao-plantao/placas"),
+  listPlantao: (conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}`),
+  createPlantao: (body) => apiRequest("/manutencao-plantao/lancamentos", {method:"POST",body:JSON.stringify(body)}),
+  checkPlantao: (id) => apiRequest(`/manutencao-plantao/conferencia/${encodeURIComponent(id)}`, {method:"PATCH"}),
+  searchFornecedoresManutencao: (q = "") => apiRequest(`/manutencao/fornecedores${buildQuery({ q })}`),
   listComponentesPosicao: (placa) =>
     apiRequest(`/manutencao/componentes-posicao${buildQuery({ placa })}`),
   consultaComponentesPosicao: (filters = {}) =>

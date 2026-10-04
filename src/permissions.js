@@ -2,6 +2,7 @@ export function getNavForUser(baseNav, user) {
   const permissions = user?.permissions || {};
   return baseNav.filter((item) => {
     if (item.adminOnly && !user?.admin) return false;
-    return user?.admin || permissions[item.permission || item.id] === true;
+    const allowed = item.permissionsAny || [item.permission || item.id];
+    return user?.admin || allowed.some(permission => permissions[permission] === true);
   });
 }
