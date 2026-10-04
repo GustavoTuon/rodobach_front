@@ -1,4 +1,6 @@
 export const SCREEN_FILES = {
+  "consulta-viagens": "consulta-viagens",
+  "manutencao-plantao": "manutencao-plantao", "conferencia-manutencao": "manutencao-plantao",
   diretoria: "diretoria", simulador: "simulador", viagens: "cargas-viagens-v2",
   "folgas-motoristas": "folgas-motoristas", "status-carga": "status-carga", "painel-tv": "painel-tv",
   "ociosidade-frota": "ociosidade-frota", trafegus: "trafegus", "oportunidades-retorno": "oportunidades-retorno",

@@ -12,6 +12,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/ {
 }; /*EDITMODE-END*/
 
 const NAV = [
+  {id:"manutencao-plantao",label:"Manutenção de plantão",icon:"wrench",title:"Manutenção de plantão",subgroup:"frota",section:"frota",permissionsAny:["manutencao-plantao","conferencia-manutencao"],href:"/manutencao-plantao"},
   {
     id: "diretoria",
     label: "Diretoria",
@@ -72,12 +73,13 @@ const NAV = [
   },
   {
     id: "lucro-viagens",
-    label: "Resultado por Viagem",
+    label: "Viagens por região",
     icon: "route",
-    title: "Resultado por Viagem",
+    title: "Viagens por região",
     group: "resultados",
     section: "financeiro",
   },
+  {id:"consulta-viagens",label:"Consulta de viagens",icon:"route",title:"Consulta de viagens",group:"resultados",section:"financeiro",permission:"lucro-viagens"},
   {
     id: "clientes",
     label: "Análise",
@@ -232,7 +234,7 @@ const NAV = [
     title: "Automações n8n",
     section: "ferramentas",
   },
-  {id:"painel-tv",label:"Painel TV",icon:"dashboard",title:"Painel TV da Frota",section:"ferramentas",permission:"status-carga"},
+  {id:"painel-tv",label:"Painel TV",icon:"dashboard",title:"Painel TV da Frota",section:"ferramentas",permission:"painel-tv"},
   {
     id: "settings",
     label: "Configurações",
@@ -268,9 +270,9 @@ const NAV_GROUPS = {
     screens: ["clientes", "clientes-ranking", "clientes-lucro"],
   },
   resultados: {
-    label: "Resultado por viagem",
+    label: "Viagens",
     icon: "chart",
-    screens: ["lucro-viagens"],
+    screens: ["lucro-viagens", "consulta-viagens"],
   },
 };
 
@@ -388,6 +390,7 @@ const App = () => {
   );
   const [frotaMenu, setFrotaMenu] = useState(null);
   const [financeiroMenu, setFinanceiroMenu] = useState(null);
+  const [viagensMenu, setViagensMenu] = useState(null);
 
   // Verificar sessÃ£o existente ao carregar
   useEffect(() => {
@@ -442,6 +445,12 @@ const App = () => {
   // Load only the authorized active screen; ignore results after navigation.
   useEffect(() => {
     if (!auth.user || !currentScreen) return;
+    if (route.screen === "conferencia-manutencao" && (auth.user.admin || auth.user.permissions?.["conferencia-manutencao"] === true)) {
+      window.location.replace("/manutencao-plantao?visao=conferencia");
+      return;
+    }
+    const standalone = visibleNav.find(item => item.id === currentScreen)?.href;
+    if (standalone) { window.location.replace(standalone); return; }
     let cancelled = false;
     setScreenError(null);
     loadScreen(currentScreen).then(() => {
@@ -450,7 +459,7 @@ const App = () => {
       if (!cancelled) setScreenError("Não foi possível carregar esta tela. Tente novamente.");
     });
     return () => { cancelled = true; };
-  }, [auth.user, currentScreen, screenAttempt]);
+  }, [auth.user, currentScreen, screenAttempt, route.screen]);
 
   const handleLogin = ({ user }) => {
     setAuth({ checking: false, user });
@@ -518,10 +527,13 @@ const App = () => {
 
   const go = (screen) => setRoute({ screen });
   const onNavigate = (screen) => {
+    const standalone = visibleNav.find(item => item.id === screen)?.href;
+    if (standalone) { window.location.assign(standalone); return; }
     if (visibleNav.some((n) => n.id === screen)) {
       go(screen);
       setFrotaMenu(null);
       setFinanceiroMenu(null);
+      setViagensMenu(null);
       if (window.innerWidth <= 960) setSidebarExpanded(false);
     }
   };
@@ -566,6 +578,12 @@ const App = () => {
     case "painel-tv":
       body = <PainelTv user={auth.user} />;
       break;
+    case "manutencao-plantao":
+      body = <ManutencaoPlantao initialView="driver"/>;
+      break;
+    case "conferencia-manutencao":
+      body = <ManutencaoPlantao initialView="manager"/>;
+      break;
     case "ociosidade-frota":
       body = <OciosidadeFrota onNavigate={onNavigate} />;
       break;
@@ -594,21 +612,8 @@ const App = () => {
       body = <PrecosCombustivel onNavigate={onNavigate} />;
       break;
     case "lucro-viagens":
-      body = (
-        <ScreenGroup
-          tabs={[
-            {
-              id: "lucro-viagens",
-              label: "Resultado por viagem",
-              available: hasScreen("lucro-viagens"),
-            },
-          ]}
-          active={currentScreen}
-          onChange={onNavigate}
-        >
-          <ResultadoFretes onNavigate={onNavigate} />
-        </ScreenGroup>
-      );
+    case "consulta-viagens":
+      body = currentScreen === "consulta-viagens" ? <ConsultaViagens/> : <ResultadoFretes onNavigate={onNavigate} />;
       break;
     case "faturamento-diario":
       body = financialBody(<FaturamentoDiario onNavigate={onNavigate} />);
@@ -833,6 +838,7 @@ const App = () => {
                     aria-expanded={Boolean(financeiroMenu)}
                     onClick={(event) => {
                       if (financeiroMenu) return setFinanceiroMenu(null);
+                      setViagensMenu(null);
                       setFrotaMenu(null);
                       const rect = event.currentTarget.getBoundingClientRect();
                       setFinanceiroMenu({
@@ -846,8 +852,16 @@ const App = () => {
                     <Icon name="chevron-right" size={13} />
                   </button>
                 )}
+                {section === "financeiro" && items.some(item => item.group === "resultados") && (
+                  <button type="button" className={`nav-item nav-flyout-trigger ${NAV_GROUPS.resultados.screens.includes(currentScreen) ? "active" : ""}`} data-tip="Viagens" aria-expanded={Boolean(viagensMenu)} onClick={event => {
+                    if (viagensMenu) return setViagensMenu(null);
+                    setFinanceiroMenu(null); setFrotaMenu(null);
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    setViagensMenu({left:rect.right+7,top:Math.max(8,Math.min(rect.top,window.innerHeight-180))});
+                  }}><Icon name="route"/><span className="lbl">Viagens</span><Icon name="chevron-right" size={13}/></button>
+                )}
                 {section === "financeiro" &&
-                  renderNavItems(items.filter((item) => !item.subgroup))}
+                  renderNavItems(items.filter((item) => !item.subgroup && item.group !== "resultados"))}
                 {section === "direcao" &&
                   renderNavItems(
                     items.filter(
@@ -862,6 +876,7 @@ const App = () => {
                     aria-expanded={Boolean(frotaMenu)}
                     onClick={(event) => {
                       if (frotaMenu) return setFrotaMenu(null);
+                      setViagensMenu(null);
                       setFinanceiroMenu(null);
                       const rect = event.currentTarget.getBoundingClientRect();
                       setFrotaMenu({
@@ -957,6 +972,13 @@ const App = () => {
         </>
       )}
 
+      {viagensMenu && <>
+        <button className="nav-flyout-dismiss" aria-label="Fechar opções de viagens" onClick={() => setViagensMenu(null)}/>
+        <div className="nav-flyout" style={{left:viagensMenu.left,top:viagensMenu.top}}>
+          <div className="nav-flyout-title"><Icon name="route" size={14}/><span>Viagens</span></div>
+          {renderNavItems(visibleNav.filter(item => item.group === "resultados").map(item => ({...item,group:undefined})))}
+        </div>
+      </>}
       {financeiroMenu && (
         <>
           <button className="nav-flyout-dismiss" aria-label="Fechar opções financeiras" onClick={() => setFinanceiroMenu(null)} />

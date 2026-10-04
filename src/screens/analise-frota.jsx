@@ -111,7 +111,23 @@ function afInjectStyles() {
     .fb-kpi .hint { font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .fb-grid { min-height:0; display:grid; gap:12px; }
     .fb-grid.general { grid-template-columns:1.55fr .9fr .95fr; grid-template-rows: minmax(250px, 1fr) minmax(190px, .75fr); }
-    .fb-grid.fuel { grid-template-columns:1fr 1.05fr 1fr; grid-template-rows:minmax(230px, .95fr) minmax(220px, 1fr) minmax(150px, .55fr); }
+    .fb-grid.fuel { grid-template-columns:1fr 1.05fr 1fr; grid-auto-rows:minmax(200px,auto); }
+    .fb-fuel-screen { grid-template-rows:none; grid-auto-rows:auto; }
+    .fb-fuel-screen .fb-kpis { min-height:104px; }
+    .fb-fuel-screen .fb-view-toggle { flex-wrap:wrap; justify-content:flex-start; }
+    .fb-km-scroll { overflow:auto; max-height:540px; }
+    .fb-km-scroll table { width:100%; white-space:nowrap; }
+    .fb-km-scroll th, .fb-km-scroll td { padding:12px; }
+    .fb-km-model { display:block; color:var(--muted); margin-top:5px; }
+    .fb-km-status { display:inline-block; padding:4px 8px; border-radius:6px; font-size:11px; }
+    .fb-km-status.ok { background:var(--ok-bg); color:var(--ok); }
+    .fb-km-status.pending { background:var(--warn-bg); color:var(--warn); }
+    .fb-km-controls { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin:12px 0; font-size:12px; }
+    .fb-km-controls select { padding:7px; background:var(--surface-2); color:var(--text); border:1px solid var(--border); border-radius:6px; }
+    .fb-km-big, .fb-km-single strong { font-size:30px; color:var(--accent); margin-top:18px; }
+    .fb-km-single { padding:30px; }
+    .fb-fuel-screen .fb-line { max-height:230px; }
+    @media(max-width:650px) { .fb-fuel-screen .fb-kpis {grid-template-columns:repeat(2,minmax(0,1fr));} .fb-fuel-screen .fb-kpi .value {font-size:19px;} }
     .fb-grid.maint { grid-template-columns:1.05fr .92fr 1.08fr; grid-template-rows:minmax(230px, 1fr) minmax(210px, .92fr); }
     .fb-grid.costs { grid-template-columns:1.05fr .82fr 1fr; grid-template-rows:minmax(230px, 1fr) minmax(210px, .86fr); }
     .fb-grid.profit { grid-template-columns:1.12fr .9fr .98fr; grid-template-rows:minmax(250px, 1fr) minmax(210px, .86fr); }
@@ -539,6 +555,19 @@ const BIPostosTable = ({ rows, initialOrder = "gasto", onMore }) => {
   );
 };
 
+export function FuelDailyHistory({ rows = [] }) {
+  const [plate,setPlate]=React.useState(''),[pending,setPending]=React.useState(false),[page,setPage]=React.useState(1);
+  const plates=[...new Set(rows.map(r=>r.placa))].sort();
+  const filtered=rows.filter(r=>(!plate||r.placa===plate)&&(!pending||r.status!=='valido'));
+  const pages=Math.max(1,Math.ceil(filtered.length/50)),current=Math.min(page,pages);
+  const km=v=>v==null?'—':Number(v).toLocaleString('pt-BR',{maximumFractionDigits:1});
+  return <section className="fb-panel fb-km-history"><div className="fb-panel-head"><div><h2>Hodômetro diário</h2><p className="meta">Leituras do rastreador preservadas por placa · horário de Brasília</p></div></div>
+    <div className="fb-km-controls"><label>Veículo <select aria-label="Veículo do histórico" value={plate} onChange={e=>{setPlate(e.target.value);setPage(1)}}><option value="">Todos</option>{plates.map(p=><option key={p}>{p}</option>)}</select></label><label><input type="checkbox" checked={pending} onChange={e=>{setPending(e.target.checked);setPage(1)}}/> Somente dias para conferir</label><span>{filtered.length} registros</span></div>
+    <div className="fb-km-scroll"><table className="table"><thead><tr><th>Dia</th><th>Placa</th><th>Hodômetro anterior</th><th>Hodômetro final</th><th>Km rodados</th><th>Conferência</th></tr></thead><tbody>{filtered.slice((current-1)*50,current*50).map(r=><tr key={`${r.placa}-${r.dia}`}><td>{r.dia.split('-').reverse().join('/')}</td><td><strong>{r.placa}</strong></td><td>{km(r.odometro_inicial)}</td><td title={r.leitura_final?new Date(r.leitura_final).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}):''}>{km(r.odometro_final)}</td><td>{r.km==null?'A conferir':km(r.km)}</td><td><span className={`fb-km-status ${r.status==='valido'?'ok':'pending'}`}>{r.status==='valido'?'Leitura consistente':r.motivo||'Leitura pendente'}</span></td></tr>)}</tbody></table></div>
+    {!filtered.length&&<p className="fb-empty">Nenhuma leitura diária encontrada neste filtro.</p>}
+    <div className="fb-km-controls"><button className="btn" disabled={current<=1} onClick={()=>setPage(current-1)}>Anterior</button><span>{current} / {pages}</span><button className="btn" disabled={current>=pages} onClick={()=>setPage(current+1)}>Próxima</button></div>
+  </section>;
+}
 const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
   const [tab, setTab] = React.useState(modoAbastecimento ? "abastecimento" : "geral");
   const defaultPeriod = modoAbastecimento ? afPreviousMonthRange() : { start:afDaysAgoISO(120), end:afTodayISO() };
@@ -559,7 +588,7 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [detail, setDetail] = React.useState(null);
-  const [fuelView, setFuelView] = React.useState("graficos");
+  const [fuelView, setFuelView] = React.useState("veiculos");
   const [postoOrder, setPostoOrder] = React.useState("diferenca");
 
   React.useEffect(() => { afInjectStyles(); }, []);
@@ -701,10 +730,6 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
     }, new Map()).values()].sort((a, b) => b.value - a.value);
     const postosAcimaMedia = postos.filter((r) => afNum(r.precoMedio) > precoReferenciaFrota);
     const sobreprecoTotal = postosAcimaMedia.reduce((sum, r) => sum + afNum(r.gastoAcimaMedia), 0);
-    const abastecimentosAcima = postosAcimaMedia.reduce((sum, r) => sum + afNum(r.abastecimentos), 0);
-    const litrosAcima = postosAcimaMedia.reduce((sum, r) => sum + afNum(r.litros), 0);
-    const percentualSobrepreco = precoReferenciaFrota > 0 && litrosAcima > 0 ? sobreprecoTotal / (precoReferenciaFrota * litrosAcima) * 100 : 0;
-    const medioExtraAbastecimento = abastecimentosAcima > 0 ? sobreprecoTotal / abastecimentosAcima : 0;
     const gastosOrdenados = postos.map((r) => afNum(r.total)).sort((a, b) => a - b);
     const medianaGasto = gastosOrdenados.length ? gastosOrdenados[Math.floor(gastosOrdenados.length / 2)] : 0;
     const matrixGroups = [
@@ -714,33 +739,39 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
       { id:"economicos", title:"Econômicos", sub:"Preço e gasto abaixo dos cortes da matriz", tone:"#2f8f5b", rows:postos.filter((r) => afNum(r.precoMedio) <= precoReferenciaFrota && afNum(r.total) < medianaGasto).sort((a,b) => afNum(a.precoMedio) - afNum(b.precoMedio)) },
     ];
     const localPosto = (r) => [r.cidade, r.uf].filter(Boolean).join("/") || "Não informado";
-    const maiorPosto = postos[0];
     const postoCritico = [...postos].sort((a, b) => afNum(b.gastoAcimaMedia) - afNum(a.gastoAcimaMedia))[0];
     const summaryText = data
       ? postoCritico?.gastoAcimaMedia > 0
         ? <>Atenção: <strong>{postoCritico.fornecedor}</strong> está {afPct(postoCritico.diferencaPreco)} acima do preço médio, gerando cerca de <strong>{afBRL(postoCritico.gastoAcimaMedia)}</strong> em custo excedente.</>
-        : <>Frota consumindo em média <strong>{afPlain(fuel.mediaFrota, 2)} km/l</strong>, sem posto com gasto relevante acima da média no período.</>
+        : <>Média estimada: <strong>{fuel.mediaFrota==null?'aguardando leituras consistentes':`${afPlain(fuel.mediaFrota, 2)} km/l`}</strong>. {fuel.fontesKm?.telemetria || 0} veículos com cobertura completa.</>
       : "Carregando resumo executivo...";
     return (
-      <div className="fb-screen">
+      <div className="fb-screen fb-fuel-screen">
         {renderExecSummary(summaryText)}
         {renderKpis([
           { label:"Total pago", value:afBRL(fuel.valor), hint:`${afPlain(fuel.abastecimentos)} abastecimentos · ${afBRL(fuel.desconto)} em descontos`, icon:"money", tone:"#e74b4b" },
-          { label:"Maior concentração", value:maiorPosto ? afPct(maiorPosto.participacao) : "0,0%", hint:maiorPosto?.fornecedor || "Sem posto", icon:"fuel", tone:"#d68a31" },
+          { label:"Km observados", value:afPlain(fuel.kmObservado,0), hint:`${fuel.diasComLeitura || 0}/${fuel.diasEsperados || 0} dias por veículo consistentes`, icon:"truck", tone:"#4d8fe8" },
           { label:"Litros", value:afPlain(fuel.litros, 0), hint:"diesel abastecido", icon:"fuel", tone:"#f0c84b" },
           { label:"Preço médio ponderado", value:afBRL(precoReferenciaFrota), hint:`média simples ${afBRL(fuel.precoMedio)}/l`, icon:"chart", tone:"#4d8fe8" },
           { label:"R$/km", value:fuel.reaisKm == null ? "A conferir" : afBRL(fuel.reaisKm), hint:"valor dos veículos com km / km", icon:"speedometer", tone:"#2f8f5b" },
-          { label:"Pago acima da média", value:afBRL(sobreprecoTotal), hint:`${afPct(percentualSobrepreco)} · média ${afBRL(medioExtraAbastecimento)}/abast.`, icon:"trending-up", tone:"#e74b4b" },
+          { label:"Consumo estimado", value:fuel.mediaFrota==null?'A conferir':`${afPlain(fuel.mediaFrota,2)} km/l`, hint:`${fuel.fontesKm?.telemetria || 0} veículos com período completo`, icon:"speedometer", tone:"#2f8f5b" },
         ])}
-        <div className="fb-method-note"><Icon name="alert" size={15}/><span><strong>Preços líquidos após descontos.</strong> O preço efetivo é calculado por <strong>total pago ÷ litros</strong>; o campo de desconto não é subtraído novamente porque já está incorporado no total. A média ponderada dá o peso correto aos abastecimentos maiores. Referência: <strong>{afBRL(precoReferenciaFrota)}/l ponderada</strong>; comparação: <strong>{afBRL(fuel.precoMedio)}/l simples</strong>.</span></div>
-        <div className="fb-method-note"><span>Quilômetros no período: {fuel.fontesKm?.telemetria || 0} veículos por telemetria, {fuel.fontesKm?.erp || 0} pelo ERP e {fuel.fontesKm?.indisponivel || 0} sem leitura válida. O ERP usa a diferença entre o primeiro e o último odômetro de abastecimento disponível no filtro; pode cobrir apenas parte do período. Km/l é uma estimativa pelos litros abastecidos. Veículos sem km válido ficam fora das médias.</span></div>
-        <details><summary>Conferir quilômetros por veículo</summary><table className="table"><thead><tr><th>Placa</th><th>Fonte</th><th>Km</th><th>Odômetro inicial</th><th>Odômetro final</th><th>Início da leitura</th><th>Fim da leitura</th></tr></thead><tbody>{afRows(abastecimento.ranking).map(r => <tr key={r.placa}><td>{r.placa}</td><td>{r.origemConsumo}</td><td>{r.km == null ? "A conferir" : afPlain(r.km, 0)}</td><td>{r.leitura?.odometroInicial ?? "—"}</td><td>{r.leitura?.odometroFinal ?? "—"}</td><td>{r.leitura?.inicio ? new Date(r.leitura.inicio).toLocaleString("pt-BR", {timeZone:"America/Sao_Paulo"}) : "—"}</td><td>{r.leitura?.fim ? new Date(r.leitura.fim).toLocaleString("pt-BR", {timeZone:"America/Sao_Paulo"}) : "—"}</td></tr>)}</tbody></table></details>
+        <details><summary>Como calculamos preços e descontos</summary><p className="meta">Preço efetivo = total pago ÷ litros. O desconto já está incorporado ao total e não é subtraído novamente. Gasto acima da média dos postos: {afBRL(sobreprecoTotal)}.</p></details>
+        <div className="fb-method-note"><span><strong>Km por fechamento diário do rastreador.</strong> Somente veículos com todos os dias consistentes entram no km/l e R$/km. Dias ausentes, saltos e regressões ficam para conferência. A média é estimada pelos litros abastecidos, não pelo consumo medido do tanque.</span></div>
+        {fuel.falhaTelemetria && <div className="fb-method-note" role="alert">Histórico diário indisponível. Não foi possível calcular as médias.</div>}
+        {fuel.filtroPostoAtivo && <div className="fb-method-note">Retire o filtro de fornecedor para calcular o consumo com todos os litros do veículo.</div>}
         <div className="fb-view-toggle">
+          <button className={`btn${fuelView === "veiculos" ? " primary" : ""}`} onClick={() => setFuelView("veiculos")}>Consumo por veículo</button>
+          <button className={`btn${fuelView === "diario" ? " primary" : ""}`} onClick={() => setFuelView("diario")}>Hodômetro diário</button>
           <button className={`btn${fuelView === "graficos" ? " primary" : ""}`} onClick={() => setFuelView("graficos")}><Icon name="chart" size={13}/> Gráficos</button>
           <button className={`btn${fuelView === "tabela" ? " primary" : ""}`} onClick={() => setFuelView("tabela")}><Icon name="file" size={13}/> Tabela de postos</button>
           <button className={`btn${fuelView === "matriz" ? " primary" : ""}`} onClick={() => setFuelView("matriz")}><Icon name="dashboard" size={13}/> Matriz</button>
         </div>
-        {fuelView === "tabela" ? (
+        {fuelView === "diario" ? <FuelDailyHistory key={JSON.stringify(filters)} rows={abastecimento.historicoKm || []}/> : fuelView === "veiculos" ? <BIPanel title="Quilometragem e consumo por veículo" meta="Período completo para calcular a média · parcial para conferir leituras">
+          <div className="fb-km-scroll"><table className="table"><thead><tr><th>Placa / modelo</th><th>Dias consistentes</th><th>Km observados</th><th>Litros abastecidos</th><th>Km/l estimado</th><th>R$/km</th><th>Situação</th></tr></thead><tbody>{afRows(abastecimento.ranking).map(r=><tr key={r.placa}><td><strong>{r.placa}</strong><small className="fb-km-model">{r.modelo}</small></td><td>{r.cobertura?.diasValidos || 0} / {r.cobertura?.diasEsperados || 0}</td><td>{r.cobertura?.diasValidos?afPlain(r.cobertura.kmObservado,0):'—'}</td><td>{afPlain(r.litros,1)}</td><td><strong>{r.media==null?'A conferir':afPlain(r.media,2)}</strong></td><td>{r.reaisKm==null?'—':afBRL(r.reaisKm)}</td><td><span className={`fb-km-status ${r.cobertura?.completo?'ok':'pending'}`}>{r.cobertura?.completo?'Período completo':r.cobertura?.diasValidos?'Período parcial':'Sem km validado'}</span></td></tr>)}</tbody></table></div>
+          {!afRows(abastecimento.ranking).length&&<p className="fb-empty">Nenhum veículo com abastecimentos no filtro.</p>}
+          <p className="meta">As leituras do ERP continuam na revisão dos abastecimentos e não são misturadas às do rastreador.</p>
+        </BIPanel> : fuelView === "tabela" ? (
           <BIPanel title="Comparativo completo dos postos" meta={`${postos.length} postos no período · clique nos títulos para ordenar`} className="fb-fuel-table-view" action={
             <div className="fb-view-toggle">
               <button className={`btn${postoOrder === "gasto" ? " primary" : ""}`} onClick={() => setPostoOrder("gasto")}>Maior gasto</button>
@@ -768,11 +799,13 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
             ))}
           </div>
         ) : <div className="fb-grid fuel">
-          <BIPanel title="Média geral da frota" meta="km/l em destaque" className="hero">
-            {fuel.mediaFrota == null ? <p>Sem quilometragem válida para calcular a média.</p> : <BIGauge value={fuel.mediaFrota} max={4} label="km/l estimado" sub="Somente veículos com km disponível; ERP pode cobrir parte do período" color="#2f8f5b"/>}
+          <BIPanel title="Cobertura das leituras" meta="Qualidade antes de calcular consumo">
+            <strong className="fb-km-big">{fuel.fontesKm?.telemetria || 0} / {fuel.veiculos || 0}</strong><p>veículos com todos os dias consistentes</p>
+            <p className="meta">{afPlain(fuel.diasComLeitura)} de {afPlain(fuel.diasEsperados)} dias por veículo validados.</p>
+            <button className="btn" onClick={()=>setFuelView("diario")}>Conferir histórico diário</button>
           </BIPanel>
           <BIPanel title="Preço diesel por mês" className="fb-span-2">
-            <BILine data={abastecimento.monthly} series={[{ key:"precoMedio", label:"Preço médio/litro", color:"#4d8fe8" }]} format={(v) => afBRL(v)} emptyMessage="Sem histórico de preço no período."/>
+            {afRows(abastecimento.monthly).length===1?<div className="fb-km-single"><strong>{afBRL(abastecimento.monthly[0].precoMedio)}/l</strong><p>{abastecimento.monthly[0].mes} · único mês no filtro</p></div>:<BILine data={abastecimento.monthly} series={[{ key:"precoMedio", label:"Preço médio/litro", color:"#4d8fe8" }]} format={(v) => afBRL(v)} emptyMessage="Sem histórico de preço no período."/>}
           </BIPanel>
           <BIPanel title="Gasto por posto" meta="onde o desembolso está concentrado">
             <BIHBar rows={postos.map((r) => ({ label:r.fornecedor, value:r.total }))} color="#e74b4b" limit={6}/>

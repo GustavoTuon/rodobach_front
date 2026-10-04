@@ -329,7 +329,7 @@ const ResultadoFretes = () => {
   return (
     <div className="view rf-page">
       <div className="page-head rf-page-head">
-        <div><h1>Resultado operacional dos fretes</h1><div className="sub">Descubra onde a operação ganha ou perde dinheiro — da saída ao retorno comercial.</div></div>
+        <div><h1>Viagens por região</h1><div className="sub">Descubra onde a operação ganha ou perde dinheiro — da saída ao retorno comercial.</div></div>
         <div className="rf-head-tag">Análise gerencial por CT-e</div>
       </div>
 
