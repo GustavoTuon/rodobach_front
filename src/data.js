@@ -279,15 +279,6 @@ const REVENUE_MONTHLY = [
   { mes: "Mai", receita: 241200, custo: 184000 },
 ];
 
-// ─── ANTT Freight Table (from 001/002 SQL) ────────────────────────────────
-const ANTT_TABELA = [
-  { tipoVeiculo: "Truck",      eixos: 3, normal: { kmValor: 5.1295, cargaDescarga: 523.33 }, altoDesempenho: { kmValor: 4.3727, cargaDescarga: 190.36 } },
-  { tipoVeiculo: "Bitruck",    eixos: 4, normal: { kmValor: 5.8178, cargaDescarga: 568.72 }, altoDesempenho: { kmValor: 4.9981, cargaDescarga: 205.98 } },
-  { tipoVeiculo: "Carreta 5e", eixos: 5, normal: { kmValor: 6.7126, cargaDescarga: 635.08 }, altoDesempenho: { kmValor: 5.7382, cargaDescarga: 220.28 } },
-  { tipoVeiculo: "Carreta 6e", eixos: 6, normal: { kmValor: 7.4124, cargaDescarga: 648.95 }, altoDesempenho: { kmValor: 6.4057, cargaDescarga: 223.27 } },
-  { tipoVeiculo: "Carreta 7e", eixos: 7, normal: { kmValor: 8.1252, cargaDescarga: 803.22 }, altoDesempenho: { kmValor: 6.8012, cargaDescarga: 263.47 } },
-];
-
 // ─── Driver daily rates (from 005 SQL) ────────────────────────────────────
 const DIARIAS_MOTORISTA = [
   { codigo: "cafe",   descricao: "Café",   horario: "08:00", valor: 19.27 },
@@ -364,6 +355,6 @@ window.NT_DATA = {
   FLEET, DRIVERS, CITIES, EVENT_TYPES, ALERTS, JOBS,
   PAYLOAD_ERRORS, RECENT_LOG, TOP_EVENT_TYPES, DAILY,
   VEHICLE_FIN, COST_DAILY, REVENUE_DAILY, REVENUE_MONTHLY,
-  ANTT_TABELA, DIARIAS_MOTORISTA, VIAGENS_MOCK,
+  DIARIAS_MOTORISTA, VIAGENS_MOCK,
   timeAgo, isoMinAgo, getVehicle, vehicleTimeline, vehicleRoute,
 };

@@ -345,6 +345,10 @@ textarea {
   border: 0;
 }
 .nav-flyout {
+  --text: #ffffff;
+  --text-2: #e2e8f5;
+  --text-3: #b8c6e2;
+  --hover: #293758;
   position: fixed;
   z-index: 1250;
   width: 210px;
@@ -379,8 +383,13 @@ textarea {
 .nav-flyout .nav-item {
   min-height: 36px;
   padding: 7px 9px;
-  font-size: 12.5px;
+  font-size: 13px;
+  font-weight: 600;
 }
+.sidebar .nav-item { color: #e2e8f5; }
+.sidebar .nav-label { color: #b8c6e2; }
+.sidebar .nav-item:hover, .nav-flyout .nav-item:hover { background: #293758; color: #fff; }
+.sidebar .nav-item:focus-visible, .nav-flyout .nav-item:focus-visible { outline: 2px solid #8ec5ff; outline-offset: -2px; }
 
 /* Manutenção visual por eixo/posição */
 .mp-view {

@@ -1,9 +1,11 @@
 import { QuoteLayouts } from './quote-layouts.jsx';
 // Calculadora de Frete ANTT - Rodobach
 const SimuladorFrete = ({ onNavigate }) => {
-  const D = window.NT_DATA || {};
   const { useEffect, useMemo, useRef, useState } = React;
-  const [anttTabela, setAnttTabela] = useState(() => D.ANTT_TABELA || []);
+  const [anttTabela, setAnttTabela] = useState([]);
+  const [anttStatus, setAnttStatus] = useState(null);
+  const [anttError, setAnttError] = useState(false);
+  const [anttAttempt, setAnttAttempt] = useState(0);
   const [eixos, setEixos] = useState(6);
   const [tipoCarga, setTipoCarga] = useState("normal");
   const [operacao, setOperacao] = useState("etc");
@@ -75,17 +77,26 @@ const SimuladorFrete = ({ onNavigate }) => {
   };
 
   useEffect(() => {
-    window.RB_API.listAntt()
-      .then((data) => { if (Array.isArray(data) && data.length) setAnttTabela(data); })
-      .catch((err) => console.warn("API indisponivel, usando dados locais.", err));
-  }, []);
+    let live=true;
+    const refresh=()=>{
+      window.RB_API.listAntt().then(data=>{
+        if(!Array.isArray(data) || !data.length) throw new Error("Tabela indisponível");
+        if(live) {setAnttTabela(data);setAnttError(false);}
+      }).catch(()=>{if(live) {setAnttError(true);setAnttTabela([]);}});
+      window.RB_API.getAnttStatus().then(data=>{if(live)setAnttStatus(data);}).catch(()=>{if(live)setAnttStatus(null);});
+    };
+    refresh();
+    const timer=setInterval(refresh,5*60*1000);
+    window.addEventListener('focus',refresh);
+    return ()=>{live=false;clearInterval(timer);window.removeEventListener('focus',refresh);};
+  }, [anttAttempt]);
 
   useEffect(() => {
     let active = true;
     clearTimeout(debounceRef.current);
     setCalc(null);
     const kmNum = parseBRNumber(km);
-    if (!kmNum) {
+    if (!kmNum || !anttTabela.length) {
       setCalc(null);
       setCalcError(false);
       setCalcLoading(false);
@@ -113,10 +124,10 @@ const SimuladorFrete = ({ onNavigate }) => {
     }, 400);
 
     return () => { active = false; clearTimeout(debounceRef.current); };
-  }, [eixos, km, pedagio, seguro, icms, valorNota]);
+  }, [eixos, km, pedagio, seguro, icms, valorNota, anttTabela]);
 
   const tabRow = useMemo(
-    () => anttTabela.find((row) => row.eixos === eixos) || anttTabela[0] || (D.ANTT_TABELA || [])[0] || {},
+    () => anttTabela.find((row) => row.eixos === eixos) || anttTabela[0] || {},
     [anttTabela, eixos]
   );
 
@@ -288,8 +299,8 @@ const SimuladorFrete = ({ onNavigate }) => {
   const vm = {
     inputError: invalidPercent ? "Use percentual bruto de 0 a menos de 100% e ICMS de 0 a 100%." : "",
     comparison,
-    money: fmtR, percent: fmtPct, ready: hasKm && !!calc && !calcLoading && !invalidPercent,
-    loading: calcLoading, error: calcError, calc, simulation, pedagioNum,
+    money: fmtR, percent: fmtPct, ready: hasKm && !!calc && !calcLoading && !invalidPercent && !anttError,
+    loading: calcLoading, error: calcError || anttError, calc, simulation, pedagioNum,
     vehicles: anttTabela, eixos, setEixos, tipoCarga, setTipoCarga, operacao, setOperacao,
     vehicleLabel: tipoVeiculoLabel,
     fields: [
@@ -311,7 +322,19 @@ const SimuladorFrete = ({ onNavigate }) => {
     ],
     copy: copiarResumo, copied, useQuote: usarComoCotacao, goTrips: () => onNavigate('viagens'),
   };
-  return <div className="quote-workspace"><QuoteLayouts model="compare" vm={vm}/></div>;
+  const reference = calc?.tabela?.dataVigencia ? calc.tabela : tabRow;
+  const referenceDate = String(reference.dataVigencia || "").slice(0, 10).split("-").reverse().join("/");
+  const referenceName = reference.versao === "portaria_suroc_22_2026" ? "Portaria SUROC 22/2026" : reference.versao === "resolucao_antt_6084_2026" ? "Resolução ANTT 6.084/2026" : reference.versao;
+  return <div className="quote-workspace">
+    <p className="ql-antt-reference">Carga geral · Tabelas A e C · {referenceName || "ANTT"} · {referenceDate ? `Vigência: ${referenceDate}` : "Vigência não informada"}</p>
+    {reference.fonte?.startsWith('https://anttlegis.antt.gov.br/') && <a className="ql-antt-source" href={reference.fonte} target="_blank" rel="noreferrer">Consultar publicação oficial</a>}
+    <p className="ql-antt-reference" role="status">{anttStatus?.lastCheck?.finalizado_em ? `Última verificação: ${new Date(anttStatus.lastCheck.finalizado_em).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}` : 'Verificação automática ainda não confirmada.'}
+      {anttStatus?.upcoming && ` Nova tabela programada para ${anttStatus.upcoming.data_vigencia.split('-').reverse().join('/')}.`}
+    </p>
+    {(anttStatus?.stale || ['error','review','running'].includes(anttStatus?.lastCheck?.status)) && <p className="ql-antt-warning" role="status">{anttStatus?.lastCheck?.status === 'running' ? 'Consultando a ANTT.' : 'A atualização automática precisa de atenção. A última tabela validada foi mantida.'} {anttStatus?.lastCheck?.mensagem}</p>}
+    {anttError && <p className="ql-antt-warning" role="alert">Não foi possível carregar a tabela do sistema. O cálculo fica indisponível até recuperar os dados. <button onClick={()=>setAnttAttempt(n=>n+1)}>Tentar novamente</button></p>}
+    <QuoteLayouts model="compare" vm={vm}/>
+  </div>;
 };
 
 window.SimuladorFrete = SimuladorFrete;

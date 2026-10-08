@@ -3,6 +3,15 @@ import "./maintenance-demo.css";
 
 const money = (value) =>
   value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const today = () =>
+  new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+const expenseDay = (r) =>
+  r.expenseDate ||
+  new Date(r.date).toLocaleDateString("en-CA", {
+    timeZone: "America/Sao_Paulo",
+  });
+const displayDay = (value) =>
+  value ? value.split("-").reverse().join("/") : "—";
 const normalize = (value) =>
   value
     .toUpperCase()
@@ -480,6 +489,39 @@ function SupplierSelect({ value, onChange }) {
   );
 }
 
+function MaintenanceDialog({ children, onClose, saving, step }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    const previous = window.document.activeElement;
+    const overflow = window.document.body.style.overflow;
+    dialog.showModal();
+    window.document.body.style.overflow = "hidden";
+    return () => {
+      dialog.close();
+      window.document.body.style.overflow = overflow;
+      if (previous?.isConnected) previous.focus();
+    };
+  }, []);
+  useEffect(() => {
+    ref.current.querySelector("[data-step-title]")?.focus();
+    ref.current.querySelector(".mp-wizard-body")?.scrollTo?.(0, 0);
+  }, [step]);
+  return (
+    <dialog
+      ref={ref}
+      className="mp-dialog"
+      aria-labelledby="mp-edit-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        if (!saving) onClose();
+      }}
+    >
+      {children}
+    </dialog>
+  );
+}
+
 function MaintenanceForm({
   user,
   initialView,
@@ -487,6 +529,18 @@ function MaintenanceForm({
   canReview,
   embedded,
 }) {
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [step, setStep] = useState(0);
+  const [completed, setCompleted] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [expenseDate, setExpenseDate] = useState(today);
+  const [document, setDocument] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [textSearch, setTextSearch] = useState("");
+  const [deleting, setDeleting] = useState(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [history, setHistory] = useState(null);
   const [records, setRecords] = useState([]);
   const [view, setView] = useState(initialView);
   const [recordsLoading, setRecordsLoading] = useState(true);
@@ -563,9 +617,114 @@ function MaintenanceForm({
       active = false;
     };
   }, [manager, recordsAttempt]);
-  const scoped = records.filter((r) =>
-    manager ? r.plate.includes(normalize(search)) : !plate || r.plate === plate,
+  const scoped = records.filter(
+    (r) =>
+      r.plate.includes(normalize(search)) &&
+      (!dateFrom || expenseDay(r) >= dateFrom) &&
+      (!dateTo || expenseDay(r) <= dateTo) &&
+      `${r.supplier || ""} ${r.document || ""} ${r.author || ""} ${r.note || ""}`
+        .toLocaleLowerCase("pt-BR")
+        .includes(textSearch.toLocaleLowerCase("pt-BR")),
   );
+  const duplicates = new Set();
+  const duplicateKeys = new Map();
+  for (const r of records) {
+    const supplierKey = (r.supplier || "").trim().toLowerCase();
+    const keys = [
+      JSON.stringify([
+        r.plate,
+        expenseDay(r),
+        r.amount,
+        r.service,
+        supplierKey,
+      ]),
+    ];
+    if (r.document && supplierKey)
+      keys.push(
+        JSON.stringify([
+          supplierKey,
+          r.document.toUpperCase().replace(/[^A-Z0-9]/g, ""),
+        ]),
+      );
+    for (const key of keys) {
+      if (duplicateKeys.has(key)) {
+        duplicates.add(r.id);
+        duplicates.add(duplicateKeys.get(key));
+      } else duplicateKeys.set(key, r.id);
+    }
+  }
+  function cancelEdit() {
+    setStep(0);
+    setEditing(null);
+    setAmount("");
+    setNote("");
+    setSupplier({ nome: "" });
+    setDocument("");
+    setExpenseDate(today());
+    setError("");
+    setPlate("");
+    setService("Borracharia");
+  }
+  function editRecord(r) {
+    if (saving || user.readOnly || r.checked) return;
+    setEditing(r);
+    setPlate(r.plate);
+    setAmount(r.amount.toFixed(2).replace(".", ","));
+    setService(r.service);
+    setNote(r.note || "");
+    setSupplier({
+      nome: r.supplier || "",
+      codigo: r.supplierCode,
+      empresa: r.supplierCompany,
+    });
+    setExpenseDate(expenseDay(r));
+    setDocument(r.document || "");
+    setMessage("");
+    setError("");
+    setStep(0);
+    setCompleted(false);
+    setWizardOpen(true);
+  }
+  async function deleteRecord(r) {
+    if (savingRef.current || deleteReason.trim().length < 5) return;
+    savingRef.current = true;
+    setSaving(true);
+    setError("");
+    try {
+      await window.RB_API.deletePlantao(
+        r.id,
+        { version: r.version, reason: deleteReason.trim() },
+        manager,
+      );
+      setRecords((items) => items.filter((item) => item.id !== r.id));
+      setDeleting(null);
+      setDeleteReason("");
+      if (editing?.id === r.id) cancelEdit();
+      setMessage(
+        "Lançamento excluído. O motivo e o histórico foram preservados.",
+      );
+    } catch (error) {
+      setError(error.message || "Não foi possível excluir.");
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
+  }
+  async function showHistory(r) {
+    setHistory({ id: r.id, loading: true, items: [] });
+    try {
+      const result = await window.RB_API.historyPlantao(r.id, manager);
+      setHistory((current) =>
+        current?.id === r.id ? { id: r.id, items: result.history } : current,
+      );
+    } catch (error) {
+      setHistory((current) =>
+        current?.id === r.id
+          ? { id: r.id, items: [], error: error.message }
+          : current,
+      );
+    }
+  }
   const visible = scoped
     .filter(
       (r) =>
@@ -580,7 +739,10 @@ function MaintenanceForm({
     setSaving(true);
     setError("");
     try {
-      const result = await window.RB_API.checkPlantao(record.id);
+      const result = await window.RB_API.checkPlantao(
+        record.id,
+        record.version,
+      );
       setRecords((items) =>
         items.map((item) => (item.id === record.id ? result.record : item)),
       );
@@ -592,9 +754,58 @@ function MaintenanceForm({
       setSaving(false);
     }
   }
+  function openWizard() {
+    if (!canRegister || user.readOnly) return;
+    setMessage("");
+    setError("");
+    setCompleted(false);
+    setWizardOpen(true);
+  }
+  function closeWizard() {
+    if (savingRef.current) return;
+    setWizardOpen(false);
+    setError("");
+    if (completed) {
+      setStep(0);
+      setCompleted(false);
+    }
+  }
+  function advance(event) {
+    event.preventDefault();
+    if (savingRef.current) return;
+    setError("");
+    if (step === 0) {
+      if (fleetLoading || fleetError || !fleet.includes(plate)) {
+        setError("Selecione uma placa cadastrada na frota.");
+        return;
+      }
+      const value = Number(amount.replace(/\./g, "").replace(",", "."));
+      if (!Number.isFinite(value) || value <= 0 || value > 999999.99) {
+        setError(
+          "Informe um valor entre R$ 0,01 e R$ 999.999,99. Exemplo: 180,00.",
+        );
+        return;
+      }
+      if (!expenseDate || expenseDate > today()) {
+        setError("Informe a data da despesa, sem data futura.");
+        return;
+      }
+    }
+    if (step < 2) setStep((n) => n + 1);
+    else submit(event);
+  }
   async function submit(event) {
     event.preventDefault();
-    if (!canRegister || user.readOnly || savingRef.current) return;
+    if (
+      (!canRegister && !(editing && canReview)) ||
+      user.readOnly ||
+      savingRef.current
+    )
+      return;
+    if (!expenseDate || expenseDate > today()) {
+      setError("Informe a data da despesa, sem data futura.");
+      return;
+    }
     const value = Number(amount.trim().replace(/\./g, "").replace(",", "."));
     if (fleetLoading || fleetError || !fleet.includes(plate)) {
       setError("Selecione uma placa cadastrada na frota.");
@@ -620,7 +831,9 @@ function MaintenanceForm({
     setError("");
     setMessage("");
     try {
-      const result = await window.RB_API.createPlantao({
+      const body = {
+        expenseDate,
+        document: document.trim(),
         plate,
         amount: value,
         service,
@@ -628,14 +841,33 @@ function MaintenanceForm({
         supplier: supplier.nome.trim(),
         supplierCode: supplier.codigo ?? null,
         supplierCompany: supplier.empresa ?? null,
-      });
-      setRecords((items) => [result.record, ...items]);
+      };
+      const result = editing
+        ? await window.RB_API.updatePlantao(
+            editing.id,
+            { ...body, version: editing.version },
+            manager,
+          )
+        : await window.RB_API.createPlantao(body);
+      setRecords((items) =>
+        editing
+          ? items.map((r) => (r.id === editing.id ? result.record : r))
+          : [result.record, ...items],
+      );
+      setCompleted(true);
+      setPlate("");
+      setService("Borracharia");
+      setEditing(null);
+      setDocument("");
+      setExpenseDate(today());
       setAmount("");
       setNote("");
       setSupplier({ nome: "" });
       setFilter("all");
       setMessage(
-        "Manutenção registrada! Ela já aparece no histórico e aguarda conferência.",
+        editing
+          ? "Lançamento atualizado. A alteração ficou registrada no histórico."
+          : "Manutenção registrada! Ela já aparece no histórico e aguarda conferência.",
       );
     } catch (error) {
       setError(error.message || "Não foi possível salvar o lançamento.");
@@ -651,6 +883,9 @@ function MaintenanceForm({
       (next === "driver" && !canRegister)
     )
       return;
+    cancelEdit();
+    setDeleting(null);
+    setHistory(null);
     setRecords([]);
     setView(next);
     setFilter("all");
@@ -715,168 +950,345 @@ function MaintenanceForm({
         </div>
         <div className="mp-layout">
           <section className="mp-entry">
-            <div className="mp-hero">
-              <span className="mp-eyebrow">
-                {manager
-                  ? "VISÃO DO ESCRITÓRIO"
-                  : "MENOS MENSAGENS. MAIS TRANQUILIDADE."}
-              </span>
-              <h2>
-                {manager ? (
-                  "Nenhum lançamento fica para trás."
-                ) : (
-                  <>
-                    Sua manutenção,
-                    <br />
-                    sem complicação.
-                  </>
-                )}
-              </h2>
-              <p>
-                {manager
-                  ? "Confira os valores e acompanhe o que está pendente."
-                  : "Placa, valor e pronto. O escritório acompanha por aqui."}
-              </p>
-              <div className="mp-hero-foot">
-                <span className="mp-dot" />
-                {manager
-                  ? `${pending.length} lançamento(s) para conferir`
-                  : "Registro rápido · disponível a qualquer hora"}
+            {!manager && (
+              <div className="mp-start-card">
+                <span className="mp-start-icon">
+                  <Icon name="tool" size={24} />
+                </span>
+                <div>
+                  <h2>Precisou de manutenção?</h2>
+                  <p>Registre em 3 passos e acompanhe por aqui.</p>
+                </div>
+                <button
+                  className="mp-submit"
+                  onClick={openWizard}
+                  disabled={user.readOnly}
+                >
+                  <Icon name="plus" />{" "}
+                  {editing
+                    ? "Continuar edição"
+                    : amount || plate
+                      ? "Continuar lançamento"
+                      : "Nova manutenção"}
+                  <Icon name="arrow" />
+                </button>
               </div>
-              <Icon name="tool" size={145} />
-            </div>
-            {!manager ? (
-              <form className="mp-form" onSubmit={submit} noValidate>
-                <div className="mp-section-title">
-                  <h2>Nova manutenção</h2>
-                  <span>É rapidinho</span>
-                </div>
-                <div className="mp-fields">
-                  <FleetSelect
-                    fleet={fleet}
-                    value={plate}
-                    loading={fleetLoading}
-                    disabled={
-                      fleetLoading || Boolean(fleetError) || fleet.length === 0
-                    }
-                    onChange={(value) => {
-                      setPlate(value);
-                      setMessage("");
-                    }}
-                  />
-                  <label>
-                    Valor pago
-                    <div className="mp-money-input">
-                      <span>R$</span>
-                      <input
-                        aria-label="Valor pago"
-                        value={amount}
-                        onChange={(e) =>
-                          setAmount(sanitizeAmount(e.target.value))
-                        }
-                        onBlur={() => {
-                          if (!amount) return;
-                          const value = Number(
-                            amount.replace(/\./g, "").replace(",", "."),
-                          );
-                          if (Number.isFinite(value))
-                            setAmount(
-                              value.toLocaleString("pt-BR", {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              }),
-                            );
-                        }}
-                        placeholder="0,00"
-                        inputMode="decimal"
-                        maxLength={13}
-                      />
-                    </div>
-                  </label>
-                </div>
-                {fleetLoading ? (
-                  <p className="mp-field-help" role="status">
-                    Carregando placas da frota…
-                  </p>
-                ) : fleetError ? (
-                  <div className="mp-feedback error" role="alert">
-                    {fleetError}
-                    <button
-                      type="button"
-                      onClick={() => setFleetAttempt((n) => n + 1)}
-                    >
-                      Tentar novamente
+            )}
+            {wizardOpen && (
+              <MaintenanceDialog
+                onClose={closeWizard}
+                saving={saving}
+                step={completed ? 3 : step}
+              >
+                {completed ? (
+                  <div className="mp-complete">
+                    <span className="mp-complete-icon">
+                      <Icon name="check" size={36} />
+                    </span>
+                    <p className="mp-eyebrow">ETAPAS CONCLUÍDAS</p>
+                    <h2 id="mp-edit-title" data-step-title tabIndex={-1}>
+                      Tudo certo. Pode seguir!
+                    </h2>
+                    <p role="status">{message}</p>
+                    <button className="mp-submit" onClick={closeWizard}>
+                      Ver lançamentos
+                      <Icon name="arrow" />
                     </button>
                   </div>
                 ) : (
-                  <p className="mp-field-help">
-                    {fleet.length
-                      ? "Digite para filtrar e selecione uma placa da frota."
-                      : "Nenhuma placa disponível na frota."}
-                  </p>
-                )}
-                <label>
-                  Quem está lançando?
-                  <input
-                    value={author}
-                    readOnly
-                    aria-describedby="mp-author-help"
-                  />
-                </label>
-                <p className="mp-field-help" id="mp-author-help">
-                  Usuário conectado ao sistema.
-                </p>
-                <SupplierSelect value={supplier} onChange={setSupplier} />
-                <fieldset>
-                  <legend>Tipo de manutenção</legend>
-                  <div className="mp-services">
-                    {["Borracharia", "Mecânica", "Elétrica", "Outros"].map(
-                      (item) => (
+                  <form
+                    className="mp-form mp-wizard"
+                    onSubmit={advance}
+                    noValidate
+                  >
+                    <header className="mp-wizard-header">
+                      <div className="mp-section-title">
+                        <div>
+                          <p className="mp-eyebrow">
+                            {editing ? "EDITAR LANÇAMENTO" : "NOVA MANUTENÇÃO"}
+                          </p>
+                          <h2 id="mp-edit-title" data-step-title tabIndex={-1}>
+                            {
+                              [
+                                "Vamos começar pelo básico",
+                                "O que foi feito?",
+                                "Tudo pronto para registrar?",
+                              ][step]
+                            }
+                          </h2>
+                        </div>
                         <button
                           type="button"
-                          key={item}
-                          aria-pressed={service === item}
-                          className={service === item ? "selected" : ""}
-                          onClick={() => setService(item)}
+                          className="mp-close"
+                          aria-label="Fechar lançamento"
+                          disabled={saving}
+                          onClick={closeWizard}
                         >
-                          {item}
+                          ×
                         </button>
-                      ),
-                    )}
-                  </div>
-                </fieldset>
-                <label>
-                  Uma observação <span className="mp-optional">(opcional)</span>
-                  <textarea
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="Ex.: troca de pneu na estrada"
-                    rows={2}
-                    maxLength={300}
-                  />
-                </label>
-                <button
-                  className="mp-submit"
-                  type="submit"
-                  disabled={
-                    saving ||
-                    user.readOnly ||
-                    recordsLoading ||
-                    fleetLoading ||
-                    Boolean(fleetError) ||
-                    fleet.length === 0
-                  }
-                >
-                  <Icon name="plus" />
-                  Registrar manutenção
-                  <Icon name="arrow" />
-                </button>
-                <p className="mp-form-help">
-                  <Icon name="clock" size={14} />A data e o horário são
-                  registrados automaticamente.
-                </p>
-              </form>
-            ) : (
+                      </div>
+                      <div
+                        className="mp-progress"
+                        role="progressbar"
+                        aria-label="Progresso do lançamento"
+                        aria-valuemin={0}
+                        aria-valuemax={3}
+                        aria-valuenow={step + 1}
+                        aria-valuetext={`Etapa ${step + 1} de 3`}
+                      >
+                        <span style={{ width: `${((step + 1) / 3) * 100}%` }} />
+                      </div>
+                      <ol className="mp-steps">
+                        {["Veículo e valor", "Detalhes", "Revisão"].map(
+                          (label, index) => (
+                            <li
+                              key={label}
+                              className={index <= step ? "is-active" : ""}
+                              aria-current={index === step ? "step" : undefined}
+                            >
+                              <span>
+                                {index < step ? (
+                                  <Icon name="check" size={13} />
+                                ) : (
+                                  index + 1
+                                )}
+                              </span>
+                              {label}
+                            </li>
+                          ),
+                        )}
+                      </ol>
+                    </header>
+                    <div className="mp-wizard-body">
+                      <section hidden={step !== 0}>
+                        <p className="mp-step-intro">
+                          Informe o veículo, o valor pago e a data da despesa.
+                        </p>
+                        <div className="mp-fields">
+                          <FleetSelect
+                            fleet={fleet}
+                            value={plate}
+                            loading={fleetLoading}
+                            disabled={
+                              fleetLoading ||
+                              Boolean(fleetError) ||
+                              fleet.length === 0
+                            }
+                            onChange={(value) => {
+                              setPlate(value);
+                              setMessage("");
+                            }}
+                          />
+                          <label>
+                            Valor pago
+                            <div className="mp-money-input">
+                              <span>R$</span>
+                              <input
+                                aria-label="Valor pago"
+                                value={amount}
+                                onChange={(e) =>
+                                  setAmount(sanitizeAmount(e.target.value))
+                                }
+                                onBlur={() => {
+                                  if (!amount) return;
+                                  const value = Number(
+                                    amount.replace(/\./g, "").replace(",", "."),
+                                  );
+                                  if (Number.isFinite(value))
+                                    setAmount(
+                                      value.toLocaleString("pt-BR", {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      }),
+                                    );
+                                }}
+                                placeholder="0,00"
+                                inputMode="decimal"
+                                maxLength={13}
+                              />
+                            </div>
+                          </label>
+                        </div>
+                        {fleetLoading ? (
+                          <p className="mp-field-help" role="status">
+                            Carregando placas da frota…
+                          </p>
+                        ) : fleetError ? (
+                          <div className="mp-feedback error" role="alert">
+                            {fleetError}
+                            <button
+                              type="button"
+                              onClick={() => setFleetAttempt((n) => n + 1)}
+                            >
+                              Tentar novamente
+                            </button>
+                          </div>
+                        ) : (
+                          <p className="mp-field-help">
+                            {fleet.length
+                              ? "Digite para filtrar e selecione uma placa da frota."
+                              : "Nenhuma placa disponível na frota."}
+                          </p>
+                        )}
+                        <label>
+                          Quem está lançando?
+                          <input
+                            value={author}
+                            readOnly
+                            aria-describedby="mp-author-help"
+                          />
+                        </label>
+                        <p className="mp-field-help" id="mp-author-help">
+                          Usuário conectado ao sistema.
+                        </p>
+                        <div className="mp-fields mp-cost-fields">
+                          <label>
+                            Data da despesa
+                            <input
+                              type="date"
+                              value={expenseDate}
+                              max={today()}
+                              required
+                              onChange={(e) => setExpenseDate(e.target.value)}
+                            />
+                          </label>
+                        </div>
+                      </section>
+                      <section hidden={step !== 1}>
+                        <p className="mp-step-intro">
+                          Mais um passo! Complete os detalhes da manutenção.
+                        </p>
+                        <SupplierSelect
+                          value={supplier}
+                          onChange={setSupplier}
+                        />
+                        <label>
+                          Nota / comprovante{" "}
+                          <span className="mp-optional">(opcional)</span>
+                          <input
+                            value={document}
+                            maxLength={80}
+                            placeholder="Número do documento"
+                            onChange={(e) => setDocument(e.target.value)}
+                          />
+                        </label>
+                        <fieldset>
+                          <legend>Tipo de manutenção</legend>
+                          <div className="mp-services">
+                            {[
+                              "Borracharia",
+                              "Mecânica",
+                              "Elétrica",
+                              "Outros",
+                            ].map((item) => (
+                              <button
+                                type="button"
+                                key={item}
+                                aria-pressed={service === item}
+                                className={service === item ? "selected" : ""}
+                                onClick={() => setService(item)}
+                              >
+                                {item}
+                              </button>
+                            ))}
+                          </div>
+                        </fieldset>
+                        <label>
+                          Uma observação{" "}
+                          <span className="mp-optional">(opcional)</span>
+                          <textarea
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                            placeholder="Ex.: troca de pneu na estrada"
+                            rows={2}
+                            maxLength={300}
+                          />
+                        </label>
+                      </section>
+                      {step === 2 && (
+                        <section className="mp-review">
+                          <p className="mp-step-intro">
+                            Última etapa. Revise os dados antes de salvar.
+                          </p>
+                          <div className="mp-review-total">
+                            <span>
+                              {plate} · {service}
+                            </span>
+                            <strong>
+                              {money(
+                                Number(
+                                  amount.replace(/\./g, "").replace(",", "."),
+                                ) || 0,
+                              )}
+                            </strong>
+                          </div>
+                          <dl>
+                            {[
+                              ["Data da despesa", displayDay(expenseDate)],
+                              ["Fornecedor", supplier.nome || "Não informado"],
+                              ["Comprovante", document || "Não informado"],
+                              ["Responsável", author],
+                              ["Observação", note || "Sem observação"],
+                            ].map(([label, value]) => (
+                              <div key={label}>
+                                <dt>{label}</dt>
+                                <dd>{value}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </section>
+                      )}
+                      {error && (
+                        <div className="mp-feedback error" role="alert">
+                          {error}
+                        </div>
+                      )}
+                    </div>
+                    <footer className="mp-wizard-actions">
+                      <button
+                        type="button"
+                        className="mp-cancel-edit"
+                        disabled={saving}
+                        onClick={() =>
+                          step
+                            ? (setStep((n) => n - 1), setError(""))
+                            : closeWizard()
+                        }
+                      >
+                        {step ? "Voltar" : "Continuar depois"}
+                      </button>
+                      <button
+                        className="mp-submit"
+                        type="submit"
+                        disabled={
+                          saving ||
+                          user.readOnly ||
+                          fleetLoading ||
+                          Boolean(fleetError) ||
+                          fleet.length === 0
+                        }
+                      >
+                        {saving
+                          ? "Salvando…"
+                          : step < 2
+                            ? "Continuar"
+                            : editing
+                              ? "Salvar alterações"
+                              : "Registrar manutenção"}
+                        <Icon name={step === 2 ? "check" : "arrow"} />
+                      </button>
+                      <p>
+                        Etapa {step + 1} de 3 ·{" "}
+                        {step === 2
+                          ? "Os dados serão salvos ao confirmar."
+                          : "Seu progresso fica aqui enquanto esta tela estiver aberta."}
+                      </p>
+                    </footer>
+                  </form>
+                )}
+              </MaintenanceDialog>
+            )}
+            {manager && (
               <div className="mp-manager-note">
                 <span className="mp-note-icon">
                   <Icon name="list" size={26} />
@@ -914,12 +1326,12 @@ function MaintenanceForm({
                 </p>
               </div>
             )}
-            {error && (
+            {error && !wizardOpen && (
               <div className="mp-feedback error" role="alert">
                 {error}
               </div>
             )}
-            {message && (
+            {message && !wizardOpen && (
               <div className="mp-feedback" role="status">
                 <Icon name="check" />
                 {message}
@@ -935,12 +1347,12 @@ function MaintenanceForm({
                 <h2>
                   {manager
                     ? "Lançamentos da frota"
-                    : plate
+                    : search
                       ? "Histórico da placa"
                       : "Meus lançamentos"}
                 </h2>
               </div>
-              {!manager && <span className="mp-plate">{plate || "Todas"}</span>}
+              <span className="mp-plate">{search || "Todas"}</span>
             </div>
             <div className="mp-stats">
               <div>
@@ -963,8 +1375,84 @@ function MaintenanceForm({
             </div>
             <div className="mp-history-label">
               <h3>{manager ? "Registros recebidos" : "Seus lançamentos"}</h3>
-              <span>Mais recentes primeiro</span>
+              <button
+                className="mp-cancel-edit"
+                disabled={saving || recordsLoading}
+                onClick={() => {
+                  setDeleting(null);
+                  setHistory(null);
+                  setRecordsAttempt((n) => n + 1);
+                }}
+              >
+                Atualizar lista
+              </button>
             </div>
+            <details className="mp-filter-panel">
+              <summary>
+                Filtrar lançamentos{" "}
+                {(search || dateFrom || dateTo || textSearch) && (
+                  <span>Filtros ativos</span>
+                )}
+              </summary>
+              <div className="mp-cost-filters">
+                {!manager && (
+                  <label>
+                    Buscar placa
+                    <input
+                      value={search}
+                      placeholder="Todas as placas"
+                      maxLength={8}
+                      onChange={(e) => setSearch(normalize(e.target.value))}
+                    />
+                  </label>
+                )}
+                <label>
+                  De
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Até
+                  <input
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom}
+                    onChange={(e) => setDateTo(e.target.value)}
+                  />
+                </label>
+                <label className="mp-cost-search">
+                  Buscar fornecedor, documento ou responsável
+                  <input
+                    type="search"
+                    value={textSearch}
+                    onChange={(e) => setTextSearch(e.target.value)}
+                    placeholder="Filtrar lançamentos"
+                  />
+                </label>
+                {(search || dateFrom || dateTo || textSearch) && (
+                  <button
+                    onClick={() => {
+                      setSearch("");
+                      setDateFrom("");
+                      setDateTo("");
+                      setTextSearch("");
+                    }}
+                  >
+                    Limpar filtros
+                  </button>
+                )}
+              </div>
+            </details>
+            {dateFrom && dateTo && dateFrom > dateTo && (
+              <p role="alert">O início do período deve ser anterior ao fim.</p>
+            )}
+            <p hidden={!manager} className="mp-control-notice">
+              Conferido significa revisado. Confira também o comprovante e o
+              pagamento no financeiro antes de pagar ou reembolsar.
+            </p>
             <div className="mp-filters">
               {[
                 ["all", "Todos"],
@@ -995,14 +1483,14 @@ function MaintenanceForm({
                   </button>
                 </div>
               )}
-              {visible.length === 0 ? (
+              {!recordsLoading && !recordsError && visible.length === 0 ? (
                 <div className="mp-empty">
                   <Icon name="list" size={32} />
                   <h3>Nenhum lançamento por aqui</h3>
                   <p>
                     {manager
                       ? "Tente outra placa ou outro filtro."
-                      : "Confira a placa acima ou registre uma manutenção."}
+                      : "Registre uma manutenção ou ajuste os filtros para ver seus lançamentos."}
                   </p>
                 </div>
               ) : (
@@ -1015,6 +1503,10 @@ function MaintenanceForm({
                         <Icon name="tool" size={23} />
                       </span>
                       <div className="mp-record-description">
+                        <span className="mp-plate-badge">
+                          <Icon name="truck" size={15} />
+                          {r.plate}
+                        </span>
                         <h3>{r.service}</h3>
                         {r.supplier && (
                           <p className="mp-record-supplier">{r.supplier}</p>
@@ -1023,12 +1515,28 @@ function MaintenanceForm({
                       </div>
                       <strong>{money(r.amount)}</strong>
                     </div>
+                    <div className="mp-cost-details">
+                      <span>
+                        Data da despesa <b>{displayDay(expenseDay(r))}</b>
+                      </span>
+                      <span>
+                        Comprovante <b>{r.document || "Não informado"}</b>
+                      </span>
+                    </div>
+                    {duplicates.has(r.id) && (
+                      <p className="mp-duplicate-warning">
+                        Possível duplicidade. Compare os comprovantes antes de
+                        conferir ou pagar.
+                      </p>
+                    )}
                     <div className="mp-record-meta">
                       <span>
                         <Icon name="clock" size={13} />
+                        Registrado em{" "}
                         {new Date(r.date).toLocaleString("pt-BR", {
                           day: "2-digit",
                           month: "short",
+                          year: "numeric",
                           hour: "2-digit",
                           minute: "2-digit",
                           timeZone: "America/Sao_Paulo",
@@ -1042,10 +1550,7 @@ function MaintenanceForm({
                       </span>
                     </div>
                     <div className="mp-record-bottom">
-                      <span>
-                        {manager && <b>{r.plate} · </b>}
-                        {r.author}
-                      </span>
+                      <span>Lançado por {r.author}</span>
                       {manager && !r.checked && (
                         <button
                           disabled={saving || user.readOnly}
@@ -1056,6 +1561,137 @@ function MaintenanceForm({
                         </button>
                       )}
                     </div>
+                    {r.checked && (
+                      <p className="mp-checked-detail">
+                        Conferido por {r.checkedBy || "usuário autorizado"}
+                        {r.checkedAt
+                          ? ` em ${new Date(r.checkedAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`
+                          : ""}
+                        . Edição e exclusão bloqueadas.
+                      </p>
+                    )}
+                    <div className="mp-cost-actions">
+                      {!r.checked &&
+                        !user.readOnly &&
+                        (manager || String(r.authorId) === String(user.id)) && (
+                          <>
+                            <button
+                              disabled={saving}
+                              onClick={() => editRecord(r)}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              className="mp-delete-action"
+                              disabled={saving}
+                              onClick={() => {
+                                setDeleting(r.id);
+                                setDeleteReason("");
+                              }}
+                            >
+                              Excluir
+                            </button>
+                          </>
+                        )}
+                      <button
+                        onClick={() =>
+                          history?.id === r.id
+                            ? setHistory(null)
+                            : showHistory(r)
+                        }
+                      >
+                        {history?.id === r.id
+                          ? "Fechar histórico"
+                          : "Histórico"}
+                      </button>
+                    </div>
+                    {deleting === r.id && (
+                      <div
+                        className="mp-delete-confirm"
+                        role="region"
+                        aria-label="Confirmar exclusão"
+                      >
+                        <strong>
+                          Excluir {r.plate} · {money(r.amount)}?
+                        </strong>
+                        <p>
+                          O lançamento sairá da lista. O motivo e os dados serão
+                          preservados no histórico.
+                        </p>
+                        <label>
+                          Motivo da exclusão
+                          <input
+                            autoFocus
+                            value={deleteReason}
+                            maxLength={300}
+                            onChange={(e) => setDeleteReason(e.target.value)}
+                            placeholder="Ex.: lançado duas vezes"
+                          />
+                        </label>
+                        <button
+                          disabled={saving || deleteReason.trim().length < 5}
+                          onClick={() => deleteRecord(r)}
+                        >
+                          Confirmar exclusão
+                        </button>
+                        <button
+                          disabled={saving}
+                          onClick={() => setDeleting(null)}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
+                    {history?.id === r.id && (
+                      <div
+                        className="mp-audit-history"
+                        role="region"
+                        aria-label="Histórico do lançamento"
+                      >
+                        {history.loading ? (
+                          <p role="status">Carregando histórico…</p>
+                        ) : history.error ? (
+                          <p role="alert">{history.error}</p>
+                        ) : history.items.length ? (
+                          history.items.map((h, i) => (
+                            <div key={i}>
+                              <strong>
+                                {{
+                                  create: "Registrado",
+                                  edit: "Editado",
+                                  delete: "Excluído",
+                                  check: "Conferido",
+                                }[h.evento] || h.evento}
+                              </strong>{" "}
+                              · {h.usuario_login} ·{" "}
+                              {new Date(h.ocorrido_em).toLocaleString("pt-BR", {
+                                timeZone: "America/Sao_Paulo",
+                              })}
+                              {h.evento === "edit" && (
+                                <p>
+                                  Antes: {h.antes.placa} ·{" "}
+                                  {money(Number(h.antes.valor))} ·{" "}
+                                  {String(h.antes.data_despesa)} ·{" "}
+                                  {h.antes.fornecedor || "Sem fornecedor"} ·{" "}
+                                  {h.antes.documento || "Sem comprovante"}
+                                  <br />
+                                  Depois: {h.depois.placa} ·{" "}
+                                  {money(Number(h.depois.valor))} ·{" "}
+                                  {String(h.depois.data_despesa)} ·{" "}
+                                  {h.depois.fornecedor || "Sem fornecedor"} ·{" "}
+                                  {h.depois.documento || "Sem comprovante"}
+                                </p>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <p>
+                            Registro anterior ao histórico de alterações.
+                            Lançado por {r.author}.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </article>
                 ))
               )}
@@ -1089,13 +1725,8 @@ function MaintenanceForm({
           hidden={!canRegister}
           className="mp-add"
           aria-label="Nova manutenção"
-          onClick={() => {
-            changeView("driver");
-            setTimeout(
-              () => document.querySelector(".mp-plate-input")?.focus(),
-              0,
-            );
-          }}
+          disabled={user.readOnly}
+          onClick={openWizard}
         >
           <Icon name="plus" size={28} />
         </button>

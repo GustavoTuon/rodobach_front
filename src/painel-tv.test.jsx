@@ -70,3 +70,16 @@ it('alerta carregado sem SM, ignora consulta indisponível e remove alerta ao re
  expect(screen.queryByText('⚠ ATENÇÃO: CARREGADO SEM SM')).toBeNull();
  expect(screen.queryByRole('status')).toBeNull();
 });
+
+it('exibe manifestos em aberto de empresas diferentes junto da carga',async()=>{
+ const now=new Date();
+ window.RB_API={getPainelTv:vi.fn().mockResolvedValue({dia:now.toISOString().slice(0,10),atualizadoEm:now.toISOString(),itens:[{
+  placa:'RYU2G97',carga:{codigo:'vazio',label:'Vazio'},base:{},sm:{disponivel:true,id:null},kmHoje:{km:0},
+  manifestos:[{empresa:2,serie:'1',numero:1719,status:'AUTORIZADO'},{empresa:1,serie:'1',numero:1719,status:'AUTORIZADO'}]
+ }]})};
+ await act(async()=>render(React.createElement(window.PainelTv)));
+ expect(screen.getAllByText(/MDF-e 1719/)).toHaveLength(2);
+ expect(screen.getByText(/MDF-e 1719.*Empresa 1/)).toBeTruthy();
+ expect(screen.getByText(/MDF-e 1719.*Empresa 2/)).toBeTruthy();
+ expect(screen.queryByText('⚠ ATENÇÃO: CARREGADO SEM SM')).toBeNull();
+});
