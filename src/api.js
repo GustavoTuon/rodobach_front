@@ -143,6 +143,7 @@ window.RB_API = {
     }),
   // ── Tabela ANTT ──────────────────────────────────────────────────────────
   listAntt: () => apiRequest("/frete/antt"),
+  getAnttStatus: () => apiRequest("/frete/antt/status"),
 
   // ── Diárias ──────────────────────────────────────────────────────────────
   // ── Frete ─────────────────────────────────────────────────────────────────
@@ -192,7 +193,7 @@ window.RB_API = {
   getViagemAuditoria: (id) => apiRequest(`/viagens/${id}/auditoria`),
   listConsultaViagens: (filters = {}) => apiRequest(`/financeiro/consulta-viagens${buildQuery(filters)}`),
   getConsultaViagem: (empresa,numero) => apiRequest(`/financeiro/consulta-viagens/${encodeURIComponent(empresa)}/${encodeURIComponent(numero)}`),
-  getConsultaViagemIndicadores: (empresa,numero) => apiRequest(`/financeiro/consulta-viagens/${encodeURIComponent(empresa)}/${encodeURIComponent(numero)}/indicadores`),
+  getConsultaViagemIndicadores: (empresa,numero,params = {}) => apiRequest(`/financeiro/consulta-viagens/${encodeURIComponent(empresa)}/${encodeURIComponent(numero)}/indicadores${buildQuery(params)}`),
 
   getCargasViagensV2Resumo: () => apiRequest("/cargas-viagens-v2/resumo"),
   getCargasViagensV2Filtros: () => apiRequest("/cargas-viagens-v2/filtros"),
@@ -401,7 +402,10 @@ window.RB_API = {
   listVeiculosPlantao: () => apiRequest("/manutencao-plantao/placas"),
   listPlantao: (conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}`),
   createPlantao: (body) => apiRequest("/manutencao-plantao/lancamentos", {method:"POST",body:JSON.stringify(body)}),
-  checkPlantao: (id) => apiRequest(`/manutencao-plantao/conferencia/${encodeURIComponent(id)}`, {method:"PATCH"}),
+  updatePlantao: (id, body, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}`, {method:"PUT",body:JSON.stringify(body)}),
+  deletePlantao: (id, body, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}`, {method:"DELETE",body:JSON.stringify(body)}),
+  historyPlantao: (id, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}/historico`),
+  checkPlantao: (id, version) => apiRequest(`/manutencao-plantao/conferencia/${encodeURIComponent(id)}`, {method:"PATCH",body:JSON.stringify({version})}),
   searchFornecedoresManutencao: (q = "") => apiRequest(`/manutencao/fornecedores${buildQuery({ q })}`),
   listComponentesPosicao: (placa) =>
     apiRequest(`/manutencao/componentes-posicao${buildQuery({ placa })}`),

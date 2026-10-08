@@ -20,7 +20,9 @@ export function tripStatus(trip) {
 function Status({ trip }) {
   const value = tripStatus(trip);
   return (
-    <span className={`trip-status ${value === "FECHADA" || value === "Finalizada" ? "closed" : ""}`}>
+    <span
+      className={`trip-status ${value === "FECHADA" || value === "Finalizada" ? "closed" : ""}`}
+    >
       {value || "Sem status"}
     </span>
   );
@@ -52,42 +54,252 @@ function DataTable({ rows, columns, emptyText }) {
 }
 export function CteAudit({ audit, onRetry }) {
   const [all, setAll] = useState(false);
-  if (!audit?.disponivel) return <section className="card trip-audit"><h3>Conferência de CT-es</h3><p role="status">{audit?.mensagem || 'Conferência indisponível.'}</p><button className="btn" onClick={onRetry}>Conferir novamente</button></section>;
-  const labels = { vinculado: 'Vinculado', sem_vinculo: 'Possível faltante', outra_viagem: 'Em outra viagem', duplicado: 'Vínculo em mais de uma viagem', fora_periodo: 'Data ou placa divergente' };
-  const rows = audit.documentos.filter(d => all || d.situacao !== 'vinculado');
-  return <section className="card trip-audit" aria-label="Conferência de CT-es">
-    <div className="trip-audit-heading"><div><h3>Conferência de CT-es</h3><p>{date(audit.inicio)} a {date(audit.fim)} · emissão por dia, incluindo saída e chegada</p></div><span className={`trip-audit-badge ${audit.pendencias ? 'warning' : ''}`}>{audit.pendencias ? `${audit.pendencias} para revisar` : audit.emitidos ? 'Sem divergências' : 'Sem emissões no período'}</span></div>
-    <div className="trip-audit-counts">{[['CT-es com financeiro',audit.emitidos],['Vínculos conferidos',audit.vinculados],['Sem vínculo',audit.semVinculo],['Outras divergências',audit.divergencias]].map(([label,total],i)=><div className={i>1&&total?'warning':''} key={label}><strong>{total}</strong><span>{label}</span></div>)}</div>
-    <div className="trip-audit-toolbar"><p>Somente CT-es emitidos com título financeiro ativo, em aberto ou quitado. Documentos sem vínculo são candidatos à revisão; viagens podem compartilhar o mesmo período.</p><button className="btn" onClick={()=>setAll(!all)}>{all?'Ver só pendências':'Ver todos os CT-es'}</button></div>
-    <div className="trip-table-wrap"><table className="data-table"><thead><tr><th>CT-e / série</th><th>Emissão</th><th>Placa</th><th>Conferência</th><th>Viagem vinculada</th></tr></thead><tbody>{rows.map(d=><tr key={`${d.empresa}-${d.serie}-${d.codigo}`} className={d.situacao==='vinculado'?'':'trip-audit-pending'}><td><strong>{d.numero || `Cód. ${d.codigo}`} / {d.serie}</strong><small className="trip-cell-sub">Empresa {d.empresa}</small></td><td>{date(d.emissao)}</td><td>{d.placa || '—'}</td><td><span className={`trip-audit-badge ${d.situacao==='vinculado'?'':'warning'}`}>{labels[d.situacao]}</span></td><td>{d.vinculos.length?d.vinculos.map(v=>`${v.numero} (empresa ${v.empresa})`).join(', '):'Sem viagem'}</td></tr>)}</tbody></table></div>
-    {!rows.length && <p className="trip-empty">{audit.emitidos ? 'Nenhuma pendência encontrada nesta conferência.' : 'Nenhum CT-e emitido para esta placa no período informado.'}</p>}
-  </section>;
+  const [open, setOpen] = useState(false);
+  if (!audit?.disponivel)
+    return (
+      <section className="card trip-audit">
+        <h3>Conferência de CT-es</h3>
+        <p role="status">{audit?.mensagem || "Conferência indisponível."}</p>
+        <button className="btn" onClick={onRetry}>
+          Conferir novamente
+        </button>
+      </section>
+    );
+  const labels = {
+    vinculado: "Vinculado",
+    sem_vinculo: "Possível faltante",
+    outra_viagem: "Em outra viagem",
+    duplicado: "Vínculo em mais de uma viagem",
+    placa_divergente: "Placa diferente da viagem",
+  };
+  const rows = audit.documentos.filter(
+    (d) => all || d.situacao !== "vinculado",
+  );
+  return (
+    <section
+      className={`card trip-audit ${audit.pendencias ? "needs-review" : ""}`}
+      aria-label="Conferência de CT-es"
+    >
+      <div className="trip-audit-heading">
+        <div>
+          <h3>
+            {audit.pendencias
+              ? `${audit.pendencias} ${audit.pendencias === 1 ? "documento" : "documentos"} para revisar`
+              : audit.emitidos
+                ? "Documentos conferidos"
+                : "Sem emissões no período"}
+          </h3>
+          <p>
+            {audit.pendencias
+              ? "Confira as diferenças encontradas nos CT-es."
+              : "Conferência de CT-es desta viagem."}
+          </p>
+        </div>
+        <button
+          className="btn"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+        >
+          {open
+            ? "Fechar conferência"
+            : audit.pendencias
+              ? "Revisar documentos"
+              : "Ver conferência"}
+        </button>
+      </div>
+      {open && (
+        <>
+          <p className="trip-audit-period">
+            Período conferido: {date(audit.inicio)} a {date(audit.fim)}
+          </p>
+          <div className="trip-audit-counts">
+            {[
+              ["Emitidos no período", audit.emitidos],
+              ["Vinculados à viagem", audit.vinculados],
+              ["Sem vínculo", audit.semVinculo],
+              ["Outras divergências", audit.divergencias],
+            ].map(([label, total], i) => (
+              <div className={i > 1 && total ? "warning" : ""} key={label}>
+                <strong>{total}</strong>
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="trip-audit-toolbar">
+            <p>
+              CT-es com financeiro ativo. O vínculo com a viagem é aceito mesmo
+              com emissão anterior à saída. Documentos sem vínculo precisam de
+              revisão; viagens podem compartilhar o mesmo período.
+            </p>
+            <button className="btn" onClick={() => setAll(!all)}>
+              {all ? "Ver só pendências" : "Ver todos os CT-es"}
+            </button>
+          </div>
+          <div className="trip-table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>CT-e / série</th>
+                  <th>Emissão</th>
+                  <th>Placa</th>
+                  <th>Conferência</th>
+                  <th>Viagem vinculada</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((d) => (
+                  <tr
+                    key={`${d.empresa}-${d.serie}-${d.codigo}`}
+                    className={
+                      d.situacao === "vinculado" ? "" : "trip-audit-pending"
+                    }
+                  >
+                    <td>
+                      <strong>
+                        {d.numero || `Cód. ${d.codigo}`} / {d.serie}
+                      </strong>
+                      <small className="trip-cell-sub">
+                        Empresa {d.empresa}
+                      </small>
+                    </td>
+                    <td>{date(d.emissao)}</td>
+                    <td>{d.placa || "—"}</td>
+                    <td>
+                      <span
+                        className={`trip-audit-badge ${d.situacao === "vinculado" ? "" : "warning"}`}
+                      >
+                        {labels[d.situacao]}
+                      </span>
+                    </td>
+                    <td>
+                      {d.vinculos.length
+                        ? d.vinculos
+                            .map((v) => `${v.numero} (empresa ${v.empresa})`)
+                            .join(", ")
+                        : "Sem viagem"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {!rows.length && (
+            <p className="trip-empty">
+              {audit.emitidos
+                ? "Nenhuma pendência encontrada nesta conferência."
+                : "Nenhum CT-e emitido para esta placa no período informado."}
+            </p>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+function ResultCard({ title, subtitle, result, vehicle = false, provisional = false }) {
+  const available = result?.disponivel && (!vehicle || result.itens?.length > 0);
+  const balance = available ? result.lucro : null;
+  const verdict = balance == null ? "Sem dados para avaliar" : balance > 0 ? "Sobrou" : balance < 0 ? "Faltou" : "Empatou";
+  return (
+    <section className="trip-comparison-card" aria-label={title}>
+      <h4>{title}</h4>
+      <p className="trip-comparison-subtitle">{subtitle}</p>
+      {available ? <>
+        <dl className="trip-calculation">
+          <div><dt>Receita</dt><dd>{money(result.receita)}</dd></div>
+          <div><dt>{vehicle ? "Todos os custos da placa" : "Custos da viagem"}</dt><dd>{money(result.custo)}</dd></div>
+        </dl>
+        <div className={`trip-balance ${balance < 0 ? "is-loss" : balance > 0 ? "is-profit" : ""}`}>
+          <span>{verdict}</span>
+          <strong>{money(Math.abs(balance))}</strong>
+          <span>{balance > 0 ? "Lucro" : balance < 0 ? "Prejuízo" : "Receita igual aos custos"}{provisional ? " · provisório" : ""}</span>
+        </div>
+        {vehicle && <p className="trip-comparison-note">Já inclui {money(result.fixos)} de custos fixos. Financiamentos incluídos: {money(result.financiamentos)}.</p>}
+      </> : <p className="trip-empty" role="status">{result?.mensagem || (vehicle ? "Sem lançamentos financeiros para esta placa no período. Não é possível afirmar se houve lucro." : "O controle da viagem ainda não tem os valores necessários para calcular o resultado.")}</p>}
+    </section>
+  );
 }
 export function TripIndicators({ trip }) {
-  const [open,setOpen]=useState(false),[mode,setMode]=useState('viagem'),[data,setData]=useState(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0);
-  useEffect(()=>{
-    if(!open)return;
-    let active=true;setError('');setData(null);
-    window.RB_API.getConsultaViagemIndicadores(trip.empresa,trip.numero).then(r=>{if(active)setData(r)}).catch(e=>{if(active)setError(e.message||'Não foi possível carregar os indicadores.')});
-    return ()=>{active=false};
-  },[open,trip.empresa,trip.numero,attempt]);
-  const current=data?.[mode];
-  return <section className="card trip-indicators" aria-label="Indicadores de resultado">
-    <div className="trip-audit-heading"><div><h3>Receita, custo e lucro</h3><p>Compare o resultado da viagem com o resultado da placa no período.</p></div><button className="btn" aria-expanded={open} onClick={()=>setOpen(!open)}>{open?'Recolher indicadores':'Ver indicadores'}</button></div>
-    {open&&<>
-      <div className="trip-tabs" role="tablist" aria-label="Visão do resultado">{[['viagem','Somente esta viagem'],['veiculo','Veículo no período']].map(([key,label])=><button key={key} role="tab" aria-selected={mode===key} onClick={()=>setMode(key)}>{label}</button>)}</div>
-      {error?<div className="trip-error" role="alert">{error}<button className="btn" onClick={()=>setAttempt(n=>n+1)}>Tentar novamente</button></div>:!data?<p className="trip-empty" role="status">Calculando indicadores…</p>:!current?.disponivel?<p className="trip-empty">{current?.mensagem||'O controle não possui os totais necessários para calcular o resultado.'}</p>:<div className="trip-result-body">
-        <p className="trip-result-method">{mode==='viagem'?'Receita e resultado do controle da viagem. Custo líquido = fretes menos o saldo total do ERP, preservando os ajustes do acerto. Resultado provisório enquanto a viagem estiver aberta.':`${trip.placa} · ${date(trip.saida)} a ${date(trip.chegada)}. Receitas e custos variáveis por emissão/data do lançamento. Custos fixos rateados pelos dias da viagem em cada mês; parcelas do contas a pagar pelo mês do vencimento, pagas ou em aberto.`}</p>
-        <div className="trip-kpis">{[['Receita',current.receita],['Custo',current.custo],['Lucro / prejuízo',current.lucro],['Margem',current.margem]].map(([label,value],i)=><div className={`card ${i===2?(value<0?'trip-loss':'trip-profit'):''}`} key={label}><span>{label}</span><strong>{i===3?(value==null?'—':`${number(value)}%`):money(value)}</strong></div>)}</div>
-        {mode==='viagem'?<DataTable rows={current.componentes} columns={[["conta","Composição do custo líquido"],["valor","Valor",money]]}/>:<>
-          <div className="trip-result-verdict"><strong>{!current.itens.length?'Sem lançamentos financeiros para avaliar.':current.lucro>=0?'A receita cobriu os custos considerados.':'A receita não cobriu os custos considerados.'}</strong><span>Custos fixos: {money(current.fixos)} · Financiamentos incluídos: {money(current.financiamentos)}</span></div>
-          <p className="trip-result-method">Fixos: financiamentos, seguros da frota, IPVA/licenciamento, aluguel de veículos e depreciação. Apenas valores lançados e atribuídos à placa. Despesas sem placa/centro identificável e custos ainda não lançados não entram. Períodos de viagens sobrepostos não devem ser somados.</p>
-          <DataTable rows={current.itens.map(r=>({...r,rateio:r.fixo?`${r.dias}/${r.diasMes} dias`:'Integral'}))} columns={[["data","Data",date],["conta","Conta financeira"],["documento","Documento"],["valorOriginal","Original (R$)",money],["rateio","Apropriação"],["valor","No período (R$)",money]]} emptyText="Nenhum lançamento financeiro encontrado."/>
-          <p className="trip-result-method">Receitas positivas e custos negativos. Esta visão é gerencial, inclui parcelas de financiamento e não representa apenas dinheiro recebido ou pago.</p>
-        </>}
+  const [open, setOpen] = useState(false),
+    [period, setPeriod] = useState("viagem"),
+    [month, setMonth] = useState(trip.saida?.slice(0, 7) || ""),
+    [data, setData] = useState(null),
+    [error, setError] = useState(""),
+    [attempt, setAttempt] = useState(0);
+  const selectedMonth = period === "mes" ? month : "";
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    setError("");
+    setData(null);
+    if (period === "mes" && !/^[1-9]\d{3}-(0[1-9]|1[0-2])$/.test(selectedMonth)) {
+      setError("Selecione um mês válido para consultar o veículo.");
+      return;
+    }
+    window.RB_API.getConsultaViagemIndicadores(trip.empresa, trip.numero, selectedMonth ? {mes: selectedMonth} : {})
+      .then((r) => { if (active) setData(r); })
+      .catch((e) => { if (active) setError(e.message || "Não foi possível carregar os resultados."); });
+    return () => { active = false; };
+  }, [open, trip.empresa, trip.numero, selectedMonth, period, attempt]);
+  const vehicle = data?.veiculo;
+  const comparable = data?.viagem?.disponivel && vehicle?.disponivel && vehicle.itens?.length > 0;
+  const tripPeriod = `${date(trip.saida)} a ${date(trip.chegada)}`;
+  const vehicleDates = `${date(vehicle?.inicio || trip.saida)} a ${date(vehicle?.fim || trip.chegada)}`;
+  return (
+    <section className="card trip-indicators" aria-label="Lucro da viagem e do veículo">
+      <div className="trip-audit-heading">
+        <div>
+          <h3>A viagem e o veículo deram lucro?</h3>
+          <p>Veja quanto sobrou na viagem e depois de considerar os custos da placa.</p>
+        </div>
+        <button className="btn" aria-expanded={open} onClick={() => setOpen(!open)}>
+          {open ? "Fechar comparação" : "Comparar lucro e custos"}
+        </button>
+      </div>
+      {open && <div className="trip-result-body">
+        <div className="trip-period-controls">
+          <label>Período do veículo
+            <select value={period} onChange={e => setPeriod(e.target.value)}>
+              <option value="viagem">Somente os dias da viagem</option>
+              <option value="mes">Mês inteiro</option>
+            </select>
+          </label>
+          {period === "mes" && <label>Mês do veículo<input type="month" value={month} onChange={e => setMonth(e.target.value)} /></label>}
+        </div>
+        {error ? <div className="trip-error" role="alert">{error}<button className="btn" onClick={() => setAttempt(n => n + 1)}>Tentar novamente</button></div>
+          : !data ? <p className="trip-empty" role="status">Consultando receitas e custos…</p>
+          : <>
+            <div className="trip-comparison-grid">
+              <ResultCard title="Esta viagem" subtitle={`Viagem ${trip.numero} · ${tripPeriod}`} result={data.viagem} provisional={!['FECHADA', 'FINALIZADA'].includes(String(trip.status || '').trim().toUpperCase())} />
+              <ResultCard title={period === "mes" ? "Veículo no mês" : "Veículo nos dias da viagem"} subtitle={`${trip.placa || "Sem placa"} · ${vehicleDates}`} result={vehicle} vehicle />
+            </div>
+            {comparable && <p className="trip-comparison-conclusion" role="status">{
+              data.viagem.lucro > 0 && vehicle.lucro < 0
+                ? "A viagem deu lucro, mas a receita do veículo não cobriu todos os custos considerados no período."
+                : vehicle.lucro > 0
+                  ? "A receita do veículo cobriu os custos considerados no período e houve lucro."
+                  : vehicle.lucro < 0
+                    ? "Faltou receita para cobrir os custos considerados do veículo no período."
+                    : "A receita do veículo foi igual aos custos considerados no período."
+            }</p>}
+            <p className="trip-comparison-note">O veículo considera todas as receitas e despesas lançadas para a placa no período, mesmo sem vínculo com esta viagem. {period === "viagem" ? "Custos fixos proporcionais aos dias da viagem." : "Custos fixos do mês inteiro."} Valores ainda não lançados ou sem placa identificável ficam de fora. Os dois resultados são separados: não devem ser somados nem descontados um do outro.</p>
+            <details className="trip-cost-details">
+              <summary>Ver de onde vêm os valores</summary>
+              <div className="trip-cost-details-body">
+                <h4>Custos desta viagem</h4>
+                <p className="trip-comparison-note">Fretes menos o saldo do controle da viagem, incluindo os ajustes do acerto. Enquanto a viagem estiver aberta, o resultado é provisório.</p>
+                <DataTable rows={data.viagem?.componentes || []} columns={[["conta", "Custo / ajuste"], ["valor", "Valor", money]]} emptyText="Custos da viagem indisponíveis." />
+                <h4>Receitas e custos do veículo</h4>
+                <p className="trip-comparison-note">{period === "mes" ? "Custos fixos do mês inteiro." : "Custos fixos divididos pelos dias do mês, considerando somente os dias da viagem."} Inclui financiamentos, seguros, IPVA/licenciamento, aluguel e depreciação que estejam lançados para a placa. As parcelas de financiamento entram pelo vencimento, pagas ou em aberto.</p>
+                <DataTable rows={(vehicle?.itens || []).map(r => ({...r, rateio: r.fixo ? `${r.dias}/${r.diasMes} dias` : "Integral"}))}
+                  columns={[["data", "Data", date], ["conta", "Receita / custo"], ["documento", "Documento"], ["rateio", "Parte considerada"], ["valor", "Valor no período", money]]}
+                  emptyText="Nenhum lançamento disponível para o veículo." />
+                <p className="trip-comparison-note">Receitas aparecem positivas e despesas negativas. Valores ainda não lançados ou sem placa identificável ficam de fora. Este resultado não é o saldo bancário. Períodos de viagens que se sobrepõem não devem ser somados.</p>
+              </div>
+            </details>
+          </>}
       </div>}
-    </>}
-  </section>;
+    </section>
+  );
 }
 export default function ConsultaViagens() {
   const [form, setForm] = useState(empty),
@@ -99,6 +311,7 @@ export default function ConsultaViagens() {
     [detail, setDetail] = useState(null),
     [detailLoading, setDetailLoading] = useState(false),
     [detailError, setDetailError] = useState("");
+  const [showList, setShowList] = useState(false);
   const [tab, setTab] = useState("fretes"),
     [attempt, setAttempt] = useState(0),
     [detailAttempt, setDetailAttempt] = useState(0);
@@ -156,10 +369,9 @@ export default function ConsultaViagens() {
         <div>
           <h1>Consulta de viagens</h1>
           <div className="sub">
-            Confira documentos, identifique pendências e acompanhe os valores da viagem.
+            Escolha uma viagem para conferir valores e documentos.
           </div>
         </div>
-        <span className="trip-origin">Dados do sistema do cliente</span>
       </header>
       <form
         className="card trip-filters"
@@ -198,27 +410,6 @@ export default function ConsultaViagens() {
             placeholder="Todas as placas"
           />
         </label>
-        <label>
-          Motorista
-          <input value={form.motorista} maxLength={120} placeholder="Nome do motorista" onChange={e=>setForm({...form,motorista:e.target.value})}/>
-        </label>
-        <label>
-          Saída inicial
-          <input
-            type="date"
-            value={form.inicio}
-            onChange={(e) => setForm({ ...form, inicio: e.target.value })}
-          />
-        </label>
-        <label>
-          Saída final
-          <input
-            type="date"
-            value={form.fim}
-            min={form.inicio || undefined}
-            onChange={(e) => setForm({ ...form, fim: e.target.value })}
-          />
-        </label>
         <button className="btn primary" disabled={loading}>
           Buscar viagens
         </button>
@@ -232,6 +423,44 @@ export default function ConsultaViagens() {
         >
           Limpar filtros
         </button>
+        <details className="trip-more-filters">
+          <summary>
+            Mais filtros
+            {[form.motorista, form.inicio, form.fim].filter(Boolean).length
+              ? " • ativos"
+              : ""}
+          </summary>
+          <div>
+            <label>
+              Motorista
+              <input
+                value={form.motorista}
+                maxLength={120}
+                placeholder="Nome do motorista"
+                onChange={(e) =>
+                  setForm({ ...form, motorista: e.target.value })
+                }
+              />
+            </label>
+            <label>
+              Saída inicial
+              <input
+                type="date"
+                value={form.inicio}
+                onChange={(e) => setForm({ ...form, inicio: e.target.value })}
+              />
+            </label>
+            <label>
+              Saída final
+              <input
+                type="date"
+                value={form.fim}
+                min={form.inicio || undefined}
+                onChange={(e) => setForm({ ...form, fim: e.target.value })}
+              />
+            </label>
+          </div>
+        </details>
       </form>
       {error && (
         <div className="card trip-error" role="alert">
@@ -247,24 +476,36 @@ export default function ConsultaViagens() {
         </div>
       ) : (
         data && (
-          <div className="trip-workspace">
+          <div
+            className={`trip-workspace ${showList || !selected ? "show-trip-list" : ""}`}
+          >
+            {selected && (
+              <button
+                className="btn trip-mobile-switch"
+                onClick={() => setShowList(!showList)}
+              >
+                {showList ? "Voltar à viagem" : "Trocar viagem"}
+              </button>
+            )}
             <section
               className="card trip-list"
               aria-label="Viagens encontradas"
             >
               <div className="trip-section-head">
                 <div>
-                  <h2>Viagens encontradas</h2>
+                  <h2>Escolha a viagem</h2>
                   <p>{data.total} registro(s) · mais recentes primeiro</p>
                 </div>
-                <span className="trip-count">{data.total}</span>
               </div>
               <div className="trip-list-items">
                 {data.itens.map((item) => (
                   <button
                     key={`${item.empresa}-${item.numero}`}
                     className={`trip-item ${selected?.numero === item.numero && selected?.empresa === item.empresa ? "selected" : ""}`}
-                    onClick={() => setSelected(item)}
+                    onClick={() => {
+                      setSelected(item);
+                      setShowList(false);
+                    }}
                     aria-pressed={
                       selected?.numero === item.numero &&
                       selected?.empresa === item.empresa
@@ -343,54 +584,91 @@ export default function ConsultaViagens() {
                   <div className="card trip-overview">
                     <div className="trip-section-head">
                       <div>
-                        <p>CONTROLE DE VIAGEM · EMPRESA {v.empresa}</p>
+                        <p>Empresa {v.empresa}</p>
                         <h2>
                           Viagem {v.numero}{" "}
                           <span className="trip-plate">{v.placa}</span>
                         </h2>
-                        <p className="trip-driver">{v.motorista || 'Motorista não informado'}</p>
+                        <p className="trip-driver">
+                          {v.motorista || "Motorista não informado"}
+                        </p>
                       </div>
                       <Status trip={v} />
                     </div>
                     <div className="trip-journey">
                       <div>
-                        <small>SAÍDA</small>
+                        <small>Saída</small>
                         <strong>{date(v.saida)}</strong>
-                        <span>{v.horaSaida?.slice(0,5) || "Horário não informado"}</span>
+                        <span>
+                          {v.horaSaida?.slice(0, 5) || "Horário não informado"}
+                        </span>
                       </div>
                       <span className="trip-journey-line">→</span>
                       <div>
-                        <small>CHEGADA</small>
+                        <small>Chegada</small>
                         <strong>{date(v.chegada)}</strong>
-                        <span>{v.horaChegada?.slice(0,5) || "Horário não informado"}</span>
+                        <span>
+                          {v.horaChegada?.slice(0, 5) ||
+                            "Horário não informado"}
+                        </span>
                       </div>
                       <div>
-                        <small>ACERTO</small>
+                        <small>Acerto</small>
                         <strong>{date(v.acerto)}</strong>
                       </div>
                     </div>
-                    <details className="trip-operational"><summary>Detalhes operacionais · quilometragem, reboque e entregas</summary><dl className="trip-facts">
-                      {[
-                        ["Motorista", v.motorista],
-                        ["Reboque", v.reboque],
-                        ["KM de saída", number(v.kmSaida)],
-                        ["KM de chegada", number(v.kmChegada)],
-                        ["KM percorridos", number(v.kmPercorrido)],
-                        ["KM vazio", number(v.kmVazio)],
-                        ["Entregas", number(v.entregas)],
-                        ["Litros", number(v.litros)],
-                      ].map(([label, value]) => (
-                        <div key={label}>
-                          <dt>{label}</dt>
-                          <dd>{value || "—"}</dd>
-                        </div>
-                      ))}
-                    </dl></details>
+                    <details className="trip-operational">
+                      <summary>Quilometragem e outros dados</summary>
+                      <dl className="trip-facts">
+                        {[
+                          ["Motorista", v.motorista],
+                          ["Reboque", v.reboque],
+                          ["KM de saída", number(v.kmSaida)],
+                          ["KM de chegada", number(v.kmChegada)],
+                          ["KM percorridos", number(v.kmPercorrido)],
+                          ["KM vazio", number(v.kmVazio)],
+                          ["Entregas", number(v.entregas)],
+                          ["Litros", number(v.litros)],
+                        ].map(([label, value]) => (
+                          <div key={label}>
+                            <dt>{label}</dt>
+                            <dd>{value || "—"}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </details>
                   </div>
-                  <TripIndicators key={`${v.empresa}-${v.numero}`} trip={v}/>
-                  <CteAudit key={`audit-${v.empresa}-${v.numero}`} audit={detail.conferencia} onRetry={()=>setDetailAttempt(n=>n+1)} />
+                  <dl
+                    className="trip-summary-values"
+                    aria-label="Valores registrados"
+                  >
+                    {[
+                      ["Total em fretes", v.fretes],
+                      ["Despesas", v.despesas],
+                      ["Abastecimentos", v.abastecimentos],
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <dt>{label}</dt>
+                        <dd>{money(value)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                  <CteAudit
+                    key={`audit-${v.empresa}-${v.numero}`}
+                    audit={detail.conferencia}
+                    onRetry={() => setDetailAttempt((n) => n + 1)}
+                  />
+                  <details key={`manifestos-${v.empresa}-${v.numero}`} className="card trip-documents">
+                    <summary>Manifestos (MDF-e){detail.manifestosDisponiveis !== false ? ` · ${detail.manifestos?.length || 0}` : " · consulta indisponível"}</summary>
+                    {detail.manifestosDisponiveis === false ? <p className="trip-empty" role="status">Não foi possível consultar os manifestos. Recarregue a viagem para tentar novamente.</p> :
+                      <DataTable rows={detail.manifestos || []} columns={[
+                        ["numero","Manifesto"],["serie","Série"],["empresa","Empresa"],["placa","Placa"],
+                        ["status","Situação"],["encerradoEm","Baixa / encerramento", value => value ? new Date(value).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"}) : "Sem baixa"]
+                      ]} emptyText="Nenhum manifesto vinculado a esta viagem." />}
+                  </details>
+                  <TripIndicators key={`${v.empresa}-${v.numero}`} trip={v} />
                   <details className="card trip-breakdown">
-                    <summary>Valores do acerto · pedágios, diárias e comissão</summary>
+                    <summary>Consultar acerto do motorista</summary>
                     <dl className="trip-facts">
                       {[
                         ["Pedágios", v.pedagios],
@@ -409,7 +687,13 @@ export default function ConsultaViagens() {
                       Totais conforme o controle de viagem do sistema de origem.
                     </p>
                   </details>
-                  <div className="card trip-documents">
+                  <details
+                    key={`documents-${v.empresa}-${v.numero}`}
+                    className="card trip-documents"
+                  >
+                    <summary>
+                      Consultar fretes, despesas e abastecimentos
+                    </summary>
                     <div
                       className="trip-tabs"
                       role="tablist"
@@ -473,7 +757,7 @@ export default function ConsultaViagens() {
                         emptyText="Nenhum abastecimento vinculado a esta viagem."
                       />
                     )}
-                  </div>
+                  </details>
                   {(v.observacao || v.observacaoPrincipal) && (
                     <div className="card trip-notes">
                       <h3>Observações da viagem</h3>

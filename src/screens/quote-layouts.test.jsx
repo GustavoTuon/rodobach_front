@@ -33,7 +33,8 @@ beforeEach(() => {
     ],
   };
   window.RB_API = {
-    listAntt: vi.fn().mockResolvedValue([]),
+    listAntt: vi.fn().mockResolvedValue([{eixos:6,tipoVeiculo:"Carreta",dataVigencia:"2026-09-30",versao:"portaria_suroc_22_2026"},{eixos:3,tipoVeiculo:"Truck"}]),
+    getAnttStatus: vi.fn().mockResolvedValue({stale:false,lastCheck:{status:"ok",finalizado_em:"2026-10-06T15:00:00Z"}}),
     calcularFrete: vi.fn().mockResolvedValue(response()),
   };
 });
@@ -44,6 +45,26 @@ afterEach(() => {
 
 const change = (name, value) => fireEvent.change(screen.getByLabelText(name), { target: { value } });
 const ready = () => screen.findByText('Cotação atualizada · valores em reais');
+
+it('usa a tabela do servidor e exibe aviso quando a verificação precisa de revisão', async () => {
+  window.RB_API.getAnttStatus.mockResolvedValue({stale:true,lastCheck:{status:'review',finalizado_em:'2026-10-06T15:00:00Z',mensagem:'Vigência ambígua.'}});
+  render(<window.SimuladorFrete onNavigate={vi.fn()} />);
+  expect(await screen.findByText(/A atualização automática precisa de atenção/)).toBeTruthy();
+  expect(screen.getByText(/Portaria SUROC 22\/2026/).textContent).toContain('30/09/2026');
+  change('Quilometragem','1000');
+  await ready();
+});
+
+it('não calcula usando dados locais quando a tabela do servidor falha e permite recuperar', async () => {
+  window.RB_API.listAntt.mockRejectedValueOnce(new Error('offline'));
+  render(<window.SimuladorFrete onNavigate={vi.fn()} />);
+  change('Quilometragem','1000');
+  expect(await screen.findByText(/Não foi possível carregar a tabela do sistema/)).toBeTruthy();
+  expect(window.RB_API.calcularFrete).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button',{name:'Tentar novamente'}));
+  await ready();
+  expect(window.RB_API.calcularFrete).toHaveBeenCalled();
+});
 
 it('reproduz a planilha com impostos nos custos e percentual bruto separado do líquido', async () => {
   window.RB_API.calcularFrete.mockImplementation(async ({ tipoCarga }) => ({
