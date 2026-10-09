@@ -1,1 +1,28 @@
-{"name":"Norte — Gestão de Frota","short_name":"Norte","scope":"/","display":"standalone","background_color":"#ffffff","theme_color":"#1c203b","icons":[{"src":"/brand/norte-04.png","type":"image/png","purpose":"any"}]}
+{
+  "name": "Norte — Gestão de Frota",
+  "short_name": "Norte",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1c203b",
+  "icons": [
+    {
+      "src": "/icons/norte-icon-192-v2.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/norte-icon-512-v2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/norte-icon-maskable-512-v2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
