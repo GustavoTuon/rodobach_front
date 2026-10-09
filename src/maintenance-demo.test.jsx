@@ -54,7 +54,7 @@ it("permite somente conferência sem liberar novos lançamentos", async () => {
   });
   render(<MaintenanceDemo />);
   await screen.findByText("Conferência simplificada");
-  expect(screen.queryByRole("button", { name: "Motorista" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Colaborador" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Nova manutenção" })).toBeNull();
   expect(window.RB_API.listPlantao).toHaveBeenCalledWith(true);
 });
@@ -131,7 +131,7 @@ it("preserva o progresso ao fechar e retomar, e permite voltar antes de registra
   expect(window.RB_API.createPlantao).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole("button", { name: "Voltar", exact: true }));
   fireEvent.click(screen.getByRole("button", { name: "Voltar", exact: true }));
-  expect(screen.getByLabelText("Valor pago").value).toBe("1250,90");
+  expect(screen.getByLabelText("Valor da despesa").value).toBe("1250,90");
   await finish();
   expect(window.RB_API.createPlantao).toHaveBeenCalledTimes(1);
 });
@@ -140,7 +140,7 @@ it("bloqueia data futura na primeira etapa e mantém o modal aberto", async () =
   fireEvent.change(screen.getByLabelText("Placa do veículo"), {
     target: { value: "ABC1234" },
   });
-  fireEvent.change(screen.getByLabelText("Valor pago"), {
+  fireEvent.change(screen.getByLabelText("Valor da despesa"), {
     target: { value: "200" },
   });
   fireEvent.change(screen.getByLabelText("Data da despesa"), {
@@ -170,7 +170,7 @@ it("seleciona placas pelo teclado, fecha com Escape e mostra busca vazia", async
 });
 it("remove letras no campo de valor e formata ao sair", async () => {
   await ready();
-  const input = screen.getByLabelText("Valor pago");
+  const input = screen.getByLabelText("Valor da despesa");
   fireEvent.change(input, { target: { value: "abc180xyz,509" } });
   expect(input.value).toBe("180,50");
   fireEvent.change(input, { target: { value: "180" } });
@@ -270,7 +270,7 @@ async function details() {
   fireEvent.change(screen.getByLabelText("Placa do veículo"), {
     target: { value: "ABC1234" },
   });
-  fireEvent.change(screen.getByLabelText("Valor pago"), {
+  fireEvent.change(screen.getByLabelText("Valor da despesa"), {
     target: { value: "1250,90" },
   });
   fireEvent.click(
@@ -312,7 +312,7 @@ async function submit(plate = "ABC1234", amount = "1.250,90") {
   fireEvent.change(screen.getByLabelText("Placa do veículo"), {
     target: { value: plate },
   });
-  fireEvent.change(screen.getByLabelText("Valor pago"), {
+  fireEvent.change(screen.getByLabelText("Valor da despesa"), {
     target: { value: amount },
   });
   await finish();
@@ -322,11 +322,11 @@ it("carrega e filtra a frota, registra o usuário autenticado e mantém o histó
   expect(screen.getByLabelText("Quem está lançando?").value).toBe("maria");
   expect(screen.getByLabelText("Quem está lançando?").readOnly).toBe(true);
   fireEvent.focus(screen.getByRole("combobox", { name: /Placa/ }));
-  expect(screen.getAllByRole("option")).toHaveLength(2);
+  expect(within(screen.getByRole("listbox", { name: "Placas da frota" })).getAllByRole("option")).toHaveLength(2);
   fireEvent.change(screen.getByLabelText("Placa do veículo"), {
     target: { value: "abc" },
   });
-  expect(screen.getAllByRole("option")).toHaveLength(1);
+  expect(within(screen.getByRole("listbox", { name: "Placas da frota" })).getAllByRole("option")).toHaveLength(1);
   await submit();
   expect(JSON.parse(localStorage.getItem(KEY))[0]).toMatchObject({
     plate: "ABC1234",
@@ -422,7 +422,7 @@ it("mostra placa, data e comprovante e salva edição com controle de versão", 
   }));
   fireEvent.click(screen.getByRole("button", { name: "Editar", exact: true }));
   expect(screen.getByLabelText("Data da despesa").value).toBe("2026-09-30");
-  fireEvent.change(screen.getByLabelText("Valor pago"), {
+  fireEvent.change(screen.getByLabelText("Valor da despesa"), {
     target: { value: "250,00" },
   });
   await finish();
@@ -535,7 +535,114 @@ it("filtra por data e comprovante e mantém o formulário se duplicidade for rej
     "Possível duplicidade",
   );
   expect(
-    within(screen.getByRole("dialog")).getByLabelText("Valor pago").value,
+    within(screen.getByRole("dialog")).getByLabelText("Valor da despesa").value,
   ).not.toBe("");
   expect(screen.getAllByRole("article")).toHaveLength(1);
+});
+
+it("mantém os controles financeiros apenas na conferência", async () => {
+  await ready();
+  expect(screen.getByAltText("Rodobach Transportes Rodoviários")).toBeTruthy();
+  await details();
+  expect(screen.queryByLabelText("Pago")).toBeNull();
+  expect(screen.queryByLabelText("Lançado")).toBeNull();
+  await finish();
+  const record = JSON.parse(localStorage.getItem(KEY))[0];
+  expect(record).not.toHaveProperty("paid");
+  expect(record).not.toHaveProperty("posted");
+  expect(screen.queryByLabelText("Pago — ABC1234")).toBeNull();
+  fireEvent.click(screen.getByText("Filtrar lançamentos"));
+  expect(screen.queryByLabelText("Pagamento")).toBeNull();
+  fireEvent.click(screen.getAllByRole("button", { name: "Conferência" })[0]);
+  await screen.findByLabelText("Lançado — ABC1234");
+  window.RB_API.updatePlantaoControl = vi.fn(async (_id, body) => ({ record: { ...record, ...body, paid: false, version: 2 } }));
+  fireEvent.click(screen.getByLabelText("Lançado — ABC1234"));
+  await waitFor(() => expect(window.RB_API.updatePlantaoControl).toHaveBeenCalledWith(record.id, { version: 1, posted: true }, true));
+  await waitFor(() => expect(screen.getByLabelText("Lançado — ABC1234").checked).toBe(true));
+  fireEvent.change(screen.getByLabelText("Pagamento"), { target: { value: "true" } });
+  expect(screen.queryByRole("article")).toBeNull();
+  fireEvent.click(screen.getAllByRole("button", { name: "Colaborador" })[0]);
+  await screen.findByRole("article");
+  expect(screen.queryByLabelText("Pagamento")).toBeNull();
+});
+
+it("registra a data no modal, mantém o formulário em falha e permite corrigir o pagamento", async () => {
+  await ready();
+  await submit();
+  fireEvent.click(screen.getAllByRole("button", { name: "Conferência" })[0]);
+  fireEvent.click(await screen.findByRole("button", { name: "Registrar pagamento — ABC1234" }));
+  fireEvent.change(screen.getByLabelText("Data do pagamento"), { target: { value: "2026-09-30" } });
+  let record = JSON.parse(localStorage.getItem(KEY))[0];
+  window.RB_API.updatePlantaoControl = vi.fn().mockRejectedValueOnce(new Error("Falha ao salvar pagamento")).mockImplementation(async (_id, body) => {
+    record = { ...record, ...body, paid: Boolean(body.paymentDate), version: record.version + 1 };
+    return { record };
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Salvar pagamento" }));
+  expect(await screen.findByText("Falha ao salvar pagamento")).toBeTruthy();
+  expect(screen.getByLabelText("Data do pagamento").value).toBe("2026-09-30");
+  fireEvent.click(screen.getByRole("button", { name: "Salvar pagamento" }));
+  await screen.findByText("Pago em 30/09/2026");
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(window.RB_API.updatePlantaoControl).toHaveBeenLastCalledWith(record.id, { version: 1, paymentDate: "2026-09-30" }, true);
+  fireEvent.click(screen.getByRole("button", { name: "Editar pagamento — ABC1234" }));
+  expect(screen.getByLabelText("Data do pagamento").value).toBe("2026-09-30");
+  fireEvent.click(screen.getByRole("button", { name: "Remover registro de pagamento" }));
+  await screen.findByRole("button", { name: "Registrar pagamento — ABC1234" });
+  expect(window.RB_API.updatePlantaoControl).toHaveBeenLastCalledWith(record.id, { version: 2, paymentDate: null }, true);
+});
+
+it("motorista registra abastecimento com km antes dos valores em sete etapas e a conferência recebe os detalhes", async () => {
+  render(<MaintenanceDemo />);
+  fireEvent.click((await screen.findAllByRole("button", {name:"Motorista",exact:true}))[0]);
+  fireEvent.click(screen.getByRole("button", {name:"Registrar despesa"}));
+  fireEvent.click(screen.getByRole("button", {name:/Abastecimento/}));
+  fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
+  await waitFor(() => expect(screen.getByLabelText("Placa do veículo").disabled).toBe(false));
+  fireEvent.change(screen.getByLabelText("Placa do veículo"), {target:{value:"ABC1234"}});
+  fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
+  expect(screen.queryByLabelText("Valor total da despesa (R$)")).toBeNull();
+  fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
+  expect(screen.getByRole("alert").textContent).toContain("hodômetro");
+  expect(screen.getByLabelText("Hodômetro (km)").getAttribute("inputmode")).toBe("decimal");
+  fireEvent.change(screen.getByLabelText("Hodômetro (km)"), {target:{value:"125430.7"}});
+  fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
+  expect(screen.queryByLabelText("Hodômetro (km)")).toBeNull();
+  expect(screen.queryByLabelText("Posto — opcional")).toBeNull();
+  expect(screen.getByLabelText("Litros abastecidos").getAttribute("inputmode")).toBe("decimal");
+  fireEvent.change(screen.getByLabelText("Valor total da despesa (R$)"), {target:{value:"1200,00"}});
+  fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
+  expect(screen.getByRole("alert").textContent).toContain("litros");
+  fireEvent.change(screen.getByLabelText("Litros abastecidos"), {target:{value:"200.500"}});
+  fireEvent.click(screen.getByLabelText("Adicionar ARLA neste abastecimento"));
+  fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
+  expect(screen.getByRole("alert").textContent).toContain("ARLA");
+  fireEvent.change(screen.getByLabelText("Litros de ARLA"), {target:{value:"20.5"}});
+  fireEvent.change(screen.getByLabelText("Valor do ARLA (R$)"), {target:{value:"80.50"}});
+
+  fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
+  fireEvent.change(screen.getByLabelText("Posto — opcional"), {target:{value:"Posto Teste"}});
+  fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
+  expect(screen.getByLabelText("Foto da nota ou comprovante — opcional")).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
+  window.RB_API.createPlantao.mockRejectedValueOnce(new Error("Sem conexão"));
+  fireEvent.click(screen.getByRole("button", {name:"Enviar para conferência"}));
+  await screen.findByText("Sem conexão");
+  fireEvent.click(screen.getByRole("button", {name:"Enviar para conferência"}));
+  await screen.findByText("Despesa enviada!");
+  const record=JSON.parse(localStorage.getItem(KEY))[0];
+  expect(record).toMatchObject({source:"motorista",service:"Abastecimento",liters:200.5,odometer:125430.7,amount:1200,supplier:"Posto Teste",arlaLiters:20.5,arlaAmount:80.5});
+  expect(record).not.toHaveProperty("paid");
+  fireEvent.click(screen.getByRole("button", {name:"Ver minhas despesas"}));
+  expect(screen.getByRole("article").textContent).toContain("200,5 L");
+  fireEvent.click(screen.getAllByRole("button", {name:"Colaborador",exact:true})[0]);
+  expect(screen.queryByRole("article")).toBeNull();
+  fireEvent.click(screen.getAllByRole("button", {name:"Conferência",exact:true})[0]);
+  expect((await screen.findByRole("article")).textContent).toContain("Motorista");
+  fireEvent.click(screen.getByRole("button", {name:"Editar",exact:true}));
+  fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
+  fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
+  expect(screen.getByLabelText("Hodômetro (km)").value).toBe("125430,7");
+  fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
+  expect(screen.getByLabelText("Litros abastecidos").value).toBe("200,5");
+  expect(screen.getByLabelText("Litros de ARLA").value).toBe("20,5");
 });
