@@ -399,11 +399,15 @@ window.RB_API = {
 
   // ── Manutenção ────────────────────────────────────────────────────────────
   listVeiculosManutencao: () => apiRequest("/manutencao/veiculos"),
+  getPlantaoLocation: plate => apiRequest(`/manutencao-plantao/placas/${encodeURIComponent(plate)}/localizacao`),
+  getPlantaoOdometer: plate => apiRequest(`/manutencao-plantao/placas/${encodeURIComponent(plate)}/hodometro`),
   listVeiculosPlantao: () => apiRequest("/manutencao-plantao/placas"),
   listPlantao: (conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}`),
   createPlantao: (body) => apiRequest("/manutencao-plantao/lancamentos", {method:"POST",body:JSON.stringify(body)}),
+  updatePlantaoControl: (id, body, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}/controle`, {method:"PATCH",body:JSON.stringify(body)}),
   updatePlantao: (id, body, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}`, {method:"PUT",body:JSON.stringify(body)}),
   deletePlantao: (id, body, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}`, {method:"DELETE",body:JSON.stringify(body)}),
+  receiptPlantao: (id, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}/comprovante`),
   historyPlantao: (id, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}/historico`),
   checkPlantao: (id, version) => apiRequest(`/manutencao-plantao/conferencia/${encodeURIComponent(id)}`, {method:"PATCH",body:JSON.stringify({version})}),
   searchFornecedoresManutencao: (q = "") => apiRequest(`/manutencao/fornecedores${buildQuery({ q })}`),
