@@ -29,10 +29,12 @@ const ConsultaCte = () => {
     setError("");
     setLoading(false);
   };
-  const money = (value) =>
+  const money = (value, digits = 2) =>
     Number(value || 0).toLocaleString("pt-BR", {
       style: "currency",
       currency: "BRL",
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
     });
   const formatDate = (value) =>
     value
@@ -436,11 +438,11 @@ const ConsultaCte = () => {
                 <div><span>NCM predominante por valor</span><strong className="ncm-code">{resumoXml.ncmPredominante || "Não informado"}</strong></div>
                 <div><span>Valor total</span><strong>{money(resumoXml.valorTotal)}</strong></div>
                 <div><span>Peso total</span><strong>{decimal(resumoXml.pesoTotal)} kg</strong></div>
-                <div><span>{ratearFreteXml ? "Frete por tonelada" : "Valor das notas por tonelada"}</span><strong>{ratearFreteXml && freteXmlTotal === null ? "Valor inválido" : valorPorToneladaXml == null ? "Sem peso" : `${money(valorPorToneladaXml)} / t`}</strong></div>
+                <div><span>{ratearFreteXml ? "Frete por tonelada" : "Valor das notas por tonelada"}</span><strong>{ratearFreteXml && freteXmlTotal === null ? "Valor inválido" : valorPorToneladaXml == null ? "Sem peso" : `${money(valorPorToneladaXml, ratearFreteXml ? 3 : 2)} / t`}</strong></div>
                 {ratearFreteXml && <div><span>Frete para ratear</span><strong>{freteXmlTotal === null ? "Valor inválido" : money(freteXmlTotal)}</strong></div>}
               </div>
               <div className="xml-method-note">O NCM predominante é o que soma o maior valor de produtos. Para o peso, usamos o peso bruto; quando ausente, usamos o líquido.</div>
-              {ratearFreteXml && <div className="xml-method-note">Frete por tonelada = frete rateado da NF-e ÷ (peso em kg ÷ 1.000). O rateio é proporcional ao peso, com ajuste de centavos para fechar o frete total.</div>}
+              {ratearFreteXml && <div className="xml-method-note">Frete por tonelada = frete total ÷ (peso total em kg ÷ 1.000). A tarifa é a mesma para todas as notas com peso e aparece com três casas decimais. O frete de cada nota é proporcional ao peso, com ajuste de centavos para fechar o total.</div>}
               {ratearFreteXml && notasXml.some(note => !(note.pesoConsiderado > 0)) && <div className="ncm-warning">Há notas sem peso. O frete é distribuído somente entre as notas com peso informado; confira as demais antes de usar o rateio.</div>}
             </div>
             {gruposXml.map((grupo) => (
@@ -451,11 +453,11 @@ const ConsultaCte = () => {
                 </div>
                 <div style={{ overflowX: "auto" }}>
                 <table className="data-table ncm-table">
-                  <thead><tr><th>Arquivo / NF-e</th><th>Emitente</th><th>Destinatário</th><th>NCM predominante</th><th className="num">Valor</th><th className="num">Peso considerado</th>{ratearFreteXml && <><th className="num">Proporção</th><th className="num">Frete rateado</th></>}<th className="num">{ratearFreteXml ? "Frete por tonelada" : "Valor da nota por tonelada"}</th><th className="num">Detalhes</th></tr></thead>
+                  <thead><tr><th>Arquivo / NF-e</th><th>Emitente</th><th>Destinatário</th><th>NCM predominante</th><th className="num">Valor</th><th className="num">Peso considerado</th>{ratearFreteXml && <><th className="num">Proporção</th><th className="num">Frete rateado</th></>}{!ratearFreteXml && <th className="num">Valor da nota por tonelada</th>}<th className="num">Detalhes</th></tr></thead>
                   <tbody>
                     {grupo.notes.map((note) => {
                       const noteSummary = consolidateNfes([note]);
-                      const valorPorTonelada = ratearFreteXml ? (freteXmlTotal === null ? null : note.fretePorTonelada) : noteSummary.valorPorTonelada;
+                      const valorPorTonelada = noteSummary.valorPorTonelada;
                       const noteKey = note.chave || note.arquivo;
                       const aberta = notaXmlAberta === noteKey;
                       return (
@@ -468,12 +470,12 @@ const ConsultaCte = () => {
                           <td className="num">{money(note.valorNota)}</td>
                           <td className="num">{decimal(note.pesoConsiderado)} kg<div className="muted">{note.pesoBruto ? "peso bruto" : note.pesoLiquido ? "peso líquido" : "não informado"}</div></td>
                           {ratearFreteXml && <><td className="num">{decimal(note.percentualPeso, 2)}%</td><td className="num ncm-rate"><strong>{freteXmlTotal === null ? "—" : money(note.freteRateado)}</strong></td></>}
-                          <td className="num ncm-rate"><strong>{valorPorTonelada == null ? "—" : `${money(valorPorTonelada)} / t`}</strong></td>
+                          {!ratearFreteXml && <td className="num ncm-rate"><strong>{valorPorTonelada == null ? "—" : `${money(valorPorTonelada)} / t`}</strong></td>}
                           <td className="num"><button type="button" className="btn sm" aria-expanded={aberta} onClick={() => setNotaXmlAberta(aberta ? "" : noteKey)}>{aberta ? "Ver menos" : "Ver mais"}</button></td>
                         </tr>
                         {aberta && (
                           <tr className="xml-note-detail-row">
-                            <td colSpan={ratearFreteXml ? 10 : 8}>
+                            <td colSpan={ratearFreteXml ? 9 : 8}>
                               <div className="xml-note-details">
                                 <div><span>Chave de acesso</span><strong className="ncm-code">{note.chave || "Não informada"}</strong></div>
                                 <div><span>Destinatário</span><strong>{note.cliente || "Não informado"}</strong><small>{note.clienteDocumento || "Documento não informado"}</small></div>

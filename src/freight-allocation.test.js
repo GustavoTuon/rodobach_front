@@ -1,6 +1,17 @@
 import { expect, it } from 'vitest';
 import { allocateFreight, parseFreight } from './freight-allocation.js';
 
+it('keeps the batch tariff even for tiny notes affected by cent rounding', () => {
+  const rows = allocateFreight([{pesoConsiderado:0.003}, {pesoConsiderado:999.997}, {pesoConsiderado:0}], 100.16);
+  expect(rows[0].freteRateado).toBe(0);
+  expect(rows[1].freteRateado).toBe(100.16);
+  for (const row of rows.slice(0, 2)) {
+    expect(row.fretePorTonelada).toBe(100.16);
+    expect(row.fretePorKg).toBeCloseTo(0.10016, 10);
+  }
+  expect(rows[2].fretePorTonelada).toBeNull();
+});
+
 it.each(['5600', '5.600', '5.600,00', '5600.00', 'R$ 5.600,00'])('reads %s as 5600 reais', value => {
   expect(parseFreight(value)).toBe(5600);
 });
