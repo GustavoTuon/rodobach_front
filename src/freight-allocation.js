@@ -20,6 +20,9 @@ export function allocateFreight(notes, freight, weightKey = 'pesoConsiderado') {
   const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
   const totalCents = Math.round(Number(freight) * 100);
   const valid = Number.isSafeInteger(totalCents) && totalCents >= 0;
+  // Unit rates belong to the whole batch, before rounding individual allocations.
+  const ratePerKg = valid && totalWeight > 0 ? totalCents / 100 / totalWeight : null;
+  const ratePerTonne = valid && totalWeight > 0 ? totalCents / 100 / (totalWeight / 1000) : null;
   const shares = weights.map(weight => valid && totalWeight > 0 ? totalCents * (weight / totalWeight) : 0);
   const cents = shares.map(Math.floor);
   // Distribute residual cents to the largest fractional shares, never to weightless notes.
@@ -36,7 +39,7 @@ export function allocateFreight(notes, freight, weightKey = 'pesoConsiderado') {
     ...note,
     percentualPeso: totalWeight > 0 ? weights[index] / totalWeight * 100 : 0,
     freteRateado: cents[index] / 100,
-    fretePorKg: weights[index] > 0 ? cents[index] / 100 / weights[index] : null,
-    fretePorTonelada: weights[index] > 0 ? cents[index] / 100 / (weights[index] / 1000) : null,
+    fretePorKg: weights[index] > 0 ? ratePerKg : null,
+    fretePorTonelada: weights[index] > 0 ? ratePerTonne : null,
   }));
 }

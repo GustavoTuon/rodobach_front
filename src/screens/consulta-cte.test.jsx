@@ -17,7 +17,7 @@ const batch = [
   [298782, 364.22, 97.136],
 ];
 const file = ([id, amount, weight]) => ({name: `${id}.xml`, text: async () => `<nfeProc><NFe><infNFe Id="NFe${id}"><ide><nNF>${id}</nNF><serie>1</serie></ide><emit><xNome>Emitente teste</xNome></emit><det><prod><NCM>10063011</NCM><vProd>${amount}</vProd></prod></det><total><ICMSTot><vNF>${amount}</vNF></ICMSTot></total><transp><modFrete>0</modFrete><vol><pesoB>${weight}</pesoB></vol></transp></infNFe></NFe></nfeProc>`});
-const money = value => value.toLocaleString('pt-BR', {style:'currency',currency:'BRL'}).replace(/\s/g, ' ');
+const money = (value, digits = 2) => value.toLocaleString('pt-BR', {style:'currency',currency:'BRL',minimumFractionDigits:digits,maximumFractionDigits:digits}).replace(/\s/g, ' ');
 const normalized = element => element.textContent.replace(/\s/g, ' ');
 async function importNotes(notes) {
   render(<window.ConsultaCte/>);
@@ -28,25 +28,27 @@ async function importNotes(notes) {
 const toggle = () => fireEvent.click(screen.getByRole('checkbox'));
 const setFreight = value => fireEvent.change(screen.getByLabelText('Valor total do frete (R$)'), {target:{value}});
 
-it('uses allocated freight per tonne for the 13-note batch, updates it and restores merchandise value when disabled', async () => {
+it('shows the three-decimal batch tariff only in the summary, updates it and restores merchandise value when disabled', async () => {
   await importNotes(batch);
+  const rate = 5600 / (batch.reduce((sum, [, , weight]) => sum + weight, 0) / 1000);
   const row = () => screen.getByText('NF 298770').closest('tr');
   expect(normalized(row())).toContain(`${money(3317.44)} / t`);
   toggle(); setFreight('5.600,00');
-  expect(screen.getByRole('columnheader', {name:'Frete por tonelada'})).toBeTruthy();
+  expect(screen.queryByRole('columnheader', {name:'Frete por tonelada'})).toBeNull();
   expect(normalized(row())).toContain(money(3250.78));
-  expect(normalized(row())).toContain(`${money(341.67)} / t`);
+  expect(normalized(row())).not.toContain(' / t');
   const rows = batch.map(([id]) => screen.getByText(`NF ${id}`).closest('tr'));
   const cents = rows.reduce((sum, r) => {
     const cells = within(r).getAllByRole('cell');
-    expect(normalized(cells[8])).toContain(' / t');
+    expect(cells).toHaveLength(9);
+    expect(normalized(r)).not.toContain(' / t');
     return sum + Math.round(Number(cells[7].textContent.replace(/[^\d,]/g,'').replace(',','.')) * 100);
   }, 0);
   expect(cents).toBe(560000);
-  expect(normalized(screen.getByText('Frete por tonelada', {selector:'span'}).parentElement)).toContain(`${money(341.67)} / t`);
+  expect(normalized(screen.getByText('Frete por tonelada', {selector:'span'}).parentElement)).toContain(`${money(rate, 3)} / t`);
   setFreight('11.200,00');
-  expect(normalized(row())).toContain(`${money(683.35)} / t`);
-  setFreight('0'); expect(normalized(row())).toContain(`${money(0)} / t`);
+  expect(normalized(screen.getByText('Frete por tonelada', {selector:'span'}).parentElement)).toContain(`${money(rate * 2, 3)} / t`);
+  setFreight('0'); expect(normalized(screen.getByText('Frete por tonelada', {selector:'span'}).parentElement)).toContain(`${money(0, 3)} / t`);
   toggle();
   expect(screen.getByRole('columnheader', {name:'Valor da nota por tonelada'})).toBeTruthy();
   expect(normalized(row())).toContain(`${money(3317.44)} / t`);
@@ -55,7 +57,7 @@ it('uses allocated freight per tonne for the 13-note batch, updates it and resto
 it('shows no unit price when a note has no weight', async () => {
   await importNotes([[1,100,0]]); toggle(); setFreight('100');
   const cells = within(screen.getByText('NF 1').closest('tr')).getAllByRole('cell');
-  expect(cells[8].textContent).toBe('—');
+  expect(normalized(cells[7])).toBe(money(0));
   expect(screen.getByText('Sem peso')).toBeTruthy();
 });
 
@@ -118,7 +120,8 @@ it('reports invalid freight instead of showing a negative or zero result', async
   await importNotes([[1,100,10]]); toggle(); setFreight('-100');
   expect(screen.getByRole('alert').textContent).toContain('frete válido');
   const cells = within(screen.getByText('NF 1').closest('tr')).getAllByRole('cell');
-  expect(cells[7].textContent).toBe('—'); expect(cells[8].textContent).toBe('—');
+  expect(cells[7].textContent).toBe('—');
+  expect(normalized(screen.getByText('Frete por tonelada', {selector:'span'}).parentElement)).toContain('Valor inválido');
 });
 
 it('handles failed and empty ERP requests and recovers on a new query', async () => {
