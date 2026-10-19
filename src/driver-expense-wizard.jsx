@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import ExpensePhotoAssist from "./expense-photo-assist.jsx";
+import {readExpenseDraft,clearExpenseDraft,useExpenseDraft} from "./expense-draft.js";
 
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
 const currency = value => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -24,7 +25,7 @@ const categories = [
   ["Manutenção", "🔧", "Serviços e reparos no veículo"],
   ["Outros", "🧾", "Pedágio, estacionamento e outras despesas"],
 ];
-async function prepareReceipt(file) {
+export async function prepareReceipt(file) {
   if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw new Error("Escolha uma foto JPG, PNG ou WebP.");
   if (file.size > 15000000) throw new Error("A foto deve ter até 15 MB.");
   const url = URL.createObjectURL(file);
@@ -41,22 +42,25 @@ async function prepareReceipt(file) {
   } finally { URL.revokeObjectURL(url); }
 }
 
-export default function DriverExpenseWizard({ record, user, fleet, fleetLoading, fleetError, onRetryFleet, onSaved, onClose, manager, Dialog, FleetSelect, sanitizeAmount }) {
+export default function DriverExpenseWizard({ record, user, fleet, fleetLoading, fleetError, onRetryFleet, onSaved, onClose, onMaintenance, manager, Dialog, FleetSelect, sanitizeAmount }) {
+  const [draft] = useState(()=>readExpenseDraft(user,"expense",record));
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
-  const [category, setCategory] = useState(record?.service || "");
-  const [plate, setPlate] = useState(record?.plate || "");
-  const [date, setDate] = useState(record?.expenseDate || today());
-  const [amount, setAmount] = useState(record ? record.amount.toFixed(2).replace(".", ",") : "");
-  const [liters, setLiters] = useState(record?.liters == null ? "" : String(record.liters).replace(".", ","));
+  const [category, setCategory] = useState(draft?.category ?? (record?.service || ""));
+  const [plate, setPlate] = useState(draft?.plate ?? (record?.plate || (user.expenseProfile === "motorista" ? fleet[0] || "" : "")));
+  const [date, setDate] = useState(draft?.date ?? (record?.expenseDate || today()));
+  const [expenseTime,setExpenseTime] = useState(draft?.expenseTime ?? record?.expenseTime ?? "");
+  const [receiptReason,setReceiptReason] = useState(draft?.receiptReason ?? record?.receiptReason ?? "");
+  const [amount, setAmount] = useState(draft?.amount ?? (record ? record.amount.toFixed(2).replace(".", ",") : ""));
+  const [liters, setLiters] = useState(draft?.liters ?? (record?.liters == null ? "" : String(record.liters).replace(".", ",")));
   const [odometer, setOdometer] = useState(record?.odometer == null ? "" : String(record.odometer).replace(".", ","));
-  const [supplier, setSupplier] = useState(record?.supplier || "");
-  const [location, setLocation] = useState(record?.location || "");
+  const [supplier, setSupplier] = useState(draft?.supplier ?? (record?.supplier || ""));
+  const [location, setLocation] = useState(draft?.location ?? (record?.location || ""));
   const [locationReference,setLocationReference]=useState(null);
   const [locationLoading,setLocationLoading]=useState(false);
   const [locationError,setLocationError]=useState("");
   const [locationAttempt,setLocationAttempt]=useState(0);
-  const locationEdited=useRef(Boolean(record)), locationPlate=useRef(plate), locationAuto=useRef(false);
+  const locationEdited=useRef(Boolean(record || draft)), locationPlate=useRef(plate), locationAuto=useRef(false);
   function editLocation(value){locationEdited.current=true;locationAuto.current=false;setLocation(value);}
   useEffect(()=>{
     let active=true;
@@ -73,44 +77,51 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
     }).catch(()=>{if(active)setLocationError("Não foi possível consultar a localização. Preencha manualmente ou tente novamente.");}).finally(()=>{if(active)setLocationLoading(false);});
     return()=>{active=false;};
   },[plate,date,fleet,record,locationAttempt]);
-  const [note, setNote] = useState(record?.note || "");
-  const [documentNumber, setDocumentNumber] = useState(record?.document || "");
-  const [photos, setPhotos] = useState({});
-  const [fuelAmount, setFuelAmount] = useState(record?.fuelAmount == null ? "" : record.fuelAmount.toFixed(2).replace(".", ","));
-  const [hasArla,setHasArla] = useState(record?.arlaLiters != null);
-  const [arlaLiters,setArlaLiters] = useState(record?.arlaLiters == null ? "" : String(record.arlaLiters).replace(".",","));
-  const [arlaAmount,setArlaAmount] = useState(record?.arlaAmount == null ? "" : record.arlaAmount.toFixed(2).replace(".",","));
+  const [note, setNote] = useState(draft?.note ?? (record?.note || ""));
+  const [documentNumber, setDocumentNumber] = useState(draft?.documentNumber ?? (record?.document || ""));
+  const [photos, setPhotos] = useState(draft?.photos ?? ({}));
+  const [fuelType,setFuelType] = useState(draft?.fuelType ?? (record?.fuelType || ""));
+  const [customerName,setCustomerName] = useState(draft?.customerName ?? (record?.customerName || ""));
+  const [fuelAmount, setFuelAmount] = useState(draft?.fuelAmount ?? (record?.fuelAmount == null ? "" : record.fuelAmount.toFixed(2).replace(".", ",")));
+  const [hasArla,setHasArla] = useState(draft?.hasArla ?? (record?.arlaLiters != null));
+  const [arlaLiters,setArlaLiters] = useState(draft?.arlaLiters ?? (record?.arlaLiters == null ? "" : String(record.arlaLiters).replace(".",",")));
+  const [arlaAmount,setArlaAmount] = useState(draft?.arlaAmount ?? (record?.arlaAmount == null ? "" : record.arlaAmount.toFixed(2).replace(".",",")));
   const [kmReference,setKmReference] = useState(null);
   const [kmLoading,setKmLoading] = useState(false);
   const [kmError,setKmError] = useState("");
   const [kmAttempt,setKmAttempt] = useState(0);
-  const kmEdited=useRef(Boolean(record)), kmPlate=useRef(plate), kmAuto=useRef(false);
-  function editOdometer(value) {kmEdited.current=true;kmAuto.current=false;setOdometer(value);}
   useEffect(()=>{
     let active=true;
-    if(kmPlate.current!==plate){kmPlate.current=plate;kmEdited.current=false;kmAuto.current=false;setOdometer("");}
-    if(date!==today() && kmAuto.current){setOdometer("");kmAuto.current=false;}
-    setKmReference(null);setKmError("");setKmLoading(false);
-    if(!fleet.includes(plate) || !window.RB_API.getPlantaoOdometer) return;
+    setKmReference(null);setKmError("");setKmLoading(false);setOdometer("");
+    const timeKey = value => value?.length===5 ? `${value}:00` : value || "";
+    if (record && record.plate===plate && record.expenseDate===date && timeKey(record.expenseTime)===timeKey(expenseTime) && record.odometer!=null) {
+      setOdometer(String(record.odometer).replace(".",","));
+      setKmReference({odometer:record.odometer,date:record.odometerDate,source:"saved"});
+      return;
+    }
+    if(!fleet.includes(plate) || !date || date>today()) return;
+    if(!expenseTime){setKmError("Informe o horário da nota na etapa Veículo.");return;}
+    if(!window.RB_API.getPlantaoOdometer){setKmError("Consulta de telemetria indisponivel.");return;}
     setKmLoading(true);
-    window.RB_API.getPlantaoOdometer(plate).then(data=>{
+    window.RB_API.getPlantaoOdometer(plate,date,expenseTime).then(data=>{
       if(!active)return;
       const value=data.odometer == null ? null : Number(data.odometer);
-      if(value==null || !Number.isFinite(value) || value<0 || value>9999999.9){setKmError("Sem km disponível para este veículo. Informe o valor do painel.");return;}
-      const reference={...data,odometer:Math.round(value*10)/10};setKmReference(reference);
-      if(!kmEdited.current && date===today() && !record){setOdometer(String(reference.odometer).replace(".",","));kmAuto.current=true;}
-    }).catch(()=>{if(active)setKmError("Não foi possível buscar o km. Você pode digitar ou tentar novamente.");}).finally(()=>{if(active)setKmLoading(false);});
+      if(data.source!=="telemetria" || value==null || !Number.isFinite(value) || value<=0 || value>9999999.9){setKmError("Sem leitura de telemetria para esta placa na data da despesa.");return;}
+      const reference={...data,odometer:Math.round(value*10)/10};
+      setKmReference(reference);setOdometer(String(reference.odometer).replace(".",","));
+    }).catch(()=>{if(active)setKmError("Nao foi possivel consultar a telemetria. Tente novamente.");}).finally(()=>{if(active)setKmLoading(false);});
     return()=>{active=false;};
-  },[plate,date,fleet,record,kmAttempt]);
+  },[plate,date,expenseTime,fleet,kmAttempt,record]);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const busy = useRef(false);
+  const draftWarning = useExpenseDraft(user,"expense",record,{category,plate,date,expenseTime,amount,liters,supplier,location,note,documentNumber,photos,fuelType,customerName,fuelAmount,hasArla,arlaLiters,arlaAmount,receiptReason},!done && Boolean(category));
   const knownPhotos=record?.photoKinds || {invoice:record?.hasReceipt};
   const hasPhoto=["odometer","pump","invoice"].some(kind=>photos[kind] !== undefined ? Boolean(photos[kind]) : knownPhotos[kind]);
   const applySuggestion=(field,value)=>{
     const formatted=typeof value === "number" ? String(value).replace(".",",") : value;
-    ({odometer:editOdometer,liters:setLiters,amount:setAmount,fuelAmount:setFuelAmount,date:setDate,supplier:setSupplier,location:editLocation,documentNumber:setDocumentNumber})[field]?.(formatted);
+    ({expenseTime:setExpenseTime,fuelType:setFuelType,customerName:setCustomerName,liters:setLiters,amount:setAmount,fuelAmount:setFuelAmount,date:setDate,supplier:setSupplier,location:editLocation,documentNumber:setDocumentNumber})[field]?.(formatted);
   };
   const loadSavedPhotos=async()=>{
     if(!record?.id)return {};
@@ -122,8 +133,12 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
     if (!category) return "Escolha o tipo de despesa.";
     if (step >= 1 && (!fleet.includes(plate) || fleetLoading || fleetError)) return "Selecione uma placa cadastrada na frota.";
     if (step >= 1 && (!date || date > today())) return "Informe a data da despesa, sem data futura.";
+    const sameSavedReading=record && record.plate===plate && record.expenseDate===date && !record.expenseTime && !expenseTime && record.odometer!=null;
+    if (step>=1 && fuel && !expenseTime && !sameSavedReading) return "Informe o horário da nota para buscar o KM do abastecimento.";
+    if (expenseTime && new Date(`${date}T${expenseTime.length===5 ? expenseTime+":00" : expenseTime}-03:00`)>new Date()) return "O horário da despesa não pode estar no futuro.";
     if (step >= 3 && (!Number.isFinite(number(amount)) || number(amount) <= 0 || number(amount) > 999999.99)) return "Informe um valor entre R$ 0,01 e R$ 999.999,99.";
     if (step >= 3 && fuel && (!Number.isFinite(number(liters)) || number(liters) <= 0 || number(liters) > 9999)) return "Informe a quantidade de litros abastecidos.";
+    if (step >= 2 && fuel && (kmLoading || !kmReference)) return "Aguarde uma leitura valida da telemetria para continuar.";
     if (step >= 2 && ((fuel && odometer === "") || (odometer !== "" && (!/^\d+(?:,\d)?$/.test(odometer) || number(odometer) > 9999999.9)))) return "Informe o hodômetro em quilômetros, com até uma casa decimal.";
     if (step >= 3 && fuel && fuelAmount && (!Number.isFinite(number(fuelAmount)) || number(fuelAmount) <= 0 || number(fuelAmount) > number(amount))) return "O valor do combustível deve ser positivo e não pode superar o total da despesa.";
     if (step >= 3 && fuel && hasArla) {
@@ -131,21 +146,25 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
       if (Math.round((number(fuelAmount)+number(arlaAmount))*100)>Math.round(number(amount)*100)) return "Combustível e ARLA não podem superar o total da despesa.";
     }
     if (step >= 5 && category === "Outros" && !note.trim()) return "Descreva a despesa para a conferência.";
+    const hasInvoice=photos.invoice !== undefined ? Boolean(photos.invoice) : Boolean(knownPhotos.invoice);
+    if (step>=5 && !hasInvoice && receiptReason.trim().length<10) return "Anexe a nota ou justifique a ausência com pelo menos 10 caracteres.";
   }
   async function advance(event) {
     event.preventDefault();
     if (busy.current || photoLoading || user.readOnly) return;
     const invalid = validate(); setError(invalid || ""); if (invalid) return;
+    if (step === 0 && category === "Manutenção" && !record && onMaintenance) { onMaintenance(); return; }
     if (step < lastStep) { setStep(step + 1); return; }
     busy.current = true; setSaving(true);
     try {
-      const body = { source: "motorista", service: category, plate, expenseDate: date, amount: number(amount),
+      const body = { source: record?.source || "motorista", service: category, plate, expenseDate: date, expenseTime:expenseTime || null, receiptReason, amount: number(amount),
         liters: fuel ? number(liters) : null, odometer: odometer === "" ? null : number(odometer), supplier: supplier.trim(),
-        location: location.trim(), note: note.trim(), document: documentNumber.trim(),
+        fuelType: fuelType.trim(), customerName: customerName.trim(), location: location.trim(), note: note.trim(), document: documentNumber.trim(),
         arlaLiters: fuel && hasArla ? number(arlaLiters) : null, arlaAmount: fuel && hasArla ? number(arlaAmount) : null,
         photos, fuelAmount: fuel && fuelAmount ? number(fuelAmount) : null,
       };
       const result = record ? await window.RB_API.updatePlantao(record.id, { ...body, version: record.version }, manager) : await window.RB_API.createPlantao(body);
+      try {clearExpenseDraft(user,"expense",record);} catch { /* Saving the expense already succeeded. */ }
       onSaved(result.record); setDone(true);
     } catch (error) { setError(error.message || "Não foi possível enviar. Seus dados continuam aqui para tentar novamente."); }
     finally { busy.current = false; setSaving(false); }
@@ -167,23 +186,27 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
         <ol className="mp-steps driver-steps">{steps.map((label, i) => <li key={label} className={i <= step ? "is-active" : ""} aria-current={i === step ? "step" : undefined}><span>{i < step ? "✓" : i + 1}</span>{label}</li>)}</ol>
       </header>
       <div className="mp-wizard-body">
-        <p className="driver-encouragement">{["Um passo de cada vez. Vamos começar pelo tipo de despesa.", "Boa! Agora identifique o veículo e a data.", "Primeiro, informe o km que aparece no painel.", fuel ? "Agora informe os litros e os valores do abastecimento." : "Informe quanto custou.", "Identifique o estabelecimento e a cidade, se souber.", "Quase lá! Uma foto ajuda a equipe a conferir.", "Último passo: confira os dados e envie com tranquilidade."][step]}</p>
+        <p className="mp-field-help">{draftWarning || (draft ? "Rascunho recuperado. Confira os dados antes de enviar." : "Rascunho salvo automaticamente neste aparelho, somente para seu usuário.")}</p>
+        <button type="button" className="mp-cancel-edit" disabled={saving || photoLoading} onClick={()=>{try {clearExpenseDraft(user,"expense",record);onClose();} catch {setError("Não foi possível descartar o rascunho.");}}}>Descartar rascunho</button>
+        <p className="driver-encouragement">{["Um passo de cada vez. Vamos começar pelo tipo de despesa.", "Boa! Agora identifique o veículo e a data.", "Confira o km recebido automaticamente pela telemetria.", fuel ? "Agora informe os litros e os valores do abastecimento." : "Informe quanto custou.", "Identifique o estabelecimento e a cidade, se souber.", "Quase lá! Uma foto ajuda a equipe a conferir.", "Último passo: confira os dados e envie com tranquilidade."][step]}</p>
         {step === 0 && <div className="driver-categories">{categories.map(([name, icon, description]) => <button type="button" key={name} aria-pressed={category === name} className={category === name ? "selected" : ""} onClick={() => {setCategory(name);setError("");}}><span aria-hidden="true">{icon}</span><span><strong>{name}</strong><small>{description}</small></span><b aria-hidden="true">{category === name ? "✓" : "→"}</b></button>)}</div>}
-        {step === 1 && <><FleetSelect fleet={fleet} value={plate} onChange={setPlate} loading={fleetLoading} disabled={fleetLoading || Boolean(fleetError)} />
+        {step === 1 && <><FleetSelect fleet={fleet} value={plate} onChange={setPlate} loading={fleetLoading} disabled={user.expenseProfile === "motorista" || fleetLoading || Boolean(fleetError)} />
           {fleetError && <p role="alert">{fleetError} <button type="button" onClick={onRetryFleet}>Tentar carregar frota</button></p>}
           <label>Data da despesa<input type="date" max={today()} value={date} onChange={e => setDate(e.target.value)} /></label>
+          <label>Horário da nota{!fuel && " — opcional"}<input type="time" step="1" value={expenseTime} onChange={e=>setExpenseTime(e.target.value)} /></label>
           <p className="mp-field-help">Registrado por {user.nome || user.login}.</p></>}
-        {step === 2 && <><label>Hodômetro (km){!fuel && " — opcional"}<input type="text" inputMode="decimal" enterKeyHint="next" autoComplete="off" aria-describedby="driver-km-help" placeholder="Ex.: 197611,7" value={odometer} onChange={e => editOdometer(decimalInput(e.target.value,1))} /></label><small id="driver-km-help" className="mp-field-help">Use a quilometragem total do veículo, não o contador parcial.</small>
+        {step === 2 && <><label>Hodômetro (km){!fuel && " — opcional"}<input type="text" readOnly aria-describedby="driver-km-help" placeholder="Aguardando telemetria" value={odometer} /></label><small id="driver-km-help" className="mp-field-help">Preenchido somente pela telemetria da placa e da data selecionadas.</small>
           {kmLoading && <p role="status">Buscando o último km do veículo…</p>}
           {kmError && <p role="status">{kmError} <button type="button" onClick={()=>setKmAttempt(n=>n+1)}>Buscar km novamente</button></p>}
           {kmReference && <aside className="driver-reference-card" aria-label="Referência de quilometragem">
-            <div className="driver-reference-top"><span className="driver-reference-tag">{kmReference.source === "telemetria" ? "TELEMETRIA" : "ÚLTIMO ABASTECIMENTO"}</span><time>{referenceDate(kmReference.date,kmReference.source!=="telemetria")}</time></div>
-            <div className="driver-reference-main"><strong>{kmReference.odometer.toLocaleString("pt-BR")} <small>km</small></strong><button className="driver-reference-use" type="button" disabled={odometer!=="" && number(odometer)===kmReference.odometer} onClick={()=>editOdometer(String(kmReference.odometer).replace(".",","))}>{odometer!=="" && number(odometer)===kmReference.odometer ? "✓ Km aplicado" : "Usar este km"}</button></div>
-            <p>{date===today() ? "Último km disponível. Confira no painel e ajuste se necessário." : "Esta referência pode ser posterior à despesa. Informe o km daquela data."}</p>
+            <div className="driver-reference-top"><span className="driver-reference-tag">{kmReference.source === "saved" ? "KM REGISTRADO" : "TELEMETRIA"}</span><time>{referenceDate(kmReference.date)}</time></div>
+            <div className="driver-reference-main"><strong>{kmReference.odometer.toLocaleString("pt-BR")} <small>km</small></strong><span>✓ Km aplicado</span></div>
+            <p>{kmReference.source==="saved" ? "KM preservado do lançamento original. Alterar placa, data ou horário exige uma nova consulta." : "Última leitura anterior ao horário da nota. O KM será preservado nas próximas edições."}</p>
           </aside>}
 
         </>}
         {step === 3 && <>
+          {fuel && <label>Combustível da nota — opcional<input value={fuelType} maxLength={80} placeholder="Ex.: Diesel S10" onChange={e=>setFuelType(e.target.value)} /></label>}
           {fuel && <label>Litros abastecidos<input type="text" inputMode="decimal" enterKeyHint="next" autoComplete="off" placeholder="Ex.: 250,500" value={liters} onChange={e => setLiters(decimalInput(e.target.value,3))} /></label>}
           <label>Valor total da despesa (R$)<input type="text" inputMode="decimal" enterKeyHint="next" autoComplete="off" placeholder="0,00" value={amount} onChange={e => setAmount(sanitizeAmount(e.target.value))} /></label>
           {fuel && <label>Valor só do combustível (R$) — opcional<input type="text" inputMode="decimal" enterKeyHint="next" autoComplete="off" value={fuelAmount} placeholder="Sem ARLA ou outros itens" onChange={e=>setFuelAmount(sanitizeAmount(e.target.value))} /></label>}
@@ -196,6 +219,7 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
           </div>}
           {fuel && number(liters) > 0 && number(fuelAmount) > 0 && number(fuelAmount) <= number(amount) && <p className="driver-unit-price">Preço do combustível por litro: <strong>{currency(number(fuelAmount) / number(liters))}</strong></p>}</>}
         {step === 4 && <>
+          <label>Cliente / destinatário da nota — opcional<input value={customerName} maxLength={160} onChange={e=>setCustomerName(e.target.value)} /></label>
           <label>{fuel ? "Posto — opcional" : "Fornecedor — opcional"}<input value={supplier} maxLength={120} enterKeyHint="next" onChange={e => setSupplier(e.target.value)} /></label>
           <label>Cidade / local — opcional<input value={location} maxLength={160} enterKeyHint="next" onChange={e => editLocation(e.target.value)} /></label>
           {locationLoading && <p role="status">Buscando a localização do veículo…</p>}
@@ -208,17 +232,18 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
           </aside>}
 
         </>}
-        {[2,3,4,5].includes(step) && (fuel || step !== 3) && <details className="driver-step-photos" key={step}>
-          <summary><span className="driver-photo-summary-icon" aria-hidden="true">+</span><span><strong>{step === 2 ? "Foto do painel" : step === 3 ? "Foto da bomba" : step === 4 ? "Preencher com a nota" : "Nota ou comprovante"}</strong><small>{step === 4 ? "Use os dados da nota para identificar o posto" : "Adicionar imagem ou tentar a leitura"}</small></span><span className="driver-photo-chevron" aria-hidden="true">⌄</span></summary>
-          <ExpensePhotoAssist photos={photos} knownPhotos={knownPhotos} fuel={fuel} suggestionFields={step === 4 ? ["supplier","location"] : undefined} photoKinds={[step === 2 ? "odometer" : step === 3 ? "pump" : "invoice"]} preparePhoto={prepareReceipt}
+        {[1,3,4,5].includes(step) && (fuel || step !== 3) && <details className="driver-step-photos" key={step}>
+          <summary><span className="driver-photo-summary-icon" aria-hidden="true">+</span><span><strong>{step === 1 ? "Ler data e horário da nota" : step === 3 ? "Ler nota do abastecimento" : step === 4 ? "Preencher com a nota" : "Nota ou comprovante"}</strong><small>Leia a nota para preencher combustível, valores, posto e cliente</small></span><span className="driver-photo-chevron" aria-hidden="true">⌄</span></summary>
+          <ExpensePhotoAssist photos={photos} knownPhotos={knownPhotos} fuel={fuel} suggestionFields={step === 1 ? ["date","expenseTime"] : step === 4 ? ["supplier","location","customerName"] : undefined} photoKinds={["invoice"]} preparePhoto={prepareReceipt}
             onPhoto={(kind,photo)=>setPhotos(current=>({...current,[kind]:photo}))} onApply={applySuggestion} onLoadSaved={loadSavedPhotos} onBusy={setPhotoLoading}
-            values={{amount,fuelAmount,liters,odometer,date,supplier,location,documentNumber}} />
+            values={{amount,fuelAmount,liters,date,supplier,location,documentNumber,fuelType,customerName}} />
         </details>}
         {step === 5 && <>
+          {!(photos.invoice !== undefined ? photos.invoice : knownPhotos.invoice) && <label>Justificativa sem nota<textarea value={receiptReason} minLength={10} maxLength={300} onChange={e=>setReceiptReason(e.target.value)} placeholder="Explique por que não há nota ou comprovante." /></label>}
           <label>Número da nota / comprovante — opcional<input maxLength={80} value={documentNumber} onChange={e => setDocumentNumber(e.target.value)} /></label>
           <label>{category === "Outros" ? "Descreva a despesa" : "O que foi feito? — opcional"}<textarea maxLength={300} rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder="Conte o que aconteceu para ajudar a conferência." /></label></>}
         {step === lastStep && <section className="mp-review"><div className="mp-review-total"><span>{category} · {plate}</span><strong>{currency(number(amount))}</strong></div><dl>
-          {[["Data", date.split("-").reverse().join("/")], ["Fornecedor", supplier || "Não informado"], ["Local", location || "Não informado"], ...(fuel ? [["Litros", liters], ["Valor do combustível",fuelAmount ? currency(number(fuelAmount)) : "Não informado"]] : []), ...(fuel && hasArla ? [["Litros de ARLA",arlaLiters],["Valor do ARLA",currency(number(arlaAmount))]] : []), ["Hodômetro", odometer ? `${odometer} km` : "Não informado"], ["Comprovante", documentNumber || "Não informado"], ["Foto", hasPhoto ? "Anexada" : "Sem foto"], ["Observação", note || "Sem observação"]].map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+          {[["Data", date.split("-").reverse().join("/")], ["Horário da nota", expenseTime || "Não informado"], ["Justificativa sem nota", receiptReason || "—"], ["Cliente da nota", customerName || "Não informado"], ["Combustível", fuelType || "Não informado"], ["Fornecedor", supplier || "Não informado"], ["Local", location || "Não informado"], ...(fuel ? [["Litros", liters], ["Valor do combustível",fuelAmount ? currency(number(fuelAmount)) : "Não informado"]] : []), ...(fuel && hasArla ? [["Litros de ARLA",arlaLiters],["Valor do ARLA",currency(number(arlaAmount))]] : []), ["Hodômetro", odometer ? `${odometer} km` : "Não informado"], ["Comprovante", documentNumber || "Não informado"], ["Foto", hasPhoto ? "Anexada" : "Sem foto"], ["Observação", note || "Sem observação"]].map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
         </dl></section>}
         {error && <p className="mp-feedback error" role="alert">{error}</p>}
       </div>

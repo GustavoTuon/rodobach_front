@@ -400,7 +400,7 @@ window.RB_API = {
   // ── Manutenção ────────────────────────────────────────────────────────────
   listVeiculosManutencao: () => apiRequest("/manutencao/veiculos"),
   getPlantaoLocation: plate => apiRequest(`/manutencao-plantao/placas/${encodeURIComponent(plate)}/localizacao`),
-  getPlantaoOdometer: plate => apiRequest(`/manutencao-plantao/placas/${encodeURIComponent(plate)}/hodometro`),
+  getPlantaoOdometer: (plate, date, time) => apiRequest(`/manutencao-plantao/placas/${encodeURIComponent(plate)}/hodometro${buildQuery({date,time})}`),
   listVeiculosPlantao: () => apiRequest("/manutencao-plantao/placas"),
   listPlantao: (conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}`),
   createPlantao: (body) => apiRequest("/manutencao-plantao/lancamentos", {method:"POST",body:JSON.stringify(body)}),
@@ -495,6 +495,7 @@ window.RB_API = {
     apiRequest("/automacoes/vencimento-clientes/desativar", { method: "POST" }),
 
   listUsuarios: () => apiRequest("/usuarios"),
+  listMotoristasTelemetria: () => apiRequest("/usuarios/motoristas-telemetria"),
   createUsuario: (payload) =>
     apiRequest("/usuarios", {
       method: "POST",

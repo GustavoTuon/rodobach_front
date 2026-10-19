@@ -1,6 +1,21 @@
 import {describe,it,expect,vi} from "vitest";
 import {extractExpenseFields,readDecimal,createLocalOcrJob,extractNumericField,readableText} from "./expense-ocr.js";
 describe("sugestões de OCR",()=>{
+ it("lê horário de emissão e não usa um horário sem identificação",()=>{
+  const fields=Object.fromEntries(extractExpenseFields("DATA EMISSAO 03/10/2026 10:32:45","invoice").suggestions.map(s=>[s.field,s.value]));
+  expect(fields).toMatchObject({date:"2026-10-03",expenseTime:"10:32:45"});
+  expect(extractExpenseFields("PROTOCOLO 11:00:00","invoice").suggestions.some(s=>s.field==="expenseTime")).toBe(false);
+ });
+ it("lê combustível, litros, valor e cliente da nota sem confundir emitente ou ARLA",()=>{
+  const text="EMITENTE: POSTO EXEMPLO LTDA\nCIDADE: CRICIUMA / SC\nDESTINATARIO\nRAZAO SOCIAL: RODOBACH TRANSPORTES LTDA\nDADOS DOS PRODUTOS\nDIESEL S10 200,500 L X 6,00 1.203,00\nARLA 20,000 L TOTAL 80,00\nVALOR TOTAL DA NOTA 1.283,00";
+  const fields=Object.fromEntries(extractExpenseFields(text,"invoice").suggestions.map(s=>[s.field,s.value]));
+  expect(fields).toMatchObject({fuelType:"DIESEL S10",liters:200.5,fuelAmount:1203,amount:1283,customerName:"RODOBACH TRANSPORTES LTDA",supplier:"POSTO EXEMPLO LTDA"});
+ });
+ it("não inventa litros ou valores em notas com vários combustíveis",()=>{
+  const result=extractExpenseFields("DIESEL S10 100,000 L TOTAL 600,00\nDIESEL S500 50,000 L TOTAL 250,00\nCLIENTE: TRANSPORTADORA TESTE","invoice");
+  expect(result.suggestions.some(s=>["liters","fuelAmount","fuelType"].includes(s.field))).toBe(false);
+  expect(result.suggestions).toContainEqual({field:"customerName",label:"Cliente / destinatário",value:"TRANSPORTADORA TESTE"});
+ });
  it("preserva decimal do hodômetro e não confunde com velocidade ou data",()=>{
   expect(extractExpenseFields("000 Km/h 03/10/26 12:28\n0197611.7Km","odometer").suggestions).toEqual([{field:"odometer",label:"Hodômetro (km)",value:197611.7}]);
   expect(extractExpenseFields("000 km/h 03/10/26 12:28","odometer").suggestions).toEqual([]);

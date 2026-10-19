@@ -27,7 +27,7 @@ export default function ExpensePhotoAssist({photos, knownPhotos, fuel, photoKind
     finally {job.current=null;if(alive.current) setReading(null);}
   }
   return <section className="expense-photo-assist" aria-label="Preenchimento por fotos">
-    <p className="expense-photo-intro">{suggestionFields ? "Leia a nota para sugerir o posto e o local. Você escolhe quais dados usar." : "Anexe uma foto e use a leitura para ajudar a preencher. Revise as sugestões antes de aplicar."}</p>
+    <p className="expense-photo-intro">{suggestionFields ? "Leia a nota para sugerir posto, local e cliente. Você escolhe quais dados usar." : "Anexe a nota e revise as sugestões de combustível, litros, valores, posto e cliente antes de aplicar."}</p>
     <div className="expense-photo-grid">{kinds.map(kind=>{
       const exists=photos[kind] !== undefined ? Boolean(photos[kind]) : Boolean(knownPhotos[kind]);
       return <div className="expense-photo-slot" key={kind}>
@@ -47,7 +47,7 @@ export default function ExpensePhotoAssist({photos, knownPhotos, fuel, photoKind
     {reading && <div className="expense-ocr-progress" role="status"><span>{progress ? `Lendo ${names[reading]}: ${progress}%` : "Preparando leitura local…"}</span><progress max="100" value={progress} /><button type="button" onClick={()=>job.current?.cancel()}>Cancelar leitura</button></div>}
     {message && <p className="expense-ocr-message" role="status">{message}</p>}
     {result && <div className="expense-ocr-results"><strong>{result.suggestions.length ? "Sugestões da foto — revise antes de usar" : "Leitura sem dados confirmados"}</strong>
-      {suggestionFields && !result.suggestions.length && <p>Posto e local não foram identificados com segurança. Você pode ajustar a foto ou preencher os campos acima.</p>}
+      {suggestionFields && !result.suggestions.length && <p>Os dados da nota não foram identificados com segurança. Você pode ajustar a foto ou preencher os campos acima.</p>}
       {result.warnings.map((warning,i)=><p key={i}>{warning}</p>)}
       {result.suggestions.map((item,i)=><div className="expense-ocr-suggestion" key={`${item.field}-${i}`}><span>{item.label}<b>{typeof item.value === "number" ? item.value.toLocaleString("pt-BR",{maximumFractionDigits:3}) : item.value}</b>{values[item.field] && <small>Atual: {values[item.field]}</small>}</span><button type="button" onClick={()=>{onApply(item.field,item.value);setMessage("Sugestão aplicada. Você pode corrigir o campo antes de enviar.");}}>Usar {item.label}</button></div>)}
       {result.text && <details><summary>Ver trechos reconhecidos (podem conter erros)</summary><pre>{result.text}</pre></details>}

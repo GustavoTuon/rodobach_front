@@ -11,6 +11,44 @@ import {
 } from "@testing-library/react";
 import MaintenanceDemo, { sanitizeAmount } from "./maintenance-demo.jsx";
 const KEY = "rodobach-maintenance-demo-v2";
+it("motorista recebe a placa da telemetria preenchida e bloqueada", async () => {
+  window.RB_AUTH.me.mockResolvedValue({user: {id:42, login:"motorista", expenseProfile:"motorista", permissions:{"manutencao-plantao":true}}});
+  window.RB_API.listVeiculosPlantao.mockResolvedValue({veiculos:[{placa:"ABC1234"}],access:{profile:"motorista",plate:"ABC1234",driverName:"Motorista teste",status:"ready",observedAt:new Date().toISOString(),message:"Placa vinculada automaticamente pela telemetria."}});
+  render(<MaintenanceDemo />);
+  await screen.findByText("Motorista teste");
+  fireEvent.click(screen.getByRole("button",{name:"Registrar despesa"}));
+  fireEvent.click(screen.getByRole("button",{name:/Abastecimento/}));
+  fireEvent.click(screen.getByRole("button",{name:"Próximo passo"}));
+  expect(screen.getByLabelText("Placa do veículo").value).toBe("ABC1234");
+  expect(screen.getByLabelText("Placa do veículo").disabled).toBe(true);
+});
+it("motorista sem identificação não consegue iniciar lançamento", async () => {
+  window.RB_AUTH.me.mockResolvedValue({user: {id:42, login:"motorista", expenseProfile:"motorista", permissions:{"manutencao-plantao":true}}});
+  window.RB_API.listVeiculosPlantao.mockResolvedValue({veiculos:[],access:{profile:"motorista",status:"unavailable",message:"Sem vínculo confirmado."}});
+  render(<MaintenanceDemo />);
+  await screen.findByText("Sem vínculo confirmado.");
+  expect(screen.getByRole("button",{name:"Registrar despesa"}).disabled).toBe(true);
+  expect(screen.getByRole("button",{name:"Atualizar vínculo"})).toBeTruthy();
+});
+it("reúne despesas antigas e de motorista inclusive pelo acesso antigo", async () => {
+  const base = {plate: "ABC1234", author: "maria", authorId: 42, date: new Date().toISOString(), checked: false, version: 1};
+  localStorage.setItem(KEY, JSON.stringify([
+    {...base, id: "legacy", service: "Borracharia", amount: 100},
+    {...base, id: "driver", source: "motorista", service: "Outros", note: "Estacionamento", amount: 50},
+  ]));
+  render(<MaintenanceDemo initialView="motorist" />);
+  await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(2));
+  expect(screen.queryByRole("button", {name: "Colaborador", exact: true})).toBeNull();
+  expect(screen.queryByRole("button", {name: "Motorista", exact: true})).toBeNull();
+  expect(window.RB_API.listPlantao).toHaveBeenCalledWith(false);
+  fireEvent.click(screen.getAllByRole("button", {name: "Minhas despesas", exact: true})[0]);
+  expect(screen.getAllByRole("article")).toHaveLength(2);
+  fireEvent.click(screen.getAllByRole("button", {name: "Conferência", exact: true})[0]);
+  await waitFor(() => expect(window.RB_API.listPlantao).toHaveBeenCalledWith(true));
+  await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(2));
+  fireEvent.click(screen.getAllByRole("button", {name: "Minhas despesas", exact: true})[0]);
+  await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(2));
+});
 it("filtra o histórico sem usar a placa do formulário", async () => {
   await ready();
   await submit("ABC1234");
@@ -54,7 +92,7 @@ it("permite somente conferência sem liberar novos lançamentos", async () => {
   });
   render(<MaintenanceDemo />);
   await screen.findByText("Conferência simplificada");
-  expect(screen.queryByRole("button", { name: "Colaborador" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Minhas despesas" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Nova manutenção" })).toBeNull();
   expect(window.RB_API.listPlantao).toHaveBeenCalledWith(true);
 });
@@ -73,7 +111,7 @@ it("seleciona fornecedor do sistema e salva nome, código e empresa no históric
     supplierCode: 10,
     supplierCompany: 1,
   });
-  expect(screen.getByText("Oficina Central")).toBeTruthy();
+  expect(screen.getAllByText("Oficina Central").length).toBeGreaterThan(0);
 });
 it("permite fornecedor digitado quando a consulta falha e remove vínculo ao editar", async () => {
   await ready();
@@ -199,6 +237,7 @@ beforeEach(() => {
     }),
   };
   window.RB_API = {
+    getPlantaoOdometer: vi.fn().mockResolvedValue({odometer:125430.7,source:"telemetria",date:new Date().toISOString()}),
     listPlantao: vi.fn(async () => ({
       records: JSON.parse(localStorage.getItem(KEY) || "[]"),
     })),
@@ -207,6 +246,7 @@ beforeEach(() => {
         ...body,
         id: crypto.randomUUID(),
         author: "maria",
+        authorProfile: "colaborador",
         authorId: 42,
         date: new Date().toISOString(),
         checked: false,
@@ -254,16 +294,21 @@ async function openForm() {
   if (!screen.queryByRole("dialog"))
     fireEvent.click(
       screen.getAllByRole("button", {
-        name: /Nova manutenção|Continuar lançamento|Continuar edição/,
+        name: "Registrar despesa",
       })[0],
     );
+  if (screen.queryByRole("button", {name: /Serviços e reparos/})) {
+    fireEvent.click(screen.getByRole("button", {name: /Serviços e reparos/}));
+    fireEvent.click(screen.getByRole("button", {name: "Próximo passo"}));
+  }
   await waitFor(() =>
     expect(screen.getByLabelText("Placa do veículo").disabled).toBe(false),
   );
 }
 async function ready() {
   render(<MaintenanceDemo />);
-  await screen.findByRole("heading", { name: "Precisou de manutenção?" });
+  await screen.findByRole("heading", { name: "Cada despesa, um registro completo." });
+  fireEvent.click(screen.getByRole("button", {name:"Todo o período"}));
   await openForm();
 }
 async function details() {
@@ -278,6 +323,7 @@ async function details() {
   );
 }
 async function finish() {
+  fireEvent.change(screen.getByLabelText("Justificativa sem nota"), {target:{value:"Fornecedor nao emitiu a nota."}});
   for (
     let i = 0;
     i < 2 && screen.queryByRole("button", { name: "Continuar", exact: true });
@@ -384,8 +430,10 @@ it("exibe erro de frota e permite tentar novamente", async () => {
   );
   render(<MaintenanceDemo />);
   fireEvent.click(
-    (await screen.findAllByRole("button", { name: "Nova manutenção" }))[0],
+    (await screen.findAllByRole("button", { name: "Registrar despesa" }))[0],
   );
+  fireEvent.click(screen.getByRole("button", {name: /Serviços e reparos/}));
+  fireEvent.click(screen.getByRole("button", {name: "Próximo passo"}));
   expect(await screen.findByRole("alert")).toBeTruthy();
   expect(
     screen.getByRole("button", { name: "Continuar", exact: true }).disabled,
@@ -414,7 +462,7 @@ it("mostra placa, data e comprovante e salva edição com controle de versão", 
   });
   await submit();
   expect(screen.getByRole("article").textContent).toContain("ABC1234");
-  expect(screen.getByText("30/09/2026")).toBeTruthy();
+  expect(screen.getByText("30/09/2026", {selector:"time"})).toBeTruthy();
   expect(screen.getByText("NF-321")).toBeTruthy();
   const record = JSON.parse(localStorage.getItem(KEY))[0];
   window.RB_API.updatePlantao = vi.fn(async (_id, body) => ({
@@ -494,6 +542,7 @@ it("conferente pode editar sem permissão de cadastro e conferidos ficam protegi
     },
   }));
   render(<MaintenanceDemo />);
+  fireEvent.click(await screen.findByRole("button", {name:"Todo o período"}));
   fireEvent.click(
     await screen.findByRole("button", { name: "Editar", exact: true }),
   );
@@ -561,7 +610,7 @@ it("mantém os controles financeiros apenas na conferência", async () => {
   await waitFor(() => expect(screen.getByLabelText("Lançado — ABC1234").checked).toBe(true));
   fireEvent.change(screen.getByLabelText("Pagamento"), { target: { value: "true" } });
   expect(screen.queryByRole("article")).toBeNull();
-  fireEvent.click(screen.getAllByRole("button", { name: "Colaborador" })[0]);
+  fireEvent.click(screen.getAllByRole("button", { name: "Minhas despesas" })[0]);
   await screen.findByRole("article");
   expect(screen.queryByLabelText("Pagamento")).toBeNull();
 });
@@ -593,18 +642,17 @@ it("registra a data no modal, mantém o formulário em falha e permite corrigir 
 
 it("motorista registra abastecimento com km antes dos valores em sete etapas e a conferência recebe os detalhes", async () => {
   render(<MaintenanceDemo />);
-  fireEvent.click((await screen.findAllByRole("button", {name:"Motorista",exact:true}))[0]);
+  fireEvent.click((await screen.findAllByRole("button", {name:"Minhas despesas",exact:true}))[0]);
   fireEvent.click(screen.getByRole("button", {name:"Registrar despesa"}));
   fireEvent.click(screen.getByRole("button", {name:/Abastecimento/}));
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
   await waitFor(() => expect(screen.getByLabelText("Placa do veículo").disabled).toBe(false));
   fireEvent.change(screen.getByLabelText("Placa do veículo"), {target:{value:"ABC1234"}});
+  fireEvent.change(screen.getByLabelText("Horário da nota"), {target:{value:"00:00:00"}});
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
   expect(screen.queryByLabelText("Valor total da despesa (R$)")).toBeNull();
-  fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
-  expect(screen.getByRole("alert").textContent).toContain("hodômetro");
-  expect(screen.getByLabelText("Hodômetro (km)").getAttribute("inputmode")).toBe("decimal");
-  fireEvent.change(screen.getByLabelText("Hodômetro (km)"), {target:{value:"125430.7"}});
+  await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("125430,7"));
+  expect(screen.getByLabelText("Hodômetro (km)").readOnly).toBe(true);
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
   expect(screen.queryByLabelText("Hodômetro (km)")).toBeNull();
   expect(screen.queryByLabelText("Posto — opcional")).toBeNull();
@@ -623,6 +671,7 @@ it("motorista registra abastecimento com km antes dos valores em sete etapas e a
   fireEvent.change(screen.getByLabelText("Posto — opcional"), {target:{value:"Posto Teste"}});
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
   expect(screen.getByLabelText("Foto da nota ou comprovante — opcional")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Justificativa sem nota"),{target:{value:"Fornecedor nao emitiu a nota."}});
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
   window.RB_API.createPlantao.mockRejectedValueOnce(new Error("Sem conexão"));
   fireEvent.click(screen.getByRole("button", {name:"Enviar para conferência"}));
@@ -634,14 +683,14 @@ it("motorista registra abastecimento com km antes dos valores em sete etapas e a
   expect(record).not.toHaveProperty("paid");
   fireEvent.click(screen.getByRole("button", {name:"Ver minhas despesas"}));
   expect(screen.getByRole("article").textContent).toContain("200,5 L");
-  fireEvent.click(screen.getAllByRole("button", {name:"Colaborador",exact:true})[0]);
-  expect(screen.queryByRole("article")).toBeNull();
+  fireEvent.click(screen.getAllByRole("button", {name:"Minhas despesas",exact:true})[0]);
+  expect(screen.getByRole("article").textContent).toContain("200,5 L");
   fireEvent.click(screen.getAllByRole("button", {name:"Conferência",exact:true})[0]);
-  expect((await screen.findByRole("article")).textContent).toContain("Motorista");
+  expect((await screen.findByRole("article")).textContent).toContain("Colaborador");
   fireEvent.click(screen.getByRole("button", {name:"Editar",exact:true}));
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
-  expect(screen.getByLabelText("Hodômetro (km)").value).toBe("125430,7");
+  await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("125430,7"));
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
   expect(screen.getByLabelText("Litros abastecidos").value).toBe("200,5");
   expect(screen.getByLabelText("Litros de ARLA").value).toBe("20,5");
