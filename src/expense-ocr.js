@@ -28,11 +28,37 @@ export function extractExpenseFields(text, kind, confidence = 100) {
     warnings.push("A bomba mostra somente o combustível. Se a nota tiver ARLA ou outros itens, revise o total da despesa.");
   }
   if (kind === "invoice") {
+    const customerSection = clean.split(/DESTINATARIO(?:\s*\/\s*REMETENTE)?|DADOS DO CLIENTE/)[1]?.split(/DADOS DOS PRODUTOS|PRODUTOS|CALCULO DO IMPOSTO|TRANSPORTADOR/)[0];
+    const customer = customerSection?.match(/(?:NOME\s*\/\s*)?RAZAO SOCIAL\s*[:=]\s*([^\n]{3,160})/)
+      || clean.match(/(?:^|\n)\s*(?:CLIENTE|DESTINATARIO|CONSUMIDOR)\s*[:=]\s*([^\n]{3,160})/);
+    if (customer && !/NAO IDENTIFICADO|CPF|CNPJ/.test(customer[1])) suggestions.push({field:"customerName",label:"Cliente / destinatário",value:customer[1].trim()});
+    const fuelLines = clean.split(/\n/).filter(line=>/\b(?:DIESEL|GASOLINA|ETANOL)\b/.test(line) && !/ARLA/.test(line));
+    // Multiple fuel lines need human review; never add ARLA to diesel volumes.
+    if (fuelLines.length === 1) {
+      const line=fuelLines[0];
+      const type=line.match(/\b(?:DIESEL(?:\s+(?:S\s*-?\s*(?:10|500)|COMUM|ADITIVADO))*|GASOLINA(?:\s+(?:COMUM|ADITIVADA))?|ETANOL(?:\s+HIDRATADO)?)\b/);
+      if(type) suggestions.push({field:"fuelType",label:"Combustível",value:type[0].replace(/S\s*-?\s*(10|500)/,"S$1")});
+      const volume=line.match(/(\d+(?:[.,]\d{1,3})?)\s*(?:L|LT|LITROS)\b/);
+      // Quantity uses decimal units, unlike a currency amount with thousands separators.
+      const liters=volume ? Number(volume[1].replace(",",".")) : null;
+      if(liters>0 && liters<=9999) suggestions.push({field:"liters",label:"Litros abastecidos",value:liters});
+      const explicit=line.match(/(?:TOTAL|VALOR TOTAL)\s*[:=]?\s*(?:R\$\s*)?(\d[\d.,]*)/);
+      if(explicit) add("fuelAmount","Valor do combustível (R$)",explicit[1],999999.99);
+      else if(volume) {
+        const calculation=line.slice(volume.index+volume[0].length).match(/^\s*[X×]\s*(?:R\$\s*)?(\d[\d.,]*)\s*(?:=\s*)?(?:R\$\s*)?(\d[\d.,]*)\s*$/);
+        if(calculation) {
+          const price=readDecimal(calculation[1]), total=readDecimal(calculation[2]);
+          if(price>0 && total>0 && Math.abs(Math.round(liters*price*100)-Math.round(total*100))<=2) add("fuelAmount","Valor do combustível (R$)",calculation[2],999999.99);
+        }
+      }
+    } else if(fuelLines.length>1) warnings.push("Há mais de um item de combustível. Confira os litros e valores de cada item antes de preencher.");
     const date = clean.match(/(?:DATA (?:DE )?EMISSAO|EMISSAO)\s*[:=]?\s*(\d{2})[/-](\d{2})[/-](\d{4})/);
     if (date) {
       const iso=`${date[3]}-${date[2]}-${date[1]}`;
       if (!Number.isNaN(Date.parse(iso+"T12:00:00Z")) && new Date(iso+"T12:00:00Z").toISOString().slice(0,10) === iso) suggestions.push({field:"date",label:"Data da despesa",value:iso});
     }
+    const time=clean.match(/(?:EMISSAO[^\n]*?\d{2}[/-]\d{2}[/-]\d{4}\s+|(?:HORA(?:RIO)?(?: DA (?:NOTA|EMISSAO))?)\s*[:=]\s*)((?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?)(?!\d)/);
+    if(time) suggestions.push({field:"expenseTime",label:"Horário da nota",value:time[1]});
     const total = clean.match(/(?:VALOR TOTAL DA NOTA|TOTAL A PAGAR|VALOR A PAGAR)\s*[:=]?\s*(?:R\$\s*)?(\d[\d.,]*)/);
     if (total) add("amount","Valor total da nota (R$)",total[1],999999.99);
     const documents=[...clean.matchAll(/(?:^|\n)\s*(?:N[.°º: ]{1,5}|NUMERO\s*[:.]?\s*)(\d{3,12})(?!\d)/g)].map(m=>m[1]);

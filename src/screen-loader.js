@@ -1,4 +1,5 @@
 export const SCREEN_FILES = {
+  compras: "compras",
   "consulta-viagens": "consulta-viagens",
   "manutencao-plantao": "manutencao-plantao", "conferencia-manutencao": "manutencao-plantao",
   diretoria: "diretoria", simulador: "simulador", viagens: "cargas-viagens-v2",

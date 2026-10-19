@@ -1,64 +1,11 @@
 ﻿const { useState, useEffect, useRef } = React;
 
 import { EXTRA_SCREEN_PERMISSIONS } from "../screen-permissions.js";
-const TELAS_GRUPOS = [
-  {
-    id: "direcao",
-    label: "Direção",
-    telas: [
-      { id: "perm_diretoria", label: "Diretoria" },
-      { id: "perm_dre_empresarial", label: "DRE Empresarial" },
-      { id: "perm_faturamento_diario", label: "Faturamento Diário" },
-      { id: "perm_comparativo_faturamento", label: "Comparativo Mensal" },
-      { id: "perm_abastecimentos", label: "Abastecimentos" },
-      { id: "perm_precos_combustivel", label: "Preços Postos" },
-      { id: "perm_lucro_viagens", label: "Viagens — região e consulta" },
-      { id: "perm_custos_veiculos", label: "Resultado por Veículo" },
-      { id: "perm_clientes", label: "Análise de Clientes" },
-      { id: "perm_clientes_lucro", label: "Rentabilidade de Clientes" },
-      { id: "perm_manutencoes_veiculos", label: "Manutenções por Veículo" },
-    ],
-  },
-  {
-    id: "operacao",
-    label: "Operação",
-    telas: [
-      { id: "perm_simulador", label: "Calculadora" },
-      { id: "perm_viagens", label: "Viagens" },
-      { id: "perm_aprovar_viagens", label: "Aprovar viagens (Comercial)" },
-      { id: "perm_folgas_motoristas", label: "Folgas" },
-      { id: "perm_status_carga", label: "Status Carga" },
-      { id: "perm_trafegus", label: "Trafegus" },
-      { id: "perm_oportunidades_retorno", label: "Retorno" },
-      { id: "perm_consulta_nfe", label: "NF / NCM e rateio" },
-      { id: "perm_controle_canhotos", label: "Canhotos" },
-    ],
-  },
-  {
-    id: "frota",
-    label: "Frota",
-    telas: [
-      { id: "perm_pneus", label: "Pneus" },
-      { id: "perm_multas_frota", label: "Multas" },
-      { id: "perm_manutencao_posicoes", label: "Peças por posição" },
-      { id: "perm_manutencao", label: "Automações" },
-    ],
-  },
-  {
-    id: "sistema",
-    label: "Sistema",
-    telas: [
-      { id: "perm_automacoes_n8n", label: "n8n" },
-      { id: "perm_settings", label: "Configurações" },
-    ],
-  },
-];
-for (const item of EXTRA_SCREEN_PERMISSIONS) {
-  TELAS_GRUPOS.find(group => group.id === item.group).telas.push({id: item.column, label: item.label});
-}
-const TELAS = TELAS_GRUPOS.flatMap((grupo) => grupo.telas);
+import { PERMISSION_ITEMS as TELAS, isPermissionEffective, filterPermissionGroups } from "../user-permissions.js";
 
 const FORM_VAZIO = {
+  perfil_despesas: "colaborador",
+  telemetria_motorista_id: null,
   ...Object.fromEntries(EXTRA_SCREEN_PERMISSIONS.map(item => [item.column, false])),
   login: "",
   senha: "",
@@ -95,7 +42,7 @@ const FORM_VAZIO = {
   perm_manutencao_posicoes: false,
 };
 
-const Toggle = ({ value, onChange, label }) => (
+const Toggle = ({ value, onChange, label, disabled = false }) => (
   <label
     style={{
       display: "flex",
@@ -108,6 +55,7 @@ const Toggle = ({ value, onChange, label }) => (
     <button
       type="button"
       role="switch"
+      disabled={disabled}
       aria-label={label}
       aria-checked={Boolean(value)}
       onClick={() => onChange(!value)}
@@ -150,9 +98,26 @@ const GerenciarUsuarios = ({ onNavigate }) => {
   const [modal, setModal] = useState(null); // null | "create" | objeto usuário
   const [form, setForm] = useState(FORM_VAZIO);
   const [saving, setSaving] = useState(false);
+  const [permissionSearch, setPermissionSearch] = useState("");
+  const permissionGroups = filterPermissionGroups(permissionSearch);
   const [erro, setErro] = useState("");
   const [erroLista, setErroLista] = useState("");
   const [showSenha, setShowSenha] = useState(false);
+  const [motoristas, setMotoristas] = useState([]);
+  const [motoristasLoading, setMotoristasLoading] = useState(false);
+  const [motoristasError, setMotoristasError] = useState("");
+  const [motoristasAttempt, setMotoristasAttempt] = useState(0);
+  useEffect(() => {
+    if (!modal || form.perfil_despesas !== "motorista") return;
+    let active = true;
+    setMotoristasLoading(true);
+    setMotoristasError("");
+    RB_API.listMotoristasTelemetria().then(data => {
+      if (active) setMotoristas(data.motoristas || []);
+    }).catch(error => { if (active) setMotoristasError(error.message); })
+      .finally(() => { if (active) setMotoristasLoading(false); });
+    return () => { active = false; };
+  }, [modal, form.perfil_despesas, motoristasAttempt]);
 
   const carregar = async () => {
     setLoading(true);
@@ -173,6 +138,7 @@ const GerenciarUsuarios = ({ onNavigate }) => {
   }, []);
 
   const abrirCriacao = () => {
+    setPermissionSearch("");
     setForm(FORM_VAZIO);
     setErro("");
     setShowSenha(false);
@@ -180,9 +146,12 @@ const GerenciarUsuarios = ({ onNavigate }) => {
   };
 
   const abrirEdicao = (u) => {
+    setPermissionSearch("");
     setForm({
       ...Object.fromEntries(EXTRA_SCREEN_PERMISSIONS.map(item => [item.column, u[item.column] === true])),
       login: u.login,
+      perfil_despesas: u.perfil_despesas || "colaborador",
+      telemetria_motorista_id: u.telemetria_motorista_id || null,
       senha: "",
       email: u.email || "",
       numero: u.numero || "",
@@ -206,6 +175,7 @@ const GerenciarUsuarios = ({ onNavigate }) => {
       perm_clientes_lucro: u.perm_clientes_lucro ?? false,
       perm_status_carga: u.perm_status_carga ?? false,
       perm_pneus: u.perm_pneus ?? false,
+      perm_multas_frota: u.perm_multas_frota ?? u.perm_manutencao ?? false,
       perm_settings: u.perm_settings ?? false,
       perm_manutencao: u.perm_manutencao ?? false,
       perm_automacoes_n8n: u.perm_automacoes_n8n ?? false,
@@ -237,6 +207,11 @@ const GerenciarUsuarios = ({ onNavigate }) => {
     setErro("");
     try {
       const payload = { ...form };
+      if (payload.perfil_despesas === "motorista") {
+        if (!payload.telemetria_motorista_id) throw new Error("Selecione o motorista da telemetria.");
+        payload.admin = false;
+        payload.perm_conferencia_manutencao = false;
+      } else payload.telemetria_motorista_id = null;
       if (!payload.senha) delete payload.senha;
       if (modal === "create") {
         await RB_API.createUsuario(payload);
@@ -329,7 +304,7 @@ const GerenciarUsuarios = ({ onNavigate }) => {
                   "Número",
                   "Perfil",
                   "Status",
-                  "Telas liberadas",
+                  "Permissões efetivas",
                   "Ações",
                 ].map((h) => (
                   <th
@@ -349,7 +324,7 @@ const GerenciarUsuarios = ({ onNavigate }) => {
             </thead>
             <tbody>
               {usuarios.map((u, i) => {
-                const telasCount = TELAS.filter((t) => u[t.id]).length;
+                const telasCount = TELAS.filter((t) => isPermissionEffective(t, u)).length;
                 return (
                   <tr
                     key={u.id}
@@ -402,7 +377,7 @@ const GerenciarUsuarios = ({ onNavigate }) => {
                       </span>
                     </td>
                     <td style={{ padding: "10px 14px", color: "var(--muted)" }}>
-                      {telasCount}/{TELAS.length} telas
+                      {telasCount}/{TELAS.length} permissões
                     </td>
                     <td style={{ padding: "10px 14px" }}>
                       <div style={{ display: "flex", gap: 6 }}>
@@ -482,7 +457,7 @@ const GerenciarUsuarios = ({ onNavigate }) => {
               background: "var(--surface)",
               borderRadius: 12,
               width: "100%",
-              maxWidth: 540,
+              maxWidth: 820,
               maxHeight: "92vh",
               overflowY: "auto",
               boxShadow: "0 24px 64px rgba(0,0,0,0.28)",
@@ -645,6 +620,35 @@ const GerenciarUsuarios = ({ onNavigate }) => {
                 </div>
               </div>
 
+              <fieldset style={{border: "1px solid var(--border)", borderRadius: 8, padding: 14, marginBottom: 16}}>
+                <legend>Perfil de despesas</legend>
+                <label>Quem utiliza esta conta?
+                  <select aria-label="Perfil de despesas" value={form.perfil_despesas} style={inputStyle}
+                    onChange={event => setForm(current => ({...current, perfil_despesas: event.target.value,
+                      telemetria_motorista_id: null,
+                      ...(event.target.value === "motorista" ? {admin: false, perm_conferencia_manutencao: false, perm_manutencao_plantao: true} : {})}))}>
+                    <option value="colaborador">Colaborador — todas as placas</option>
+                    <option value="motorista">Motorista — placa da telemetria</option>
+                  </select>
+                </label>
+                {form.perfil_despesas === "motorista" && <>
+                  <label>Motorista na telemetria
+                    <select aria-label="Motorista na telemetria" required style={inputStyle}
+                      disabled={motoristasLoading || Boolean(motoristasError)} value={form.telemetria_motorista_id || ""}
+                      onChange={event => set("telemetria_motorista_id", event.target.value || null)}>
+                      <option value="">{motoristasLoading ? "Carregando motoristas…" : "Selecione o motorista"}</option>
+                      {form.telemetria_motorista_id && !motoristas.some(item => item.id === form.telemetria_motorista_id) &&
+                        <option value={form.telemetria_motorista_id}>Vínculo atual · ID {form.telemetria_motorista_id}</option>}
+                      {motoristas.map(item => <option key={item.id} value={item.id}>{item.nome} · ID {item.id} · {item.plate || "Sem placa confirmada"}</option>)}
+                    </select>
+                  </label>
+                  <p>A placa acompanha automaticamente a identificação do motorista na telemetria. Esta conta não terá acesso de administrador ou conferência.</p>
+                  {motoristas.find(item => item.id === form.telemetria_motorista_id)?.message && <p role="status">{motoristas.find(item => item.id === form.telemetria_motorista_id).message}</p>}
+                  {motoristasError && <p role="alert">{motoristasError} <button type="button" onClick={() => setMotoristasAttempt(n => n + 1)}>Tentar novamente</button></p>}
+                </>}
+                {form.perfil_despesas === "colaborador" && <p>Pode registrar despesas para qualquer placa da frota, conforme as permissões abaixo.</p>}
+              </fieldset>
+
               {/* Flags */}
               <div
                 className="user-status-flags"
@@ -659,6 +663,7 @@ const GerenciarUsuarios = ({ onNavigate }) => {
               >
                 <Toggle
                   value={form.admin}
+                  disabled={form.perfil_despesas === "motorista"}
                   onChange={(v) => set("admin", v)}
                   label="Administrador (pode cadastrar usuários)"
                 />
@@ -669,49 +674,38 @@ const GerenciarUsuarios = ({ onNavigate }) => {
                 />
               </div>
 
-              {/* Permissões de telas */}
-              <div style={{ marginBottom: 16 }}>
-                <div
-                  style={{
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    color: "var(--text)",
-                    marginBottom: 10,
-                  }}
-                >
-                  Permissões de telas
+              <section className="user-permissions" aria-label="Permissões de telas e funções">
+                <div className="user-permissions-heading">
+                  <div><h3>Telas e funções</h3><p>Confira o que cada permissão libera antes de salvar.</p></div>
+                  <span>{TELAS.filter(t => isPermissionEffective(t, form)).length} de {TELAS.length} ativas</span>
                 </div>
+                <input type="search" aria-label="Buscar tela ou função" placeholder="Buscar tela ou função…" value={permissionSearch}
+                  onChange={event => setPermissionSearch(event.target.value)} style={inputStyle} />
+                <p className="user-permission-note">{form.admin
+                  ? "Administrador: acessos gerais e gestão de usuários incluídos. Folgas, Status Carga e Automações n8n exigem liberação explícita."
+                  : "Cada controle libera as telas e funções descritas. Telas que compartilham uma permissão são ativadas juntas. Gestão de usuários é exclusiva do administrador."}</p>
                 <div className="user-permission-groups">
-                  {TELAS_GRUPOS.map((grupo) => (
-                    <section className="user-permission-group" key={grupo.id}>
-                      <div className="user-permission-group-title">
-                        {grupo.label}
-                      </div>
-                      <div className="user-permission-grid">
-                        {grupo.telas.map((t) => (
-                          <Toggle
-                            key={t.id}
-                            value={form[t.id]}
-                            onChange={(v) => set(t.id, v)}
-                            label={t.label}
-                          />
-                        ))}
-                      </div>
-                    </section>
-                  ))}
+                  {permissionGroups.map(grupo => <section className="user-permission-group" key={grupo.id} aria-label={grupo.label}>
+                    <div className="user-permission-group-title">{grupo.label}</div>
+                    <div className="user-permission-grid">
+                      {grupo.telas.map(t => {
+                        const inherited = form.admin && !t.explicit;
+                        const blocked = form.perfil_despesas === "motorista" && t.id === "perm_conferencia_manutencao";
+                        return <div className="user-permission-item" key={t.id}>
+                          <Toggle value={!blocked && isPermissionEffective(t, form)} disabled={saving || inherited || blocked}
+                            onChange={v => set(t.id, v)} label={t.label} />
+                          <p>{t.description}</p>
+                          {inherited && <small>Incluída no perfil administrador</small>}
+                          {blocked && <small>Indisponível para o perfil Motorista</small>}
+                          {t.explicit && form.admin && <small>Liberação explícita para administrador</small>}
+                        </div>;
+                      })}
+                    </div>
+                  </section>)}
                 </div>
-                <div
-                  style={{
-                    marginTop: 6,
-                    fontSize: 11.5,
-                    color: "var(--muted)",
-                  }}
-                >
-                  Telas desativadas ficam ocultas no menu do usuário. Conferência
-                  de manutenção tem liberação independente do lançamento.
-                  Administradores têm acesso a todas as telas.
-                </div>
-              </div>
+                {!permissionGroups.length && <p role="status">Nenhuma permissão encontrada.</p>}
+                {form.perm_aprovar_viagens && !form.perm_viagens && !form.admin && <p className="user-permission-note">Para usar a aprovação comercial na tela Cargas e viagens, libere também Cargas e viagens.</p>}
+              </section>
 
               {/* Erro */}
               {erro && (
@@ -732,6 +726,7 @@ const GerenciarUsuarios = ({ onNavigate }) => {
 
               {/* Ações */}
               <div
+                className="user-modal-actions"
                 style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}
               >
                 <button

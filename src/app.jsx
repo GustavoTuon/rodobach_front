@@ -1,6 +1,6 @@
 import { createScreenLoader } from "./screen-loader.js";
 // Norte Telemetria — App shell, router, sidebar, Tweaks
-import { getNavForUser as filterNavForUser } from "./permissions.js";
+import { getNavForUser as filterNavForUser, getCurrentScreen } from "./permissions.js";
 
 const { useState, useEffect } = React;
 
@@ -147,6 +147,14 @@ const NAV = [
     section: "operacao",
   },
   {
+    id: "compras",
+    label: "Compras",
+    icon: "package",
+    title: "Compras — cotações e fornecedores",
+    section: "operacao",
+    href: "/compras",
+  },
+  {
     id: "viagens",
     label: "Cargas e viagens",
     icon: "route",
@@ -173,7 +181,7 @@ const NAV = [
     icon: "clock",
     title: "Ociosidade da Frota",
     section: "operacao",
-    permission: "status-carga",
+    permission: "ociosidade-frota",
   },
   {
     id: "trafegus",
@@ -393,7 +401,7 @@ const App = () => {
   const [screenError, setScreenError] = useState(null);
   const [screenAttempt, setScreenAttempt] = useState(0);
   const visibleNav = getNavForUser(auth.user);
-  const currentScreen = visibleNav.some(n => n.id === route.screen) ? route.screen : visibleNav[0]?.id;
+  const currentScreen = getCurrentScreen(visibleNav, route.screen);
   const [sidebarExpanded, setSidebarExpanded] = useState(
     () => window.innerWidth > 960,
   );
@@ -574,6 +582,9 @@ const App = () => {
       break;
     case "simulador":
       body = <SimuladorFrete onNavigate={onNavigate} />;
+      break;
+    case "compras":
+      body = <ComprasDemo />;
       break;
     case "viagens":
       body = <CargasViagensV2 onNavigate={onNavigate} user={auth.user} />;
@@ -976,7 +987,7 @@ const App = () => {
           />
           <div
             className="nav-flyout"
-            style={{ left: frotaMenu.left, top: frotaMenu.top }}
+            style={{ left: frotaMenu.left, top: frotaMenu.top, "--flyout-top": `${frotaMenu.top}px` }}
           >
             <div className="nav-flyout-title">
               <Icon name="truck" size={14} />
@@ -991,7 +1002,7 @@ const App = () => {
 
       {viagensMenu && <>
         <button className="nav-flyout-dismiss" aria-label="Fechar opções de viagens" onClick={() => setViagensMenu(null)}/>
-        <div className="nav-flyout" style={{left:viagensMenu.left,top:viagensMenu.top}}>
+        <div className="nav-flyout" style={{left:viagensMenu.left,top:viagensMenu.top,"--flyout-top":`${viagensMenu.top}px`}}>
           <div className="nav-flyout-title"><Icon name="route" size={14}/><span>Viagens</span></div>
           {renderNavItems(visibleNav.filter(item => item.group === "resultados").map(item => ({...item,group:undefined})))}
         </div>
@@ -999,7 +1010,7 @@ const App = () => {
       {financeiroMenu && (
         <>
           <button className="nav-flyout-dismiss" aria-label="Fechar opções financeiras" onClick={() => setFinanceiroMenu(null)} />
-          <div className="nav-flyout" style={{ left: financeiroMenu.left, top: financeiroMenu.top }}>
+          <div className="nav-flyout" style={{ left: financeiroMenu.left, top: financeiroMenu.top, "--flyout-top": `${financeiroMenu.top}px` }}>
             <div className="nav-flyout-title"><Icon name="chart" size={14} /><span>Financeiro</span></div>
             {renderNavItems(
               sidebarNav.filter((item) => item.subgroup === "financeiro" && !["faturamento-diario", "comparativo-faturamento"].includes(item.id)),

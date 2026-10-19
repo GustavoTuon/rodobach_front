@@ -98,8 +98,8 @@ function positionState(records, plate, axle, side, currentKm) {
   history.forEach((record) => {
     if (!latest.has(record.componente)) latest.set(record.componente, record);
   });
-  const components = COMPONENTS.filter(
-    (component) => component !== "Outro",
+  const components = (axle === "GERAL" ? [...latest.keys()] : COMPONENTS).filter(
+    (component) => axle === "GERAL" || component !== "Outro",
   ).map((component) => ({
     component,
     record: latest.get(component),
@@ -197,6 +197,12 @@ function AxleDiagram({
       <div
         className={`mp-body-shape ${type === "IMPLEMENTO" ? "trailer" : "truck"}`}
       />
+      <div style={{ display: "flex", justifyContent: "center", margin: "12px 0" }}>
+        <button className="btn" type="button" disabled={!plate}
+          onClick={() => onSelect({ plate, type, axle: { id: "GERAL", label: "Manutenções gerais" }, side: "GERAL" })}>
+          <Icon name="wrench" size={16} /> Manutenções gerais
+        </button>
+      </div>
       {axleConfig(type, count).map((axle) => {
         const left = positionState(records, plate, axle.id, "E", currentKm);
         const right = positionState(records, plate, axle.id, "D", currentKm);
@@ -303,7 +309,7 @@ const conditionLabel = (value) =>
         ? "Bom"
         : "";
 const axleLabel = (code) =>
-  code?.startsWith("DIR-")
+  code === "GERAL" ? "Manutenções gerais" : code?.startsWith("DIR-")
     ? `Direcional ${code.split("-")[1]}`
     : code?.startsWith("TRAS-")
       ? `Traseiro ${code.split("-")[1]}`
@@ -1238,6 +1244,7 @@ function ServiceForm({
   onCancel,
   onSave,
 }) {
+  const general = selected.axle.id === "GERAL";
   const serviceMeta = {
     Troca: {
       icon: "refresh",
@@ -1257,7 +1264,7 @@ function ServiceForm({
     },
   };
   const empty = {
-    componentes: [initialComponent || "Lona de freio"],
+    componentes: [general ? (initialComponent || "").trim() : initialComponent || "Lona de freio"],
     tipo_servico: "Troca",
     condicao: "",
     motivo: "",
@@ -1300,7 +1307,7 @@ function ServiceForm({
   const canContinue =
     step !== 2 ||
     (step === 2 &&
-      form.componentes.length > 0 &&
+      form.componentes.some((item) => item.trim()) &&
       (form.tipo_servico !== "Inspeção" || Boolean(form.condicao)));
   const optionalFieldsFilled = [
     form.proximo_km,
@@ -1325,7 +1332,7 @@ function ServiceForm({
           if (canContinue) setStep((current) => current + 1);
           return;
         }
-        onSave(form);
+        if (form.componentes.some((item) => item.trim())) onSave({ ...form, componentes: form.componentes.map((item) => item.trim()) });
       }}
     >
       <div className="mp-wizard-head">
@@ -1384,10 +1391,12 @@ function ServiceForm({
           <div className="mp-stage-copy">
             <span>ETAPA 2</span>
             <h3>Quais componentes?</h3>
-            <p>
-              Você pode selecionar vários itens e registrar tudo de uma vez.
-            </p>
+            <p>{general ? "Informe a peça ou manutenção realizada, como retrovisor, farol ou ar-condicionado." : "Você pode selecionar vários itens e registrar tudo de uma vez."}</p>
           </div>
+          {general ? <label>Peça ou manutenção
+            <input value={form.componentes[0]} maxLength={120} placeholder="Ex.: retrovisor esquerdo"
+              onChange={(event) => setForm({ ...form, componentes: [event.target.value] })} />
+          </label> : <>
           <div className="mp-components-grid">
             {COMPONENTS.map((component) => (
               <button
@@ -1408,6 +1417,7 @@ function ServiceForm({
             componente{form.componentes.length === 1 ? "" : "s"} selecionado
             {form.componentes.length === 1 ? "" : "s"}
           </div>
+          </>}
           {form.tipo_servico === "Inspeção" && (
             <div className="mp-inspection">
               <strong>Como está a condição encontrada?</strong>
@@ -1576,8 +1586,7 @@ function ServiceForm({
             <span>
               <small>Posição</small>
               <strong>
-                {selected.axle.label} · lado{" "}
-                {selected.side === "E" ? "esquerdo" : "direito"}
+                {selected.axle.label}{selected.side !== "GERAL" && ` · lado ${sideLabel(selected.side)}`}
               </strong>
             </span>
             <span>
@@ -1735,8 +1744,7 @@ function PositionModal({
                 {selected.plate} · {vehicle?.modelo || "Veículo"}
               </small>
               <h2 id="mp-position-title">
-                {selected.axle.label} · lado{" "}
-                {selected.side === "E" ? "esquerdo" : "direito"}
+                {selected.axle.label}{selected.side !== "GERAL" && ` · lado ${sideLabel(selected.side)}`}
               </h2>
               <span className="mp-position-subtitle">
                 {selected.state.label} · {selected.state.components.length}{" "}
@@ -1762,14 +1770,13 @@ function PositionModal({
                 <div>
                   <strong>Pronto para registrar?</strong>
                   <span>
-                    Escolha um componente abaixo ou registre vários em um único
-                    fluxo.
+                    {selected.axle.id === "GERAL" ? "Registre serviços gerais do veículo e consulte o histórico." : "Escolha um componente abaixo ou registre vários em um único fluxo."}
                   </span>
                 </div>
                 <button
                   className="btn btn-primary"
                   type="button"
-                  onClick={() => onFormComponent("Lona de freio")}
+                  onClick={() => onFormComponent(selected.axle.id === "GERAL" ? " " : "Lona de freio")}
                 >
                   <Icon name="plus" size={14} /> Novo registro
                 </button>

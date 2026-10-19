@@ -28,6 +28,23 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+it("registra uma manutenção geral com peça livre e sem vincular a um eixo", async () => {
+  render(<ManutencaoPosicoes embedded vehicles={[{ placa: "ABC1D23", modelo: "Truck", km_atual: 12345 }]} />);
+  await waitFor(() => expect(RB_API.listComponentesPosicao).toHaveBeenCalled());
+  fireEvent.click(screen.getByRole("button", { name: /Manutenções gerais/ }));
+  expect(screen.getByRole("dialog", { name: "Manutenções gerais" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: /Novo registro/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Continuar/ }));
+  expect(screen.getByRole("button", { name: /Continuar/ }).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText("Peça ou manutenção"), { target: { value: "Retrovisor esquerdo" } });
+  fireEvent.click(screen.getByRole("button", { name: /Continuar/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Continuar sem preencher/ }));
+  fireEvent.click(screen.getByRole("button", { name: /Concluir/ }));
+  await waitFor(() => expect(RB_API.createComponentesPosicaoLote).toHaveBeenCalledWith({ itens: [expect.objectContaining({
+    placa: "ABC1D23", conjunto_placa: "ABC1D23", eixo_codigo: "GERAL", lado: "GERAL", componente: "Retrovisor esquerdo", tipo_servico: "Troca",
+  })] }));
+});
+
 it("abre a posição em modal e permite pular os detalhes opcionais", async () => {
   render(
     <ManutencaoPosicoes

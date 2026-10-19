@@ -1,0 +1,89 @@
+/* Acesso /compras: uma área própria, sem a navegação lateral do ERP. */
+.app-mode .sidebar { display: none; }
+.app-mode .shell { margin: 0; }
+.app-mode .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: 66px;
+  background: #0c1025;
+  border-color: #242b40;
+}
+.app-mode .mobile-brand { display: flex; align-items: center; }
+.app-mode .mobile-brand img { width: 83px; height: 44px; object-fit: contain; }
+.app-mode .breadcrumb { margin-right: auto; margin-left: 22px; color: #b4bfd5; }
+.app-mode .breadcrumb strong { color: #e8eef8; }
+.app-mode .topbar .button.secondary { color: #e8eef8; background: #171f34; border-color: #354057; }
+.app-mode .theme-toggle { background: #171f34; color: #dae3f4; border-color: #354057; }
+.app-mode .demo-pill { color: #b4bfd5; }
+.app-back { color: #b4bfd5; font-size: 11px; text-decoration: none; padding: 10px 0; }
+.app-back:hover { color: white; }
+.app-mode .company-header { max-width: 1280px; }
+.app-mode .embed-nav {
+  display: flex;
+  gap: 6px;
+  max-width: 1212px;
+  margin: 25px auto 0;
+  padding: 0 0 14px;
+  border-bottom: 1px solid var(--border);
+}
+.app-mode .embed-nav button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 43px;
+  padding: 10px 18px;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.app-mode .embed-nav button.active { background: var(--pale); color: var(--green); font-weight: 600; }
+.app-mode .embed-nav svg { width: 17px; height: 17px; }
+.app-mode main { max-width: 1280px; min-height: calc(100dvh - 310px); }
+.app-mode footer { max-width: 1280px; }
+.app-mode .page-title .eyebrow { display: none; }
+.app-mode .page-title h1 { margin-top: 0; }
+.app-mode .content-grid { grid-template-columns: minmax(0, 1fr) 270px; }
+.app-mode .company-header strong { font-weight: 600; }
+@media (max-width: 1280px) {
+  .app-mode .embed-nav { margin-left: 34px; margin-right: 34px; }
+}
+@media (max-width: 1060px) {
+  .app-mode .content-grid { grid-template-columns: 1fr; }
+  .app-mode .top-actions .demo-pill { display: none; }
+}
+@media (max-width: 700px) {
+  .app-mode .topbar { height: 60px; padding-left: 16px; padding-right: 16px; }
+  .app-mode .topbar .mobile-brand { margin: 0 auto 0 0; }
+  .app-mode .mobile-brand img { width: 64px; height: 40px; }
+  .app-mode .topbar .breadcrumb, .app-mode .embed-nav { display: none; }
+  .app-mode .app-back { font-size: 10px; }
+  .app-mode .top-actions { gap: 10px; }
+  .app-mode .topbar #switch-role { min-height: 36px; padding: 8px; font-size: 10px; }
+  .app-mode .topbar #switch-role svg { display: none; }
+  .app-mode .theme-toggle { width: 32px; height: 36px; }
+  .app-mode .company-header { padding: 21px 18px 0; }
+  .app-mode main { padding-top: 26px; }
+  .app-mode .page-title { align-items: center; }
+  .app-mode .page-title h1 { font-size: 27px; }
+  .app-mode .page-title p { max-width: 205px; font-size: 12px; }
+  .app-mode .page-title > .button { margin-top: 0; min-height: 44px; }
+  .app-mode .stat { min-height: 116px; }
+  .app-mode .stat-value { margin: 8px 0 6px; }
+  .app-mode .tab { min-height: 38px; }
+  .app-mode .field input, .app-mode .field select, .app-mode .field textarea,
+  .app-mode .item-input, .app-mode .search input { font-size: 16px; min-height: 44px; }
+  .app-mode .search svg { top: 15px; }
+  .app-mode .mobile-nav { height: calc(67px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); }
+  .app-mode .mobile-nav button { font-size: 11px; gap: 6px; }
+  .app-mode footer { padding-bottom: calc(93px + env(safe-area-inset-bottom)); }
+  .app-mode .modal-actions .button { min-height: 44px; }
+}
+@media (max-width: 360px) {
+  .app-mode .app-back { display: none; }
+  .app-mode .company-header { gap: 10px; }
+  .app-mode .company-logo { width: 137px; }
+  .app-mode .company-logo img { width: 118px; }
+}

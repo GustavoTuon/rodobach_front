@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./maintenance-demo.css";
-import DriverExpenseWizard from "./driver-expense-wizard.jsx";
+import ExpenseHistory, { ExpenseSummary } from "./expense-history.jsx";
+import DriverExpenseWizard, {prepareReceipt} from "./driver-expense-wizard.jsx";
+import ExpensePhotoAssist from "./expense-photo-assist.jsx";
+import {readExpenseDraft,clearExpenseDraft,useExpenseDraft} from "./expense-draft.js";
 
 const money = (value) =>
   value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -534,21 +537,25 @@ function MaintenanceForm({
   embedded,
 }) {
   const [driverWizard, setDriverWizard] = useState(null);
+  const [maintenanceDraft] = useState(()=>readExpenseDraft(user,"maintenance"));
+  const [receiptReason,setReceiptReason] = useState(maintenanceDraft?.receiptReason || "");
+  const [maintenancePhotos,setMaintenancePhotos] = useState(maintenanceDraft?.photos || {});
+  const [photoBusy,setPhotoBusy] = useState(false);
   const [receiptView, setReceiptView] = useState(null);
   const [sourceFilter, setSourceFilter] = useState("");
   const [wizardOpen, setWizardOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [expenseDate, setExpenseDate] = useState(today);
+  const [expenseDate, setExpenseDate] = useState(maintenanceDraft?.expenseDate || today);
   const [paymentRecord, setPaymentRecord] = useState(null);
   const [paymentDate, setPaymentDate] = useState("");
   const [paymentError, setPaymentError] = useState("");
   const [paidFilter, setPaidFilter] = useState("");
   const [postedFilter, setPostedFilter] = useState("");
-  const [document, setDocument] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [document, setDocument] = useState(maintenanceDraft?.document || "");
+  const [dateFrom, setDateFrom] = useState(() => `${today().slice(0,7)}-01`);
+  const [dateTo, setDateTo] = useState(today);
   const [textSearch, setTextSearch] = useState("");
   const [deleting, setDeleting] = useState(null);
   const [deleteReason, setDeleteReason] = useState("");
@@ -560,20 +567,30 @@ function MaintenanceForm({
   const [recordsError, setRecordsError] = useState("");
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
-  const [plate, setPlate] = useState("");
+  const [plate, setPlate] = useState(maintenanceDraft?.plate || "");
   const [fleet, setFleet] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
   const [fleetError, setFleetError] = useState("");
   const [fleetAttempt, setFleetAttempt] = useState(0);
+  const [expenseAccess, setExpenseAccess] = useState(null);
+  const isDriver = user.expenseProfile === "motorista";
+  useEffect(() => {
+    if (!isDriver || wizardOpen || driverWizard) return;
+    const refresh = () => setFleetAttempt(n => n + 1);
+    const timer = window.setInterval(refresh, 60000);
+    window.addEventListener("focus", refresh);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); };
+  }, [isDriver, wizardOpen, driverWizard]);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
-  const [amount, setAmount] = useState("");
-  const [supplier, setSupplier] = useState({ nome: "" });
+  const [amount, setAmount] = useState(maintenanceDraft?.amount || "");
+  const [supplier, setSupplier] = useState(maintenanceDraft?.supplier || { nome: "" });
   const author = user.nome || user.login;
-  const [service, setService] = useState("Borracharia");
-  const [note, setNote] = useState("");
+  const [service, setService] = useState(maintenanceDraft?.service || "Borracharia");
+  const [note, setNote] = useState(maintenanceDraft?.note || "");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const draftWarning = useExpenseDraft(user,"maintenance",editing,{expenseDate,document,plate,amount,service,note,supplier,receiptReason,photos:maintenancePhotos},wizardOpen && !completed);
   useEffect(() => {
     let active = true;
     setFleetLoading(true);
@@ -582,6 +599,7 @@ function MaintenanceForm({
       .then((data) => {
         if (!Array.isArray(data.veiculos))
           throw new Error("Resposta inválida ao consultar a frota.");
+        if (active) setExpenseAccess(data.access || null);
         if (active)
           setFleet(
             [
@@ -596,6 +614,7 @@ function MaintenanceForm({
       .catch((error) => {
         if (active) {
           setFleet([]);
+          setExpenseAccess(null);
           setFleetError(error.message || "Não foi possível carregar a frota.");
         }
       })
@@ -607,7 +626,6 @@ function MaintenanceForm({
     };
   }, [fleetAttempt]);
   const manager = view === "manager" && canReview;
-  const motorist = view === "motorist";
   useEffect(() => {
     let active = true;
     setRecordsLoading(true);
@@ -632,7 +650,7 @@ function MaintenanceForm({
   }, [manager, recordsAttempt]);
   const scoped = records.filter(
     (r) =>
-      (manager ? (!sourceFilter || (r.source || "colaborador") === sourceFilter) : (r.source || "colaborador") === (motorist ? "motorista" : "colaborador")) &&
+      (!manager || !sourceFilter || (r.authorProfile || "unknown") === sourceFilter) &&
       (!manager || !paidFilter || String(r.paid ?? "unknown") === paidFilter) &&
       (!manager || !postedFilter || String(r.posted ?? "unknown") === postedFilter) &&
       r.plate.includes(normalize(search)) &&
@@ -670,6 +688,7 @@ function MaintenanceForm({
     }
   }
   function cancelEdit() {
+    setReceiptReason("");setMaintenancePhotos({});
     setStep(0);
     setEditing(null);
     setAmount("");
@@ -684,18 +703,21 @@ function MaintenanceForm({
   function editRecord(r) {
     if (saving || user.readOnly || r.checked) return;
     if (r.source === "motorista") { setDriverWizard({record:r}); return; }
+    const draft = readExpenseDraft(user,"maintenance",r);
+    setReceiptReason(draft?.receiptReason ?? r.receiptReason ?? "");
+    setMaintenancePhotos(draft?.photos || {});
     setEditing(r);
-    setPlate(r.plate);
-    setAmount(r.amount.toFixed(2).replace(".", ","));
-    setService(r.service);
-    setNote(r.note || "");
-    setSupplier({
+    setPlate(draft?.plate ?? r.plate);
+    setAmount(draft?.amount ?? r.amount.toFixed(2).replace(".", ","));
+    setService(draft?.service ?? r.service);
+    setNote(draft?.note ?? r.note ?? "");
+    setSupplier(draft?.supplier ?? {
       nome: r.supplier || "",
       codigo: r.supplierCode,
       empresa: r.supplierCompany,
     });
-    setExpenseDate(expenseDay(r));
-    setDocument(r.document || "");
+    setExpenseDate(draft?.expenseDate ?? expenseDay(r));
+    setDocument(draft?.document ?? r.document ?? "");
     setMessage("");
     setError("");
     setStep(0);
@@ -755,7 +777,6 @@ function MaintenanceForm({
         filter === "all" || (filter === "pending" ? !r.checked : r.checked),
     )
     .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
-  const pending = scoped.filter((r) => !r.checked);
 
   async function updateControl(record, field, value) {
     if (!manager || user.readOnly || savingRef.current) return;
@@ -815,13 +836,14 @@ function MaintenanceForm({
   }
   function openWizard() {
     if (!canRegister || user.readOnly) return;
+    if (isDriver && !editing) setPlate(fleet[0] || "");
     setMessage("");
     setError("");
     setCompleted(false);
     setWizardOpen(true);
   }
   function closeWizard() {
-    if (savingRef.current) return;
+    if (savingRef.current || photoBusy) return;
     setWizardOpen(false);
     setError("");
     if (completed) {
@@ -831,7 +853,7 @@ function MaintenanceForm({
   }
   function advance(event) {
     event.preventDefault();
-    if (savingRef.current) return;
+    if (savingRef.current || photoBusy) return;
     setError("");
     if (step === 0) {
       if (fleetLoading || fleetError || !fleet.includes(plate)) {
@@ -858,7 +880,7 @@ function MaintenanceForm({
     if (
       (!canRegister && !(editing && canReview)) ||
       user.readOnly ||
-      savingRef.current
+      savingRef.current || photoBusy
     )
       return;
     if (!expenseDate || expenseDate > today()) {
@@ -885,6 +907,8 @@ function MaintenanceForm({
       setError("Entre no sistema novamente para registrar a manutenção.");
       return;
     }
+    const hasInvoice=maintenancePhotos.invoice !== undefined ? Boolean(maintenancePhotos.invoice) : Boolean(editing?.photoKinds?.invoice);
+    if (!hasInvoice && receiptReason.trim().length<10) {setError("Anexe a nota ou justifique a ausência com pelo menos 10 caracteres.");return;}
     savingRef.current = true;
     setSaving(true);
     setError("");
@@ -892,6 +916,7 @@ function MaintenanceForm({
     try {
       const body = {
         expenseDate,
+        receiptReason,photos:maintenancePhotos,
         document: document.trim(),
         plate,
         amount: value,
@@ -914,6 +939,8 @@ function MaintenanceForm({
           : [result.record, ...items],
       );
       setCompleted(true);
+      try {clearExpenseDraft(user,"maintenance",editing);} catch { /* Expense already saved. */ }
+      setReceiptReason("");setMaintenancePhotos({});
       setPlate("");
       setService("Borracharia");
       setEditing(null);
@@ -942,6 +969,7 @@ function MaintenanceForm({
       (["driver", "motorist"].includes(next) && !canRegister)
     )
       return;
+    if (next === view || (next !== "manager" && !manager)) return;
     cancelEdit();
     setDeleting(null);
     setHistory(null);
@@ -956,6 +984,247 @@ function MaintenanceForm({
     setMessage("");
     setError("");
   }
+  const renderExpenseRecord = (r) => (
+                  <div className="mp-record" key={r.id}>
+                    <div className="mp-record-main">
+                      <span
+                        className={`mp-service-icon ${r.service === "Elétrica" ? "peach" : ""}`}
+                      >
+                        <Icon name="tool" size={23} />
+                      </span>
+                      <div className="mp-record-description">
+                        <span className="mp-plate-badge">
+                          <Icon name="truck" size={15} />
+                          {r.plate}
+                        </span>
+                        <h3>{r.service}</h3>
+                        {manager && <span className="driver-source-tag">{r.authorProfile === "motorista" ? "Motorista" : r.authorProfile === "colaborador" ? "Colaborador" : "Perfil não registrado"}</span>}
+                        {r.supplier && (
+                          <p className="mp-record-supplier">{r.supplier}</p>
+                        )}
+                        <p>{r.note || "Sem observação"}</p>
+                      </div>
+                      <strong>{money(r.amount)}</strong>
+                    </div>
+                    <div className="mp-cost-details">
+                      {r.expenseTime && <span>Horário da nota <b>{r.expenseTime}</b></span>}
+                      <span>
+                        Data da despesa <b>{displayDay(expenseDay(r))}</b>
+                      </span>
+                      <span>
+                        Comprovante <b>{r.document || "Não informado"}</b>
+                      </span>
+                    </div>
+                    {!r.photoKinds?.invoice && <p className="mp-duplicate-warning">Sem nota anexada · {r.receiptReason || "Justificativa não registrada"}</p>}
+                    {r.source !== "motorista" && r.photoKinds?.invoice && <button className="mp-cancel-edit" onClick={()=>showReceipt(r)}>Ver comprovante</button>}
+                    {r.paid && !r.checked && <p className="mp-duplicate-warning">Pago, aguardando conferência</p>}
+                    {r.source === "motorista" && <div className="mp-cost-details driver-expense-details">
+                      {r.fuelType && <span>Combustível <b>{r.fuelType}</b></span>}
+                      {r.customerName && <span>Cliente da nota <b>{r.customerName}</b></span>}
+                      {r.odometerDate && <span>Leitura da telemetria <b>{new Date(r.odometerDate).toLocaleString("pt-BR", {timeZone:"America/Sao_Paulo"})}</b></span>}
+                      {r.arlaLiters != null && <span>ARLA <b>{r.arlaLiters.toLocaleString("pt-BR")} L · {money(r.arlaAmount)}</b></span>}
+                      {r.fuelAmount != null && <span>Combustível <b>{money(r.fuelAmount)}</b></span>}
+                      {r.liters != null && <span>Abastecimento <b>{Number(r.liters).toLocaleString("pt-BR")} L</b></span>}
+                      {r.odometer != null && <span>Hodômetro <b>{Number(r.odometer).toLocaleString("pt-BR")} km</b></span>}
+                      {r.location && <span>Local <b>{r.location}</b></span>}
+                      {r.hasReceipt && <button className="mp-cancel-edit" onClick={() => showReceipt(r)}>Ver comprovante</button>}
+                    </div>}
+                    {manager && <div className="mp-payment-controls">
+                      <button type="button" className={`mp-payment-button ${r.paid ? "is-paid" : ""}`}
+                        disabled={saving || user.readOnly} onClick={() => openPayment(r)}
+                        aria-label={`${r.paid ? "Editar pagamento" : "Registrar pagamento"} — ${r.plate}`}>
+                        <span className="mp-payment-symbol"><Icon name={r.paid ? "check" : "calendar"} size={19} /></span>
+                        <span><small>PAGAMENTO</small><strong>{r.paymentDate ? `Pago em ${displayDay(r.paymentDate)}` : r.paid ? "Pago · informar data" : "Registrar pagamento"}</strong></span>
+                        <Icon name="arrow" size={16} />
+                      </button>
+                      <label className={`mp-posted-check ${r.posted ? "is-posted" : ""}`}>
+                        <input type="checkbox" checked={r.posted === true} disabled={saving || user.readOnly}
+                          aria-label={`Lançado — ${r.plate}`} onChange={(e) => updateControl(r, "posted", e.target.checked)} />
+                        <span><small>LANÇAMENTO</small><strong>{r.posted ? "Lançado" : "Marcar como lançado"}</strong></span>
+                      </label>
+                    </div>}
+                    {!manager && <div className="mp-payment-controls mp-financial-status" aria-label="Status financeiro">
+                      <div className={`mp-payment-button ${r.paid ? "is-paid" : ""}`}>
+                        <span className="mp-payment-symbol"><Icon name={r.paid ? "check" : "clock"} size={19} /></span>
+                        <span><small>PAGAMENTO</small><strong>{r.paymentDate ? `Pago em ${displayDay(r.paymentDate)}` : r.paid ? "Pago · data não informada" : r.paid === false ? "Não pago" : "Não informado"}</strong></span>
+                      </div>
+                      <div className={`mp-posted-check ${r.posted ? "is-posted" : ""}`}>
+                        <span className="mp-payment-symbol"><Icon name={r.posted ? "check" : "clock"} size={19} /></span>
+                        <span><small>LANÇAMENTO</small><strong>{r.posted ? "Lançado" : r.posted === false ? "Não lançado" : "Não informado"}</strong></span>
+                      </div>
+                    </div>}
+                    {duplicates.has(r.id) && (
+                      <p className="mp-duplicate-warning">
+                        Possível duplicidade. Compare os comprovantes antes de
+                        conferir ou pagar.
+                      </p>
+                    )}
+                    <div className="mp-record-meta">
+                      <span>
+                        <Icon name="clock" size={13} />
+                        Registrado em{" "}
+                        {new Date(r.date).toLocaleString("pt-BR", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          timeZone: "America/Sao_Paulo",
+                        })}
+                      </span>
+                      <span
+                        className={`mp-status ${r.checked ? "checked" : ""}`}
+                      >
+                        {r.checked ? <Icon name="check" size={12} /> : <i />}
+                        {r.checked ? "Conferido" : "Pendente"}
+                      </span>
+                    </div>
+                    <div className="mp-record-bottom">
+                      <span>Lançado por {r.author}</span>
+                      {manager && !r.checked && (
+                        <button
+                          disabled={saving || user.readOnly}
+                          onClick={() => confirmRecord(r)}
+                        >
+                          <Icon name="check" size={15} />
+                          Conferir
+                        </button>
+                      )}
+                    </div>
+                    {r.checked && (
+                      <p className="mp-checked-detail">
+                        Conferido por {r.checkedBy || "usuário autorizado"}
+                        {r.checkedAt
+                          ? ` em ${new Date(r.checkedAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`
+                          : ""}
+                        . Edição e exclusão bloqueadas.
+                      </p>
+                    )}
+                    <div className="mp-cost-actions">
+                      {!r.checked &&
+                        !user.readOnly &&
+                        (manager || String(r.authorId) === String(user.id)) && (
+                          <>
+                            <button
+                              disabled={saving || photoBusy}
+                              onClick={() => editRecord(r)}
+                            >
+                              Editar
+                            </button>
+                            <button
+                              className="mp-delete-action"
+                              disabled={saving || photoBusy}
+                              onClick={() => {
+                                setDeleting(r.id);
+                                setDeleteReason("");
+                              }}
+                            >
+                              Excluir
+                            </button>
+                          </>
+                        )}
+                      <button
+                        onClick={() =>
+                          history?.id === r.id
+                            ? setHistory(null)
+                            : showHistory(r)
+                        }
+                      >
+                        {history?.id === r.id
+                          ? "Fechar histórico"
+                          : "Histórico"}
+                      </button>
+                    </div>
+                    {deleting === r.id && (
+                      <div
+                        className="mp-delete-confirm"
+                        role="region"
+                        aria-label="Confirmar exclusão"
+                      >
+                        <strong>
+                          Excluir {r.plate} · {money(r.amount)}?
+                        </strong>
+                        <p>
+                          O lançamento sairá da lista. O motivo e os dados serão
+                          preservados no histórico.
+                        </p>
+                        <label>
+                          Motivo da exclusão
+                          <input
+                            autoFocus
+                            value={deleteReason}
+                            maxLength={300}
+                            onChange={(e) => setDeleteReason(e.target.value)}
+                            placeholder="Ex.: lançado duas vezes"
+                          />
+                        </label>
+                        <button
+                          disabled={saving || deleteReason.trim().length < 5}
+                          onClick={() => deleteRecord(r)}
+                        >
+                          Confirmar exclusão
+                        </button>
+                        <button
+                          disabled={saving || photoBusy}
+                          onClick={() => setDeleting(null)}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    )}
+                    {history?.id === r.id && (
+                      <div
+                        className="mp-audit-history"
+                        role="region"
+                        aria-label="Histórico do lançamento"
+                      >
+                        {history.loading ? (
+                          <p role="status">Carregando histórico…</p>
+                        ) : history.error ? (
+                          <p role="alert">{history.error}</p>
+                        ) : history.items.length ? (
+                          history.items.map((h, i) => (
+                            <div key={i}>
+                              <strong>
+                                {{
+                                  create: "Registrado",
+                                  edit: "Editado",
+                                  delete: "Excluído",
+                                  check: "Conferido",
+                                  status: "Controle atualizado",
+                                }[h.evento] || h.evento}
+                              </strong>{" "}
+                              · {h.usuario_login} ·{" "}
+                              {new Date(h.ocorrido_em).toLocaleString("pt-BR", {
+                                timeZone: "America/Sao_Paulo",
+                              })}
+                              {h.evento === "edit" && (
+                                <p>
+                                  Antes: {h.antes.placa} ·{" "}
+                                  {money(Number(h.antes.valor))} ·{" "}
+                                  {String(h.antes.data_despesa)} ·{" "}
+                                  {h.antes.fornecedor || "Sem fornecedor"} ·{" "}
+                                  {h.antes.documento || "Sem comprovante"}
+                                  <br />
+                                  Depois: {h.depois.placa} ·{" "}
+                                  {money(Number(h.depois.valor))} ·{" "}
+                                  {String(h.depois.data_despesa)} ·{" "}
+                                  {h.depois.fornecedor || "Sem fornecedor"} ·{" "}
+                                  {h.depois.documento || "Sem comprovante"} {manager && <>· Pago: {controlLabel(h.depois.pago)}{h.depois.data_pagamento ? ` em ${displayDay(String(h.depois.data_pagamento).slice(0, 10))}` : ""} · Lançado: {controlLabel(h.depois.lancado)}</>}
+                                </p>
+                              )}
+                            </div>
+                          ))
+                        ) : (
+                          <p>
+                            Registro anterior ao histórico de alterações.
+                            Lançado por {r.author}.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+  );
   return (
     <div className={`mp-app ${embedded ? "mp-embedded" : ""}`}>
       <header className="mp-topbar">
@@ -969,6 +1238,7 @@ function MaintenanceForm({
       </header>
       {driverWizard && <DriverExpenseWizard record={driverWizard.record} user={user} fleet={fleet} fleetLoading={fleetLoading} fleetError={fleetError}
         onRetryFleet={() => setFleetAttempt(n => n + 1)} manager={manager} Dialog={MaintenanceDialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}
+        onMaintenance={() => { try {clearExpenseDraft(user,"expense");} catch {} setDriverWizard(null); openWizard(); }}
         onClose={() => setDriverWizard(null)} onSaved={record => {
           setRecords(items => items.some(item => item.id === record.id) ? items.map(item => item.id === record.id ? record : item) : [record, ...items]);
           setHistory(null);
@@ -983,17 +1253,17 @@ function MaintenanceForm({
           <form className="mp-form mp-payment-modal" onSubmit={savePayment}>
             <header className="mp-section-title">
               <div><p className="mp-eyebrow">CONTROLE FINANCEIRO</p><h2 id="mp-edit-title" data-step-title tabIndex={-1}>Pagamento da manutenção</h2></div>
-              <button className="mp-close" type="button" aria-label="Fechar pagamento" disabled={saving} onClick={() => setPaymentRecord(null)}>×</button>
+              <button className="mp-close" type="button" aria-label="Fechar pagamento" disabled={saving || photoBusy} onClick={() => setPaymentRecord(null)}>×</button>
             </header>
             <div className="mp-payment-summary"><span>{paymentRecord.plate} · {paymentRecord.service}</span><strong>{money(paymentRecord.amount)}</strong></div>
-            <label>Data do pagamento<input type="date" value={paymentDate} required max={today()} disabled={saving} onChange={(e) => setPaymentDate(e.target.value)} /></label>
+            <label>Data do pagamento<input type="date" value={paymentDate} required max={today()} disabled={saving || photoBusy} onChange={(e) => setPaymentDate(e.target.value)} /></label>
             <p className="mp-field-help">Ao salvar a data, esta manutenção será marcada como paga.</p>
             {paymentError && <p className="mp-feedback error" role="alert">{paymentError}</p>}
             <div className="mp-payment-modal-actions">
-              <button className="mp-cancel-edit" type="button" disabled={saving} onClick={() => setPaymentRecord(null)}>Cancelar</button>
+              <button className="mp-cancel-edit" type="button" disabled={saving || photoBusy} onClick={() => setPaymentRecord(null)}>Cancelar</button>
               <button className="mp-submit" type="submit" disabled={saving || !paymentDate}>{saving ? "Salvando…" : "Salvar pagamento"}<Icon name="check" size={18} /></button>
             </div>
-            {paymentRecord.paid && <button className="mp-undo-payment" type="button" disabled={saving} onClick={async () => {
+            {paymentRecord.paid && <button className="mp-undo-payment" type="button" disabled={saving || photoBusy} onClick={async () => {
               setPaymentError("");
               if (await updateControl(paymentRecord, "paymentDate", null)) setPaymentRecord(null);
             }}>Remover registro de pagamento</button>}
@@ -1003,7 +1273,7 @@ function MaintenanceForm({
       <main className="mp-main">
         <div className="mp-heading">
           <div>
-            <p className="mp-eyebrow">{motorist ? "PORTAL DO MOTORISTA" : manager ? "CENTRAL DE CONFERÊNCIA" : "MANUTENÇÃO DE PLANTÃO"}</p>
+            <p className="mp-eyebrow">{manager ? "CENTRAL DE CONFERÊNCIA" : "DESPESAS DE COLABORADORES E MOTORISTAS"}</p>
             <h1>
               {manager ? (
                 <>
@@ -1018,20 +1288,19 @@ function MaintenanceForm({
             <p className="mp-subtitle">
               {manager
                 ? "Manutenções e despesas da viagem. Tudo no mesmo lugar."
-                : motorist ? "Abasteceu ou teve uma despesa? Registre e acompanhe por aqui." : "Precisou parar? Registre aqui e siga tranquilo."}
+                : "Abastecimento, manutenção e outros custos. Registre e acompanhe por aqui."}
             </p>
           </div>
           <div className="mp-view" aria-label="Área de trabalho">
             <button
               hidden={!canRegister}
-              className={view === "driver" ? "active" : ""}
+              className={!manager ? "active" : ""}
               onClick={() => changeView("driver")}
-              aria-pressed={view === "driver"}
+              aria-pressed={!manager}
             >
               <Icon name="truck" />
-              Colaborador
+              Minhas despesas
             </button>
-            <button hidden={!canRegister} className={motorist ? "active" : ""} onClick={() => changeView("motorist")} aria-pressed={motorist}><Icon name="truck" />Motorista</button>
             <button
               hidden={!canReview}
               className={manager ? "active" : ""}
@@ -1045,42 +1314,24 @@ function MaintenanceForm({
         </div>
         <div className="mp-layout">
           <section className="mp-entry">
-            {!manager && !motorist && (
-              <div className="mp-start-card">
-                <span className="mp-start-icon">
-                  <Icon name="tool" size={24} />
-                </span>
-                <div>
-                  <h2>Precisou de manutenção?</h2>
-                  <p>Registre em 3 passos e acompanhe por aqui.</p>
-                </div>
-                <button
-                  className="mp-submit"
-                  onClick={openWizard}
-                  disabled={user.readOnly}
-                >
-                  <Icon name="plus" />{" "}
-                  {editing
-                    ? "Continuar edição"
-                    : amount || plate
-                      ? "Continuar lançamento"
-                      : "Nova manutenção"}
-                  <Icon name="arrow" />
-                </button>
-              </div>
-            )}
-            {motorist && <div className="driver-start-card">
-              <div className="driver-start-top"><span className="driver-road-icon" aria-hidden="true">↗</span><span className="driver-badge">SEU REGISTRO DE BORDO</span></div>
+            {!manager && isDriver && <div className="mp-feedback" role="status">
+              <strong>{expenseAccess?.driverName || "Seu vínculo de motorista"}</strong>
+              <p>{fleetLoading ? "Consultando sua placa na telemetria…" : fleetError || expenseAccess?.message || "Vínculo indisponível."}</p>
+              {expenseAccess?.plate && <p>Placa: <strong>{expenseAccess.plate}</strong> · Identificação em {new Date(expenseAccess.observedAt).toLocaleString("pt-BR")}</p>}
+              <button type="button" disabled={fleetLoading} onClick={() => setFleetAttempt(n => n + 1)}>Atualizar vínculo</button>
+            </div>}
+            {!manager && <div className="driver-start-card">
+              <div className="driver-start-top"><span className="driver-road-icon" aria-hidden="true">↗</span><span className="driver-badge">SUAS DESPESAS EM UM SÓ LUGAR</span></div>
               <h2>Cada despesa, um registro completo.</h2>
               <p>Escolha o tipo, preencha as etapas e envie para a equipe. Você acompanha tudo por aqui.</p>
               <div className="driver-route"><span>1 · Escolha</span><i /><span>2 · Preencha</span><i /><span>3 · Acompanhe</span></div>
-              <button className="mp-submit" disabled={user.readOnly} onClick={() => setDriverWizard({record:null})}><Icon name="plus" />Registrar despesa<Icon name="arrow" /></button>
-              <small>{records.filter(r => r.source === "motorista").length} despesa(s) registrada(s) · Seu histórico fica sempre disponível.</small>
+              <button className="mp-submit" disabled={user.readOnly || (isDriver && (fleetLoading || Boolean(fleetError) || !fleet.length))} onClick={() => { if (editing || amount || plate) openWizard(); else setDriverWizard({record:null}); }}><Icon name="plus" />Registrar despesa<Icon name="arrow" /></button>
+              <small>{records.length} despesa(s) registrada(s) · Seu histórico fica sempre disponível.</small>
             </div>}
             {wizardOpen && (
               <MaintenanceDialog
                 onClose={closeWizard}
-                saving={saving}
+                saving={saving || photoBusy}
                 step={completed ? 3 : step}
               >
                 {completed ? (
@@ -1124,7 +1375,7 @@ function MaintenanceForm({
                           type="button"
                           className="mp-close"
                           aria-label="Fechar lançamento"
-                          disabled={saving}
+                          disabled={saving || photoBusy}
                           onClick={closeWizard}
                         >
                           ×
@@ -1173,6 +1424,7 @@ function MaintenanceForm({
                             value={plate}
                             loading={fleetLoading}
                             disabled={
+                              isDriver ||
                               fleetLoading ||
                               Boolean(fleetError) ||
                               fleet.length === 0
@@ -1258,6 +1510,8 @@ function MaintenanceForm({
                         </div>
                       </section>
                       <section hidden={step !== 1}>
+                        <p className="mp-field-help">{draftWarning || "Rascunho salvo automaticamente neste aparelho, somente para seu usuário."}</p>
+                        <button type="button" className="mp-cancel-edit" disabled={saving || photoBusy} onClick={()=>{try {clearExpenseDraft(user,"maintenance",editing);cancelEdit();setWizardOpen(false);} catch {setError("Não foi possível descartar o rascunho.");}}}>Descartar rascunho</button>
                         <p className="mp-step-intro">
                           Mais um passo! Complete os detalhes da manutenção.
                         </p>
@@ -1296,6 +1550,11 @@ function MaintenanceForm({
                             ))}
                           </div>
                         </fieldset>
+                        <ExpensePhotoAssist photos={maintenancePhotos} knownPhotos={editing?.photoKinds || {}} photoKinds={["invoice"]} suggestionFields={["supplier","documentNumber"]}
+                          preparePhoto={prepareReceipt} onPhoto={(kind,photo)=>setMaintenancePhotos(current=>({...current,[kind]:photo}))}
+                          onApply={(field,value)=>field==="supplier" ? setSupplier({nome:value}) : field==="documentNumber" ? setDocument(value) : null}
+                          onLoadSaved={async()=>editing ? (await window.RB_API.receiptPlantao(editing.id,manager)).photos : {}} onBusy={setPhotoBusy} values={{supplier:supplier.nome,documentNumber:document}} />
+                        {!(maintenancePhotos.invoice !== undefined ? maintenancePhotos.invoice : editing?.photoKinds?.invoice) && <label>Justificativa sem nota<textarea value={receiptReason} onChange={e=>setReceiptReason(e.target.value)} minLength={10} maxLength={300} placeholder="Explique por que não há nota ou comprovante." /></label>}
                         <label>
                           Uma observação{" "}
                           <span className="mp-optional">(opcional)</span>
@@ -1351,7 +1610,7 @@ function MaintenanceForm({
                       <button
                         type="button"
                         className="mp-cancel-edit"
-                        disabled={saving}
+                        disabled={saving || photoBusy}
                         onClick={() =>
                           step
                             ? (setStep((n) => n - 1), setError(""))
@@ -1400,32 +1659,6 @@ function MaintenanceForm({
                 <p>
                   Confira os registros de colaboradores e motoristas, os comprovantes e os status financeiros.
                 </p>
-                <label>
-                  Buscar placa
-                  <div className="mp-filter-input">
-                    <input
-                      value={search}
-                      onChange={(e) => setSearch(normalize(e.target.value))}
-                      placeholder="Todas as placas"
-                      maxLength={8}
-                    />
-                    {search && (
-                      <button
-                        type="button"
-                        aria-label="Limpar filtro de placa"
-                        onClick={() => {
-                          setSearch("");
-                          setFilter("all");
-                        }}
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
-                </label>
-                <p className="mp-small">
-                  Os valores do resumo acompanham a placa buscada.
-                </p>
               </div>
             )}
             {error && !wizardOpen && (
@@ -1444,7 +1677,7 @@ function MaintenanceForm({
             <div className="mp-section-title">
               <div>
                 <p className="mp-eyebrow">
-                  {manager ? "CONTROLE DE DESPESAS" : motorist ? "SUAS DESPESAS NA ESTRADA" : "SEU VEÍCULO"}
+                  {manager ? "CONTROLE DE DESPESAS" : "SUAS DESPESAS"}
                 </p>
                 <h2>
                   {manager
@@ -1455,25 +1688,6 @@ function MaintenanceForm({
                 </h2>
               </div>
               <span className="mp-plate">{search || "Todas"}</span>
-            </div>
-            <div className="mp-stats">
-              <div>
-                <span>Total registrado</span>
-                <strong>
-                  {money(scoped.reduce((sum, r) => sum + r.amount, 0))}
-                </strong>
-                <small>{scoped.length} lançamento(s)</small>
-              </div>
-              <div>
-                <span>A conferir</span>
-                <strong>
-                  {money(pending.reduce((sum, r) => sum + r.amount, 0))}
-                </strong>
-                <small>
-                  <i />
-                  {pending.length} pendente(s)
-                </small>
-              </div>
             </div>
             <div className="mp-history-label">
               <h3>{manager ? "Registros recebidos" : "Seus lançamentos"}</h3>
@@ -1489,15 +1703,8 @@ function MaintenanceForm({
                 Atualizar lista
               </button>
             </div>
-            <details className="mp-filter-panel">
-              <summary>
-                Filtrar lançamentos{" "}
-                {(search || dateFrom || dateTo || textSearch || paidFilter || postedFilter || sourceFilter) && (
-                  <span>Filtros ativos</span>
-                )}
-              </summary>
-              <div className="mp-cost-filters">
-                {!manager && (
+            <div className="mp-period-filters">
+                {(
                   <label>
                     Buscar placa
                     <input
@@ -1525,7 +1732,18 @@ function MaintenanceForm({
                     onChange={(e) => setDateTo(e.target.value)}
                   />
                 </label>
-                {manager && <label>Origem<select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}><option value="">Todas</option><option value="colaborador">Colaborador</option><option value="motorista">Motorista</option></select></label>}
+              <button type="button" onClick={() => {setDateFrom(`${today().slice(0,7)}-01`);setDateTo(today());}}>Mês atual</button>
+              <button type="button" onClick={() => {setDateFrom("");setDateTo("");}}>Todo o período</button>
+            </div>
+            <details className="mp-filter-panel">
+              <summary>
+                Filtrar lançamentos{" "}
+                {(search || dateFrom || dateTo || textSearch || paidFilter || postedFilter || sourceFilter) && (
+                  <span>Filtros ativos</span>
+                )}
+              </summary>
+              <div className="mp-cost-filters">
+                {manager && <label>Perfil de quem lançou<select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}><option value="">Todos</option><option value="colaborador">Colaborador</option><option value="motorista">Motorista</option><option value="unknown">Perfil não registrado</option></select></label>}
                 {manager && [["Pagamento", paidFilter, setPaidFilter], ["Lançamento", postedFilter, setPostedFilter]].map(([label, value, setter]) => (
                   <label key={label}>{label}<select value={value} onChange={(e) => setter(e.target.value)}>
                     <option value="">Todos</option><option value="true">Sim</option><option value="false">Não</option><option value="unknown">Não informado</option>
@@ -1605,242 +1823,10 @@ function MaintenanceForm({
                   </p>
                 </div>
               ) : (
-                visible.map((r) => (
-                  <article className="mp-record" key={r.id}>
-                    <div className="mp-record-main">
-                      <span
-                        className={`mp-service-icon ${r.service === "Elétrica" ? "peach" : ""}`}
-                      >
-                        <Icon name="tool" size={23} />
-                      </span>
-                      <div className="mp-record-description">
-                        <span className="mp-plate-badge">
-                          <Icon name="truck" size={15} />
-                          {r.plate}
-                        </span>
-                        <h3>{r.service}</h3>
-                        {manager && <span className="driver-source-tag">{r.source === "motorista" ? "Motorista" : "Colaborador"}</span>}
-                        {r.supplier && (
-                          <p className="mp-record-supplier">{r.supplier}</p>
-                        )}
-                        <p>{r.note || "Sem observação"}</p>
-                      </div>
-                      <strong>{money(r.amount)}</strong>
-                    </div>
-                    <div className="mp-cost-details">
-                      <span>
-                        Data da despesa <b>{displayDay(expenseDay(r))}</b>
-                      </span>
-                      <span>
-                        Comprovante <b>{r.document || "Não informado"}</b>
-                      </span>
-                    </div>
-                    {r.source === "motorista" && <div className="mp-cost-details driver-expense-details">
-                      {r.arlaLiters != null && <span>ARLA <b>{r.arlaLiters.toLocaleString("pt-BR")} L · {money(r.arlaAmount)}</b></span>}
-                      {r.fuelAmount != null && <span>Combustível <b>{money(r.fuelAmount)}</b></span>}
-                      {r.liters != null && <span>Abastecimento <b>{Number(r.liters).toLocaleString("pt-BR")} L</b></span>}
-                      {r.odometer != null && <span>Hodômetro <b>{Number(r.odometer).toLocaleString("pt-BR")} km</b></span>}
-                      {r.location && <span>Local <b>{r.location}</b></span>}
-                      {r.hasReceipt && <button className="mp-cancel-edit" onClick={() => showReceipt(r)}>Ver comprovante</button>}
-                    </div>}
-                    {manager && <div className="mp-payment-controls">
-                      <button type="button" className={`mp-payment-button ${r.paid ? "is-paid" : ""}`}
-                        disabled={saving || user.readOnly} onClick={() => openPayment(r)}
-                        aria-label={`${r.paid ? "Editar pagamento" : "Registrar pagamento"} — ${r.plate}`}>
-                        <span className="mp-payment-symbol"><Icon name={r.paid ? "check" : "calendar"} size={19} /></span>
-                        <span><small>PAGAMENTO</small><strong>{r.paymentDate ? `Pago em ${displayDay(r.paymentDate)}` : r.paid ? "Pago · informar data" : "Registrar pagamento"}</strong></span>
-                        <Icon name="arrow" size={16} />
-                      </button>
-                      <label className={`mp-posted-check ${r.posted ? "is-posted" : ""}`}>
-                        <input type="checkbox" checked={r.posted === true} disabled={saving || user.readOnly}
-                          aria-label={`Lançado — ${r.plate}`} onChange={(e) => updateControl(r, "posted", e.target.checked)} />
-                        <span><small>LANÇAMENTO</small><strong>{r.posted ? "Lançado" : "Marcar como lançado"}</strong></span>
-                      </label>
-                    </div>}
-                    {!manager && <div className="mp-payment-controls mp-financial-status" aria-label="Status financeiro">
-                      <div className={`mp-payment-button ${r.paid ? "is-paid" : ""}`}>
-                        <span className="mp-payment-symbol"><Icon name={r.paid ? "check" : "clock"} size={19} /></span>
-                        <span><small>PAGAMENTO</small><strong>{r.paymentDate ? `Pago em ${displayDay(r.paymentDate)}` : r.paid ? "Pago · data não informada" : r.paid === false ? "Não pago" : "Não informado"}</strong></span>
-                      </div>
-                      <div className={`mp-posted-check ${r.posted ? "is-posted" : ""}`}>
-                        <span className="mp-payment-symbol"><Icon name={r.posted ? "check" : "clock"} size={19} /></span>
-                        <span><small>LANÇAMENTO</small><strong>{r.posted ? "Lançado" : r.posted === false ? "Não lançado" : "Não informado"}</strong></span>
-                      </div>
-                    </div>}
-                    {duplicates.has(r.id) && (
-                      <p className="mp-duplicate-warning">
-                        Possível duplicidade. Compare os comprovantes antes de
-                        conferir ou pagar.
-                      </p>
-                    )}
-                    <div className="mp-record-meta">
-                      <span>
-                        <Icon name="clock" size={13} />
-                        Registrado em{" "}
-                        {new Date(r.date).toLocaleString("pt-BR", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          timeZone: "America/Sao_Paulo",
-                        })}
-                      </span>
-                      <span
-                        className={`mp-status ${r.checked ? "checked" : ""}`}
-                      >
-                        {r.checked ? <Icon name="check" size={12} /> : <i />}
-                        {r.checked ? "Conferido" : "Pendente"}
-                      </span>
-                    </div>
-                    <div className="mp-record-bottom">
-                      <span>Lançado por {r.author}</span>
-                      {manager && !r.checked && (
-                        <button
-                          disabled={saving || user.readOnly}
-                          onClick={() => confirmRecord(r)}
-                        >
-                          <Icon name="check" size={15} />
-                          Conferir
-                        </button>
-                      )}
-                    </div>
-                    {r.checked && (
-                      <p className="mp-checked-detail">
-                        Conferido por {r.checkedBy || "usuário autorizado"}
-                        {r.checkedAt
-                          ? ` em ${new Date(r.checkedAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`
-                          : ""}
-                        . Edição e exclusão bloqueadas.
-                      </p>
-                    )}
-                    <div className="mp-cost-actions">
-                      {!r.checked &&
-                        !user.readOnly &&
-                        (manager || String(r.authorId) === String(user.id)) && (
-                          <>
-                            <button
-                              disabled={saving}
-                              onClick={() => editRecord(r)}
-                            >
-                              Editar
-                            </button>
-                            <button
-                              className="mp-delete-action"
-                              disabled={saving}
-                              onClick={() => {
-                                setDeleting(r.id);
-                                setDeleteReason("");
-                              }}
-                            >
-                              Excluir
-                            </button>
-                          </>
-                        )}
-                      <button
-                        onClick={() =>
-                          history?.id === r.id
-                            ? setHistory(null)
-                            : showHistory(r)
-                        }
-                      >
-                        {history?.id === r.id
-                          ? "Fechar histórico"
-                          : "Histórico"}
-                      </button>
-                    </div>
-                    {deleting === r.id && (
-                      <div
-                        className="mp-delete-confirm"
-                        role="region"
-                        aria-label="Confirmar exclusão"
-                      >
-                        <strong>
-                          Excluir {r.plate} · {money(r.amount)}?
-                        </strong>
-                        <p>
-                          O lançamento sairá da lista. O motivo e os dados serão
-                          preservados no histórico.
-                        </p>
-                        <label>
-                          Motivo da exclusão
-                          <input
-                            autoFocus
-                            value={deleteReason}
-                            maxLength={300}
-                            onChange={(e) => setDeleteReason(e.target.value)}
-                            placeholder="Ex.: lançado duas vezes"
-                          />
-                        </label>
-                        <button
-                          disabled={saving || deleteReason.trim().length < 5}
-                          onClick={() => deleteRecord(r)}
-                        >
-                          Confirmar exclusão
-                        </button>
-                        <button
-                          disabled={saving}
-                          onClick={() => setDeleting(null)}
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    )}
-                    {history?.id === r.id && (
-                      <div
-                        className="mp-audit-history"
-                        role="region"
-                        aria-label="Histórico do lançamento"
-                      >
-                        {history.loading ? (
-                          <p role="status">Carregando histórico…</p>
-                        ) : history.error ? (
-                          <p role="alert">{history.error}</p>
-                        ) : history.items.length ? (
-                          history.items.map((h, i) => (
-                            <div key={i}>
-                              <strong>
-                                {{
-                                  create: "Registrado",
-                                  edit: "Editado",
-                                  delete: "Excluído",
-                                  check: "Conferido",
-                                  status: "Controle atualizado",
-                                }[h.evento] || h.evento}
-                              </strong>{" "}
-                              · {h.usuario_login} ·{" "}
-                              {new Date(h.ocorrido_em).toLocaleString("pt-BR", {
-                                timeZone: "America/Sao_Paulo",
-                              })}
-                              {h.evento === "edit" && (
-                                <p>
-                                  Antes: {h.antes.placa} ·{" "}
-                                  {money(Number(h.antes.valor))} ·{" "}
-                                  {String(h.antes.data_despesa)} ·{" "}
-                                  {h.antes.fornecedor || "Sem fornecedor"} ·{" "}
-                                  {h.antes.documento || "Sem comprovante"}
-                                  <br />
-                                  Depois: {h.depois.placa} ·{" "}
-                                  {money(Number(h.depois.valor))} ·{" "}
-                                  {String(h.depois.data_despesa)} ·{" "}
-                                  {h.depois.fornecedor || "Sem fornecedor"} ·{" "}
-                                  {h.depois.documento || "Sem comprovante"} {manager && <>· Pago: {controlLabel(h.depois.pago)}{h.depois.data_pagamento ? ` em ${displayDay(String(h.depois.data_pagamento).slice(0, 10))}` : ""} · Lançado: {controlLabel(h.depois.lancado)}</>}
-                                </p>
-                              )}
-                            </div>
-                          ))
-                        ) : (
-                          <p>
-                            Registro anterior ao histórico de alterações.
-                            Lançado por {r.author}.
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </article>
-                ))
+                <ExpenseHistory records={visible} isDriver={isDriver && !manager} currentPlate={expenseAccess?.plate} renderRecord={renderExpenseRecord} />
               )}
             </div>
+            {!recordsLoading && !recordsError && <ExpenseSummary records={visible} />}
             <p className="mp-history-help">
               <Icon name="check" size={16} />
               Registrou aqui? Não precisa lembrar depois.
@@ -1860,13 +1846,12 @@ function MaintenanceForm({
       <nav className="mp-mobile-nav" aria-label="Áreas do portal">
         <button
           hidden={!canRegister}
-          className={view === "driver" ? "active" : ""}
+          className={!manager ? "active" : ""}
           onClick={() => changeView("driver")}
         >
           <Icon name="truck" />
-          <span>Colaborador</span>
+          <span>Minhas despesas</span>
         </button>
-        <button hidden={!canRegister} className={motorist ? "active" : ""} onClick={() => changeView("motorist")}><Icon name="truck" /><span>Motorista</span></button>
         <button
           hidden={!canReview}
           className={manager ? "active" : ""}
