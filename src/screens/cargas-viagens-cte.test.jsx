@@ -4,6 +4,30 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 afterEach(cleanup);
+it('preserva CT-e e orçamento de mesmo número e séries diferentes ao salvar', async () => {
+  window.React = React;
+  const { Cv2CteModal } = await import('./cargas-viagens-v2.jsx');
+  const options = [
+    {numero:'123',empresa:'1',serie:'1',chave:'key'},
+    {numero:'123',empresa:'1',serie:'C',chave:''},
+    {numero:'123',empresa:'2',serie:'C',chave:''},
+  ];
+  window.RB_API = {
+    searchViagemDocumentos: vi.fn(async () => options),
+    saveCargaDocumentosV2: vi.fn(async (_id, documentos) => ({id:1,documentos})),
+  };
+  render(<Cv2CteModal carga={{id:1,documentos:[]}} onClose={() => {}} onSaved={() => {}} />);
+  for (const item of [...options, options[1]]) {
+    fireEvent.change(screen.getByPlaceholderText('Ex.: 4030'), {target:{value:'123'}});
+    fireEvent.click(screen.getByRole('button', {name:'Pesquisar'}));
+    fireEvent.click(await screen.findByRole('button', {name:new RegExp(`^CT-e 123 · Série ${item.serie} · Empresa ${item.empresa}`)}));
+  }
+  fireEvent.click(screen.getByRole('button', {name:'Vincular documentos'}));
+  await waitFor(() => expect(window.RB_API.saveCargaDocumentosV2).toHaveBeenCalled());
+  expect(window.RB_API.saveCargaDocumentosV2.mock.calls[0][1]).toEqual(
+    options.map(item => ({...item,tipo:'CT-e',observacoes:undefined})),
+  );
+});
 it('permite desvincular o único CT-e, revisar e desfazer antes de salvar', async () => {
   window.React = React;
   const { Cv2CteModal } = await import('./cargas-viagens-v2.jsx');
