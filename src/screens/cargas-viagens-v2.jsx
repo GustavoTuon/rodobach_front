@@ -1,3 +1,4 @@
+import { sameCargaDocumento } from "../carga-documentos.js";
 import { QuoteHistoryGrid } from './quote-history-grid.jsx';
 const { useEffect, useState } = React;
 
@@ -357,17 +358,12 @@ export function Cv2CteModal({ carga, onClose, onSaved }) {
     finally { setLoading(false); }
   };
   const select = (item) => {
-    const next = [{ tipo: "CT-e", numero: item.numero, chave: item.chave, observacoes: item.observacoes }];
+    const next = [{ tipo: "CT-e", numero: item.numero, chave: item.chave, empresa: item.empresa, serie: item.serie, observacoes: item.observacoes }];
     (item.notasDocumentos || []).forEach((nota) => next.push({ tipo: "NF-e", numero: String(nota.numero || ""), chave: nota.chave || "", observacoes: `Vinculada ao CT-e ${item.numero}` }));
     setDocuments(current => {
       const merged = [...current];
       for (const doc of next) {
-        const exists = merged.some(existing => {
-          const type = value => String(value || "").toUpperCase().replace(/[^A-Z]/g, "");
-          if (type(existing.tipo) !== type(doc.tipo)) return false;
-          if (existing.chave && doc.chave) return existing.chave === doc.chave;
-          return Boolean(doc.numero) && String(existing.numero) === String(doc.numero);
-        });
+        const exists = merged.some(existing => sameCargaDocumento(existing, doc));
         if (!exists) merged.push(doc);
       }
       return merged;
@@ -386,12 +382,12 @@ export function Cv2CteModal({ carga, onClose, onSaved }) {
       <Cv2Field label="Número do CT-e no ERP" hint="Pesquise e adicione quantos CT-es precisar. Os documentos já vinculados serão mantidos, e as NF-es serão incluídas automaticamente.">
         <div className="cv2-search-row"><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); search(); } }} placeholder="Ex.: 4030" /><button type="button" className="btn" onClick={search} disabled={loading}>{loading ? "Buscando..." : "Pesquisar"}</button></div>
       </Cv2Field>
-      {results.map((item) => <button type="button" className="cv2-cte-result" key={`${item.serie}-${item.numero}`} onClick={() => select(item)}>
-        <div><strong>CT-e {item.numero}</strong><span>{item.cliente}</span></div><div><span>{item.placa || "Sem placa"}</span><b>{(item.notas || []).length} NF-e</b></div>
+      {results.map((item) => <button type="button" className="cv2-cte-result" key={`${item.empresa}-${item.serie}-${item.numero}`} onClick={() => select(item)}>
+        <div><strong>CT-e {item.numero}{item.serie ? ` · Série ${item.serie}` : ""}{item.empresa ? ` · Empresa ${item.empresa}` : ""}</strong><span>{item.cliente}</span></div><div><span>{item.placa || "Sem placa"}</span><b>{(item.notas || []).length} NF-e</b></div>
       </button>)}
       <div className="cv2-doc-list"><b>Documentos da carga · {documents.filter(doc => String(doc.tipo).toUpperCase().replace(/[^A-Z]/g, "") === "CTE").length} CT-e(s)</b>
         {!documents.length && <span>Nenhum documento selecionado.</span>}
-        {documents.map((doc, index) => <div key={`${doc.tipo}-${doc.numero}-${index}`}><span className="cv2-doc-type">{doc.tipo}</span><strong>{doc.numero || "Sem número"}</strong><small>{doc.chave ? `Chave ${doc.chave}` : doc.observacoes}</small><button type="button" disabled={saving} aria-label={`Desvincular ${doc.tipo} ${doc.numero}`} onClick={() => setDocuments(current => current.filter((_, i) => i !== index))}>Desvincular</button></div>)}
+        {documents.map((doc, index) => <div key={`${doc.tipo}-${doc.numero}-${index}`}><span className="cv2-doc-type">{doc.tipo}</span><strong>{doc.numero || "Sem número"}{doc.serie ? ` · Série ${doc.serie}` : ""}{doc.empresa ? ` · Empresa ${doc.empresa}` : ""}</strong><small>{doc.chave ? `Chave ${doc.chave}` : doc.observacoes}</small><button type="button" disabled={saving} aria-label={`Desvincular ${doc.tipo} ${doc.numero}${doc.serie ? ` série ${doc.serie}` : ""}${doc.empresa ? ` empresa ${doc.empresa}` : ""}`} onClick={() => setDocuments(current => current.filter((_, i) => i !== index))}>Desvincular</button></div>)}
       </div>
       {!!removedDocuments.length && <div className="cv2-alert info" role="status"><b>Vínculos que serão removidos ao salvar:</b> {removedDocuments.map(doc => `${doc.tipo} ${doc.numero || "sem número"}`).join(', ')}.<p>A carga e a viagem serão mantidas. Os documentos e títulos no ERP não serão alterados. As NF-es permanecem vinculadas até que você as remova individualmente.</p><button type="button" className="btn" disabled={saving} onClick={() => setDocuments(current => [...current, ...removedDocuments])}>Desfazer remoções</button></div>}
     </div>
