@@ -9,8 +9,8 @@ it('preserva CT-e e orçamento de mesmo número e séries diferentes ao salvar',
   const { Cv2CteModal } = await import('./cargas-viagens-v2.jsx');
   const options = [
     {numero:'123',empresa:'1',serie:'1',chave:'key'},
-    {numero:'123',empresa:'1',serie:'C',chave:''},
-    {numero:'123',empresa:'2',serie:'C',chave:''},
+    {numero:'123',empresa:'1',serie:'O',chave:'',tipo:'Orçamento'},
+    {numero:'123',empresa:'2',serie:'O',chave:'',tipo:'Orçamento'},
   ];
   window.RB_API = {
     searchViagemDocumentos: vi.fn(async () => options),
@@ -20,12 +20,12 @@ it('preserva CT-e e orçamento de mesmo número e séries diferentes ao salvar',
   for (const item of [...options, options[1]]) {
     fireEvent.change(screen.getByPlaceholderText('Ex.: 4030'), {target:{value:'123'}});
     fireEvent.click(screen.getByRole('button', {name:'Pesquisar'}));
-    fireEvent.click(await screen.findByRole('button', {name:new RegExp(`^CT-e 123 · Série ${item.serie} · Empresa ${item.empresa}`)}));
+    fireEvent.click(await screen.findByRole('button', {name:new RegExp(`^${item.tipo || 'CT-e'} 123 · Série ${item.serie} · Empresa ${item.empresa}`)}));
   }
   fireEvent.click(screen.getByRole('button', {name:'Vincular documentos'}));
   await waitFor(() => expect(window.RB_API.saveCargaDocumentosV2).toHaveBeenCalled());
   expect(window.RB_API.saveCargaDocumentosV2.mock.calls[0][1]).toEqual(
-    options.map(item => ({...item,tipo:'CT-e',observacoes:undefined})),
+    options.map(item => ({...item,tipo:item.tipo || 'CT-e',observacoes:undefined})),
   );
 });
 it('permite desvincular o único CT-e, revisar e desfazer antes de salvar', async () => {

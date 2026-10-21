@@ -1,6 +1,6 @@
 import { quoteProgress } from "./purchases-status.js";
 import { SupplierAccess } from "./purchases-groups.jsx";
-import PurchaseAnalysis, { analysisRows } from "./purchases-analysis.jsx";
+import { analysisRows } from "./purchases-analysis.jsx";
 import PurchaseDecision from "./purchases-decision.jsx";
 import React, { useState } from "react";
 const money = (v) =>
@@ -278,7 +278,6 @@ export function ImportedQuote({ quote, onBack }) {
         {quote.observacoes && <p>{quote.observacoes}</p>}
       </section>
       <PurchaseDecision quote={quote} rows={analysisRows(quote)} />
-      <PurchaseAnalysis quote={quote} />
       <details className="analysis-original">
         <summary>Consultar registros originais e descontos</summary>
         <label className="purchase-search">

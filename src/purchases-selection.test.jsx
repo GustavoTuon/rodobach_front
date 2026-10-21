@@ -135,3 +135,40 @@ it("mostra pendências e identifica resumo parcial na cópia", () => {
   );
   expect(purchaseSummaryText(quote)).toContain("Resumo parcial");
 });
+
+it("seleção na oferta pede confirmação explícita para comprar quantidade menor", async () => {
+  const fetch = vi
+    .fn()
+    .mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+  vi.stubGlobal("fetch", fetch);
+  render(
+    <ProductChoice
+      quote={{ id: "q" }}
+      product={{ id: "p", nome: "Lâmpada", quantidade: 10, unidade: "UN" }}
+      offers={[
+        {
+          id: "a",
+          inviteId: "a",
+          supplier: "A",
+          available: true,
+          price: 2,
+          quantity: 30,
+          unit: "UN",
+          proposalVersion: "v1",
+        },
+      ]}
+      onRefresh={vi.fn()}
+      suggested={{ inviteId: "a" }}
+    />,
+  );
+  const save = screen.getByRole("button", { name: "Salvar escolha" });
+  expect(save.disabled).toBe(true);
+  fireEvent.click(screen.getByRole("checkbox"));
+  expect(save.disabled).toBe(false);
+  fireEvent.click(save);
+  await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+  expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({
+    quantidadeConfirmada: true,
+    conviteId: "a",
+  });
+});

@@ -59,6 +59,8 @@ export function analysisRows(quote) {
         total: o.disponivel ? price * o.quantidade : null,
         brand: o.marca || "Não informada",
         freight: c.resposta.frete,
+        delivery: c.resposta.prazoEntrega,
+        payment: c.resposta.pagamento,
         date: c.respondido_em,
         notes: o.observacoes,
         available: o.disponivel,

@@ -6,7 +6,7 @@ import QuoteActions from "../purchases-quote-actions.jsx";
 import { quoteProgress } from "../purchases-status.js";
 import { SupplierGroups } from "../purchases-groups.jsx";
 import QuoteQuest from "../purchases-quest.jsx";
-import PurchaseAnalysis, { analysisRows } from "../purchases-analysis.jsx";
+import { analysisRows } from "../purchases-analysis.jsx";
 import { PurchaseNavigation, PurchaseHome } from "../purchases-shell.jsx";
 import {
   PurchaseDashboard,
@@ -14,7 +14,7 @@ import {
   SupplierDirectory,
 } from "../purchases-dashboard.jsx";
 import React, { useEffect, useState } from "react";
-import { purchasesApi as api, rankedOffers } from "../purchases-api.js";
+import { purchasesApi as api } from "../purchases-api.js";
 import "./compras.css";
 import "./compras-app.css";
 import "../supplier-workspace.css";
@@ -151,8 +151,7 @@ function SupplierForm({ onSave }) {
   );
 }
 function QuoteDetail({ quote, onRefresh, onChanged, suppliers, groups }) {
-  const [history, setHistory] = useState(null),
-    [error, setError] = useState(""),
+  const [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
   const closed =
@@ -212,69 +211,74 @@ function QuoteDetail({ quote, onRefresh, onChanged, suppliers, groups }) {
           max={Math.max(1, quoteProgress(quote).total)}
         />
       </div>
-      <QuoteActions quote={quote} onChanged={onChanged} />
-      <p>{quote.observacoes}</p>
-      <AddSuppliers
-        quote={quote}
-        suppliers={suppliers}
-        groups={groups}
-        onSaved={() => onChanged(false)}
-      />
-      <h3>Links dos fornecedores</h3>
-      <p>
-        Copie o link e envie ao contato. Cada fornecedor acessa somente os
-        produtos vinculados a ele.
-      </p>
-      {quote.convites.map((c) => (
-        <div className="purchase-invite" key={c.id}>
-          <strong>{c.nome}</strong>
-          <span>
-            {c.respondido_em
-              ? `Respondido em ${date(c.respondido_em)}`
-              : "Aguardando resposta"}{" "}
-            · {c.itens.length} produto(s)
-          </span>
-          <span>
-            {c.email} {c.telefone}
-          </span>
-          {!closed && (
-            <button
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(
-                    `${window.location.origin}/compras/responder#${c.token}`,
-                  );
-                  setNotice(`Link de ${c.nome} copiado.`);
-                } catch {
-                  setError("Não foi possível copiar. Selecione o link abaixo.");
-                }
-              }}
-            >
-              Copiar link
-            </button>
-          )}
-          {!closed && (
-            <input
-              aria-label={`Link de ${c.nome}`}
-              readOnly
-              value={`${window.location.origin}/compras/responder#${c.token}`}
-              onFocus={(e) => e.target.select()}
-            />
-          )}{" "}
-          {c.resposta && (
-            <p>
-              Observações da proposta: {c.resposta.observacoes || "Nenhuma"} ·
-              Total com frete:{" "}
-              {money(
-                c.resposta.itens
-                  .filter((i) => i.disponivel)
-                  .reduce((s, i) => s + i.quantidade * i.valor, 0) +
-                  c.resposta.frete,
-              )}
-            </p>
-          )}
-        </div>
-      ))}
+      <details className="purchase-invitation-details">
+        <summary>Fornecedores, convites e ações da cotação</summary>
+        <QuoteActions quote={quote} onChanged={onChanged} />
+        <p>{quote.observacoes}</p>
+        <AddSuppliers
+          quote={quote}
+          suppliers={suppliers}
+          groups={groups}
+          onSaved={() => onChanged(false)}
+        />
+        <h3>Links dos fornecedores</h3>
+        <p>
+          Copie o link e envie ao contato. Cada fornecedor acessa somente os
+          produtos vinculados a ele.
+        </p>
+        {quote.convites.map((c) => (
+          <div className="purchase-invite" key={c.id}>
+            <strong>{c.nome}</strong>
+            <span>
+              {c.respondido_em
+                ? `Respondido em ${date(c.respondido_em)}`
+                : "Aguardando resposta"}{" "}
+              · {c.itens.length} produto(s)
+            </span>
+            <span>
+              {c.email} {c.telefone}
+            </span>
+            {!closed && (
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(
+                      `${window.location.origin}/compras/responder#${c.token}`,
+                    );
+                    setNotice(`Link de ${c.nome} copiado.`);
+                  } catch {
+                    setError(
+                      "Não foi possível copiar. Selecione o link abaixo.",
+                    );
+                  }
+                }}
+              >
+                Copiar link
+              </button>
+            )}
+            {!closed && (
+              <input
+                aria-label={`Link de ${c.nome}`}
+                readOnly
+                value={`${window.location.origin}/compras/responder#${c.token}`}
+                onFocus={(e) => e.target.select()}
+              />
+            )}{" "}
+            {c.resposta && (
+              <p>
+                Observações da proposta: {c.resposta.observacoes || "Nenhuma"} ·
+                Total original com frete:{" "}
+                {money(
+                  c.resposta.itens
+                    .filter((i) => i.disponivel)
+                    .reduce((s, i) => s + i.quantidade * i.valor, 0) +
+                    c.resposta.frete,
+                )}
+              </p>
+            )}
+          </div>
+        ))}
+      </details>
       {notice && <p role="status">{notice}</p>}
       {error && <p role="alert">{error}</p>}
       <PurchaseDecision
@@ -282,146 +286,7 @@ function QuoteDetail({ quote, onRefresh, onChanged, suppliers, groups }) {
         rows={analysisRows(quote)}
         onRefresh={onRefresh}
       />
-      <PurchaseAnalysis quote={quote} />
       <PurchaseSummary quote={quote} onRefresh={onRefresh} />
-      <details className="analysis-original">
-        <summary>Detalhamento original e histórico de compras</summary>
-        <h3>Comparativo por produto</h3>
-        <p>
-          Menor preço unitário entre propostas que atendem a quantidade. Frete é
-          por fornecedor e não está incluído no ranking. Confira marca, unidade
-          e condições antes de decidir.
-        </p>
-        {quote.itens.map((item) => {
-          const offers = rankedOffers(item, quote.convites);
-          const best = offers.find((o) => o.completa)?.valor;
-          return (
-            <div className="purchase-item" key={item.id}>
-              <header className="purchase-toolbar">
-                <div>
-                  <h3>{item.nome}</h3>
-                  <p>
-                    Solicitado: {item.quantidade} {item.unidade}
-                  </p>
-                </div>
-                <button
-                  onClick={async () => {
-                    setHistory(null);
-                    try {
-                      const rows = await api(
-                        `/historico?empresa=${encodeURIComponent(item.empresa)}&codigo=${encodeURIComponent(item.codigo)}`,
-                      );
-                      setHistory({ nome: item.nome, rows });
-                    } catch (e) {
-                      setError(e.message);
-                    }
-                  }}
-                >
-                  Histórico de compras
-                </button>
-              </header>
-              <div className="purchase-table">
-                <table>
-                  <thead>
-                    <tr>
-                      {[
-                        "Fornecedor",
-                        "Marca",
-                        "Quantidade",
-                        "Unitário",
-                        "Total ofertado",
-                        "Frete do fornecedor",
-                        "Entrega / pagamento",
-                        "Análise",
-                      ].map((h) => (
-                        <th key={h}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {offers.map((o, n) => (
-                      <tr key={n}>
-                        <td data-label="Fornecedor">{o.fornecedor}</td>
-                        <td data-label="Marca">
-                          {o.marca}
-                          <small>{o.observacoes}</small>
-                        </td>
-                        <td data-label="Quantidade">
-                          {o.quantidade} {item.unidade}
-                        </td>
-                        <td data-label="Unitario">{money(o.valor)}</td>
-                        <td data-label="Total ofertado">
-                          {money(o.valor * o.quantidade)}
-                        </td>
-                        <td data-label="Frete">{money(o.frete)}</td>
-                        <td data-label="Entrega / pagamento">
-                          {o.prazoEntrega}
-                          <small>{o.pagamento}</small>
-                        </td>
-                        <td data-label="Analise">
-                          {!o.completa
-                            ? "Quantidade parcial"
-                            : o.valor === best
-                              ? "Menor preço unitário"
-                              : "Atende quantidade"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {!offers.length && (
-                <p>Nenhuma oferta disponível para este produto.</p>
-              )}
-            </div>
-          );
-        })}
-        {history && (
-          <section className="purchase-item">
-            <header className="purchase-toolbar">
-              <h3>Histórico · {history.nome}</h3>
-              <button onClick={() => setHistory(null)}>Fechar histórico</button>
-            </header>
-            <p>
-              Últimas 50 entradas do produto na empresa selecionada, conforme
-              notas fiscais do sistema.
-            </p>
-            <div className="purchase-table">
-              <table>
-                <thead>
-                  <tr>
-                    {[
-                      "Data",
-                      "Nota",
-                      "Fornecedor",
-                      "Quantidade",
-                      "Unitário",
-                      "Total",
-                    ].map((h) => (
-                      <th key={h}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {history.rows.map((r, i) => (
-                    <tr key={i}>
-                      <td data-label="Data">{r.data ? date(r.data) : "—"}</td>
-                      <td data-label="Nota">{r.documento}</td>
-                      <td data-label="Fornecedor">
-                        {r.fornecedor || r.fornecedor_codigo}
-                      </td>
-                      <td data-label="Quantidade">{r.quantidade}</td>
-                      <td data-label="Unitario">{money(r.valor_unitario)}</td>
-                      <td data-label="Total">{money(r.total)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {!history.rows.length && <p>Nenhuma compra anterior encontrada.</p>}
-          </section>
-        )}
-      </details>
     </section>
   );
 }

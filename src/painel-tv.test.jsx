@@ -6,11 +6,24 @@ globalThis.React=React;
 await import('./screens/painel-tv.jsx');
 beforeEach(()=>vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){}}));
 afterEach(()=>{cleanup();vi.useRealTimers();vi.unstubAllGlobals();delete window.RB_API;});
-it('mostra correção somente para administrador fora do modo consulta',async()=>{
+it('mostra provável vazio com motivo sem alarme de carregado ou contador de vazio',async()=>{
+ const now=new Date();
+ window.RB_API={getPainelTv:vi.fn().mockResolvedValue({dia:now.toISOString().slice(0,10),atualizadoEm:now.toISOString(),itens:[{placa:'RAA8G58',carga:{codigo:'provavelmente_vazio',label:'Provavelmente vazio',confirmacaoPendente:true,smId:123,fonte:'SM 123 finalizada; confira a descarga.'},base:{situacao:'fora'},sm:{disponivel:true,id:null},kmHoje:{km:0}}]})};
+ await act(async()=>render(React.createElement(window.PainelTv)));
+ expect(screen.getByText('Provavelmente vazio')).toBeTruthy();
+ expect(screen.getByText('SM 123 finalizada; confira a descarga.')).toBeTruthy();
+ expect(screen.getByRole('article').classList.contains('tv-missing-sm')).toBe(false);
+ expect(screen.queryByText(/Vazio há/)).toBeNull();
+});
+it('permite correção a usuários do painel e administradores fora do modo consulta',async()=>{
  window.RB_API={getPainelTv:vi.fn().mockResolvedValue({dia:'2026-09-16',atualizadoEm:new Date().toISOString(),confirmacoesDisponiveis:true,itens:[]})};
  const {rerender}=await act(async()=>render(React.createElement(window.PainelTv,{user:{admin:true,readOnly:false}})));
  expect(screen.getByRole('button',{name:'Corrigir carga'})).toBeTruthy();
  rerender(React.createElement(window.PainelTv,{user:{admin:true,readOnly:true}}));
+ expect(screen.queryByRole('button',{name:'Corrigir carga'})).toBeNull();
+ rerender(React.createElement(window.PainelTv,{user:{admin:false,permissions:{'painel-tv':true},readOnly:false}}));
+ expect(screen.getByRole('button',{name:'Corrigir carga'}).disabled).toBe(false);
+ rerender(React.createElement(window.PainelTv,{user:{admin:false,permissions:{'painel-tv':true},readOnly:true}}));
  expect(screen.queryByRole('button',{name:'Corrigir carga'})).toBeNull();
  rerender(React.createElement(window.PainelTv,{user:{admin:false,readOnly:false}}));
  expect(screen.queryByRole('button',{name:'Corrigir carga'})).toBeNull();
