@@ -98,7 +98,9 @@ test("histórico conserva aprovação sem oferecer envio de link", () => {
     },
   };
   render(<ImportedQuote quote={quote} />);
-  expect(screen.getByText("Aprovada no sistema")).toBeTruthy();
+  expect(
+    screen.getByRole("cell", { name: "Aprovada no sistema", exact: true }),
+  ).toBeTruthy();
   expect(screen.queryByText("Copiar link")).toBeNull();
   expect(screen.getByText(/marca não estão informados/)).toBeTruthy();
 });

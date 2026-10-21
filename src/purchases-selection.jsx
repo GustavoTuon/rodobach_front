@@ -5,9 +5,16 @@ const money = (v) =>
     style: "currency",
     currency: "BRL",
   });
-export function ProductChoice({ quote, product, offers, onRefresh }) {
+export function ProductChoice({
+  quote,
+  product,
+  offers,
+  onRefresh,
+  suggested,
+}) {
   const selected = quote.planoCompra?.escolhas?.[product.id];
   const [invite, setInvite] = useState(selected?.conviteId || ""),
+    [quantityConfirmed, setQuantityConfirmed] = useState(false),
     [reason, setReason] = useState(selected?.motivo || ""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -16,6 +23,28 @@ export function ProductChoice({ quote, product, offers, onRefresh }) {
     setInvite(selected?.conviteId || "");
     setReason(selected?.motivo || "");
   }, [selected?.conviteId, selected?.motivo, selected?.escolhido_em]);
+  useEffect(() => {
+    if (suggested?.inviteId) {
+      setInvite(suggested.inviteId);
+      setNotice("");
+      setError("");
+    }
+  }, [suggested]);
+  useEffect(() => {
+    setQuantityConfirmed(
+      Boolean(
+        selected?.valida &&
+        selected?.conviteId === invite &&
+        selected?.quantidadeConfirmada,
+      ),
+    );
+  }, [
+    invite,
+    selected?.valida,
+    selected?.conviteId,
+    selected?.quantidadeConfirmada,
+    offers.find((r) => r.inviteId === invite)?.proposalVersion,
+  ]);
   const eligible = offers.filter(
     (r) =>
       r.available &&
@@ -29,6 +58,16 @@ export function ProductChoice({ quote, product, offers, onRefresh }) {
   const save = async (remove = false) => {
     if (busy) return;
     if (!remove && !candidate) return;
+    if (
+      !remove &&
+      candidate.quantity > product.quantidade &&
+      !quantityConfirmed
+    ) {
+      setError(
+        "Confirme com o fornecedor o preço para a quantidade solicitada.",
+      );
+      return;
+    }
     if (!remove && needsReason && !reason.trim()) {
       setError(
         "Informe o motivo para escolher uma oferta acima do menor preço.",
@@ -45,6 +84,7 @@ export function ProductChoice({ quote, product, offers, onRefresh }) {
         conviteId: remove ? null : invite,
         versaoProposta: remove ? undefined : candidate?.proposalVersion,
         motivo: reason,
+        quantidadeConfirmada: quantityConfirmed,
       });
       saved = true;
       await onRefresh();
@@ -145,10 +185,29 @@ export function ProductChoice({ quote, product, offers, onRefresh }) {
           sem frete. Marca: {candidate.brand}.
         </p>
       )}
+      {candidate?.quantity > product.quantidade && (
+        <label className="purchase-check quantity-confirmation">
+          <input
+            type="checkbox"
+            checked={quantityConfirmed}
+            onChange={(e) => setQuantityConfirmed(e.target.checked)}
+          />
+          Confirmei com o fornecedor que o unitário de {money(candidate.price)}{" "}
+          vale para {product.quantidade} {product.unidade}, embora a proposta
+          seja para {candidate.quantity} {product.unidade}.
+        </label>
+      )}
       {error && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
       <div className="purchase-actions">
-        <button className="purchase-primary" disabled={busy || !candidate}>
+        <button
+          className="purchase-primary"
+          disabled={
+            busy ||
+            !candidate ||
+            (candidate.quantity > product.quantidade && !quantityConfirmed)
+          }
+        >
           {busy
             ? "Salvando…"
             : selected && !selected.valida

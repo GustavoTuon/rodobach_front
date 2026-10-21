@@ -60,3 +60,15 @@ it("sinaliza empate e não recomenda quantidade insuficiente", () => {
   );
   expect(bestProductOffers([{ ...row, quantity: 2 }], "p")).toHaveLength(0);
 });
+
+import { priceDifference, historyDate } from "./purchases-item-history.jsx";
+it("compara somente unidades conhecidas iguais e respeita a data brasileira", () => {
+  expect(
+    priceDifference(90, { valor_unitario: 100, unidade: "UN" }, "UN"),
+  ).toBeCloseTo(-10);
+  expect(
+    priceDifference(90, { valor_unitario: 100, unidade: "CX" }, "UN"),
+  ).toBeNull();
+  expect(priceDifference(90, { valor_unitario: 100 }, "UN")).toBeNull();
+  expect(historyDate({ criado_em: "2026-07-16T01:00:00Z" })).toBe("2026-07-15");
+});

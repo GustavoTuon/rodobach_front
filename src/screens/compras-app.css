@@ -1385,3 +1385,260 @@
     padding: 14px;
   }
 }
+
+/* Item-centered purchase analysis */
+.purchase-invitation-details {
+  margin: 20px 0;
+  padding: 16px;
+  border: 1px solid #d8e2eb;
+  border-radius: 14px;
+}
+.purchase-invitation-details > summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+.purchase-invitation-details[open] > summary {
+  margin-bottom: 20px;
+}
+.decision-progress {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 16px;
+  background: #edf4f9;
+  color: #16344c;
+  border-radius: 12px;
+  margin: 18px 0;
+}
+.item-history {
+  background: #f6f8fa;
+  border: 1px solid #dce4eb;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 20px 0;
+}
+.item-history h4 {
+  margin: 0 0 6px;
+}
+.item-history small {
+  display: block;
+  margin-top: 8px;
+  color: #536475;
+}
+.item-history-table {
+  min-width: 700px;
+}
+.decision-compare {
+  min-width: 1120px;
+  width: 100%;
+  border-collapse: collapse;
+}
+.decision-compare th,
+.decision-compare td {
+  padding: 14px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid #dae3eb;
+}
+.decision-compare th {
+  background: #edf3f8;
+  color: #24425a;
+  font-size: 12px;
+}
+.decision-compare td small {
+  display: block;
+  margin-top: 6px;
+  color: #536475;
+  line-height: 1.45;
+}
+.decision-compare td:first-child {
+  min-width: 190px;
+}
+.decision-compare .offer-lowest {
+  background: #f2faf6;
+}
+.decision-compare .offer-chosen {
+  background: #e9f2fc;
+}
+.decision-row-actions {
+  display: grid;
+  gap: 8px;
+  min-width: 140px;
+}
+.decision-row-actions button[aria-pressed="true"] {
+  background: #173b57;
+  color: white;
+}
+.quantity-confirmation {
+  padding: 14px;
+  background: #fff8e7;
+  color: #654600;
+  border-radius: 10px;
+  line-height: 1.5;
+}
+.purchase-decision .analysis-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.purchase-decision .analysis-controls .purchase-check {
+  flex-direction: row;
+  align-items: center;
+}
+.purchase-decision .decision-negotiation {
+  position: fixed;
+  z-index: 100;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(650px, calc(100vw - 32px));
+  max-height: 85vh;
+  overflow-y: auto;
+  background: white;
+  padding: 28px;
+  border-radius: 16px;
+  box-shadow: 0 0 0 100vmax #10243599;
+}
+@media (max-width: 700px) {
+  .purchase-decision {
+    padding: 12px;
+  }
+  .purchase-decision .decision-product {
+    padding: 12px;
+  }
+  .item-history {
+    padding: 10px;
+  }
+  .decision-progress {
+    display: grid;
+  }
+}
+
+.previous-suppliers {
+  margin: 14px 0;
+  padding: 14px;
+  border-radius: 10px;
+  background: #f2f6fa;
+}
+.previous-suppliers > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+.previous-suppliers small {
+  display: block;
+  color: #526476;
+  margin-top: 5px;
+}
+@media (max-width: 700px) {
+  .previous-suppliers > div {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .decision-compare,
+  .decision-compare tbody,
+  .decision-compare tr,
+  .decision-compare td {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+  .decision-compare thead {
+    display: none;
+  }
+  .decision-compare tr {
+    border: 1px solid #dce4eb;
+    border-radius: 12px;
+    margin: 12px 0;
+    padding: 10px;
+  }
+  .decision-compare td {
+    padding: 9px 4px;
+    overflow-wrap: anywhere;
+  }
+  .decision-compare td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #526476;
+    margin-bottom: 5px;
+  }
+  .decision-compare td:first-child {
+    min-width: 0;
+  }
+  .decision-row-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.purchase-negotiation-dialog {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  overflow: visible;
+}
+.purchase-negotiation-dialog::backdrop {
+  background: #10243599;
+}
+.purchase-decision .purchase-negotiation-dialog .decision-negotiation {
+  position: static;
+  transform: none;
+  box-shadow: none;
+  max-height: 80vh;
+}
+
+@media (max-width: 760px) {
+  .item-history-table,
+  .item-history-table tbody {
+    display: block;
+    min-width: 0;
+    width: 100%;
+  }
+  .item-history-table thead {
+    display: none;
+  }
+  .item-history-table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid #dce4eb;
+    padding: 10px 0;
+  }
+  .item-history-table td {
+    display: block;
+    padding: 8px !important;
+    overflow-wrap: anywhere;
+    min-width: 0;
+  }
+  .item-history-table td:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+  .item-history-table td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    color: #526476;
+    margin-bottom: 4px;
+  }
+}
+@media (max-width: 760px) {
+  .analysis-table-scroll .decision-compare,
+  .analysis-table-scroll .item-history-table {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+.decision-progress {
+  position: sticky;
+  top: 12px;
+  z-index: 3;
+  box-shadow: 0 3px 14px #18334a0c;
+}

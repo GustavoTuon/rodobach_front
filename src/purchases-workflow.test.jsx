@@ -60,6 +60,7 @@ test("percurso guiado valida, revisa e cria somente ao concluir", async () => {
   fireEvent.click(screen.getByText("Concluir e gerar links"));
   await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
   expect(save.mock.calls[0][0].itens[0].fornecedores).toEqual(["s"]);
+  expect(localStorage.getItem("rodobach:purchase-draft:local")).toBeNull();
 });
 const quote = {
   itens: [{ id: "p", nome: "Filtro", quantidade: 4, unidade: "UN" }],
@@ -121,4 +122,18 @@ test("histórico sem total não fabrica preço zero", () => {
   });
   expect(result[0].price).toBeNull();
   expect(result[0].freight).toBeNull();
+});
+
+test("recupera o rascunho da cotação ao voltar para o cadastro", () => {
+  const view = render(
+    <QuoteQuest suppliers={[]} onSave={vi.fn()} Catalog={() => null} />,
+  );
+  fireEvent.change(screen.getByLabelText("Título da cotação"), {
+    target: { value: "Compra em preparação" },
+  });
+  view.unmount();
+  render(<QuoteQuest suppliers={[]} onSave={vi.fn()} Catalog={() => null} />);
+  expect(screen.getByLabelText("Título da cotação").value).toBe(
+    "Compra em preparação",
+  );
 });

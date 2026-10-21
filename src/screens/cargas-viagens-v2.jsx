@@ -1,6 +1,6 @@
 import { sameCargaDocumento } from "../carga-documentos.js";
 import { QuoteHistoryGrid } from './quote-history-grid.jsx';
-const { useEffect, useState } = React;
+const { useEffect, useState, useRef } = React;
 
 const CV2_STATUS = {
   aguardando_viagem: { label: "Somente carga", tone: "neutral" },
@@ -21,6 +21,8 @@ const CV2_FINANCIAL = {
   cancelado: { label: "Cancelado", tone: "neutral" },
   indisponivel: { label: "Financeiro indisponível", tone: "neutral" },
 };
+
+const cv2IsTransportDocument = doc => ["CTE", "ORCAMENTO"].includes(String(doc.tipo || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().replace(/[^A-Z]/g, ""));
 
 const CV2_TODAY = () => new Date().toISOString().slice(0, 10);
 const cv2Money = (value) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -134,12 +136,15 @@ function Cv2Autocomplete({ label, hint, value, onChange, onSelect, search, place
   const [loading, setLoading] = useState(false);
   useEffect(() => {
     const q = String(value || "").trim();
-    if (!open || q.length < 2) { setItems([]); return; }
+    let active = true;
+    if (!open || q.length < 2) { setItems([]); setLoading(false); return; }
+    setItems([]); setLoading(true);
     const timer = setTimeout(() => {
-      setLoading(true);
-      search(q).then((result) => setItems(Array.isArray(result) ? result : [])).catch(() => setItems([])).finally(() => setLoading(false));
+      search(q).then((result) => { if (active) setItems(Array.isArray(result) ? result : []); })
+        .catch(() => { if (active) setItems([]); })
+        .finally(() => { if (active) setLoading(false); });
     }, 220);
-    return () => clearTimeout(timer);
+    return () => { active = false; clearTimeout(timer); };
   }, [value, open]);
   return (
     <Cv2Field label={label} hint={hint} required={required} className="cv2-autocomplete-field">
@@ -168,7 +173,7 @@ function Cv2Autocomplete({ label, hint, value, onChange, onSelect, search, place
   );
 }
 
-function Cv2CargaForm({ initial, user, onClose, onSaved }) {
+export function Cv2CargaForm({ initial, user, onClose, onSaved }) {
   const userCommercial = cv2CommercialForUser(user);
   const [form, setForm] = useState(() => initial
     ? { ...emptyCarga(), ...initial }
@@ -190,7 +195,7 @@ function Cv2CargaForm({ initial, user, onClose, onSaved }) {
     finally { setCalculating(false); }
   };
   const save = async (event) => {
-    event.preventDefault(); setError(""); setSaving(true);
+    event.preventDefault(); if (saving) return; setError(""); setSaving(true);
     try {
       const saved = initial?.id ? await window.RB_API.updateCargaV2(initial.id, form) : await window.RB_API.createCargaV2(form);
       onSaved(saved);
@@ -252,7 +257,7 @@ function Cv2CargaForm({ initial, user, onClose, onSaved }) {
             <input value={stop.cliente} onChange={(e) => editStop(index, "cliente", e.target.value)} placeholder="Cliente/local" />
             <input value={stop.endereco} onChange={(e) => editStop(index, "endereco", e.target.value)} placeholder="Endereço" />
             <input value={stop.nf} onChange={(e) => editStop(index, "nf", e.target.value)} placeholder="Nota fiscal" />
-            <button type="button" className="cv2-icon-btn" onClick={() => removeStop(index)}>×</button>
+            <button type="button" className="cv2-icon-btn" aria-label="Remover parada" onClick={() => removeStop(index)}>×</button>
           </div>)}
           <Cv2Field label="Observações"><textarea value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} rows="3" placeholder="Instruções comerciais ou detalhes da operação" /></Cv2Field>
         </div>
@@ -289,6 +294,7 @@ export function Cv2ViagemForm({ initial, initialCargaId, cargas, onClose, onSave
   const toggleCarga = (id) => set("cargaIds", form.cargaIds.includes(id) ? form.cargaIds.filter((item) => item !== id) : [...form.cargaIds, id]);
   const save = async (event) => {
     event.preventDefault();
+    if (saving) return;
     if (!initial?.id && !form.reservaNumero) return;
     setError(""); setSaving(true);
     try { onSaved(initial?.id ? await window.RB_API.updateViagemV2(initial.id, form) : await window.RB_API.createViagemV2(form)); }
@@ -346,20 +352,29 @@ export function Cv2ViagemForm({ initial, initialCargaId, cargas, onClose, onSave
 export function Cv2CteModal({ carga, onClose, onSaved }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
+  const [searched, setSearched] = useState(false);
+  const searchVersion = useRef(0);
+  useEffect(() => () => { searchVersion.current += 1; }, []);
   const [documents, setDocuments] = useState(carga.documentos || []);
   const removedDocuments = (carga.documentos || []).filter(doc => !documents.includes(doc));
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const search = async () => {
-    setLoading(true); setError("");
-    try { setResults(await window.RB_API.searchViagemDocumentos(query)); }
-    catch (err) { setError(cv2Error(err)); }
-    finally { setLoading(false); }
+    if (loading || saving) return;
+    if (!query.trim() || !/\d/.test(query)) { setError("Informe o número ou a chave do documento."); return; }
+    const version = ++searchVersion.current;
+    setLoading(true); setError(""); setResults([]); setSearched(false);
+    try {
+      const items = await window.RB_API.searchViagemDocumentos(query.trim());
+      if (version === searchVersion.current) { setResults(items); setSearched(true); }
+    } catch (err) { if (version === searchVersion.current) setError(cv2Error(err)); }
+    finally { if (version === searchVersion.current) setLoading(false); }
   };
   const select = (item) => {
-    const next = [{ tipo: "CT-e", numero: item.numero, chave: item.chave, empresa: item.empresa, serie: item.serie, observacoes: item.observacoes }];
-    (item.notasDocumentos || []).forEach((nota) => next.push({ tipo: "NF-e", numero: String(nota.numero || ""), chave: nota.chave || "", observacoes: `Vinculada ao CT-e ${item.numero}` }));
+    if (saving || loading) return;
+    const next = [{ tipo: item.tipo || "CT-e", numero: item.numero, chave: item.chave, empresa: item.empresa, serie: item.serie, observacoes: item.observacoes }];
+    (item.notasDocumentos || []).forEach((nota) => next.push({ tipo: "NF-e", numero: String(nota.numero || ""), chave: nota.chave || "", observacoes: `Vinculada ao ${item.tipo || "CT-e"} ${item.numero}` }));
     setDocuments(current => {
       const merged = [...current];
       for (const doc of next) {
@@ -368,38 +383,41 @@ export function Cv2CteModal({ carga, onClose, onSaved }) {
       }
       return merged;
     });
-    setResults([]); setQuery("");
+    setResults([]); setQuery(""); setSearched(false);
   };
   const save = async () => {
+    if (saving || loading) return;
     setSaving(true); setError("");
     try { onSaved(await window.RB_API.saveCargaDocumentosV2(carga.id, documents)); }
     catch (err) { setError(cv2Error(err)); }
     finally { setSaving(false); }
   };
-  return <Cv2Modal title={`Gerenciar CT-es · ${carga.codigo}`} subtitle={`${carga.cliente} · ${carga.origem}/${carga.ufOrigem} → ${carga.destino}/${carga.ufDestino}`} onClose={onClose}>
+  return <Cv2Modal title={`Gerenciar CT-es · ${carga.codigo}`} subtitle={`${carga.cliente} · ${carga.origem}/${carga.ufOrigem} → ${carga.destino}/${carga.ufDestino}`} onClose={() => { if (!saving) onClose(); }}>
     <div className="cv2-modal-body">
       {error && <div className="cv2-alert error">{error}</div>}
-      <Cv2Field label="Número do CT-e no ERP" hint="Pesquise e adicione quantos CT-es precisar. Os documentos já vinculados serão mantidos, e as NF-es serão incluídas automaticamente.">
-        <div className="cv2-search-row"><input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); search(); } }} placeholder="Ex.: 4030" /><button type="button" className="btn" onClick={search} disabled={loading}>{loading ? "Buscando..." : "Pesquisar"}</button></div>
+      <Cv2Field label="Número ou chave do CT-e / orçamento no ERP" hint="Pesquise CT-es ou orçamentos e confira o tipo, a série, a empresa e a placa antes de vincular. Os documentos já vinculados serão mantidos, e as NF-es serão incluídas automaticamente.">
+        <div className="cv2-search-row"><input value={query} disabled={saving} onChange={(e) => { searchVersion.current += 1; setLoading(false); setQuery(e.target.value); setResults([]); setSearched(false); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); search(); } }} placeholder="Ex.: 4030" /><button type="button" className="btn" onClick={search} disabled={loading || saving}>{loading ? "Buscando..." : "Pesquisar"}</button></div>
       </Cv2Field>
-      {results.map((item) => <button type="button" className="cv2-cte-result" key={`${item.empresa}-${item.serie}-${item.numero}`} onClick={() => select(item)}>
-        <div><strong>CT-e {item.numero}{item.serie ? ` · Série ${item.serie}` : ""}{item.empresa ? ` · Empresa ${item.empresa}` : ""}</strong><span>{item.cliente}</span></div><div><span>{item.placa || "Sem placa"}</span><b>{(item.notas || []).length} NF-e</b></div>
+      {searched && !loading && !results.length && <div role="status" className="cv2-alert info">Nenhum documento ativo encontrado. Confira o número ou a chave no ERP.</div>}
+      {results.map((item) => <button type="button" className="cv2-cte-result" disabled={saving || loading} key={`${item.empresa}-${item.serie}-${item.numero}`} onClick={() => select(item)}>
+        <div><strong>{item.tipo || "CT-e"} {item.numero}{item.serie ? ` · Série ${item.serie}` : ""}{item.empresa ? ` · Empresa ${item.empresa}` : ""}</strong><span>{item.cliente}{item.emissao ? ` · Emissão ${cv2Date(item.emissao)}` : ""}</span></div><div><span>{item.placa || "Sem placa"}</span><b>{(item.notas || []).length} NF-e</b></div>
       </button>)}
-      <div className="cv2-doc-list"><b>Documentos da carga · {documents.filter(doc => String(doc.tipo).toUpperCase().replace(/[^A-Z]/g, "") === "CTE").length} CT-e(s)</b>
+      <div className="cv2-doc-list"><b>Documentos da carga · {documents.filter(cv2IsTransportDocument).length} CT-e(s) / orçamento(s)</b>
         {!documents.length && <span>Nenhum documento selecionado.</span>}
         {documents.map((doc, index) => <div key={`${doc.tipo}-${doc.numero}-${index}`}><span className="cv2-doc-type">{doc.tipo}</span><strong>{doc.numero || "Sem número"}{doc.serie ? ` · Série ${doc.serie}` : ""}{doc.empresa ? ` · Empresa ${doc.empresa}` : ""}</strong><small>{doc.chave ? `Chave ${doc.chave}` : doc.observacoes}</small><button type="button" disabled={saving} aria-label={`Desvincular ${doc.tipo} ${doc.numero}${doc.serie ? ` série ${doc.serie}` : ""}${doc.empresa ? ` empresa ${doc.empresa}` : ""}`} onClick={() => setDocuments(current => current.filter((_, i) => i !== index))}>Desvincular</button></div>)}
       </div>
       {!!removedDocuments.length && <div className="cv2-alert info" role="status"><b>Vínculos que serão removidos ao salvar:</b> {removedDocuments.map(doc => `${doc.tipo} ${doc.numero || "sem número"}`).join(', ')}.<p>A carga e a viagem serão mantidas. Os documentos e títulos no ERP não serão alterados. As NF-es permanecem vinculadas até que você as remova individualmente.</p><button type="button" className="btn" disabled={saving} onClick={() => setDocuments(current => [...current, ...removedDocuments])}>Desfazer remoções</button></div>}
     </div>
-    <footer className="cv2-modal-actions"><button type="button" className="btn" onClick={onClose}>Cancelar</button><button type="button" className="btn primary" onClick={save} disabled={saving || (!documents.length && !removedDocuments.length)}>{saving ? "Salvando..." : removedDocuments.length ? "Salvar alterações" : "Vincular documentos"}</button></footer>
+    <footer className="cv2-modal-actions"><button type="button" className="btn" disabled={saving} onClick={onClose}>Cancelar</button><button type="button" className="btn primary" onClick={save} disabled={saving || loading || (!documents.length && !removedDocuments.length)}>{saving ? "Salvando..." : removedDocuments.length ? "Salvar alterações" : "Vincular documentos"}</button></footer>
   </Cv2Modal>;
 }
 
-function Cv2DeleteModal({ type, item, onClose, onDeleted }) {
+export function Cv2DeleteModal({ type, item, onClose, onDeleted }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const isTrip = type === "viagem";
   const remove = async () => {
+    if (saving) return;
     setSaving(true); setError("");
     try {
       if (isTrip) await window.RB_API.deleteViagemV2(item.id);
@@ -427,8 +445,8 @@ const cv2Escape = (value) => String(value ?? "—").replace(/[&<>"']/g, (char) =
 const cv2Route = (item) => `${[item.origem, item.ufOrigem].filter(Boolean).join("/") || "—"} → ${[item.destino, item.ufDestino].filter(Boolean).join("/") || "—"}`;
 const cv2PrintCell = (label, value) => `<div class="cell"><span>${cv2Escape(label)}</span><b>${cv2Escape(value || "—")}</b></div>`;
 const cv2CteNumbers = (carga) => (carga.documentos || [])
-  .filter((doc) => String(doc.tipo || "").toUpperCase().includes("CT"))
-  .map((doc) => String(doc.numero || "").trim())
+  .filter(cv2IsTransportDocument)
+  .map((doc) => `${doc.tipo === "Orçamento" ? "Orç. " : ""}${String(doc.numero || "").trim()}`)
   .filter(Boolean)
   .join(", ");
 
@@ -483,19 +501,19 @@ function cv2PrintTrip(viagem) {
   });
 }
 
-function Cv2TripDetails({ viagem, onClose, onLinkCte }) {
+export function Cv2TripDetails({ viagem, onClose, onLinkCte }) {
   return <Cv2Modal title={`Viagem ${viagem.numero}`} subtitle={`${cv2Date(viagem.data)} · ${viagem.placa || "Sem placa"}`} onClose={onClose} wide>
     <div className="cv2-modal-body">
       <div className="cv2-detail-grid"><div><span>Operação</span><Cv2Status value={viagem.situacao} vehicleLinked={Boolean(viagem.placa)} /></div><div><span>Financeiro</span><Cv2FinancialStatus value={viagem.financeiro} /></div><div><span>Motorista</span><b>{viagem.motorista || "—"}</b></div><div><span>KM previsto</span><b>{viagem.km ?? "—"}</b></div><div><span>ANTT / RNTRC</span><b>{viagem.antt || "—"}</b></div><div><span>Celular / CNH</span><b>{[viagem.numeroMotorista, viagem.cnh].filter(Boolean).join(" · ") || "—"}</b></div></div>
       <Cv2TripBilling financeiro={viagem.financeiro} />
       <h3 className="cv2-subtitle">Cargas vinculadas</h3>
-      <div className="cv2-linked-loads">{viagem.cargas.map((carga) => { const hasCte = (carga.documentos || []).some((doc) => String(doc.tipo || "").toUpperCase().includes("CT")); return <div key={carga.id}><div><strong>{carga.codigo} · {carga.cliente}</strong><span>{carga.origem}/{carga.ufOrigem} → {carga.destino}/{carga.ufDestino}</span><small>CT-es: {cv2CteNumbers(carga) || "Nenhum vinculado"}</small></div><div className="cv2-linked-statuses"><Cv2Status value={carga.status} /><Cv2FinancialStatus value={carga.financeiro} /><button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => onLinkCte(carga)}><Icon name="file" size={13} /> {hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button><button className="btn" onClick={() => cv2PrintLoad(carga)}>Imprimir carga</button></div></div>; })}</div>
+      <div className="cv2-linked-loads">{viagem.cargas.map((carga) => { const hasCte = (carga.documentos || []).some(cv2IsTransportDocument); return <div key={carga.id}><div><strong>{carga.codigo} · {carga.cliente}</strong><span>{carga.origem}/{carga.ufOrigem} → {carga.destino}/{carga.ufDestino}</span><small>CT-es: {cv2CteNumbers(carga) || "Nenhum vinculado"}</small></div><div className="cv2-linked-statuses"><Cv2Status value={carga.status} /><Cv2FinancialStatus value={carga.financeiro} /><button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => onLinkCte(carga)}><Icon name="file" size={13} /> {hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button><button className="btn" onClick={() => cv2PrintLoad(carga)}>Imprimir carga</button></div></div>; })}</div>
     </div>
     <footer className="cv2-modal-actions"><button className="btn" onClick={onClose}>Fechar</button><button className="btn primary" onClick={() => cv2PrintTrip(viagem)}>Imprimir folha da viagem</button></footer>
   </Cv2Modal>;
 }
 
-function Cv2Pagination({ page, pageSize, total, totalPages, onPage, onPageSize }) {
+export function Cv2Pagination({ page, pageSize, total, totalPages, onPage, onPageSize }) {
   if (!total) return null;
   const first = (page - 1) * pageSize + 1;
   const last = Math.min(page * pageSize, total);
@@ -528,12 +546,12 @@ const Cv2Styles = () => <style>{`
   .cv2-table-wrap{border:1px solid var(--border);border-radius:11px;overflow:auto;background:var(--surface)}.cv2-table{width:100%;border-collapse:collapse;min-width:1360px;table-layout:auto}.cv2-table th{position:sticky;top:0;z-index:2;background:var(--surface);color:var(--muted);font-size:10.5px;font-weight:600;letter-spacing:.02em;text-align:left;padding:13px 14px;border-bottom:1px solid var(--border);white-space:nowrap}.cv2-table td{padding:13px 14px;border-bottom:1px solid var(--border);font-size:12px;line-height:1.35;vertical-align:middle}.cv2-table tr:last-child td{border:0}.cv2-table tr:hover td{background:var(--hover)}.cv2-table strong{display:block;color:var(--text);overflow-wrap:anywhere}.cv2-table small{display:block;color:var(--muted);margin-top:4px;line-height:1.35}.cv2-route{max-width:260px}.cv2-route span{color:var(--muted)}.cv2-client-cell{min-width:210px}.cv2-client-line{display:flex!important;gap:5px;align-items:baseline;margin-top:4px!important}.cv2-client-line b{color:var(--muted);font-size:9px;letter-spacing:.04em;text-transform:uppercase;min-width:48px}.cv2-client-line span{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:190px}.cv2-plate{display:inline-block!important;border:1px solid #35445d;border-radius:5px;padding:4px 7px;background:#171b22;color:#fff!important;letter-spacing:.7px}.cv2-row-actions{display:flex;justify-content:flex-end;align-items:center;gap:6px;min-width:max-content}.cv2-row-actions .btn{padding:7px 10px;white-space:nowrap}.cv2-row-actions .cv2-icon-btn{width:32px;height:32px;font-size:16px;color:var(--crit)}
   .cv2-status-stack{display:flex;flex-direction:column;align-items:flex-start;min-width:max-content}.cv2-status-stack>.cv2-status+.cv2-status{margin-top:5px}.cv2-status-stack>small{margin:5px 0 0 2px;font-size:9.5px}.cv2-status{display:inline-flex!important;align-items:center;gap:6px;border:1px solid var(--border);border-radius:14px;padding:5px 8px;font-size:11px;white-space:nowrap}.cv2-status i{width:6px;height:6px;border-radius:50%;background:var(--neutral-text)}.cv2-status.linked{color:#a78bfa;border-color:rgba(167,139,250,.35);background:rgba(139,92,246,.10)}.cv2-status.linked i{background:#a78bfa}.cv2-status.warning,.cv2-status.open{color:var(--warn);border-color:var(--warn-border);background:var(--warn-bg)}.cv2-status.warning i,.cv2-status.open i{background:var(--warn)}.cv2-status.info,.cv2-status.blue{color:var(--info);border-color:var(--info-border);background:var(--info-bg)}.cv2-status.info i,.cv2-status.blue i{background:var(--info)}.cv2-status.delivered{color:#2dd4bf;border-color:rgba(45,212,191,.35);background:rgba(20,184,166,.10)}.cv2-status.delivered i{background:#2dd4bf}.cv2-status.paid{color:var(--ok);border-color:var(--ok-border);background:var(--ok-bg)}.cv2-status.paid i{background:var(--ok)}.cv2-status.partial{color:#c084fc;border-color:rgba(192,132,252,.35);background:rgba(168,85,247,.10)}.cv2-status.partial i{background:#c084fc}.cv2-status.danger{color:var(--crit);border-color:var(--crit-border);background:var(--crit-bg)}.cv2-status.danger i{background:var(--crit)}
   .cv2-empty{padding:60px 20px;text-align:center;color:var(--muted)}.cv2-empty b,.cv2-empty span{display:block}.cv2-empty span{margin-top:7px}.cv2-empty.small{padding:28px}.cv2-note{font-size:12px;color:var(--muted);margin-top:10px}.cv2-pagination{display:flex;align-items:center;gap:18px;padding:16px 2px;color:var(--muted);font-size:11.5px}.cv2-page-summary{margin-right:auto}.cv2-page-summary b{color:var(--text)}.cv2-pagination>label{display:flex;align-items:center;gap:8px;white-space:nowrap}.cv2-pagination select{width:auto;padding:7px 28px 7px 9px}.cv2-pagination nav{display:flex;align-items:center;gap:4px}.cv2-pagination nav button{min-width:32px;height:32px;padding:0 8px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--muted);cursor:pointer}.cv2-pagination nav button:hover:not(:disabled){border-color:#5270ae;color:var(--text)}.cv2-pagination nav button.active{background:#1a2d5a;border-color:#4164ad;color:#fff}.cv2-pagination nav button:disabled{opacity:.35;cursor:not-allowed}.cv2-pagination nav span{padding:0 3px}
-  .cv2-overlay{position:fixed;inset:0;background:rgba(9,9,11,.58);z-index:1000;display:grid;place-items:center;padding:24px;backdrop-filter:blur(2px)}.cv2-modal{width:min(680px,calc(100vw - 48px));max-height:94vh;background:var(--surface);color:var(--text);border:1px solid var(--border-strong);border-radius:13px;box-shadow:var(--shadow-lg);overflow:hidden;display:flex;flex-direction:column}.cv2-modal.wide{width:min(1120px,calc(100vw - 48px))}.cv2-modal>header{display:flex;justify-content:space-between;gap:15px;padding:20px 22px;background:var(--surface);border-bottom:1px solid var(--border)}.cv2-modal h2{color:var(--text);font-size:18px;line-height:1.3;margin:0}.cv2-modal header p{font-size:12px;line-height:1.5;color:var(--muted);margin:5px 0 0}.cv2-icon-btn{width:34px;height:34px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--muted);font-size:20px;cursor:pointer}.cv2-icon-btn:hover{background:var(--hover);color:var(--text)}.cv2-modal form{display:flex;flex-direction:column;min-height:0}.cv2-modal-body{padding:22px;background:var(--surface);overflow-y:auto;overflow-x:hidden}.cv2-modal-actions{border-top:1px solid var(--border);padding:14px 22px;display:flex;align-items:center;justify-content:flex-end;gap:9px;background:var(--surface-2)}.cv2-modal-actions>span{margin-right:auto;color:var(--muted);font-size:12px}.cv2-modal-actions>div{display:flex;gap:8px}
+  .cv2-overlay{position:fixed;inset:0;background:rgba(9,9,11,.58);z-index:1300;display:grid;place-items:center;padding:24px;backdrop-filter:blur(2px)}.cv2-modal{width:min(680px,calc(100vw - 48px));max-height:94vh;background:var(--surface);color:var(--text);border:1px solid var(--border-strong);border-radius:13px;box-shadow:var(--shadow-lg);overflow:hidden;display:flex;flex-direction:column}.cv2-modal.wide{width:min(1120px,calc(100vw - 48px))}.cv2-modal>header{display:flex;justify-content:space-between;gap:15px;padding:20px 22px;background:var(--surface);border-bottom:1px solid var(--border)}.cv2-modal h2{color:var(--text);font-size:18px;line-height:1.3;margin:0}.cv2-modal header p{font-size:12px;line-height:1.5;color:var(--muted);margin:5px 0 0}.cv2-icon-btn{width:34px;height:34px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--muted);font-size:20px;cursor:pointer}.cv2-icon-btn:hover{background:var(--hover);color:var(--text)}.cv2-modal form{display:flex;flex-direction:column;min-height:0}.cv2-modal-body{padding:22px;background:var(--surface);overflow-y:auto;overflow-x:hidden}.cv2-modal-actions{flex-shrink:0;flex-wrap:wrap;border-top:1px solid var(--border);padding:14px 22px;display:flex;align-items:center;justify-content:flex-end;gap:9px;background:var(--surface-2)}.cv2-modal-actions>span{margin-right:auto;color:var(--muted);font-size:12px}.cv2-modal-actions>div{display:flex;gap:8px}
   .cv2-section-title{display:flex;align-items:center;gap:10px;margin:4px 0 14px}.cv2-section-title:not(:first-of-type){margin-top:25px}.cv2-section-title b,.cv2-section-title small{display:block}.cv2-section-title small{font-size:11px;color:var(--muted);margin-top:3px}.cv2-grid{display:grid;gap:13px}.cv2-grid.four{grid-template-columns:repeat(4,1fr)}.cv2-grid.three{grid-template-columns:repeat(3,1fr)}.cv2-field{display:block;min-width:0}.cv2-field>span{display:block;color:var(--muted);font-size:11px;margin:0 0 6px}.cv2-field>span b{color:#ff8d8d}.cv2-field small{display:block;color:var(--muted);font-size:10.5px;margin-top:5px}.cv2 input,.cv2 select,.cv2 textarea{width:100%;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:7px;padding:10px 11px;outline:none;font:inherit;font-size:12.5px}.cv2 input:focus,.cv2 select:focus,.cv2 textarea:focus{border-color:#729ce9;box-shadow:0 0 0 2px rgba(81,127,215,.16)}.cv2 textarea{resize:vertical}
   .cv2-autocomplete{position:relative}.cv2-suggestions{position:absolute;z-index:20;left:0;top:calc(100% + 5px);width:100%;min-width:min(360px,calc(100vw - 70px));max-height:245px;overflow:auto;background:var(--surface);border:1px solid var(--border-strong);border-radius:9px;padding:5px;box-shadow:var(--shadow-lg)}.cv2-suggestions button{display:flex;flex-direction:column;align-items:flex-start;width:100%;border:0;background:transparent;color:var(--text);border-radius:6px;padding:10px;text-align:left;cursor:pointer}.cv2-suggestions button:hover{background:var(--hover)}.cv2-suggestions strong{font-size:12.5px}.cv2-suggestions span{font-size:10.5px;color:var(--accent);margin-top:4px}.cv2-suggestion-empty{padding:12px;color:var(--muted);font-size:12px}.cv2-vehicle-option{display:grid!important;grid-template-columns:minmax(76px,auto) auto 1fr;align-items:center;gap:10px;width:100%}.cv2-vehicle-option strong{white-space:nowrap}.cv2-vehicle-option span{margin:0!important;color:var(--accent)!important;font-weight:600}.cv2-vehicle-option em{font-style:normal;color:var(--text-2);white-space:normal;overflow-wrap:anywhere}
   .cv2-alert{border:1px solid var(--info-border);background:var(--info-bg);color:var(--info);border-radius:8px;padding:11px 13px;font-size:12px;margin:14px 0}.cv2-alert.success{color:var(--ok);border-color:var(--ok-border);background:var(--ok-bg)}.cv2-alert.error{color:var(--crit);border-color:var(--crit-border);background:var(--crit-bg)}.cv2-stops-head{display:flex;justify-content:space-between;align-items:center;margin-top:22px}.cv2-stops-head b,.cv2-stops-head small{display:block}.cv2-stops-head small{color:var(--muted);font-size:11px;margin-top:3px}.cv2-stop{display:grid;grid-template-columns:110px 1fr 62px 1.2fr 1.4fr 1fr 34px;gap:7px;margin-top:9px}.cv2-stop .cv2-icon-btn{height:auto}.cv2-details{margin:16px 0;border:1px solid var(--border);border-radius:8px;padding:12px}.cv2-details summary{cursor:pointer;font-size:12px}.cv2-checks{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:13px}.cv2-checks label{font-size:11px;color:var(--muted);display:flex;gap:7px;align-items:center}.cv2-checks input{width:auto}
   .cv2-price-box{border:1px solid var(--accent-border);background:var(--accent-soft);border-radius:10px;padding:0 14px 14px;margin-top:18px}.cv2-price-box .cv2-stops-head{margin-top:14px}.cv2-price-inputs{margin-top:13px}.cv2-price-results{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:13px}.cv2-price-results>div{border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:11px}.cv2-price-results span,.cv2-price-results b,.cv2-price-results small{display:block}.cv2-price-results span,.cv2-price-results small{font-size:10px;color:var(--muted)}.cv2-price-results b{margin:6px 0;font-size:14px}.cv2-price-results .negative b{color:var(--crit)}.cv2-price-results .positive b{color:var(--ok)}
-  .cv2-load-picker{border:1px solid var(--border);background:var(--surface);border-radius:9px;max-height:260px;overflow:auto;padding:7px}.cv2-load-picker>label{display:grid;grid-template-columns:20px 1fr auto;gap:10px;align-items:center;padding:11px;border-radius:7px;cursor:pointer}.cv2-load-picker>label:hover,.cv2-load-picker>label.selected{background:var(--accent-soft)}.cv2-load-picker input{width:auto;accent-color:var(--accent)}.cv2-load-picker strong,.cv2-load-picker span{display:block}.cv2-load-picker span{color:var(--muted);font-size:11px;margin-top:4px}.cv2-load-picker em{font-size:11px;color:var(--muted);font-style:normal}.cv2-search-row{display:flex;gap:8px}.cv2-search-row .btn{white-space:nowrap}.cv2-cte-result{width:100%;display:flex;justify-content:space-between;text-align:left;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;padding:12px;margin-top:8px;cursor:pointer}.cv2-cte-result:hover{border-color:var(--accent-border);background:var(--hover)}.cv2-cte-result strong,.cv2-cte-result span{display:block}.cv2-cte-result span{color:var(--muted);font-size:11px;margin-top:4px}.cv2-doc-list{margin-top:22px}.cv2-doc-list>b,.cv2-doc-list>span{display:block;margin-bottom:10px}.cv2-doc-list>span{color:var(--muted);font-size:12px}.cv2-doc-list>div{display:grid;grid-template-columns:55px 100px 1fr 28px;gap:9px;align-items:center;border-top:1px solid var(--border);padding:10px 0}.cv2-doc-list small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}.cv2-doc-list button{border:0;background:none;color:var(--muted);cursor:pointer}.cv2-doc-type{font-size:10px;color:var(--accent)}.cv2-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.cv2-detail-grid>div{border:1px solid var(--border);background:var(--surface-2);border-radius:8px;padding:12px}.cv2-detail-grid>div>span{display:block;color:var(--muted);font-size:10px;margin-bottom:7px}.cv2-subtitle{font-size:14px;margin:22px 0 10px}.cv2-linked-loads{border:1px solid var(--border);border-radius:8px}.cv2-linked-loads>div{padding:12px;display:flex;justify-content:space-between;align-items:center;gap:18px;border-bottom:1px solid var(--border)}.cv2-linked-loads>div:last-child{border:0}.cv2-linked-loads strong,.cv2-linked-loads span{display:block}.cv2-linked-loads span{color:var(--muted);font-size:11px;margin-top:4px}.cv2-linked-statuses{display:flex;align-items:flex-start;gap:9px}
+  .cv2-load-picker{border:1px solid var(--border);background:var(--surface);border-radius:9px;max-height:260px;overflow:auto;padding:7px}.cv2-load-picker>label{display:grid;grid-template-columns:20px 1fr auto;gap:10px;align-items:center;padding:11px;border-radius:7px;cursor:pointer}.cv2-load-picker>label:hover,.cv2-load-picker>label.selected{background:var(--accent-soft)}.cv2-load-picker input{width:auto;accent-color:var(--accent)}.cv2-load-picker strong,.cv2-load-picker span{display:block}.cv2-load-picker span{color:var(--muted);font-size:11px;margin-top:4px}.cv2-load-picker em{font-size:11px;color:var(--muted);font-style:normal}.cv2-search-row{display:flex;gap:8px}.cv2-search-row .btn{white-space:nowrap}.cv2-cte-result{width:100%;display:flex;justify-content:space-between;text-align:left;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;padding:12px;margin-top:8px;cursor:pointer}.cv2-cte-result:hover{border-color:var(--accent-border);background:var(--hover)}.cv2-cte-result strong,.cv2-cte-result span{display:block}.cv2-cte-result span{color:var(--muted);font-size:11px;margin-top:4px}.cv2-doc-list{margin-top:22px}.cv2-doc-list>b,.cv2-doc-list>span{display:block;margin-bottom:10px}.cv2-doc-list>span{color:var(--muted);font-size:12px}.cv2-doc-list>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center;border-top:1px solid var(--border);padding:12px 0}.cv2-doc-list>div>span{grid-column:1;grid-row:1}.cv2-doc-list>div>strong{grid-column:1;grid-row:2;min-width:0;overflow-wrap:anywhere}.cv2-doc-list>div>small{grid-column:1;grid-row:3;min-width:0}.cv2-doc-list>div>button{grid-column:2;grid-row:1 / span 3;white-space:nowrap;min-width:96px;padding:9px 12px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--crit)}.cv2-doc-list>div>button:hover:not(:disabled){background:var(--hover);border-color:var(--crit)}.cv2-doc-list>div>button:disabled{opacity:.5;cursor:not-allowed}.cv2-doc-list small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}.cv2-doc-list button{cursor:pointer}.cv2-doc-type{font-size:10px;color:var(--accent)}.cv2-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.cv2-detail-grid>div{border:1px solid var(--border);background:var(--surface-2);border-radius:8px;padding:12px}.cv2-detail-grid>div>span{display:block;color:var(--muted);font-size:10px;margin-bottom:7px}.cv2-subtitle{font-size:14px;margin:22px 0 10px}.cv2-linked-loads{border:1px solid var(--border);border-radius:8px}.cv2-linked-loads>div{padding:12px;display:flex;justify-content:space-between;align-items:center;gap:18px;border-bottom:1px solid var(--border)}.cv2-linked-loads>div:last-child{border:0}.cv2-linked-loads strong,.cv2-linked-loads span{display:block}.cv2-linked-loads span{color:var(--muted);font-size:11px;margin-top:4px}.cv2-linked-statuses{display:flex;align-items:flex-start;gap:9px}
   .cv2-delete-message{padding:5px 2px}.cv2-delete-message b{font-size:15px}.cv2-delete-message p{color:var(--muted);line-height:1.6;margin:8px 0 0}
   .cv2-billing{margin-top:18px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);overflow:hidden}.cv2-billing-head{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:14px 16px;border-bottom:1px solid var(--border)}.cv2-billing-head h3{margin:0;font-size:14px}.cv2-billing-head p{margin:4px 0 0;color:var(--muted);font-size:10.5px}.cv2-billing-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border)}.cv2-billing-summary>div{padding:12px 14px;background:var(--surface)}.cv2-billing-summary span,.cv2-billing-summary b{display:block}.cv2-billing-summary span{color:var(--muted);font-size:10px}.cv2-billing-summary b{margin-top:6px;font-size:14px}.cv2-billing-summary b.received{color:var(--ok)}.cv2-billing-summary b.open{color:var(--warn)}.cv2-progress{height:4px;margin-top:7px;border-radius:4px;background:var(--neutral-bg);overflow:hidden}.cv2-progress i{display:block;height:100%;border-radius:inherit;background:var(--ok)}.cv2-billing-empty{padding:20px 16px}.cv2-billing-empty b,.cv2-billing-empty span{display:block}.cv2-billing-empty span{margin-top:5px;color:var(--muted);font-size:11px}.cv2-installments{overflow:auto}.cv2-installments table{width:100%;min-width:790px;border-collapse:collapse}.cv2-installments th{padding:10px 12px;color:var(--muted);font-size:9.5px;text-align:left;text-transform:uppercase;letter-spacing:.04em;background:var(--surface)}.cv2-installments td{padding:11px 12px;border-top:1px solid var(--border);font-size:11px;white-space:nowrap}.cv2-installments td strong,.cv2-installments td small{display:block}.cv2-installments td small{margin-top:3px;color:var(--muted);font-size:9.5px}.cv2-installments .cv2-status{font-size:10px;padding:4px 7px}
   .cv2-quote-filters{display:grid;grid-template-columns:90px minmax(170px,1fr) 90px minmax(170px,1fr);gap:12px;align-items:start;padding:13px;border:1px solid var(--border);border-radius:9px;background:var(--surface-2)}.cv2-quote-loading{margin-top:10px;padding:8px 11px;border-radius:7px;background:var(--accent-soft);color:var(--accent);font-size:11px}.cv2-quote-sheet{margin-top:14px;border:1px solid var(--border);border-radius:9px;overflow:hidden}.cv2-quote-sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 11px;background:var(--surface-2);border-bottom:1px solid var(--border)}.cv2-quote-sheet-head>div{display:flex;align-items:center;gap:12px}.cv2-quote-sheet-head b{font-size:12px}.cv2-quote-sheet-head span,.cv2-quote-sheet-head small{color:var(--muted);font-size:10.5px}.cv2-quote-view-actions .btn{padding:6px 9px;font-size:10.5px}.cv2-quote-view-actions details{position:relative}.cv2-quote-view-actions summary{padding:6px 9px;border:1px solid var(--border);border-radius:7px;background:var(--surface);font-size:10.5px;cursor:pointer;list-style:none}.cv2-quote-view-actions details>div{position:absolute;z-index:10;right:0;top:calc(100% + 5px);width:210px;padding:8px;border:1px solid var(--border-strong);border-radius:8px;background:var(--surface);box-shadow:var(--shadow-lg)}.cv2-quote-view-actions details label{display:flex;align-items:center;gap:8px;padding:6px;border-radius:5px;font-size:10.5px;cursor:pointer}.cv2-quote-view-actions details label:hover{background:var(--hover)}.cv2-quote-view-actions details input{width:auto}.cv2-quote-view-actions details button{width:100%;margin-top:5px;padding:7px;border:0;border-top:1px solid var(--border);background:none;color:var(--accent);font-size:10.5px;cursor:pointer}.cv2-quote-history{max-height:430px;overflow:auto}.cv2-quote-history table{width:max-content;min-width:100%;border-collapse:collapse}.cv2-quote-history th{position:sticky;top:0;z-index:2;padding:0;background:var(--surface-2);border-bottom:1px solid var(--border);text-align:left}.cv2-quote-history th[draggable=true]{cursor:grab}.cv2-quote-history th.dragging{opacity:.45}.cv2-quote-history th button{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;padding:9px 10px;border:0;background:transparent;color:var(--muted);font:inherit;font-size:9px;font-weight:700;text-align:left;text-transform:uppercase;cursor:pointer;white-space:nowrap}.cv2-quote-history th button:hover{color:var(--accent);background:var(--hover)}.cv2-quote-history th button span{font-size:8px}.cv2-quote-history td{max-width:250px;padding:8px 10px;border-top:1px solid var(--border);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cv2-quote-history.comfortable th button{padding:12px 14px}.cv2-quote-history.comfortable td{padding:12px 14px;font-size:11px}.cv2-quote-history tbody tr:hover td{background:var(--hover)}.cv2-quote-history td strong{display:block}
@@ -564,7 +582,9 @@ const CargasViagensV2 = ({ user }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [modal, setModal] = useState(null);
+  const loadVersion = useRef(0);
   const load = async (refreshMeta = false) => {
+    const version = ++loadVersion.current;
     setLoading(true); setError("");
     try {
       const request = tab === "cargas"
@@ -575,21 +595,20 @@ const CargasViagensV2 = ({ user }) => {
         refreshMeta || !Object.keys(summary).length ? window.RB_API.getCargasViagensV2Resumo() : Promise.resolve(summary),
         refreshMeta || !filterOptions.empresas.length ? window.RB_API.getCargasViagensV2Filtros() : Promise.resolve(filterOptions),
       ]);
+      if (version !== loadVersion.current) return;
       const rows = Array.isArray(result) ? result : result.items || [];
       if (tab === "cargas") setCargas(rows); else setViagens(rows);
       const totalPages = Number(result.totalPages || 1);
       setPageInfo({ total: Number(result.total ?? rows.length), totalPages });
       if (page > totalPages) setPage(totalPages);
       setSummary(stats); setFilterOptions(options);
-      const loginSeller = cv2CommercialForUser(user);
-      if (loginSeller && !seller && options.vendedores?.includes(loginSeller)) setSeller(loginSeller);
       if (seller && options.vendedores?.length && !options.vendedores.includes(seller)) setSeller("");
-    } catch (err) { setError(cv2Error(err)); }
-    finally { setLoading(false); }
+    } catch (err) { if (version === loadVersion.current) setError(cv2Error(err)); }
+    finally { if (version === loadVersion.current) setLoading(false); }
   };
   useEffect(() => {
     const timer = setTimeout(load, 260);
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(timer); loadVersion.current += 1; };
   }, [tab, page, pageSize, query, status, financialStatus, seller, cargaFilters.empresa, cargaFilters.origem, cargaFilters.ufOrigem, cargaFilters.destino, cargaFilters.ufDestino, cargaFilters.material]);
   const saved = (kind, item) => {
     setModal(kind === "viagem" ? { type: "tripDone", item } : null);
@@ -627,10 +646,10 @@ const CargasViagensV2 = ({ user }) => {
     setPage(1); setStatus(nextStatus); setFinancialStatus(nextFinancial);
   };
   const cargaActions = (carga) => {
-    const hasCte = carga.documentos.some((doc) => doc.tipo.toUpperCase().includes("CT"));
+    const hasCte = carga.documentos.some(cv2IsTransportDocument);
     return <div className="cv2-row-actions">
       {carga.status === "aguardando_viagem" && <button className="btn primary" onClick={() => openViagemForm(carga.id)}>Programar veículo</button>}
-      {carga.viagemId && <button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => setModal({ type: "cte", item: carga })}>{hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button>}
+      <button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => setModal({ type: "cte", item: carga })}>{hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button>
       <details className="cv2-more"><summary aria-label="Mais ações">•••</summary><div>
         <button onClick={() => cv2PrintLoad(carga)}><Icon name="file" size={13} /> Imprimir folha da carga</button>
         <button onClick={() => setModal({ type: "carga", item: carga })}>Editar carga</button>
@@ -644,7 +663,7 @@ const CargasViagensV2 = ({ user }) => {
     <div className="cv2-flow"><div><i>1</i><div><b>Cadastre a carga</b><small>Clientes, rota, peso e valor</small></div></div><div><i>2</i><div><b>Vincule o veículo</b><small>Viagem, placa e motorista</small></div></div><div><i>3</i><div><b>Emita o CT-e</b><small>Documento e acompanhamento</small></div></div><div><i>4</i><div><b>Entregue e receba</b><small>Entrega operacional e quitação</small></div></div></div>
     {tab === "cargas" ? <div className="cv2-kpis">
       <button className="cv2-kpi total" onClick={() => useStatusShortcut()}><span>Cargas cadastradas</span><b>{summary.cargas || 0}</b></button>
-      <button className="cv2-kpi vehicle" onClick={() => useStatusShortcut("aguardando_cte")}><span>Veículo vinculado</span><b>{summary.cargas_vinculadas || 0}</b></button>
+      <button className="cv2-kpi vehicle" onClick={() => useStatusShortcut("veiculo_vinculado")}><span>Veículo vinculado</span><b>{summary.cargas_vinculadas || 0}</b></button>
       <button className="cv2-kpi cte" onClick={() => useStatusShortcut("aguardando_cte")}><span>Aguardando CT-e</span><b>{summary.aguardando_cte || 0}</b></button>
       <button className="cv2-kpi transit" onClick={() => useStatusShortcut("em_transito")}><span>Em trânsito</span><b>{summary.cargas_em_transito || 0}</b></button>
       <button className="cv2-kpi delivered" onClick={() => useStatusShortcut("entregue")}><span>Entregues</span><b>{summary.cargas_entregues || 0}</b></button>
@@ -704,7 +723,7 @@ const CargasViagensV2 = ({ user }) => {
     {modal?.type === "details" && <Cv2TripDetails viagem={modal.item} onClose={() => setModal(null)} onLinkCte={(carga) => setModal({ type: "cte", item: carga, viagem: modal.item })} />}
     {modal?.type === "deleteCarga" && <Cv2DeleteModal type="carga" item={modal.item} onClose={() => setModal(null)} onDeleted={removeDone} />}
     {modal?.type === "deleteViagem" && <Cv2DeleteModal type="viagem" item={modal.item} onClose={() => setModal(null)} onDeleted={removeDone} />}
-    {modal?.type === "tripDone" && <Cv2Modal title="Viagem criada com sucesso" subtitle={`${modal.item.numero} está aguardando a vinculação do CT-e.`} onClose={() => setModal(null)}><div className="cv2-modal-body"><div className="cv2-alert success"><b>{modal.item.placa}</b> · {modal.item.motorista || "Motorista não informado"}<br />{modal.item.cargas.length} carga(s) vinculada(s).</div></div><footer className="cv2-modal-actions"><button className="btn" onClick={() => setModal(null)}>Fechar</button><button className="btn primary" onClick={() => cv2PrintTrip(modal.item)}>Imprimir folha da viagem</button></footer></Cv2Modal>}
+    {modal?.type === "tripDone" && <Cv2Modal title="Viagem criada com sucesso" subtitle={`${modal.item.numero} · ${CV2_STATUS[modal.item.situacao]?.label || "Viagem programada"}`} onClose={() => setModal(null)}><div className="cv2-modal-body"><div className="cv2-alert success"><b>{modal.item.placa}</b> · {modal.item.motorista || "Motorista não informado"}<br />{modal.item.cargas.length} carga(s) vinculada(s).</div></div><footer className="cv2-modal-actions"><button className="btn" onClick={() => setModal(null)}>Fechar</button><button className="btn primary" onClick={() => cv2PrintTrip(modal.item)}>Imprimir folha da viagem</button></footer></Cv2Modal>}
   </div>;
 };
 

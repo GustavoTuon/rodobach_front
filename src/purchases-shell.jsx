@@ -117,6 +117,9 @@ export function PurchaseHome({
     (n, q) => n + Math.max(0, q.fornecedores - q.respostas),
     0,
   );
+  const ready = quotes.filter(
+    (q) => quoteProgress(q).key === "respondida",
+  ).length;
   const history = quotes.filter((q) => q.origem_chave).length;
   return (
     <div className="purchase-home">
@@ -185,14 +188,18 @@ export function PurchaseHome({
         <PurchaseIcon name="clock" size={21} />
         <div>
           <strong>
-            {pending
-              ? "Há fornecedores aguardando resposta"
-              : "Tudo em dia por aqui"}
+            {ready
+              ? `${ready} ${ready === 1 ? "cotação aguardando" : "cotações aguardando"} sua análise`
+              : pending
+                ? "Há fornecedores aguardando resposta"
+                : "Tudo em dia por aqui"}
           </strong>
           <p>
-            {pending
-              ? `Acompanhe as ${pending} respostas pendentes nas cotações em andamento.`
-              : "Crie uma cotação para começar a receber propostas dos fornecedores."}
+            {ready
+              ? "Compare as propostas e escolha os fornecedores de cada item."
+              : pending
+                ? `Acompanhe as ${pending} respostas pendentes nas cotações em andamento.`
+                : "Crie uma cotação para começar a receber propostas dos fornecedores."}
           </p>
         </div>
         <button

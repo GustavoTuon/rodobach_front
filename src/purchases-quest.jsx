@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import PreviousSuppliers from "./purchases-previous-suppliers.jsx";
 import { SupplierPicker } from "./purchases-dashboard.jsx";
 export function quoteChecklist({ titulo, prazo, items }, now = Date.now()) {
   return [
@@ -17,24 +18,44 @@ export default function QuoteQuest({
   onSave,
   Catalog,
 }) {
-  const [step, setStep] = useState(0),
-    [titulo, setTitulo] = useState(""),
-    [prazo, setPrazo] = useState(""),
-    [observacoes, setObservacoes] = useState(""),
-    [items, setItems] = useState([]),
+  const draftKey = `rodobach:purchase-draft:${window.RB_AUTH?.getUser?.()?.id || "local"}`;
+  const [draft] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(draftKey)) || {};
+    } catch {
+      return {};
+    }
+  });
+  const [step, setStep] = useState(draft.step || 0),
+    [titulo, setTitulo] = useState(draft.titulo || ""),
+    [prazo, setPrazo] = useState(draft.prazo || ""),
+    [observacoes, setObservacoes] = useState(draft.observacoes || ""),
+    [items, setItems] = useState(Array.isArray(draft.items) ? draft.items : []),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [feedback, setFeedback] = useState("");
+  const [draftWarning, setDraftWarning] = useState("");
+  useEffect(() => {
+    try {
+      if (!titulo && !prazo && !observacoes && !items.length)
+        localStorage.removeItem(draftKey);
+      else
+        localStorage.setItem(
+          draftKey,
+          JSON.stringify({ step, titulo, prazo, observacoes, items }),
+        );
+      setDraftWarning("");
+    } catch {
+      setDraftWarning(
+        "Não foi possível salvar o rascunho neste navegador. Mantenha esta página aberta.",
+      );
+    }
+  }, [draftKey, step, titulo, prazo, observacoes, items]);
   const checks = quoteChecklist({ titulo, prazo, items }),
     complete = checks.filter(Boolean).length,
     ready = checks.every(Boolean),
     partners = new Set(items.flatMap((i) => i.fornecedores)).size;
-  const names = [
-    "Defina a missão",
-    "Monte a lista",
-    "Escolha os parceiros",
-    "Revise e conclua",
-  ];
+  const names = ["Dados", "Produtos", "Fornecedores", "Revisão"];
   const update = (index, key, value) =>
     setItems((old) =>
       old.map((i, n) => (n === index ? { ...i, [key]: value } : i)),
@@ -56,7 +77,7 @@ export default function QuoteQuest({
     }
     setFeedback(
       [
-        "Missão definida. Vamos aos produtos!",
+        "Dados preenchidos. Vamos aos produtos!",
         "Lista pronta. Hora de escolher os parceiros!",
         "Parceiros definidos. Falta só sua revisão.",
       ][step],
@@ -87,6 +108,11 @@ export default function QuoteQuest({
             observacoes,
             itens: items,
           });
+          try {
+            localStorage.removeItem(draftKey);
+          } catch {
+            /* Optional storage. */
+          }
           setStep(0);
           setTitulo("");
           setPrazo("");
@@ -105,7 +131,7 @@ export default function QuoteQuest({
           <span className="purchase-eyebrow">SUA PRÓXIMA BOA COMPRA</span>
           <h2>{names[step]}</h2>
         </div>
-        <span className="quest-score">{complete}/3 missões concluídas</span>
+        <span className="quest-score">{complete}/3 etapas preenchidas</span>
       </header>
       <progress
         aria-label="Progresso do preenchimento"
@@ -203,7 +229,12 @@ export default function QuoteQuest({
               }
               setItems((old) => [
                 ...old,
-                { ...r, quantidade: 1, unidade: "UN", fornecedores: [] },
+                {
+                  ...r,
+                  quantidade: 1,
+                  unidade: r.unidade || "UN",
+                  fornecedores: [],
+                },
               ]);
               setFeedback(`${r.nome} adicionado à lista.`);
             }}
@@ -213,6 +244,10 @@ export default function QuoteQuest({
               <header>
                 <strong>
                   {n + 1}. {i.nome}
+                  <small>
+                    {" "}
+                    · Empresa {i.empresa} · Código {i.codigo}
+                  </small>
                 </strong>
                 <button
                   type="button"
@@ -223,6 +258,7 @@ export default function QuoteQuest({
                   Remover
                 </button>
               </header>
+              <PreviousSuppliers product={i} />
               <div className="purchase-grid">
                 <label className="purchase-field">
                   Quantidade de {i.nome}
@@ -266,6 +302,15 @@ export default function QuoteQuest({
                   {i.quantidade} {i.unidade}
                 </span>
               </header>
+              <PreviousSuppliers
+                product={i}
+                suppliers={suppliers}
+                onSelect={(id) =>
+                  update(n, "fornecedores", [
+                    ...new Set([...i.fornecedores, id]),
+                  ])
+                }
+              />
               <SupplierPicker
                 groups={groups}
                 suppliers={suppliers}
@@ -339,6 +384,10 @@ export default function QuoteQuest({
           </p>
         </section>
       )}
+      {!draftWarning && (
+        <small>Rascunho salvo neste navegador enquanto você preenche.</small>
+      )}
+      {draftWarning && <p role="alert">{draftWarning}</p>}
       {error && <p role="alert">{error}</p>}
       <footer className="quest-footer">
         <span>
