@@ -4,7 +4,7 @@ import {afterEach,expect,it,vi} from 'vitest';
 import {act,cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
 afterEach(()=>{cleanup();vi.restoreAllMocks();});
 async function components(api={}) {
-  window.React=React;window.Icon=()=>null;window.RB_API=api;
+  window.React=React;window.Icon=()=>null;window.RB_API={searchCidades:vi.fn(async()=>[]),...api};
   return import('./cargas-viagens-v2.jsx');
 }
 it('remove apenas o CT-e legado 1283, desfaz e salva mantendo orçamento da série O',async()=>{
@@ -82,9 +82,12 @@ it('detalhes abrem documentos e geram impressão da carga e da viagem sem execut
   const carga={id:1,codigo:'C-1',cliente:'<script>alert(1)</script>',peso:10,valorCliente:100,documentos:[{tipo:'Orçamento',numero:'1283'}]};
   render(<Cv2TripDetails viagem={{id:7,numero:'V-7',cargas:[carga]}} onClose={()=>{}} onLinkCte={link}/>);
   fireEvent.click(screen.getByRole('button',{name:'Gerenciar CT-es'}));expect(link).toHaveBeenCalledWith(carga);
+  window.RB_API.getCargaV2=vi.fn(async()=>carga);
   fireEvent.click(screen.getByRole('button',{name:'Imprimir carga'}));
+  await waitFor(()=>expect(write).toHaveBeenCalledTimes(2));
+  write.mockClear();
   fireEvent.click(screen.getByRole('button',{name:'Imprimir folha da viagem'}));
-  expect(write).toHaveBeenCalledTimes(2);
+  expect(write).toHaveBeenCalledTimes(1);
   for(const [html] of write.mock.calls){expect(html).toContain('Orç. 1283');expect(html).toContain('&lt;script&gt;');expect(html).not.toContain('<script>alert(1)</script>');}
 });
 

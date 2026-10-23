@@ -1,3 +1,4 @@
+import { trackLoadingActivity } from "./loading-activity.js";
 import { fetchWithTimeout } from "./http.js";
 const LOCAL_API_BASE = "http://localhost:3333/api";
 const PRODUCTION_API_BASE =
@@ -25,7 +26,9 @@ function buildQuery(params = {}) {
   return text ? `?${text}` : "";
 }
 
-async function apiRequest(path, options = {}) {
+const apiRequest = (path, options = {}) => trackLoadingActivity(() => requestData(path, options));
+
+async function requestData(path, options = {}) {
   const token = localStorage.getItem(TOKEN_KEY);
 
   const response = await fetchWithTimeout(`${API_BASE}${path}`, {
@@ -74,7 +77,7 @@ window.RB_AUTH = {
     }
   },
 
-  login: async (login, senha) => {
+  login: (login, senha) => trackLoadingActivity(async () => {
     const response = await fetchWithTimeout(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -87,7 +90,7 @@ window.RB_AUTH = {
     localStorage.setItem(TOKEN_KEY, result.token);
     localStorage.setItem(USER_KEY, JSON.stringify(result.user));
     return result;
-  },
+  }),
 
   logout: () => {
     localStorage.removeItem(TOKEN_KEY);
@@ -169,7 +172,7 @@ window.RB_API = {
   searchViagemVendedores: (q = "") =>
     apiRequest(`/viagens/opcoes/vendedores${buildQuery({ q })}`),
   searchViagemDocumentos: (q = "") =>
-    apiRequest(`/viagens/documentos-financeiros${buildQuery({ q })}`),
+    apiRequest(`/viagens/documentos-financeiros${buildQuery(typeof q === "object" ? q : { q })}`),
 
   createViagem: (payload) =>
     apiRequest("/viagens", {
@@ -364,7 +367,7 @@ window.RB_API = {
       body: JSON.stringify(payload),
       timeoutMs: 600000,
     }),
-  downloadOportunidadesModelo: async () => {
+  downloadOportunidadesModelo: () => trackLoadingActivity(async () => {
     const token = localStorage.getItem(TOKEN_KEY);
     const response = await fetchWithTimeout(
       `${API_BASE}/oportunidades-retorno/modelo.xlsx`,
@@ -375,7 +378,7 @@ window.RB_API = {
     if (!response.ok)
       throw new Error("Nao foi possivel baixar o modelo da planilha.");
     return response.blob();
-  },
+  }),
   getAnaliseClientes: (filters) => {
     const params = typeof filters === "object" ? filters : { period: filters };
     return apiRequest(`/financeiro/analise-clientes${buildQuery(params)}`);

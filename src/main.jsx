@@ -1,11 +1,22 @@
+import { GlobalLoading } from "./global-loading.jsx";
+import { beginLoadingActivity } from "./loading-activity.js";
 import React from "react";
 import ReactDOM from "react-dom/client";
 
 window.React = React;
 window.ReactDOM = ReactDOM;
 
+const loadingHost = document.createElement("div");
+loadingHost.id = "global-loading";
+document.body.appendChild(loadingHost);
+const loadingRoot = ReactDOM.createRoot(loadingHost);
+loadingRoot.render(<GlobalLoading />);
+const finishStartup = beginLoadingActivity();
+if (import.meta.hot) import.meta.hot.dispose(() => { loadingRoot.unmount(); loadingHost.remove(); finishStartup(); });
+
 const standalonePath = window.location.pathname.replace(/\/$/, "");
 
+try {
 if (["/compras/responder", "/compras/fornecedor"].includes(standalonePath)) {
   await import("./api.js");
   document.title = "Rodobach \u00b7 Portal do fornecedor";
@@ -40,3 +51,5 @@ if (["/compras/responder", "/compras/fornecedor"].includes(standalonePath)) {
   await import("./screens/usuarios.jsx");
   await import("./app.jsx");
 }
+
+} finally { finishStartup(); }

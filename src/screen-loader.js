@@ -1,3 +1,4 @@
+import { trackLoadingActivity } from "./loading-activity.js";
 export const SCREEN_FILES = {
   compras: "compras",
   "consulta-viagens": "consulta-viagens",
@@ -23,7 +24,7 @@ export function createScreenLoader(modules) {
     const load = modules[`./screens/${file}.jsx`];
     if (!load) throw new Error("Tela indisponível.");
     if (!loaded.has(file)) {
-      const promise = Promise.resolve().then(load).catch(error => { loaded.delete(file); throw error; });
+      const promise = trackLoadingActivity(load).catch(error => { loaded.delete(file); throw error; });
       loaded.set(file, promise);
     }
     await loaded.get(file);

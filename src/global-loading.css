@@ -1,0 +1,12 @@
+.rb-global-loading { position: fixed; inset: 0; z-index: 2147483000; pointer-events: none; }
+.rb-global-loading-bar { position: absolute; top: 0; left: 0; width: 100%; height: 3px; overflow: hidden; background: var(--accent-soft, #dce7ff); }
+.rb-global-loading-bar span { display: block; width: 35%; height: 100%; background: var(--accent, #4263eb); animation: rb-loading-progress 1.4s ease-in-out infinite; }
+.rb-global-loading-notice { position: absolute; right: max(20px, env(safe-area-inset-right)); bottom: max(20px, env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 12px; max-width: calc(100vw - 32px); padding: 13px 17px; border: 1px solid var(--border, #d8deea); border-radius: 12px; background: var(--surface, #fff); color: var(--text, #18233d); box-shadow: 0 6px 24px #0002; font-family: inherit; }
+.rb-global-loading-notice strong { display: block; font-size: 13px; line-height: 1.5; }
+.rb-global-loading-notice div > span { display: block; font-size: 11px; line-height: 1.5; color: var(--muted, #667085); }
+.rb-global-loading-spinner { flex: 0 0 auto; width: 18px; height: 18px; box-sizing: border-box; border: 2px solid var(--border, #d8deea); border-top-color: var(--accent, #4263eb); border-radius: 50%; animation: rb-loading-spin .8s linear infinite; }
+@keyframes rb-loading-progress { from { transform: translateX(-100%); } to { transform: translateX(390%); } }
+@keyframes rb-loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .rb-global-loading-bar span, .rb-global-loading-spinner { animation: none; } .rb-global-loading-bar span { width: 100%; } }
+@media (max-width: 480px) { .rb-global-loading-notice { right: 16px; bottom: max(16px, env(safe-area-inset-bottom)); padding: 10px 12px; } }
+@media print { .rb-global-loading { display: none; } }
