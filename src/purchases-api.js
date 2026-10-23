@@ -1,5 +1,8 @@
+import { trackLoadingActivity } from "./loading-activity.js";
 import { fetchWithTimeout } from "./http.js";
-export async function purchasesApi(
+export const purchasesApi = (...args) => trackLoadingActivity(() => requestPurchases(...args));
+
+async function requestPurchases(
   path,
   body,
   method = "POST",

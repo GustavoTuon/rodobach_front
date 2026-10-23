@@ -1,0 +1,36 @@
+.cv2-modal.cv2-cte-modal{width:min(740px,96vw)}
+.cv2-cte-modal .cv2-modal-body{padding:24px}
+.cv2-cte-modes{display:flex;gap:4px;padding:5px;border:1px solid var(--border);border-radius:10px;background:var(--surface);margin-bottom:20px}
+.cv2-cte-modes .btn{flex:1;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--muted);padding:10px 14px;font-weight:600}
+.cv2-cte-modes .btn[aria-pressed=true]{background:var(--accent-soft);border-color:var(--accent-border);color:var(--text)}
+.cv2-cte-search-panel{padding:18px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)}
+.cv2-cte-heading strong{font-size:14px}
+.cv2-cte-heading p{font-size:12px;color:var(--muted);line-height:1.6;margin:6px 0 18px}
+.cv2-cte-filters{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) auto;gap:12px;align-items:end}
+.cv2-cte-filters .cv2-field{min-width:0;margin:0}
+.cv2-cte-filters>.btn{min-height:38px;margin-bottom:0}
+.cv2-cte-modal .cv2-search-row input{min-width:0}
+.cv2-cte-modal .cv2-suggestions{z-index:20}
+.cv2-cte-hint{font-size:11px;color:var(--muted);line-height:1.6;margin:14px 0 0;padding-top:12px;border-top:1px solid var(--border)}
+.cv2-cte-selection-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
+.cv2-cte-count{font-size:12px;color:var(--muted);padding:12px 0;margin:0}
+.cv2-cte-results{max-height:340px;overflow-y:auto}
+.cv2-cte-modal .cv2-cte-result{gap:14px;align-items:center;line-height:1.5}
+.cv2-cte-modal .cv2-cte-result>div{min-width:0;overflow-wrap:anywhere}
+.cv2-cte-modal .cv2-cte-result>div:last-child{text-align:right;flex-shrink:0}
+.cv2-cte-modal .cv2-cte-result[aria-checked=true]{background:var(--accent-soft);border-color:var(--accent-border)}
+.cv2-cte-modal .cv2-cte-result:disabled{opacity:.6;cursor:default}
+.cv2-cte-modal .cv2-doc-list{border-top:1px solid var(--border);padding-top:20px;margin-top:22px}
+.cv2-cte-modal .cv2-doc-list>b{font-size:13px;margin-bottom:14px}
+.cv2-cte-modal .cv2-cte-empty{padding:22px 16px;text-align:center;border:1px dashed var(--border);border-radius:10px;background:var(--surface)}
+.cv2-cte-modal .cv2-cte-empty small{display:block;white-space:normal;margin-top:7px;font-size:11px;line-height:1.5}
+.cv2-cte-modal .cv2-modal-actions{gap:12px}
+@media(max-width:600px){
+ .cv2-cte-modal .cv2-modal-body{padding:16px}
+ .cv2-cte-search-panel{padding:14px}
+ .cv2-cte-filters{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ .cv2-cte-filters>.btn{grid-column:1/-1}
+ .cv2-cte-modal .cv2-cte-result{gap:8px}
+ .cv2-cte-modes .btn{padding:10px 6px}
+}
+@media(max-width:380px){.cv2-cte-filters{grid-template-columns:minmax(0,1fr)}}
