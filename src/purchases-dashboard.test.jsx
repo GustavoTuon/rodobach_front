@@ -41,7 +41,7 @@ test("busca, filtros e abertura usam registros reais da lista", () => {
   fireEvent.change(screen.getByLabelText("Buscar cotação"), {
     target: { value: "" },
   });
-  fireEvent.click(screen.getByRole("button", { name: /Do sistema/ }));
+  fireEvent.change(screen.getByLabelText('Filtrar por situação'),{target:{value:'historico'}});
   expect(screen.queryByText("Compra de pneus")).toBeNull();
 });
 test("preço líquido respeita o total de origem e não cria frete ou marca", () => {
@@ -98,6 +98,7 @@ test("histórico conserva aprovação sem oferecer envio de link", () => {
     },
   };
   render(<ImportedQuote quote={quote} />);
+  fireEvent.click(screen.getByRole('button',{name:/Comparar ofertas/}));
   expect(
     screen.getByRole("cell", { name: "Aprovada no sistema", exact: true }),
   ).toBeTruthy();

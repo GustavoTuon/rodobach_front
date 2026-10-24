@@ -1,0 +1,72 @@
+// @vitest-environment jsdom
+import React from 'react';
+import {afterEach,expect,it,vi} from 'vitest';
+import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
+import {buildItinerary,itineraryHtml,volumesSummary} from '../carga-itinerary.js';
+afterEach(()=>{cleanup();vi.restoreAllMocks();});
+it('abre fora do rodapé da viagem e fecha sem fechar os detalhes',async()=>{
+  window.React=React;window.Icon=()=>null;
+  const trip={id:1,numero:'V-1',cargas:[{id:1,documentos:[]}]};
+  window.RB_API={getViagemV2:vi.fn(async()=>trip),getCargaV2:vi.fn(async()=>({id:1,paradas:[]}))};
+  const closeTrip=vi.fn();
+  const {Cv2TripDetails}=await import('./cargas-viagens-v2.jsx');
+  render(<Cv2TripDetails viagem={trip} onClose={closeTrip} />);
+  fireEvent.click(screen.getByText('Itinerário / conferência'));
+  const dialog=screen.getByText('Itinerário de conferência').closest('[role="dialog"]');
+  expect(dialog.parentElement.parentElement).toBe(document.body);
+  expect(dialog.closest('.cv2-modal-actions')).toBeNull();
+  fireEvent.mouseDown(dialog.parentElement);
+  expect(screen.queryByText('Itinerário de conferência')).toBeNull();
+  expect(screen.getByText('Viagem V-1')).toBeTruthy();
+  expect(closeTrip).not.toHaveBeenCalled();
+});
+const load={id:1,codigo:'C-1',cliente:'Coleta',clienteFinal:'Entrega final',origem:'Origem',destino:'Destino',volumes:23,valorCliente:9999,material:'Caixas',observacoes:'Frete R$ 9999',paradas:[{tipo:'entrega',cliente:'Entrega parcial',volumes:10,endereco:'Rua A',nf:'123'}]};
+it('duplica volumes da carga e permite editar volumes da entrega antes de salvar',async()=>{
+  window.React=React;window.Icon=()=>null;
+  const save=vi.fn(async()=>({id:2}));
+  window.RB_API={createCargaV2:save};
+  const {Cv2CargaForm}=await import('./cargas-viagens-v2.jsx');
+  render(<Cv2CargaForm duplicateFrom={load} onClose={()=>{}} onSaved={()=>{}} />);
+  expect(screen.getByLabelText('Quantidade de volumes').value).toBe('23');
+  expect(screen.getByLabelText('Volumes da parada 1').value).toBe('10');
+  fireEvent.change(screen.getByLabelText('Quantidade de volumes'),{target:{value:'30'}});
+  fireEvent.change(screen.getByLabelText('Volumes da parada 1'),{target:{value:'12'}});
+  fireEvent.click(screen.getByText('Cadastrar carga'));
+  await waitFor(()=>expect(save).toHaveBeenCalled());
+  expect(save.mock.calls[0][0]).toMatchObject({volumes:'30',paradas:[{volumes:'12'}]});
+});
+it('distribui total nas entregas sem duplicar; preserva pendências e não expõe valores financeiros',()=>{
+  const stops=buildItinerary([load]);
+  expect(stops.map(stop=>stop.volumes)).toEqual([23,10,13]);
+  const html=itineraryHtml({numero:'V-1',valorMotorista:500,chavePix:'pix-secreto'},[load],stops);
+  expect(html).toContain('Rua A');expect(html).toContain('13');
+  expect(html).not.toContain('9999');expect(html).not.toContain('pix-secreto');expect(html).not.toContain('R$');
+  const unknown=buildItinerary([{...load,volumes:null}]);
+  expect(unknown[0].volumes).toBeNull();expect(unknown.at(-1).volumes).toBeNull();
+  expect(volumesSummary([load,{volumes:null}])).toMatchObject({total:23,missing:1});
+  expect(buildItinerary([{...load,paradas:[{tipo:'entrega',volumes:null}]}]).at(-1).volumes).toBeNull();
+  expect(buildItinerary([{...load,volumes:0,paradas:[]}]).at(-1).volumes).toBe(0);
+});
+it('permite revisar ordem e imprimir dados completos das cargas',async()=>{
+  window.React=React;window.Icon=()=>null;
+  window.RB_API={getViagemV2:vi.fn(async()=>({id:1,numero:'V-1',cargas:[{id:1}]})),getCargaV2:vi.fn(async()=>load)};
+  const {Cv2ItineraryButton}=await import('./cargas-viagens-v2.jsx');
+  const popup={document:{write:vi.fn(),close:vi.fn(),getElementById:()=>null}};
+  vi.spyOn(window,'open').mockReturnValue(popup);
+  render(<Cv2ItineraryButton viagemId={1} />);
+  fireEvent.click(screen.getByText('Itinerário / conferência'));
+  await screen.findByText('Entrega · Entrega parcial');
+  fireEvent.click(screen.getByLabelText('Descer parada 2'));
+  fireEvent.click(screen.getByText('Imprimir itinerário'));
+  const html=popup.document.write.mock.calls[0][0];
+  expect(html.indexOf('Entrega final')).toBeLessThan(html.indexOf('Entrega parcial'));
+  expect(window.RB_API.getCargaV2).toHaveBeenCalledWith(1);
+});
+it('não libera impressão parcial quando uma carga falha',async()=>{
+  window.React=React;window.RB_API={getViagemV2:vi.fn(async()=>({id:1,cargas:[{id:1}]})),getCargaV2:vi.fn(async()=>{throw new Error('Falha ao consultar carga');})};
+  const {Cv2ItineraryButton}=await import('./cargas-viagens-v2.jsx');
+  render(<Cv2ItineraryButton viagemId={1} />);
+  fireEvent.click(screen.getByText('Itinerário / conferência'));
+  await screen.findByRole('alert');
+  expect(screen.getByText('Imprimir itinerário').disabled).toBe(true);
+});

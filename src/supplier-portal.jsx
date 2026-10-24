@@ -1,3 +1,4 @@
+import { trackLoadingActivity } from "./loading-activity.js";
 import { SupplierInvitations } from "./supplier-workspace.jsx";
 import React, { useEffect, useState } from "react";
 import { SupplierResponse } from "./screens/compras.jsx";
@@ -10,7 +11,8 @@ function savedSession() {
     return null;
   }
 }
-async function call(path, body) {
+const call = (path, body) => trackLoadingActivity(() => requestSupplier(path, body));
+async function requestSupplier(path, body) {
   const response = await fetchWithTimeout(
     `${window.RB_API_BASE_URL}/compras-fornecedor${path}`,
     {

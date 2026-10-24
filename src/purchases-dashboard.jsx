@@ -43,31 +43,8 @@ export function PurchaseDashboard({
   );
   const pages = Math.max(1, Math.ceil(filtered.length / 12)),
     current = Math.min(page, pages);
-  const active = quotes.filter((q) => quoteStatus(q) === "aberta"),
-    pending = active.reduce(
-      (sum, q) => sum + Math.max(0, q.fornecedores - q.respostas),
-      0,
-    );
   return (
     <>
-      <div className="purchase-metrics">
-        {[
-          [quotes.length, "Cotações no painel", "Sua base de negociações"],
-          [active.length, "Em andamento", "Recebendo propostas"],
-          [pending, "Respostas pendentes", "Fornecedores a acompanhar"],
-          [
-            quotes.filter((q) => q.origem_chave).length,
-            "Importadas do sistema",
-            "Histórico preservado",
-          ],
-        ].map(([value, label, hint]) => (
-          <div className="purchase-metric" key={label}>
-            <span>{label}</span>
-            <strong>{loading ? "—" : value}</strong>
-            <small>{hint}</small>
-          </div>
-        ))}
-      </div>
       <section className="purchase-card purchase-panel">
         <header className="purchase-toolbar">
           <div>
@@ -103,11 +80,8 @@ export function PurchaseDashboard({
             Atualizar
           </button>
         </div>
-        <div
-          className="purchase-filter-tabs"
-          role="group"
-          aria-label="Filtrar por situação"
-        >
+        <label className="simple-status-filter">Situação
+          <select aria-label="Filtrar por situação" value={filter} onChange={event=>{setFilter(event.target.value);setPage(1);}}>
           {[
             ["todas", "Todas"],
             ["cancelada", "Canceladas"],
@@ -118,26 +92,17 @@ export function PurchaseDashboard({
             ["historico", "Do sistema"],
             ["encerrada", "Encerradas"],
           ].map(([id, label]) => (
-            <button
-              aria-pressed={filter === id}
-              key={id}
-              onClick={() => {
-                setFilter(id);
-                setPage(1);
-              }}
-            >
-              {label}
-              <span>
-                {id === "todas"
+            <option key={id} value={id}>
+              {label} ({id === "todas"
                   ? quotes.length
                   : quotes.filter(
                       (q) =>
                         quoteStatus(q) === id || quoteProgress(q).key === id,
-                    ).length}
-              </span>
-            </button>
+                    ).length})
+            </option>
           ))}
-        </div>
+          </select>
+        </label>
         <div className="purchase-list-heading">
           <span>Cotação / origem</span>
           <span>Produtos</span>

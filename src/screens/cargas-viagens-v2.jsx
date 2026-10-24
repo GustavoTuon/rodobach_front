@@ -1,4 +1,6 @@
 import { sameCargaDocumento } from "../carga-documentos.js";
+import { createPortal } from 'react-dom';
+import { buildItinerary, itineraryHtml, formatVolumes, volumesSummary } from '../carga-itinerary.js';
 import './cargas-viagens-cte.css';
 import { QuoteHistoryGrid } from './quote-history-grid.jsx';
 const { useEffect, useState, useRef } = React;
@@ -43,7 +45,7 @@ const cv2CommercialForUser = (user) =>
 
 const emptyCarga = () => ({
   data: CV2_TODAY(), cliente: "", clienteFinal: "", tomadorServico: "", vendedor: "",
-  origem: "", ufOrigem: "", destino: "", ufDestino: "", material: "", peso: "",
+  origem: "", ufOrigem: "", destino: "", ufDestino: "", material: "", peso: "", volumes: "",
   valorCliente: "", condicaoPagamento: "", observacoes: "", paradas: [], calculoPreco: {},
 });
 
@@ -92,8 +94,8 @@ function Cv2TripBilling({ financeiro }) {
   </section>;
 }
 
-function Cv2Modal({ title, subtitle, onClose, children, wide = false, className = "" }) {
-  return (
+function Cv2Modal({ title, subtitle, onClose, children, wide = false, className = "", portal = false }) {
+  const content = (
     <div className="cv2-overlay" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
       <section className={`cv2-modal ${wide ? "wide" : ""} ${className}`} role="dialog" aria-modal="true">
         <header><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div><button className="cv2-icon-btn" onClick={onClose} aria-label="Fechar">×</button></header>
@@ -101,6 +103,7 @@ function Cv2Modal({ title, subtitle, onClose, children, wide = false, className 
       </section>
     </div>
   );
+  return portal ? createPortal(content, document.body) : content;
 }
 
 function Cv2Field({ label, required, hint, children, className = "" }) {
@@ -179,8 +182,8 @@ function cv2DuplicateCarga(source) {
   for (const key of Object.keys(copy)) {
     if (source[key] != null) copy[key] = source[key];
   }
-  copy.paradas = (source.paradas || []).map(({ tipo, cidade, uf, cliente, endereco, nf, observacoes }) =>
-    ({ tipo, cidade, uf, cliente, endereco, nf, observacoes }));
+  copy.paradas = (source.paradas || []).map(({ tipo, cidade, uf, cliente, endereco, nf, observacoes, volumes }) =>
+    ({ tipo, cidade, uf, cliente, endereco, nf, observacoes, volumes }));
   copy.calculoPreco = {};
   return copy;
 }
@@ -267,12 +270,14 @@ export function Cv2CargaForm({ initial, duplicateFrom, user, onClose, onSaved })
             <Cv2Field label="UF destino"><input maxLength="2" value={form.ufDestino} onChange={(e) => set("ufDestino", e.target.value.toUpperCase())} /></Cv2Field>
             <Cv2Field label="Material"><input value={form.material} onChange={(e) => set("material", e.target.value)} placeholder="Mercadoria transportada" /></Cv2Field>
             <Cv2Field label="Peso (kg)"><input type="number" min="0" step="0.001" value={form.peso} onChange={(e) => set("peso", e.target.value)} /></Cv2Field>
+            <Cv2Field label="Quantidade de volumes" hint="Total da carga. Deixe vazio quando ainda não souber."><input aria-label="Quantidade de volumes" type="number" min="0" max="2147483647" step="1" value={form.volumes ?? ""} onChange={e=>set("volumes",e.target.value)} /></Cv2Field>
           </div>
           <div className="cv2-price-box">
             <div className="cv2-stops-head"><div><b>Referência de preço do ERP</b><small>Consulta CT-es, viagens e custos fiscais da mesma rota. Não bloqueia o valor negociado.</small></div><button type="button" className="btn" disabled={calculating || !form.origem || !form.destino} onClick={calculatePrice}>{calculating ? "Consultando ERP..." : "Consultar histórico"}</button></div>
             {pricing && <div className="cv2-price-results"><div><span>Operações no ERP</span><b>{pricing.historico.quantidade} frete(s)</b><small>{pricing.historico.ultimaData ? `Último em ${cv2Date(pricing.historico.ultimaData)}` : "Sem histórico exato"}</small></div><div><span>Receita média</span><b>{pricing.historico.quantidade ? cv2Money(pricing.historico.media) : "—"}</b><small>CT-es emitidos na rota</small></div><div><span>Custo médio real</span><b>{pricing.suficienteParaCusto ? cv2Money(pricing.custoEstimado) : "—"}</b><small>Custos vinculados às viagens no ERP</small></div><div className={pricing.margemEstimada < 0 ? "negative" : "positive"}><span>Preço recomendado</span><b>{pricing.suficienteParaCusto ? cv2Money(pricing.precoSugerido) : "Sem base suficiente"}</b><small>{pricing.suficienteParaCusto ? `Margem neste valor: ${Number(pricing.margemEstimada || 0).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% · confiança ${pricing.confianca}` : "Não foi encontrado histórico confiável desta rota"}</small></div></div>}
           </div>
           <div className="cv2-stops-head"><div><b>Paradas adicionais</b><small>Opcional: coletas ou entregas intermediárias.</small></div><button type="button" className="btn" onClick={addStop}>+ Adicionar parada</button></div>
+          {!!form.paradas.length && <p className="cv2-cte-hint">Distribua os volumes pelas paradas adicionais. O restante fica na coleta e na entrega principais. Se faltar uma quantidade, o itinerário indicará a distribuição pendente.</p>}
           {form.paradas.map((stop, index) => <div className="cv2-stop" key={stopKeys[index]}>
             <select value={stop.tipo} onChange={(e) => editStop(index, "tipo", e.target.value)}><option value="coleta">Coleta</option><option value="entrega">Entrega</option></select>
             <Cv2Autocomplete label={`Cidade da parada ${index + 1}`} value={stop.cidade} placeholder="Cidade"
@@ -287,6 +292,7 @@ export function Cv2CargaForm({ initial, duplicateFrom, user, onClose, onSaved })
               renderOption={(item) => <><strong>{item.nome}</strong><span>{[item.documento, item.cidade, item.uf, item.endereco].filter(Boolean).join(" · ")}</span></>} />
             <input value={stop.endereco} onChange={(e) => editStop(index, "endereco", e.target.value)} placeholder="Endereço" />
             <input value={stop.nf} onChange={(e) => editStop(index, "nf", e.target.value)} placeholder="Nota fiscal" />
+            <input aria-label={`Volumes da parada ${index + 1}`} type="number" min="0" max="2147483647" step="1" value={stop.volumes ?? ""} onChange={e=>editStop(index,"volumes",e.target.value)} placeholder="Volumes" />
             <button type="button" className="cv2-icon-btn" aria-label="Remover parada" onClick={() => removeStop(index)}>×</button>
           </div>)}
           <Cv2Field label="Observações"><textarea value={form.observacoes} onChange={(e) => set("observacoes", e.target.value)} rows="3" placeholder="Instruções comerciais ou detalhes da operação" /></Cv2Field>
@@ -525,11 +531,12 @@ const cv2CteNumbers = (carga) => (carga.documentos || [])
   .filter(Boolean)
   .join(", ");
 
-function cv2PrintSheet({ title, code, route, metrics = [], sections = [], rows = [], rowsTitle = "Cargas vinculadas", notes = "", manualDocument = false, signatures = true }) {
+const cv2ErpLabel = doc => doc?.tipo === "viagem_frota" ? "Viagem frota" : "Carta frete";
+function cv2PrintSheet({ title, code, route, metrics = [], sections = [], rows = [], rowsTitle = "Cargas vinculadas", notes = "", manualDocument = false, documentoErp = null, signatures = true }) {
   const metricHtml = metrics.map((item) => cv2PrintCell(item.label, item.value)).join("");
   const sectionHtml = sections.map((section) => `<section><h2>${cv2Escape(section.title)}</h2><div class="data-grid">${section.items.map((item) => cv2PrintCell(item.label, item.value, item.detail)).join("")}</div></section>`).join("");
-  const tableHtml = rows.length ? `<section class="loads-section"><h2>${cv2Escape(rowsTitle)}</h2><table><colgroup><col class="col-load"><col class="col-client"><col class="col-delivery"><col class="col-payer"><col class="col-cte"><col class="col-weight"><col class="col-value"></colgroup><thead><tr><th scope="col">Carga</th><th scope="col">Cliente (coleta)</th><th scope="col">Entrega</th><th scope="col">Tomador</th><th scope="col">CT-e</th><th scope="col">Peso</th><th scope="col">Valor</th></tr></thead><tbody>${rows.map((carga) => { const cte = cv2CteNumbers(carga); return `<tr><td><b>${cv2Escape(carga.codigo)}</b></td><td><b>${cv2Escape(carga.cliente || "—")}</b><small>${cv2Escape([carga.origem, carga.ufOrigem].filter(Boolean).join("/") || "—")}</small></td><td><b>${cv2Escape(carga.clienteFinal || "—")}</b><small>${cv2Escape([carga.destino, carga.ufDestino].filter(Boolean).join("/") || "—")}</small></td><td>${cv2Escape(carga.tomadorServico || "—")}</td><td class="cte-cell">${cte ? cv2Escape(cte) : '<span class="manual-entry">&nbsp;</span>'}</td><td>${cv2Escape(cv2Weight(carga.peso))}</td><td>${cv2Escape(cv2Money(carga.valorCliente))}</td></tr>`; }).join("")}</tbody></table></section>` : "";
-  return `<main class="sheet"><header class="head"><div class="brand"><div class="logo">RODO<br>BACH</div><div><span class="eyebrow">${cv2Escape(title)}</span><div class="route">${cv2Escape(route)}</div></div></div><div class="code"><span class="eyebrow">NÚMERO</span><b>${cv2Escape(code)}</b></div>${manualDocument ? '<div class="code document"><span class="eyebrow">DOCUMENTO</span><b>&nbsp;</b></div>' : ""}</header><div class="metrics">${metricHtml}</div><div class="warning">TODA DOCUMENTAÇÃO DEVE SER LEGÍVEL · CONFERIR ANTES DE ENCAMINHAR PARA FATURAMENTO</div>${sectionHtml}${tableHtml}${notes ? `<section><h2>Observações</h2><p class="notes">${cv2Escape(notes)}</p></section>` : ""}${signatures ? '<div class="sign"><div>Responsável pela programação</div><div>Motorista</div></div>' : ""}</main>`;
+  const tableHtml = rows.length ? `<section class="loads-section"><h2>${cv2Escape(rowsTitle)}</h2><table><colgroup><col class="col-load"><col class="col-client"><col class="col-delivery"><col class="col-payer"><col class="col-cte"><col class="col-weight"><col class="col-value"></colgroup><thead><tr><th scope="col">Carga</th><th scope="col">Cliente (coleta)</th><th scope="col">Entrega</th><th scope="col">Tomador</th><th scope="col">CT-e</th><th scope="col">Peso / vol.</th><th scope="col">Valor</th></tr></thead><tbody>${rows.map((carga) => { const cte = cv2CteNumbers(carga); return `<tr><td><b>${cv2Escape(carga.codigo)}</b></td><td><b>${cv2Escape(carga.cliente || "—")}</b><small>${cv2Escape([carga.origem, carga.ufOrigem].filter(Boolean).join("/") || "—")}</small></td><td><b>${cv2Escape(carga.clienteFinal || "—")}</b><small>${cv2Escape([carga.destino, carga.ufDestino].filter(Boolean).join("/") || "—")}</small></td><td>${cv2Escape(carga.tomadorServico || "—")}</td><td class="cte-cell">${cte ? cv2Escape(cte) : '<span class="manual-entry">&nbsp;</span>'}</td><td>${cv2Escape(cv2Weight(carga.peso))}<small>Vol.: ${cv2Escape(formatVolumes(carga.volumes))}</small></td><td>${cv2Escape(cv2Money(carga.valorCliente))}</td></tr>`; }).join("")}</tbody></table></section>` : "";
+  return `<main class="sheet"><header class="head"><div class="brand"><div class="logo">RODO<br>BACH</div><div><span class="eyebrow">${cv2Escape(title)}</span><div class="route">${cv2Escape(route)}</div></div></div><div class="code"><span class="eyebrow">NÚMERO</span><b>${cv2Escape(code)}</b></div>${manualDocument ? `<div class="code document"><span class="eyebrow">DOCUMENTO</span>${documentoErp ? `<b>${documentoErp.tipo === "viagem_frota" ? "V" : "C"}-${cv2Escape(documentoErp.numero)}</b>` : '<b>&nbsp;</b>'}</div>` : ""}</header><div class="metrics">${metricHtml}</div><div class="warning">TODA DOCUMENTAÇÃO DEVE SER LEGÍVEL · CONFERIR ANTES DE ENCAMINHAR PARA FATURAMENTO</div>${sectionHtml}${tableHtml}${notes ? `<section><h2>Observações</h2><p class="notes">${cv2Escape(notes)}</p></section>` : ""}${signatures ? '<div class="sign"><div>Responsável pela programação</div><div>Motorista</div></div>' : ""}</main>`;
 }
 
 function cv2OpenPrint(options, target) {
@@ -541,7 +548,7 @@ function cv2OpenPrint(options, target) {
     return;
   }
   popup.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${cv2Escape(title)}</title><style>
-    *{box-sizing:border-box}body{margin:0;background:#eef1f5;color:#111827;font:11px Arial,sans-serif}.toolbar{position:sticky;top:0;display:flex;justify-content:flex-end;gap:8px;padding:10px 18px;background:#111827}.toolbar button{border:0;border-radius:5px;padding:9px 14px;cursor:pointer}.toolbar .primary{background:#1e3a8a;color:white}.sheet{width:190mm;min-height:270mm;margin:18px auto;background:#fff;border:1px solid #d1d5db}.head{display:flex;align-items:stretch;border-bottom:2px solid #111827}.brand{display:flex;align-items:center;gap:12px;flex:1;padding:11px 14px}.logo{display:grid;place-items:center;width:44px;height:44px;border-radius:4px;background:#1e3a8a;color:#fff;font-size:9px;font-weight:900;line-height:1.15;text-align:center}.eyebrow,.cell span{display:block;color:#6b7280;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}.route{margin-top:3px;font-size:14px;font-weight:700}.code{display:grid;place-items:center;min-width:88px;padding:10px 12px;border-left:2px solid #111827;text-align:center}.code b{display:block;margin-top:4px;font-size:13px}.code.document{min-width:105px}.code.document b{min-width:78px;min-height:18px;border-bottom:1px solid #9ca3af}.metrics,.data-grid{display:grid;grid-template-columns:repeat(4,1fr)}.metrics{border-bottom:1px solid #d1d5db}.cell{min-width:0;overflow-wrap:anywhere;min-height:50px;padding:9px 12px;border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb}.cell b{display:block;margin-top:4px;font-size:11.5px;line-height:1.35}.warning{padding:5px 12px;border-bottom:1px solid #d1d5db;background:#f9fafb;text-align:center;font-size:8px;font-weight:700;letter-spacing:.04em}section{padding:12px 14px 0}section h2{margin:0;padding-bottom:6px;border-bottom:1px solid #d1d5db;font-size:9px;letter-spacing:.06em;text-transform:uppercase}.data-grid{margin-top:7px}.data-grid .cell:nth-child(4n){border-right:0}table{width:100%;table-layout:fixed;border-collapse:collapse;margin-top:7px}.col-load{width:9%}.col-client{width:23%}.col-delivery{width:23%}.col-payer{width:21%}.col-cte{width:7%}.col-weight{width:7%}.col-value{width:10%}th,td{padding:8px 4px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{font-size:7.5px;text-transform:uppercase;color:#4b5563}td{font-size:9px}.cell small{display:block;margin-top:4px;color:#6b7280;line-height:1.35}td small{display:block;margin-top:3px;color:#6b7280}.cte-cell .manual-entry{display:block;min-height:14px;border-bottom:1px solid #9ca3af}.notes{min-height:38px;white-space:pre-wrap}.sign{display:grid;grid-template-columns:1fr 1fr;gap:55px;margin:55px 22px 20px}.sign div{padding-top:6px;border-top:1px solid #4b5563;text-align:center;font-size:9px}
+    *{box-sizing:border-box}body{margin:0;background:#eef1f5;color:#111827;font:11px Arial,sans-serif}.toolbar{position:sticky;top:0;display:flex;justify-content:flex-end;gap:8px;padding:10px 18px;background:#111827}.toolbar button{border:0;border-radius:5px;padding:9px 14px;cursor:pointer}.toolbar .primary{background:#1e3a8a;color:white}.sheet{width:190mm;min-height:270mm;margin:18px auto;background:#fff;border:1px solid #d1d5db}.head{display:flex;align-items:stretch;border-bottom:2px solid #111827}.brand{display:flex;align-items:center;gap:12px;flex:1;padding:11px 14px}.logo{display:grid;place-items:center;width:44px;height:44px;border-radius:4px;background:#1e3a8a;color:#fff;font-size:9px;font-weight:900;line-height:1.15;text-align:center}.eyebrow,.cell span{display:block;color:#6b7280;font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}.route{margin-top:3px;font-size:14px;font-weight:700}.code{display:grid;place-items:center;min-width:88px;padding:10px 12px;border-left:2px solid #111827;text-align:center}.code b{display:block;margin-top:4px;font-size:13px}.code.document{min-width:105px;max-width:145px;overflow-wrap:anywhere}.code.document small{font-size:8px;color:#4b5563;margin-top:4px}.code.document b{min-width:78px;min-height:18px;border-bottom:1px solid #9ca3af}.metrics,.data-grid{display:grid;grid-template-columns:repeat(4,1fr)}.metrics{border-bottom:1px solid #d1d5db}.cell{min-width:0;overflow-wrap:anywhere;min-height:50px;padding:9px 12px;border-right:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb}.cell b{display:block;margin-top:4px;font-size:11.5px;line-height:1.35}.warning{padding:5px 12px;border-bottom:1px solid #d1d5db;background:#f9fafb;text-align:center;font-size:8px;font-weight:700;letter-spacing:.04em}section{padding:12px 14px 0}section h2{margin:0;padding-bottom:6px;border-bottom:1px solid #d1d5db;font-size:9px;letter-spacing:.06em;text-transform:uppercase}.data-grid{margin-top:7px}.data-grid .cell:nth-child(4n){border-right:0}table{width:100%;table-layout:fixed;border-collapse:collapse;margin-top:7px}.col-load{width:9%}.col-client{width:23%}.col-delivery{width:23%}.col-payer{width:21%}.col-cte{width:7%}.col-weight{width:7%}.col-value{width:10%}th,td{padding:8px 4px;border-bottom:1px solid #e5e7eb;text-align:left;vertical-align:top;overflow-wrap:anywhere}th{font-size:7.5px;text-transform:uppercase;color:#4b5563}td{font-size:9px}.cell small{display:block;margin-top:4px;color:#6b7280;line-height:1.35}td small{display:block;margin-top:3px;color:#6b7280}.cte-cell .manual-entry{display:block;min-height:14px;border-bottom:1px solid #9ca3af}.notes{min-height:38px;white-space:pre-wrap}.sign{display:grid;grid-template-columns:1fr 1fr;gap:55px;margin:55px 22px 20px}.sign div{padding-top:6px;border-top:1px solid #4b5563;text-align:center;font-size:9px}
     @page{size:A4 portrait;margin:8mm}@media print{body{background:#fff}.toolbar{display:none}.sheet{width:100%;min-height:0;margin:0;border:0}section{break-inside:avoid}.loads-section{break-inside:auto}thead{display:table-header-group}tr{break-inside:avoid}.sheet + .sheet{break-before:page;page-break-before:always}}
   </style></head><body><div class="toolbar"><button id="close-print">Fechar</button><button class="primary" id="print-document">Imprimir</button></div>${documents.map(cv2PrintSheet).join("")}</body></html>`);
   popup.document.close();
@@ -551,10 +558,10 @@ function cv2OpenPrint(options, target) {
 
 function cv2LoadPrintData(carga) {
   return {
-    title: "Romaneio de carga", code: carga.codigo, route: cv2Route(carga), rows: [carga], rowsTitle: "Dados da carga", notes: carga.observacoes, manualDocument: true, signatures: false,
+    title: "Romaneio de carga", code: carga.codigo, route: cv2Route(carga), rows: [carga], rowsTitle: "Dados da carga", notes: carga.observacoes, documentoErp: carga.documentoErp, manualDocument: true, signatures: false,
     metrics: [
       { label: "Data", value: cv2Date(carga.data) }, { label: "Valor da carga", value: cv2Money(carga.valorCliente) },
-      { label: "Peso", value: cv2Weight(carga.peso) }, { label: "Valor por tonelada", value: `${cv2Money(carga.valorTon)}/ton` },
+      { label: "Peso / volumes", value: `${cv2Weight(carga.peso)} / ${formatVolumes(carga.volumes)} vol.` }, { label: "Valor por tonelada", value: `${cv2Money(carga.valorTon)}/ton` },
     ],
     sections: [{ title: "Dados comerciais e operacionais", items: [
       { label: "Cliente (coleta)", value: carga.cliente, detail: [carga.origem, carga.ufOrigem].filter(Boolean).join("/") },
@@ -564,7 +571,7 @@ function cv2LoadPrintData(carga) {
       { label: "Viagem", value: carga.numeroViagem }, { label: "Placa / motorista", value: [carga.placa, carga.motorista].filter(Boolean).join(" · ") },
     ]}, ...(carga.paradas || []).map((stop, index) => ({ title: `Parada ${index + 1} · ${stop.tipo === "coleta" ? "Coleta" : "Entrega"}`, items: [
       { label: "Cliente/local", value: stop.cliente }, { label: "Cidade / UF", value: [stop.cidade, stop.uf].filter(Boolean).join("/") },
-      { label: "Endereço", value: stop.endereco }, { label: "Nota fiscal", value: stop.nf },
+      { label: "Endereço", value: stop.endereco }, { label: "Nota fiscal", value: stop.nf }, { label: "Volumes", value: formatVolumes(stop.volumes) },
       { label: "Observações", value: stop.observacoes },
     ] }))],
   };
@@ -618,10 +625,10 @@ export function Cv2PrintLoadsButton({ ids = [], viagemId, children = "Imprimir c
 function cv2PrintTrip(viagem) {
   const cargas = viagem.cargas || [];
   cv2OpenPrint({
-    title: "Romaneio de viagem", code: viagem.numero, route: cargas.length ? cv2Route(cargas[0]) : "Rota não definida", rows: cargas, notes: viagem.observacoes, manualDocument: true, signatures: false,
+    title: "Romaneio de viagem", code: viagem.numero, route: cargas.length ? cv2Route(cargas[0]) : "Rota não definida", rows: cargas, notes: viagem.observacoes, documentoErp: viagem.documentoErp, manualDocument: true, signatures: false,
     metrics: [
       { label: "Data", value: cv2Date(viagem.data) }, { label: "Valor das cargas", value: cv2Money(cargas.reduce((sum, carga) => sum + carga.valorCliente, 0)) },
-      { label: "Peso total", value: cv2Weight(cargas.reduce((sum, carga) => sum + carga.peso, 0)) }, { label: "KM da viagem", value: viagem.km ? `${Number(viagem.km).toLocaleString("pt-BR")} km` : "—" },
+      { label: "Peso / volumes totais", value: `${cv2Weight(cargas.reduce((sum, carga) => sum + carga.peso, 0))} / ${volumesSummary(cargas).text} vol.` }, { label: "KM da viagem", value: viagem.km ? `${Number(viagem.km).toLocaleString("pt-BR")} km` : "—" },
     ],
     sections: [{ title: "Motorista e pagamento", items: [
       { label: "Motorista", value: viagem.motorista }, { label: "Placa do veículo", value: viagem.placa },
@@ -632,15 +639,133 @@ function cv2PrintTrip(viagem) {
   });
 }
 
-export function Cv2TripDetails({ viagem, onClose, onLinkCte, onDuplicateCarga }) {
+export function Cv2ItineraryButton({ viagemId, disabled=false }) {
+  const [open,setOpen]=useState(false);
+  const [loading,setLoading]=useState(false);
+  const [error,setError]=useState("");
+  const [report,setReport]=useState(null);
+  const version=useRef(0);
+  useEffect(()=>()=>{version.current++;},[]);
+  const close=()=>{version.current++;setOpen(false);setLoading(false);};
+  const prepare=async()=>{
+    const current=++version.current;
+    setOpen(true);setLoading(true);setError("");setReport(null);
+    try {
+      const trip=await window.RB_API.getViagemV2(viagemId);
+      const ids=[...new Set((trip.cargas||[]).map(load=>load.id))];
+      if(!ids.length)throw new Error("Esta viagem não possui cargas vinculadas.");
+      const loads=new Array(ids.length);let cursor=0;
+      await Promise.all(Array.from({length:Math.min(4,ids.length)},async()=>{
+        while(cursor<ids.length && current===version.current){const index=cursor++;loads[index]=await window.RB_API.getCargaV2(ids[index]);}
+      }));
+      if(current===version.current)setReport({trip,loads,stops:buildItinerary(loads)});
+    }catch(err){if(current===version.current)setError(cv2Error(err));}
+    finally{if(current===version.current)setLoading(false);}
+  };
+  const move=(index,offset)=>setReport(current=>{
+    const stops=[...current.stops];[stops[index],stops[index+offset]]=[stops[index+offset],stops[index]];
+    return {...current,stops};
+  });
+  const print=()=>{
+    const popup=window.open("","_blank","width=980,height=760");
+    if(!popup){setError("Permita pop-ups para abrir a impressão.");return;}
+    popup.document.write(itineraryHtml(report.trip,report.loads,report.stops));popup.document.close();
+    popup.document.getElementById("print-document")?.addEventListener("click",()=>popup.print());
+    popup.document.getElementById("close-print")?.addEventListener("click",()=>popup.close());
+  };
+  return <><button className="btn" disabled={disabled||loading} onClick={prepare}>Itinerário / conferência</button>{open && <Cv2Modal title="Itinerário de conferência" subtitle="Organize a sequência de atendimento antes de imprimir" onClose={close} wide portal>
+    <div className="cv2-modal-body">
+      {error && <div className="cv2-alert error" role="alert">{error}<button className="btn" onClick={prepare}>Tentar novamente</button></div>}
+      {loading && <p role="status">Carregando volumes e paradas das cargas…</p>}
+      {report && <><div className="cv2-alert info"><b>{report.trip.numero} · {report.trip.placa}</b><p>Volumes previstos: {volumesSummary(report.loads).text}</p><small>A ordem abaixo vale para esta impressão. Revise coletas e entregas antes da saída. Quantidades conferidas serão preenchidas no papel.</small></div>
+        <ol className="cv2-itinerary-list">{report.stops.map((stop,index)=><li key={stop.id}><span className="cv2-erp-step">{index+1}</span><div><b>{stop.tipo==='coleta'?'Coleta':'Entrega'} · {stop.cliente||'Local não informado'}</b><small>{stop.carga} · {[stop.cidade,stop.uf].filter(Boolean).join('/')} · {stop.volumes==null?'Volumes a distribuir':`${formatVolumes(stop.volumes)} volume(s)`}</small>{stop.endereco && <small>{stop.endereco}</small>}</div><button className="btn" aria-label={`Subir parada ${index+1}`} disabled={index===0} onClick={()=>move(index,-1)}>↑</button><button className="btn" aria-label={`Descer parada ${index+1}`} disabled={index===report.stops.length-1} onClick={()=>move(index,1)}>↓</button></li>)}</ol>
+      </>}
+    </div><footer className="cv2-modal-actions"><button className="btn" onClick={close}>Fechar</button><button className="btn primary" disabled={!report||loading} onClick={print}>Imprimir itinerário</button></footer>
+  </Cv2Modal>}</>;
+}
+
+export function Cv2ErpDocumentModal({ viagem, onClose, onSaved }) {
+  const [numero,setNumero] = useState("");
+  const [data,setData] = useState("");
+  const [results,setResults] = useState([]);
+  const [selected,setSelected] = useState(viagem.documentoErp || null);
+  const [loading,setLoading] = useState(false);
+  const [saving,setSaving] = useState(false);
+  const [searched,setSearched] = useState(false);
+  const [page,setPage] = useState(0);
+  const [hasMore,setHasMore] = useState(false);
+  const [error,setError] = useState("");
+  const version = useRef(0);
+  useEffect(()=>()=>{version.current++;},[]);
+  const reset = () => { version.current++; setResults([]); setSearched(false); setLoading(false); setHasMore(false); };
+  const same = (a,b) => a && b && a.tipo===b.tipo && a.numero===b.numero && a.empresa===b.empresa && a.serie===b.serie;
+  const search = async (more=false) => {
+    const current=++version.current;
+    setLoading(true); setError("");
+    if (!more) {setResults([]);setSearched(false);}
+    try {
+      const response=await window.RB_API.searchViagemDocumentosErp(viagem.id,{numero,data,page:more?page+1:1});
+      if(current!==version.current)return;
+      setResults(items=>more?[...items,...response.items.filter(item=>!items.some(existing=>same(existing,item)))]:response.items);
+      setPage(response.page);setHasMore(response.hasMore);setSearched(true);
+    } catch(err) {if(current===version.current)setError(cv2Error(err));}
+    finally {if(current===version.current)setLoading(false);}
+  };
+  const save = async () => {
+    setSaving(true);setError("");
+    try { const result=await window.RB_API.saveViagemDocumentoErp(viagem.id,selected); onSaved(result.documentoErp); }
+    catch(err){setError(cv2Error(err));}
+    finally{setSaving(false);}
+  };
+  const ownership=String(viagem.tipoPropriedade || "").toUpperCase();
+  const classified=["FROTA","TERCEIRO"].includes(ownership);
+  const label=ownership === "FROTA" ? "Viagem frota" : "Carta frete";
+  return <Cv2Modal className="cv2-cte-modal cv2-erp-modal" title="Vincular documento da viagem" subtitle={`${viagem.numero} · Consulta no ERP`} onClose={()=>{if(!saving)onClose();}}>
+    <div className="cv2-modal-body">
+      {error && <div className="cv2-alert error" role="alert">{error}</div>}
+      <div className="cv2-erp-vehicle">
+        <div className="cv2-erp-plate"><small>VEÍCULO</small><strong>{viagem.placa || "Sem placa"}</strong></div>
+        <div className="cv2-erp-classification"><span className={`cv2-erp-badge ${ownership === "FROTA" ? "fleet" : "third"}`}>{classified ? ownership === "FROTA" ? "Frota própria" : "Veículo terceiro" : "Tipo não informado"}</span><p>{classified ? <>Consulta automática de <b>{ownership === "FROTA" ? "viagens da frota" : "cartas de frete"}</b></> : "Defina o tipo do veículo no cadastro da viagem para pesquisar."}</p></div>
+      </div>
+      <section className="cv2-cte-search-panel"><div className="cv2-cte-heading"><strong><span className="cv2-erp-step">1</span> Encontre o documento</strong><p>Pesquise os documentos desta placa. Use os filtros para refinar a consulta.</p></div>
+        <div className="cv2-cte-filters">
+          <Cv2Field label="Número (opcional)"><input aria-label="Número do documento" value={numero} disabled={saving} onChange={e=>{reset();setNumero(e.target.value);}} placeholder="Ex.: 12345" /></Cv2Field>
+          <Cv2Field label={ownership === "FROTA" ? "Data de saída (opcional)" : "Data de emissão (opcional)"}><input aria-label="Data do documento" type="date" value={data} disabled={saving} onChange={e=>{reset();setData(e.target.value);}} /></Cv2Field>
+          <button className="btn primary" disabled={loading||saving||!classified} onClick={()=>search()}>{loading?"Buscando...":"Pesquisar"}</button>
+        </div>
+      </section>
+      {(loading || searched) && <div className="cv2-erp-results-heading" role="status"><strong>{loading ? "Consultando o ERP…" : `${results.length} documento(s) carregado(s)`}</strong><span>{loading ? "Aguarde a consulta" : "Escolha um documento abaixo"}</span></div>}
+      {searched && !loading && !results.length && <div className="cv2-erp-empty"><strong>Nenhum documento encontrado</strong><span>Confira o número ou tente outra data para esta placa.</span></div>}
+      <div className="cv2-cte-results" role="radiogroup" aria-label="Documentos disponíveis">{results.map(item=><button className="cv2-cte-result" role="radio" aria-checked={Boolean(same(item,selected))} disabled={saving} key={`${item.empresa}-${item.serie}-${item.numero}`} onClick={()=>setSelected(item)}>
+        <div><strong>{label} {item.numero}</strong><span>Empresa {item.empresa}{item.serie?` · Série ${item.serie}`:""} · {cv2Date(item.data)}</span><span>{item.motorista || "Motorista não informado"}</span></div><div>{item.placa}<span>{same(item,selected)?"Selecionado":"Selecionar"}</span></div>
+      </button>)}</div>
+      {hasMore && <button className="btn" disabled={loading||saving} onClick={()=>search(true)}>Carregar mais resultados</button>}
+      <section className={`cv2-erp-preview ${selected ? "has-document" : ""}`}>
+        <div className="cv2-erp-preview-heading"><strong><span className="cv2-erp-step">2</span> Documento para impressão</strong><span>{selected ? "Pronto para salvar" : "Aguardando seleção"}</span></div>
+        <div className="cv2-erp-preview-content"><div className="cv2-erp-paper" aria-hidden="true"><i /><i /><i /></div><div><strong>{selected ? `${cv2ErpLabel(selected)} ${selected.numero}` : "Selecione um documento na consulta"}</strong><p>{selected ? `Empresa ${selected.empresa}${selected.serie ? ` · Série ${selected.serie}` : ""} · ${selected.placa || viagem.placa}` : "O número aparecerá no campo Documento da viagem e das cargas."}</p></div>
+          {selected && <button className="btn" disabled={saving} onClick={()=>setSelected(null)}>Remover vínculo</button>}
+        </div>
+      </section>
+      <p className="cv2-cte-hint">O mesmo documento pode ser usado em várias viagens. Ao trocar a placa ou o tipo do veículo, vincule novamente.</p>
+    </div>
+    <footer className="cv2-modal-actions"><button className="btn" disabled={saving} onClick={onClose}>Cancelar</button><button className="btn primary" disabled={saving||loading||(!selected&&!viagem.documentoErp)} onClick={save}>{saving?"Salvando...":"Salvar vínculo"}</button></footer>
+  </Cv2Modal>;
+}
+
+export function Cv2TripDetails({ viagem: initialViagem, onClose, onLinkCte, onDuplicateCarga }) {
+  const [viagem,setViagem]=useState(initialViagem);
+  const [linking,setLinking]=useState(false);
+  useEffect(()=>setViagem(initialViagem),[initialViagem]);
+  if(linking) return <Cv2ErpDocumentModal viagem={viagem} onClose={()=>setLinking(false)} onSaved={documentoErp=>{setViagem(current=>({...current,documentoErp}));setLinking(false);}} />;
   return <Cv2Modal title={`Viagem ${viagem.numero}`} subtitle={`${cv2Date(viagem.data)} · ${viagem.placa || "Sem placa"}`} onClose={onClose} wide>
     <div className="cv2-modal-body">
       <div className="cv2-detail-grid"><div><span>Operação</span><Cv2Status value={viagem.situacao} vehicleLinked={Boolean(viagem.placa)} /></div><div><span>Financeiro</span><Cv2FinancialStatus value={viagem.financeiro} /></div><div><span>Motorista</span><b>{viagem.motorista || "—"}</b></div><div><span>KM previsto</span><b>{viagem.km ?? "—"}</b></div><div><span>ANTT / RNTRC</span><b>{viagem.antt || "—"}</b></div><div><span>Celular / CNH</span><b>{[viagem.numeroMotorista, viagem.cnh].filter(Boolean).join(" · ") || "—"}</b></div></div>
       <Cv2TripBilling financeiro={viagem.financeiro} />
+      <section className="cv2-erp-link"><div><span>Documento para impressão</span><strong>{viagem.documentoErp ? `${cv2ErpLabel(viagem.documentoErp)} ${viagem.documentoErp.numero}` : "Viagem frota / carta frete não vinculada"}</strong><small>{viagem.documentoErp ? `Empresa ${viagem.documentoErp.empresa}${viagem.documentoErp.serie ? ` · Série ${viagem.documentoErp.serie}` : ""}` : "Consulte o ERP e selecione o documento desta placa."}</small></div><button className="btn primary" onClick={()=>setLinking(true)}>{viagem.documentoErp?"Gerenciar vínculo":"Vincular viagem / carta frete"}</button></section>
       <h3 className="cv2-subtitle">Cargas vinculadas</h3>
       <div className="cv2-linked-loads">{viagem.cargas.map((carga) => { const hasCte = (carga.documentos || []).some(cv2IsTransportDocument); return <div key={carga.id}><div><strong>{carga.codigo} · {carga.cliente}</strong><span>{carga.origem}/{carga.ufOrigem} → {carga.destino}/{carga.ufDestino}</span><small>CT-es: {cv2CteNumbers(carga) || "Nenhum vinculado"}</small></div><div className="cv2-linked-statuses"><Cv2Status value={carga.status} /><Cv2FinancialStatus value={carga.financeiro} /><button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => onLinkCte(carga)}><Icon name="file" size={13} /> {hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button><Cv2PrintLoadsButton ids={[carga.id]}>Imprimir carga</Cv2PrintLoadsButton>{onDuplicateCarga && <button className="btn" onClick={() => onDuplicateCarga(carga)}>Duplicar carga</button>}</div></div>; })}</div>
     </div>
-    <footer className="cv2-modal-actions"><button className="btn" onClick={onClose}>Fechar</button><Cv2PrintLoadsButton viagemId={viagem.id} disabled={!viagem.cargas?.length}>Imprimir cargas da viagem</Cv2PrintLoadsButton><button className="btn primary" onClick={() => cv2PrintTrip(viagem)}>Imprimir folha da viagem</button></footer>
+    <footer className="cv2-modal-actions"><button className="btn" onClick={onClose}>Fechar</button><Cv2ItineraryButton viagemId={viagem.id} disabled={!viagem.cargas?.length} /><Cv2PrintLoadsButton viagemId={viagem.id} disabled={!viagem.cargas?.length}>Imprimir cargas da viagem</Cv2PrintLoadsButton><button className="btn primary" onClick={() => cv2PrintTrip(viagem)}>Imprimir folha da viagem</button></footer>
   </Cv2Modal>;
 }
 
@@ -680,7 +805,7 @@ const Cv2Styles = () => <style>{`
   .cv2-overlay{position:fixed;inset:0;background:rgba(9,9,11,.58);z-index:1300;display:grid;place-items:center;padding:24px;backdrop-filter:blur(2px)}.cv2-modal{width:min(680px,calc(100vw - 48px));max-height:94vh;background:var(--surface);color:var(--text);border:1px solid var(--border-strong);border-radius:13px;box-shadow:var(--shadow-lg);overflow:hidden;display:flex;flex-direction:column}.cv2-modal.wide{width:min(1120px,calc(100vw - 48px))}.cv2-modal>header{display:flex;justify-content:space-between;gap:15px;padding:20px 22px;background:var(--surface);border-bottom:1px solid var(--border)}.cv2-modal h2{color:var(--text);font-size:18px;line-height:1.3;margin:0}.cv2-modal header p{font-size:12px;line-height:1.5;color:var(--muted);margin:5px 0 0}.cv2-icon-btn{width:34px;height:34px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--muted);font-size:20px;cursor:pointer}.cv2-icon-btn:hover{background:var(--hover);color:var(--text)}.cv2-modal form{display:flex;flex-direction:column;min-height:0}.cv2-modal-body{padding:22px;background:var(--surface);overflow-y:auto;overflow-x:hidden}.cv2-modal-actions{flex-shrink:0;flex-wrap:wrap;border-top:1px solid var(--border);padding:14px 22px;display:flex;align-items:center;justify-content:flex-end;gap:9px;background:var(--surface-2)}.cv2-modal-actions>span{margin-right:auto;color:var(--muted);font-size:12px}.cv2-modal-actions>div{display:flex;gap:8px}
   .cv2-section-title{display:flex;align-items:center;gap:10px;margin:4px 0 14px}.cv2-section-title:not(:first-of-type){margin-top:25px}.cv2-section-title b,.cv2-section-title small{display:block}.cv2-section-title small{font-size:11px;color:var(--muted);margin-top:3px}.cv2-grid{display:grid;gap:13px}.cv2-grid.four{grid-template-columns:repeat(4,1fr)}.cv2-grid.three{grid-template-columns:repeat(3,1fr)}.cv2-field{display:block;min-width:0}.cv2-field>span{display:block;color:var(--muted);font-size:11px;margin:0 0 6px}.cv2-field>span b{color:#ff8d8d}.cv2-field small{display:block;color:var(--muted);font-size:10.5px;margin-top:5px}.cv2 input,.cv2 select,.cv2 textarea{width:100%;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:7px;padding:10px 11px;outline:none;font:inherit;font-size:12.5px}.cv2 input:focus,.cv2 select:focus,.cv2 textarea:focus{border-color:#729ce9;box-shadow:0 0 0 2px rgba(81,127,215,.16)}.cv2 textarea{resize:vertical}
   .cv2-autocomplete{position:relative}.cv2-suggestions{position:absolute;z-index:20;left:0;top:calc(100% + 5px);width:100%;min-width:min(360px,calc(100vw - 70px));max-height:245px;overflow:auto;background:var(--surface);border:1px solid var(--border-strong);border-radius:9px;padding:5px;box-shadow:var(--shadow-lg)}.cv2-suggestions button{display:flex;flex-direction:column;align-items:flex-start;width:100%;border:0;background:transparent;color:var(--text);border-radius:6px;padding:10px;text-align:left;cursor:pointer}.cv2-suggestions button:hover{background:var(--hover)}.cv2-suggestions strong{font-size:12.5px}.cv2-suggestions span{font-size:10.5px;color:var(--accent);margin-top:4px}.cv2-suggestion-empty{padding:12px;color:var(--muted);font-size:12px}.cv2-vehicle-option{display:grid!important;grid-template-columns:minmax(76px,auto) auto 1fr;align-items:center;gap:10px;width:100%}.cv2-vehicle-option strong{white-space:nowrap}.cv2-vehicle-option span{margin:0!important;color:var(--accent)!important;font-weight:600}.cv2-vehicle-option em{font-style:normal;color:var(--text-2);white-space:normal;overflow-wrap:anywhere}
-  .cv2-alert{border:1px solid var(--info-border);background:var(--info-bg);color:var(--info);border-radius:8px;padding:11px 13px;font-size:12px;margin:14px 0}.cv2-alert.success{color:var(--ok);border-color:var(--ok-border);background:var(--ok-bg)}.cv2-alert.error{color:var(--crit);border-color:var(--crit-border);background:var(--crit-bg)}.cv2-stops-head{display:flex;justify-content:space-between;align-items:center;margin-top:22px}.cv2-stops-head b,.cv2-stops-head small{display:block}.cv2-stops-head small{color:var(--muted);font-size:11px;margin-top:3px}.cv2-stop{display:grid;grid-template-columns:110px 1fr 62px 1.2fr 1.4fr 1fr 34px;gap:7px;margin-top:9px}.cv2-stop .cv2-icon-btn{height:auto}.cv2-details{margin:16px 0;border:1px solid var(--border);border-radius:8px;padding:12px}.cv2-details summary{cursor:pointer;font-size:12px}.cv2-checks{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:13px}.cv2-checks label{font-size:11px;color:var(--muted);display:flex;gap:7px;align-items:center}.cv2-checks input{width:auto}
+  .cv2-alert{border:1px solid var(--info-border);background:var(--info-bg);color:var(--info);border-radius:8px;padding:11px 13px;font-size:12px;margin:14px 0}.cv2-alert.success{color:var(--ok);border-color:var(--ok-border);background:var(--ok-bg)}.cv2-alert.error{color:var(--crit);border-color:var(--crit-border);background:var(--crit-bg)}.cv2-stops-head{display:flex;justify-content:space-between;align-items:center;margin-top:22px}.cv2-stops-head b,.cv2-stops-head small{display:block}.cv2-stops-head small{color:var(--muted);font-size:11px;margin-top:3px}.cv2-stop{display:grid;grid-template-columns:95px minmax(0,1fr) 50px minmax(0,1.2fr) minmax(0,1.4fr) minmax(0,1fr) 78px 34px;gap:7px;margin-top:9px}.cv2-stop .cv2-icon-btn{height:auto}.cv2-details{margin:16px 0;border:1px solid var(--border);border-radius:8px;padding:12px}.cv2-details summary{cursor:pointer;font-size:12px}.cv2-checks{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:13px}.cv2-checks label{font-size:11px;color:var(--muted);display:flex;gap:7px;align-items:center}.cv2-checks input{width:auto}
   .cv2-stop .cv2-field>span{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}.cv2-stop .cv2-suggestions{min-width:0;overflow-wrap:anywhere}
   .cv2-bulk-print{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}.cv2-bulk-print>div{flex:1;min-width:220px}.cv2-bulk-print strong,.cv2-bulk-print small{display:block}.cv2-bulk-print small{color:var(--muted);font-size:11px;margin-top:4px}.cv2-select-cell{width:36px}.cv2 .cv2-select-cell input{width:16px;height:16px;cursor:pointer;accent-color:var(--accent)}.cv2-print-error{display:block;color:var(--crit);font-size:12px;max-width:420px}
   .cv2-price-box{border:1px solid var(--accent-border);background:var(--accent-soft);border-radius:10px;padding:0 14px 14px;margin-top:18px}.cv2-price-box .cv2-stops-head{margin-top:14px}.cv2-price-inputs{margin-top:13px}.cv2-price-results{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:13px}.cv2-price-results>div{border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:11px}.cv2-price-results span,.cv2-price-results b,.cv2-price-results small{display:block}.cv2-price-results span,.cv2-price-results small{font-size:10px;color:var(--muted)}.cv2-price-results b{margin:6px 0;font-size:14px}.cv2-price-results .negative b{color:var(--crit)}.cv2-price-results .positive b{color:var(--ok)}
@@ -869,10 +994,10 @@ const CargasViagensV2 = ({ user }) => {
     {tab === "cargas" && <div className="cv2-bulk-print"><div><strong>{selectedLoads.length} carga(s) selecionada(s)</strong><small>Selecione as cargas abaixo. A seleção é mantida entre páginas e limpa ao mudar os filtros.</small></div><button className="btn" disabled={!selectedLoads.length} onClick={() => setSelectedLoads([])}>Limpar seleção</button><Cv2PrintLoadsButton ids={selectedLoads}>Imprimir selecionadas ({selectedLoads.length})</Cv2PrintLoadsButton></div>}
     {tab === "cargas" ? <div className="cv2-table-wrap"><table className="cv2-table"><thead><tr><th className="cv2-select-cell"><input type="checkbox" aria-label="Selecionar todas as cargas desta página" checked={allPageSelected} disabled={loading || !cargas.length} onChange={togglePrintPage} ref={node => { if (node) node.indeterminate = !allPageSelected && cargas.some(carga => selectedLoads.includes(carga.id)); }} /></th><th>Carga / data</th><th>Clientes</th><th>Origem</th><th>Destino</th><th>Material / peso</th><th>Valor da carga</th><th>Placa / viagem</th><th>Operação</th><th>Financeiro</th><th></th></tr></thead><tbody>
       {!loading && !cargas.length && <tr><td colSpan="11"><div className="cv2-empty"><b>Nenhuma carga encontrada.</b><span>Ajuste os filtros.</span></div></td></tr>}
-      {cargas.map((carga) => <tr key={carga.id}><td className="cv2-select-cell"><input type="checkbox" aria-label={`Selecionar carga ${carga.codigo}`} checked={selectedLoads.includes(carga.id)} disabled={loading} onChange={() => togglePrintLoad(carga.id)} /></td><td><strong>{carga.codigo}</strong><small>{cv2Date(carga.data)}</small></td><td className="cv2-client-cell"><small className="cv2-client-line"><b>Inicial</b><span>{carga.cliente || "—"}</span></small><small className="cv2-client-line"><b>Entrega</b><span>{carga.clienteFinal || "—"}</span></small><small className="cv2-client-line"><b>Tomador</b><span>{carga.tomadorServico || "—"}</span></small></td><td><strong>{carga.origem || "—"}</strong><small>{carga.ufOrigem || "Sem UF"}</small></td><td><strong>{carga.destino || "—"}</strong><small>{carga.ufDestino || "Sem UF"}</small></td><td><strong>{carga.material || "—"}</strong><small>{cv2Weight(carga.peso)}</small></td><td><strong>{cv2Money(carga.valorCliente)}</strong><small>{cv2Money(carga.valorTon)}/ton</small></td><td>{carga.placa ? <><strong className="cv2-plate">{carga.placa}</strong><small>{[carga.numeroViagem, carga.motorista].filter(Boolean).join(" · ")}</small></> : <><strong>Sem veículo</strong><small>Não programada</small></>}</td><td><Cv2Status value={carga.status} vehicleLinked={Boolean(carga.placa)} detail={carga.status === "aguardando_viagem" ? "Sem veículo programado" : ""} /></td><td><Cv2FinancialStatus value={carga.financeiro} /></td><td>{cargaActions(carga)}</td></tr>)}
+      {cargas.map((carga) => <tr key={carga.id}><td className="cv2-select-cell"><input type="checkbox" aria-label={`Selecionar carga ${carga.codigo}`} checked={selectedLoads.includes(carga.id)} disabled={loading} onChange={() => togglePrintLoad(carga.id)} /></td><td><strong>{carga.codigo}</strong><small>{cv2Date(carga.data)}</small></td><td className="cv2-client-cell"><small className="cv2-client-line"><b>Inicial</b><span>{carga.cliente || "—"}</span></small><small className="cv2-client-line"><b>Entrega</b><span>{carga.clienteFinal || "—"}</span></small><small className="cv2-client-line"><b>Tomador</b><span>{carga.tomadorServico || "—"}</span></small></td><td><strong>{carga.origem || "—"}</strong><small>{carga.ufOrigem || "Sem UF"}</small></td><td><strong>{carga.destino || "—"}</strong><small>{carga.ufDestino || "Sem UF"}</small></td><td><strong>{carga.material || "—"}</strong><small>{cv2Weight(carga.peso)} ? {formatVolumes(carga.volumes)} vol.</small></td><td><strong>{cv2Money(carga.valorCliente)}</strong><small>{cv2Money(carga.valorTon)}/ton</small></td><td>{carga.placa ? <><strong className="cv2-plate">{carga.placa}</strong><small>{[carga.numeroViagem, carga.motorista].filter(Boolean).join(" · ")}</small></> : <><strong>Sem veículo</strong><small>Não programada</small></>}</td><td><Cv2Status value={carga.status} vehicleLinked={Boolean(carga.placa)} detail={carga.status === "aguardando_viagem" ? "Sem veículo programado" : ""} /></td><td><Cv2FinancialStatus value={carga.financeiro} /></td><td>{cargaActions(carga)}</td></tr>)}
     </tbody></table></div> : <div className="cv2-table-wrap"><table className="cv2-table"><thead><tr><th>Viagem / data</th><th>Motorista / placa</th><th>Rota</th><th>Cargas</th><th>Peso total</th><th>Receita</th><th>Operação</th><th>Financeiro</th><th></th></tr></thead><tbody>
       {!loading && !viagens.length && <tr><td colSpan="9"><div className="cv2-empty"><b>Nenhuma viagem encontrada.</b><span>Programe um veículo usando as cargas disponíveis.</span></div></td></tr>}
-      {viagens.map((viagem) => { const first = viagem.cargas[0] || {}; const destinations = [...new Set(viagem.cargas.map((carga) => [carga.destino, carga.ufDestino].filter(Boolean).join("/")).filter(Boolean))]; const delivered = viagem.cargas.filter((carga) => carga.status === "entregue").length; return <tr key={viagem.id}><td><strong>{viagem.numero}</strong><small>{cv2Date(viagem.data)}</small></td><td><strong>{viagem.motorista || "—"}</strong>{viagem.placa ? <small><span className="cv2-plate">{viagem.placa}</span></small> : <small>Sem placa</small>}</td><td className="cv2-route"><strong>{first.origem ? `${first.origem}/${first.ufOrigem}` : "—"}</strong><span>{destinations.length === 1 ? ` → ${destinations[0]}` : destinations.length > 1 ? ` → ${destinations.length} destinos` : ""}</span></td><td><button className="cv2-load-count" onClick={() => setModal({ type: "details", item: viagem })}><strong>{viagem.cargas.length} {viagem.cargas.length === 1 ? "carga" : "cargas"}</strong><small>{delivered}/{viagem.cargas.length} entregue(s)</small></button></td><td><strong>{cv2Weight(viagem.cargas.reduce((sum, carga) => sum + carga.peso, 0))}</strong></td><td><strong>{cv2Money(viagem.cargas.reduce((sum, carga) => sum + carga.valorCliente, 0))}</strong></td><td><Cv2Status value={viagem.situacao} vehicleLinked={Boolean(viagem.placa)} detail={`${delivered}/${viagem.cargas.length} cargas entregues`} /></td><td><Cv2FinancialStatus value={viagem.financeiro} /></td><td><div className="cv2-row-actions"><button className="btn" onClick={() => setModal({ type: "details", item: viagem })}>Detalhes</button><button className="btn primary" onClick={() => cv2PrintTrip(viagem)}><Icon name="file" size={13} /> Imprimir</button><details className="cv2-more"><summary aria-label="Mais ações">•••</summary><div><Cv2PrintLoadsButton viagemId={viagem.id} disabled={!viagem.cargas?.length}>Imprimir cargas da viagem</Cv2PrintLoadsButton><button onClick={() => openViagemEdit(viagem)}><Icon name="wrench" size={13} /> Editar viagem</button><button onClick={() => setModal({ type: "cargaViagem", viagem })}>+ Adicionar carga</button><button className="danger" onClick={() => setModal({ type: "deleteViagem", item: viagem })}>Excluir viagem</button></div></details></div></td></tr>; })}
+      {viagens.map((viagem) => { const first = viagem.cargas[0] || {}; const destinations = [...new Set(viagem.cargas.map((carga) => [carga.destino, carga.ufDestino].filter(Boolean).join("/")).filter(Boolean))]; const delivered = viagem.cargas.filter((carga) => carga.status === "entregue").length; return <tr key={viagem.id}><td><strong>{viagem.numero}</strong><small>{cv2Date(viagem.data)}</small></td><td><strong>{viagem.motorista || "—"}</strong>{viagem.placa ? <small><span className="cv2-plate">{viagem.placa}</span></small> : <small>Sem placa</small>}</td><td className="cv2-route"><strong>{first.origem ? `${first.origem}/${first.ufOrigem}` : "—"}</strong><span>{destinations.length === 1 ? ` → ${destinations[0]}` : destinations.length > 1 ? ` → ${destinations.length} destinos` : ""}</span></td><td><button className="cv2-load-count" onClick={() => setModal({ type: "details", item: viagem })}><strong>{viagem.cargas.length} {viagem.cargas.length === 1 ? "carga" : "cargas"}</strong><small>{delivered}/{viagem.cargas.length} entregue(s)</small></button></td><td><strong>{cv2Weight(viagem.cargas.reduce((sum, carga) => sum + carga.peso, 0))}</strong></td><td><strong>{cv2Money(viagem.cargas.reduce((sum, carga) => sum + carga.valorCliente, 0))}</strong></td><td><Cv2Status value={viagem.situacao} vehicleLinked={Boolean(viagem.placa)} detail={`${delivered}/${viagem.cargas.length} cargas entregues`} /></td><td><Cv2FinancialStatus value={viagem.financeiro} /></td><td><div className="cv2-row-actions"><button className="btn" onClick={() => setModal({ type: "details", item: viagem })}>Detalhes</button><button className="btn primary" onClick={() => cv2PrintTrip(viagem)}><Icon name="file" size={13} /> Imprimir</button><details className="cv2-more"><summary aria-label="Mais ações">•••</summary><div><Cv2ItineraryButton viagemId={viagem.id} disabled={!viagem.cargas?.length} /><Cv2PrintLoadsButton viagemId={viagem.id} disabled={!viagem.cargas?.length}>Imprimir cargas da viagem</Cv2PrintLoadsButton><button onClick={() => openViagemEdit(viagem)}><Icon name="wrench" size={13} /> Editar viagem</button><button onClick={() => setModal({ type: "cargaViagem", viagem })}>+ Adicionar carga</button><button className="danger" onClick={() => setModal({ type: "deleteViagem", item: viagem })}>Excluir viagem</button></div></details></div></td></tr>; })}
     </tbody></table></div>}
     <Cv2Pagination page={page} pageSize={pageSize} total={pageInfo.total} totalPages={pageInfo.totalPages}
       onPage={setPage} onPageSize={(value) => { setPage(1); setPageSize(value); }} />
@@ -893,7 +1018,7 @@ const CargasViagensV2 = ({ user }) => {
     {modal?.type === "details" && <Cv2TripDetails viagem={modal.item} onDuplicateCarga={openDuplicateCarga} onClose={() => setModal(null)} onLinkCte={(carga) => setModal({ type: "cte", item: carga, viagem: modal.item })} />}
     {modal?.type === "deleteCarga" && <Cv2DeleteModal type="carga" item={modal.item} onClose={() => setModal(null)} onDeleted={removeDone} />}
     {modal?.type === "deleteViagem" && <Cv2DeleteModal type="viagem" item={modal.item} onClose={() => setModal(null)} onDeleted={removeDone} />}
-    {modal?.type === "tripDone" && <Cv2Modal title="Viagem criada com sucesso" subtitle={`${modal.item.numero} · ${CV2_STATUS[modal.item.situacao]?.label || "Viagem programada"}`} onClose={() => setModal(null)}><div className="cv2-modal-body"><div className="cv2-alert success"><b>{modal.item.placa}</b> · {modal.item.motorista || "Motorista não informado"}<br />{modal.item.cargas.length} carga(s) vinculada(s).</div></div><footer className="cv2-modal-actions"><button className="btn" onClick={() => setModal(null)}>Fechar</button><Cv2PrintLoadsButton viagemId={modal.item.id} disabled={!modal.item.cargas?.length}>Imprimir cargas da viagem</Cv2PrintLoadsButton><button className="btn primary" onClick={() => cv2PrintTrip(modal.item)}>Imprimir folha da viagem</button></footer></Cv2Modal>}
+    {modal?.type === "tripDone" && <Cv2Modal title="Viagem criada com sucesso" subtitle={`${modal.item.numero} · ${CV2_STATUS[modal.item.situacao]?.label || "Viagem programada"}`} onClose={() => setModal(null)}><div className="cv2-modal-body"><div className="cv2-alert success"><b>{modal.item.placa}</b> · {modal.item.motorista || "Motorista não informado"}<br />{modal.item.cargas.length} carga(s) vinculada(s).</div></div><footer className="cv2-modal-actions"><button className="btn" onClick={() => setModal(null)}>Fechar</button><Cv2ItineraryButton viagemId={modal.item.id} disabled={!modal.item.cargas?.length} /><Cv2PrintLoadsButton viagemId={modal.item.id} disabled={!modal.item.cargas?.length}>Imprimir cargas da viagem</Cv2PrintLoadsButton><button className="btn primary" onClick={() => cv2PrintTrip(modal.item)}>Imprimir folha da viagem</button></footer></Cv2Modal>}
   </div>;
 };
 

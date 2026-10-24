@@ -8,6 +8,7 @@ import ItemHistory, {
   priceDifference,
 } from "./purchases-item-history.jsx";
 import { purchasesApi as api } from "./purchases-api.js";
+import './purchases-simple.css';
 export function bestProductOffers(rows, productId) {
   const eligible = rows.filter(
     (r) =>
@@ -24,6 +25,8 @@ export function bestProductOffers(rows, productId) {
 }
 export default function PurchaseDecision({ quote, rows, onRefresh }) {
   const negotiationDialog = useRef(null);
+  const [panels, setPanels] = useState({});
+  const showPanel = (id, panel) => setPanels(current => ({...current, [id]: current[id] === panel ? null : panel}));
   const [search, setSearch] = useState(""),
     [pendingOnly, setPendingOnly] = useState(false),
     [picks, setPicks] = useState({}),
@@ -80,35 +83,14 @@ export default function PurchaseDecision({ quote, rows, onRefresh }) {
     }
   };
   return (
-    <section className="purchase-card purchase-decision">
+    <section className="purchase-decision purchase-simple">
       <header className="purchase-toolbar">
         <div>
-          <span className="purchase-eyebrow">
-            HISTÓRICO · PROPOSTAS · ESCOLHA
-          </span>
           <h2>Análise por item</h2>
-          <p>
-            Veja de quem comprou, compare as condições e escolha a proposta.
-          </p>
+          <p>Menor preço e última compra, lado a lado.</p>
         </div>
       </header>
-      <div className="decision-progress">
-        <strong>
-          {
-            quote.itens.filter((p) => bestProductOffers(rows, p.id).length)
-              .length
-          }{" "}
-          de {quote.itens.length} itens com oferta para toda a quantidade
-        </strong>
-        {quote.planoCompra && !quote.origem_chave && (
-          <span>
-            {quote.planoCompra.pendentes} sem escolha ·{" "}
-            {quote.planoCompra.revisar} para revisar · Total selecionado com
-            frete: <b>{money(quote.planoCompra.total)}</b>
-          </span>
-        )}
-      </div>
-      <div className="analysis-controls">
+      {quote.itens.length > 4 && <div className="analysis-controls">
         <label>
           Buscar item
           <input
@@ -127,12 +109,8 @@ export default function PurchaseDecision({ quote, rows, onRefresh }) {
             Somente itens sem escolha ou para revisar
           </label>
         )}
-      </div>
-      <p className="analysis-caution">
-        Menor unitário sem frete, com descontos registrados. Confira marca,
-        embalagem e impostos. O frete é da proposta e entra uma vez por
-        fornecedor no resumo.
-      </p>
+      </div>}
+      <p className="simple-price-note">Menor preço por unidade, sem frete, entre ofertas que atendem toda a quantidade.</p>
       {error && (
         <p role="alert">
           Histórico indisponível: {error}{" "}
@@ -159,17 +137,13 @@ export default function PurchaseDecision({ quote, rows, onRefresh }) {
           );
           const last = past[0];
           const selected = quote.planoCompra?.escolhas?.[product.id];
+          const delta = best.length ? priceDifference(best[0].price, last, best[0].unit) : null;
           return (
             <article className="decision-product" key={product.id}>
               <header className="purchase-toolbar">
                 <div>
-                  <small>
-                    Empresa {product.empresa} · Produto {product.codigo}
-                  </small>
                   <h3>{product.nome}</h3>
-                  <strong>
-                    Solicitado: {quantity(product.quantidade)} {product.unidade}
-                  </strong>
+                  <small>{quantity(product.quantidade)} {product.unidade} · Cód. {product.codigo} · Empresa {product.empresa}</small>
                 </div>
                 <span className="purchase-badge">
                   {selected?.valida
@@ -177,13 +151,19 @@ export default function PurchaseDecision({ quote, rows, onRefresh }) {
                     : selected
                       ? "Revisar escolha"
                       : best.length
-                        ? "Pronto para comparar"
+                        ? `${offers.length} ${offers.length===1?'oferta':'ofertas'}`
                         : "Sem oferta completa"}
                 </span>
               </header>
-              <div className="decision-summary">
+              <div className="simple-item-summary">
+                <div className="simple-best">
+                  <small>{best.length>1?'Menor preço · empate':'Menor preço da cotação'}</small>
+                  <strong>{best.length ? best.map(r=>r.supplier).join(' / ') : 'Aguardando oferta completa'}</strong>
+                  {best.length>0&&<b>{money(best[0].price)} <span>/ {best[0].unit||product.unidade}</span></b>}
+                  {delta!=null&&<span className={delta<=0?'decision-saving':'decision-increase'}>{Math.abs(delta).toLocaleString('pt-BR',{maximumFractionDigits:1})}% {delta<=0?'abaixo':'acima'} da última compra</span>}
+                </div>
                 <div>
-                  <small>Última compra até a abertura</small>
+                  <small>Última compra antes desta cotação</small>
                   <strong>
                     {loading
                       ? "Carregando…"
@@ -201,40 +181,25 @@ export default function PurchaseDecision({ quote, rows, onRefresh }) {
                     </span>
                   )}
                 </div>
-                <div>
-                  <small>Menor unitário da cotação · sem frete</small>
-                  <strong>
-                    {best.length ? money(best[0].price) : "Sem oferta completa"}
-                  </strong>
-                  <span>{best.map((r) => r.supplier).join(" / ")}</span>
-                </div>
-                <div>
-                  <small>
-                    {quote.origem_chave
-                      ? "Cotação importada"
-                      : "Fornecedor escolhido"}
-                  </small>
-                  <strong>
-                    {quote.origem_chave
-                      ? "Somente consulta"
-                      : selected?.fornecedor || "Ainda não escolhido"}
-                  </strong>
-                  <span>
-                    {selected && !selected.valida
-                      ? "Condições alteradas: confirme novamente"
-                      : "Compare entrega, pagamento e quantidade antes de decidir."}
-                  </span>
-                </div>
               </div>
-              <ItemHistory
+              {selected&&<p className="simple-selection">{selected.valida?'Escolhido':'Revisar escolha'}: <strong>{selected.fornecedor}</strong>{!selected.valida&&' · A proposta mudou; confirme novamente.'}</p>}
+              <div className="simple-item-actions">
+                <button type="button" aria-expanded={panels[product.id]==='ofertas'} onClick={()=>showPanel(product.id,'ofertas')}>Comparar ofertas ({offers.length})</button>
+                <button type="button" aria-expanded={panels[product.id]==='historico'} onClick={()=>showPanel(product.id,'historico')}>Ver histórico</button>
+                {onRefresh&&!quote.origem_chave&&quote.status!=='cancelada'&&<button type="button" className="purchase-primary" disabled={!best.length&&!selected} aria-expanded={panels[product.id]==='escolha'} onClick={()=>{
+                  setPanels(current=>({...current,[product.id]:'escolha'}));
+                  if(best.length===1&&!selected)setPicks(current=>({...current,[product.id]:{inviteId:best[0].inviteId,revision:Date.now()}}));
+                }}>{selected?'Revisar escolha':'Escolher fornecedor'}</button>}
+              </div>
+              {panels[product.id]==='historico'&&<ItemHistory
                 key={`${quote.id}:${product.id}`}
                 product={product}
                 preview={past}
                 cutoff={historyDate(quote)}
                 loading={loading}
                 error={error}
-              />
-              <h4>Propostas desta cotação</h4>
+              />}
+              {panels[product.id]==='ofertas'&&<><h4>Propostas desta cotação</h4>
               {offers.length ? (
                 <div
                   className="analysis-table-scroll"
@@ -362,15 +327,16 @@ export default function PurchaseDecision({ quote, rows, onRefresh }) {
                                       (picks[product.id]?.inviteId ||
                                         selected?.conviteId) === r.inviteId
                                     }
-                                    onClick={() =>
+                                    onClick={() => {
+                                      setPanels(current=>({...current,[product.id]:'escolha'}));
                                       setPicks({
                                         ...picks,
                                         [product.id]: {
                                           inviteId: r.inviteId,
                                           revision: Date.now(),
                                         },
-                                      })
-                                    }
+                                      });
+                                    }}
                                   >
                                     Escolher
                                   </button>
@@ -401,8 +367,8 @@ export default function PurchaseDecision({ quote, rows, onRefresh }) {
                 </div>
               ) : (
                 <p>Aguardando propostas para este item.</p>
-              )}
-              {onRefresh &&
+              )}</>}
+              {panels[product.id]==='escolha'&&onRefresh &&
                 !quote.origem_chave &&
                 quote.status !== "cancelada" && (
                   <ProductChoice

@@ -8,14 +8,40 @@ afterEach(()=>{cleanup();localStorage.clear();});
 const fleet=["ABC1234","DEF4G56"];
 const Dialog=({children})=><div>{children}</div>;
 const FleetSelect=({value,onChange})=><label>Placa<input value={value} onChange={e=>onChange(e.target.value)}/></label>;
-function mount(api,locationApi){window.RB_API={getPlantaoOdometer:api,getPlantaoLocation:locationApi};render(<Wizard user={{login:"teste"}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);fireEvent.click(screen.getByRole("button",{name:/Abastecimento/}));next();fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"ABC1234"}});fireEvent.change(screen.getByLabelText("Horário da nota"),{target:{value:"00:00:00"}});}
+function mount(api,locationApi){window.RB_API={getPlantaoOdometer:api,getPlantaoLocation:locationApi};render(<Wizard user={{login:"teste"}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);fireEvent.click(screen.getByRole("button",{name:/Abastecimento/}));fireEvent.change(screen.getByLabelText("Horário da nota"),{target:{value:"00:00:00"}});next();fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"ABC1234"}});}
 function next(){fireEvent.click(screen.getByRole("button",{name:"Próximo passo"}));}
+it("Outros pula KM e volta à placa sem exigir telemetria",()=>{
+ const telemetry=vi.fn();window.RB_API={getPlantaoOdometer:telemetry};
+ render(<Wizard user={{login:"teste"}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);
+ fireEvent.click(screen.getByRole("button",{name:/Outros/}));next();
+ fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"ABC1234"}});next();
+ expect(screen.getByLabelText("Valor total da despesa (R$)")).toBeTruthy();
+ expect(screen.queryByLabelText(/Hodômetro/)).toBeNull();
+ expect(screen.getByRole("progressbar").getAttribute("aria-valuemax")).toBe("6");
+ expect(telemetry).not.toHaveBeenCalled();
+ fireEvent.click(screen.getByRole("button",{name:"Voltar"}));expect(screen.getByLabelText("Placa").value).toBe("ABC1234");
+});
+it("abre a correção de horário quando o abastecimento não tem hora reconhecida",()=>{
+ window.RB_API={};render(<Wizard user={{login:"teste"}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);
+ fireEvent.click(screen.getByRole("button",{name:/Abastecimento/}));next();
+ expect(screen.getByText("Ajustar horário da nota").closest("details").open).toBe(true);
+ expect(screen.getByRole("alert").textContent).toContain("horário");
+});
+it("oferece leitura aberta na primeira etapa e mantém a nota ao seguir para manutenção",()=>{
+ const onMaintenance=vi.fn();
+ localStorage.setItem("rodobach:expense-draft:v1:teste:expense:new",JSON.stringify({version:null,data:{photos:{invoice:"data:image/png;base64,test"},amount:"150,00",supplier:"Posto teste"}}));
+ window.RB_API={};
+ render(<Wizard user={{login:"teste"}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount} onMaintenance={onMaintenance}/>);
+ expect(screen.getByText("Começar pela nota fiscal").closest("details").open).toBe(true);
+ fireEvent.click(screen.getByRole("button",{name:/Manutenção/}));next();
+ expect(onMaintenance).toHaveBeenCalledWith(expect.objectContaining({photos:{invoice:"data:image/png;base64,test"},amount:"150,00",supplier:"Posto teste"}));
+});
 it("usa somente telemetria e remove as fotos de painel e bomba",async()=>{
  const api=vi.fn().mockResolvedValueOnce({odometer:197611.7,source:"telemetria",date:new Date().toISOString()}).mockResolvedValueOnce({odometer:250000,source:"abastecimento",date:new Date().toISOString()});
- mount(api);next();await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("197611,7"));
+ mount(api);expect(screen.queryByLabelText("Horário da nota")).toBeNull();expect(screen.queryByText("Ler data e horário da nota")).toBeNull();next();await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("197611,7"));
  expect(screen.getByLabelText("Hodômetro (km)").readOnly).toBe(true);
  expect(screen.queryByText("Foto do painel")).toBeNull();
- next();expect(screen.queryByText("Foto da bomba")).toBeNull();expect(screen.getByText("Ler nota do abastecimento")).toBeTruthy();
+ next();expect(screen.queryByText("Foto da bomba")).toBeNull();expect(screen.queryByText("Ler nota do abastecimento")).toBeNull();
  fireEvent.click(screen.getByRole("button",{name:"Voltar"}));fireEvent.click(screen.getByRole("button",{name:"Voltar"}));
  fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"DEF4G56"}});next();
  await screen.findByText(/Sem leitura de telemetria/);
@@ -50,7 +76,7 @@ it("preserva KM salvo ao editar valores e consulta de novo se o horário mudar",
  const api=vi.fn().mockResolvedValue({odometer:200000,source:"telemetria",date:"2026-09-30T15:00:00Z"});window.RB_API={getPlantaoOdometer:api};
  render(<Wizard record={{id:"edit",version:1,service:"Abastecimento",plate:"ABC1234",expenseDate:"2026-09-30",expenseTime:"10:30:00",amount:500,liters:100,odometer:197611.7}} user={{id:42}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);
  next();next();expect(screen.getByLabelText("Hodômetro (km)").value).toBe("197611,7");expect(api).not.toHaveBeenCalled();
- fireEvent.click(screen.getByRole("button",{name:"Voltar"}));fireEvent.change(screen.getByLabelText("Horário da nota"),{target:{value:"12:00:00"}});next();
+ fireEvent.click(screen.getByRole("button",{name:"Voltar"}));fireEvent.click(screen.getByRole("button",{name:"Voltar"}));fireEvent.change(screen.getByLabelText("Horário da nota"),{target:{value:"12:00:00"}});next();next();
  await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("200000"));
  expect(api).toHaveBeenLastCalledWith("ABC1234","2026-09-30","12:00:00");
 });

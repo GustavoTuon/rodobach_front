@@ -23,6 +23,7 @@ export function PurchaseIcon({ name, size = 22 }) {
       </>
     ),
     plus: <path d="M12 5v14M5 12h14" />,
+    analysis: <><path d="M3 3v18h18M7 14l4-5 4 3 6-8"/><circle cx="7" cy="14" r="1"/><circle cx="11" cy="9" r="1"/><circle cx="15" cy="12" r="1"/></>,
     arrow: <path d="M4 12h16m-6-6 6 6-6 6" />,
     clock: (
       <>
@@ -62,6 +63,7 @@ export function PurchaseNavigation({ tab, onNavigate }) {
   const items = [
     ["inicio", "Início", "home"],
     ["cotacoes", "Cotações", "quotes"],
+    ["analise", "Análise", "analysis"],
     ["fornecedores", "Fornecedores", "suppliers"],
     ["nova", "Criar cotação", "plus"],
   ];
