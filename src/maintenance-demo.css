@@ -1657,7 +1657,7 @@ button.mp-payment-button:hover:not(:disabled) { border-color: var(--accent); }
 
 .mp-financial-status .mp-posted-check { cursor: default; }
 
-.driver-start-card { padding: 30px; border: 1px solid #c4d6ec; border-radius: 24px; background: linear-gradient(130deg, color-mix(in srgb, var(--accent) 9%, var(--surface)), var(--surface)); }
+.driver-start-card { padding: 24px; border: 1px solid #c4d6ec; border-radius: 24px; background: linear-gradient(130deg, color-mix(in srgb, var(--accent) 9%, var(--surface)), var(--surface)); }
 .driver-start-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; }
 .driver-road-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; background: var(--accent); color: white; font-size: 28px; }
 .driver-badge { font-size: 9px; letter-spacing: .13em; color: var(--accent); font-weight: 650; }
@@ -1784,6 +1784,30 @@ button.mp-payment-button:hover:not(:disabled) { border-color: var(--accent); }
 .expense-photo-actions { gap:8px; }
 .expense-photo-assist button { min-height:40px; padding:10px 12px; border-radius:10px; font-size:12px; }
 .expense-photo-actions .expense-photo-read { background:#3c75ae; color:#fff; border-color:#3c75ae; flex:1; }
+
+/* Keep the initial receipt entry short enough to expose the expense choices. */
+.driver-draft-bar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.driver-draft-bar p { margin:0; }
+.driver-draft-bar button { flex-shrink:0; font-size:11px; }
+.driver-initial-receipt { margin-top:0; }
+.driver-initial-receipt .expense-photo-intro,
+.driver-initial-receipt .expense-photo-slot-title,
+.driver-initial-receipt .expense-photo-tip { display:none; }
+.driver-initial-receipt .expense-photo-assist { padding:12px; }
+.driver-time-correction > summary { min-height:44px; }
+.driver-time-correction > p,
+.driver-time-correction > label { margin:12px 16px; }
+.expense-ocr-suggestion > span { min-width:0; overflow-wrap:anywhere; }
+.mp-review dd { overflow-wrap:anywhere; }
+.mp-history-label { justify-content:flex-end; }
+@media(max-width:480px) {
+  .driver-draft-bar { align-items:flex-start; }
+  .driver-draft-bar button { max-width:110px; white-space:normal; }
+  .driver-start-top, .driver-route { display:none; }
+  .driver-start-card { padding:18px; }
+  .driver-start-card h2 { font-size:20px; }
+  .driver-start-card > p { margin-bottom:16px; }
+}
 .expense-photo-actions .expense-photo-remove { color:#99616a; }
 .expense-photo-assist .expense-photo-tip { line-height:1.6; font-size:11px; margin:14px 0 0; }
 .expense-photo-assist .expense-ocr-local { padding-top:12px; border-top:1px solid #edf1f6; line-height:1.6; font-size:10px; }

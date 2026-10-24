@@ -223,6 +223,8 @@ window.RB_API = {
   listViagensV2: (filters = {}) =>
     apiRequest(`/cargas-viagens-v2/viagens${buildQuery(filters)}`),
   getViagemV2: (id) => apiRequest(`/cargas-viagens-v2/viagens/${id}`),
+  searchViagemDocumentosErp: (id, filters) => apiRequest(`/cargas-viagens-v2/viagens/${id}/documentos-erp${buildQuery(filters)}`),
+  saveViagemDocumentoErp: (id, documento) => apiRequest(`/cargas-viagens-v2/viagens/${id}/documento-erp`, { method: "PUT", body: JSON.stringify({documento}) }),
   reservarNumeroViagemV2: () => apiRequest("/cargas-viagens-v2/viagens/numero", { method: "POST" }),
   createViagemV2: (payload) =>
     apiRequest("/cargas-viagens-v2/viagens", {

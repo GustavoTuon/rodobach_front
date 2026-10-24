@@ -140,7 +140,7 @@ export default function ItemHistory({
           <>
             <HistoryTable rows={preview} />
             <small>
-              Até 3 compras mais recentes até a abertura da cotação.
+              Até 3 compras mais recentes até a data de referência acima.
             </small>
           </>
         ) : (

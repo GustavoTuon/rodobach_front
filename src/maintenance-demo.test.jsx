@@ -2,6 +2,7 @@
 import React from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -18,6 +19,7 @@ it("motorista recebe a placa da telemetria preenchida e bloqueada", async () => 
   await screen.findByText("Motorista teste");
   fireEvent.click(screen.getByRole("button",{name:"Registrar despesa"}));
   fireEvent.click(screen.getByRole("button",{name:/Abastecimento/}));
+  fireEvent.change(screen.getByLabelText("Horário da nota"),{target:{value:"00:00:00"}});
   fireEvent.click(screen.getByRole("button",{name:"Próximo passo"}));
   expect(screen.getByLabelText("Placa do veículo").value).toBe("ABC1234");
   expect(screen.getByLabelText("Placa do veículo").disabled).toBe(true);
@@ -160,6 +162,7 @@ it("preserva o progresso ao fechar e retomar, e permite voltar antes de registra
     screen.getByRole("heading", { name: "O que foi feito?" }),
   ).toBeTruthy();
   expect(screen.getByLabelText("Fornecedor").value).toBe("Oficina da estrada");
+  fireEvent.change(screen.getByLabelText("Justificativa sem nota"), {target:{value:"Fornecedor nao emitiu a nota."}});
   fireEvent.click(
     screen.getByRole("button", { name: "Continuar", exact: true }),
   );
@@ -192,6 +195,30 @@ it("bloqueia data futura na primeira etapa e mantém o modal aberto", async () =
     screen.getByRole("heading", { name: "Vamos começar pelo básico" }),
   ).toBeTruthy();
   expect(window.RB_API.createPlantao).not.toHaveBeenCalled();
+});
+it("pede comprovante nos detalhes antes de abrir a revisão da manutenção",async()=>{
+ await ready();await details();
+ fireEvent.click(screen.getByRole("button",{name:"Continuar",exact:true}));
+ expect(screen.getByRole("alert").textContent).toContain("justifique");
+ expect(screen.getByRole("heading",{name:"O que foi feito?"})).toBeTruthy();
+ fireEvent.change(screen.getByLabelText("Justificativa sem nota"),{target:{value:"Fornecedor nao emitiu comprovante."}});
+ fireEvent.click(screen.getByRole("button",{name:"Continuar",exact:true}));
+ expect(screen.getByRole("heading",{name:"Tudo pronto para registrar?"})).toBeTruthy();
+ expect(screen.getByText("Fornecedor nao emitiu comprovante.",{selector:"dd"})).toBeTruthy();
+ expect(window.RB_API.createPlantao).not.toHaveBeenCalled();
+});
+it("comprovante atrasado não substitui a foto de outra despesa",async()=>{
+ let resolveFirst;
+ const base={plate:"ABC1234",amount:100,service:"Borracharia",author:"maria",authorId:42,date:new Date().toISOString(),checked:false,version:1,photoKinds:{invoice:true},hasReceipt:true};
+ localStorage.setItem(KEY,JSON.stringify([{...base,id:"first"},{...base,id:"second",amount:200}]));
+ window.RB_API.receiptPlantao=vi.fn().mockImplementationOnce(()=>new Promise(resolve=>{resolveFirst=resolve;})).mockResolvedValueOnce({photos:{invoice:"data:image/png;base64,second"}});
+ render(<MaintenanceDemo/>);await screen.findByRole("button",{name:"Todo o período"});
+ fireEvent.click(screen.getByRole("button",{name:"Todo o período"}));
+ const buttons=await screen.findAllByRole("button",{name:"Ver comprovante"});
+ fireEvent.click(buttons[0]);fireEvent.click(screen.getByRole("button",{name:"Fechar comprovante"}));fireEvent.click(buttons[1]);
+ expect((await screen.findByAltText("Foto do comprovante da despesa")).getAttribute("src")).toBe("data:image/png;base64,second");
+ await act(async()=>{resolveFirst({photos:{invoice:"data:image/png;base64,first"}});});
+ await waitFor(()=>expect(screen.getByAltText("Foto do comprovante da despesa").getAttribute("src")).toBe("data:image/png;base64,second"));
 });
 it("seleciona placas pelo teclado, fecha com Escape e mostra busca vazia", async () => {
   await ready();
@@ -645,10 +672,10 @@ it("motorista registra abastecimento com km antes dos valores em sete etapas e a
   fireEvent.click((await screen.findAllByRole("button", {name:"Minhas despesas",exact:true}))[0]);
   fireEvent.click(screen.getByRole("button", {name:"Registrar despesa"}));
   fireEvent.click(screen.getByRole("button", {name:/Abastecimento/}));
+  fireEvent.change(screen.getByLabelText("Horário da nota"), {target:{value:"00:00:00"}});
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
   await waitFor(() => expect(screen.getByLabelText("Placa do veículo").disabled).toBe(false));
   fireEvent.change(screen.getByLabelText("Placa do veículo"), {target:{value:"ABC1234"}});
-  fireEvent.change(screen.getByLabelText("Horário da nota"), {target:{value:"00:00:00"}});
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
   expect(screen.queryByLabelText("Valor total da despesa (R$)")).toBeNull();
   await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("125430,7"));

@@ -21,7 +21,7 @@ it('agrupa nome e local de coleta e entrega em sete colunas no A4', async () => 
   await waitFor(() => expect(popup.document.write).toHaveBeenCalledTimes(2));
   const html = popup.document.write.mock.calls[1][0];
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  expect([...doc.querySelectorAll('th')].map(cell => cell.textContent)).toEqual(['Carga', 'Cliente (coleta)', 'Entrega', 'Tomador', 'CT-e', 'Peso', 'Valor']);
+  expect([...doc.querySelectorAll('th')].map(cell => cell.textContent)).toEqual(['Carga', 'Cliente (coleta)', 'Entrega', 'Tomador', 'CT-e', 'Peso / vol.', 'Valor']);
   const cells = [...doc.querySelectorAll('tbody tr:first-child td')].map(cell => cell.textContent);
   expect(cells).toHaveLength(7);
   expect(doc.querySelector('tbody td:nth-child(2) b').textContent).toBe(fixture.cliente);

@@ -1,4 +1,5 @@
 import PurchaseDecision from "../purchases-decision.jsx";
+import PurchaseInsights from "../purchases-insights.jsx";
 import { PurchaseSummary } from "../purchases-selection.jsx";
 import { SupplierEditor } from "../supplier-workspace.jsx";
 import AddSuppliers from "../purchases-add-suppliers.jsx";
@@ -157,7 +158,7 @@ function QuoteDetail({ quote, onRefresh, onChanged, suppliers, groups }) {
   const closed =
     quote.status !== "aberta" || new Date(quote.prazo) <= new Date();
   return (
-    <section className="purchase-card">
+    <section className="purchase-card simple-quote-detail">
       <header className="purchase-toolbar">
         <div>
           <h2>{quote.titulo}</h2>
@@ -178,6 +179,18 @@ function QuoteDetail({ quote, onRefresh, onChanged, suppliers, groups }) {
         >
           Atualizar respostas
         </button>
+      </header>
+
+      {notice && <p role="status">{notice}</p>}
+      {error && <p role="alert">{error}</p>}
+      <PurchaseDecision
+        quote={quote}
+        rows={analysisRows(quote)}
+        onRefresh={onRefresh}
+      />
+      <details className="simple-purchase-summary"><summary>Resumo da compra <strong>{money(quote.planoCompra?.total || 0)}</strong></summary><PurchaseSummary quote={quote} onRefresh={onRefresh} /></details>
+      <details className="purchase-invitation-details">
+        <summary>Fornecedores, convites e ações da cotação</summary>
         {!closed && (
           <button
             disabled={busy}
@@ -196,23 +209,7 @@ function QuoteDetail({ quote, onRefresh, onChanged, suppliers, groups }) {
             Encerrar recebimento
           </button>
         )}
-      </header>
-      <div className="quote-status-summary">
-        <span className={`purchase-badge ${quoteProgress(quote).key}`}>
-          {quoteProgress(quote).label}
-        </span>
-        <strong>
-          {quoteProgress(quote).answered} de {quoteProgress(quote).total}{" "}
-          fornecedores responderam
-        </strong>
-        <progress
-          aria-label="Progresso das respostas"
-          value={quoteProgress(quote).answered}
-          max={Math.max(1, quoteProgress(quote).total)}
-        />
-      </div>
-      <details className="purchase-invitation-details">
-        <summary>Fornecedores, convites e ações da cotação</summary>
+
         <QuoteActions quote={quote} onChanged={onChanged} />
         <p>{quote.observacoes}</p>
         <AddSuppliers
@@ -279,14 +276,6 @@ function QuoteDetail({ quote, onRefresh, onChanged, suppliers, groups }) {
           </div>
         ))}
       </details>
-      {notice && <p role="status">{notice}</p>}
-      {error && <p role="alert">{error}</p>}
-      <PurchaseDecision
-        quote={quote}
-        rows={analysisRows(quote)}
-        onRefresh={onRefresh}
-      />
-      <PurchaseSummary quote={quote} onRefresh={onRefresh} />
     </section>
   );
 }
@@ -364,6 +353,7 @@ function Compras({ standalone = false }) {
                 {
                   inicio: "Visão geral",
                   cotacoes: "Cotações",
+                  analise: "Análise de cotações",
                   nova: "Nova cotação",
                   fornecedores: "Fornecedores",
                   detalhe: "Detalhes da cotação",
@@ -401,6 +391,7 @@ function Compras({ standalone = false }) {
         )}
         {notice && <p role="status">{notice}</p>}
         {loading && <p role="status">Carregando compras…</p>}
+        {tab === "analise" && !loading && <PurchaseInsights quotes={quotes} onOpen={open}/>}
         {tab === "cotacoes" && (
           <PurchaseDashboard
             quotes={quotes}

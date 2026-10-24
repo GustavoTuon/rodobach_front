@@ -750,11 +750,11 @@ function MaintenanceForm({
     }
   }
   async function showReceipt(r) {
-    setReceiptView({loading:true});
+    setReceiptView({id:r.id,loading:true});
     try {
       const result = await window.RB_API.receiptPlantao(r.id, manager);
-      setReceiptView(current => current ? {receipt:result.receipt,photos:result.photos} : null);
-    } catch(error) {setReceiptView(current => current ? {error:error.message} : null);}
+      setReceiptView(current => current?.id === r.id ? {id:r.id,receipt:result.receipt,photos:result.photos} : current);
+    } catch(error) {setReceiptView(current => current?.id === r.id ? {id:r.id,error:error.message} : current);}
   }
   async function showHistory(r) {
     setHistory({ id: r.id, loading: true, items: [] });
@@ -872,6 +872,13 @@ function MaintenanceForm({
         return;
       }
     }
+    if (step === 1) {
+      const hasInvoice = maintenancePhotos.invoice !== undefined ? Boolean(maintenancePhotos.invoice) : Boolean(editing?.photoKinds?.invoice || editing?.hasReceipt);
+      if (!hasInvoice && receiptReason.trim().length < 10) {
+        setError("Anexe a nota ou justifique a ausência com pelo menos 10 caracteres.");
+        return;
+      }
+    }
     if (step < 2) setStep((n) => n + 1);
     else submit(event);
   }
@@ -907,7 +914,7 @@ function MaintenanceForm({
       setError("Entre no sistema novamente para registrar a manutenção.");
       return;
     }
-    const hasInvoice=maintenancePhotos.invoice !== undefined ? Boolean(maintenancePhotos.invoice) : Boolean(editing?.photoKinds?.invoice);
+    const hasInvoice=maintenancePhotos.invoice !== undefined ? Boolean(maintenancePhotos.invoice) : Boolean(editing?.photoKinds?.invoice || editing?.hasReceipt);
     if (!hasInvoice && receiptReason.trim().length<10) {setError("Anexe a nota ou justifique a ausência com pelo menos 10 caracteres.");return;}
     savingRef.current = true;
     setSaving(true);
@@ -1238,7 +1245,18 @@ function MaintenanceForm({
       </header>
       {driverWizard && <DriverExpenseWizard record={driverWizard.record} user={user} fleet={fleet} fleetLoading={fleetLoading} fleetError={fleetError}
         onRetryFleet={() => setFleetAttempt(n => n + 1)} manager={manager} Dialog={MaintenanceDialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}
-        onMaintenance={() => { try {clearExpenseDraft(user,"expense");} catch {} setDriverWizard(null); openWizard(); }}
+        onMaintenance={receipt => {
+          if (receipt) {
+            setMaintenancePhotos(current=>({...current,...receipt.photos}));
+            setExpenseDate(receipt.date);
+            if(receipt.amount) setAmount(receipt.amount);
+            if(receipt.supplier) setSupplier({nome:receipt.supplier});
+            if(receipt.documentNumber) setDocument(receipt.documentNumber);
+            if(receipt.plate) setPlate(receipt.plate);
+            setStep(0);
+          }
+          try {clearExpenseDraft(user,"expense");} catch {} setDriverWizard(null); openWizard();
+        }}
         onClose={() => setDriverWizard(null)} onSaved={record => {
           setRecords(items => items.some(item => item.id === record.id) ? items.map(item => item.id === record.id ? record : item) : [record, ...items]);
           setHistory(null);
@@ -1589,6 +1607,8 @@ function MaintenanceForm({
                               ["Data da despesa", displayDay(expenseDate)],
                               ["Fornecedor", supplier.nome || "Não informado"],
                               ["Comprovante", document || "Não informado"],
+                              ["Nota anexada", (maintenancePhotos.invoice !== undefined ? maintenancePhotos.invoice : editing?.photoKinds?.invoice || editing?.hasReceipt) ? "Sim" : "Não"],
+                              ["Justificativa sem nota", receiptReason || "—"],
                               ["Responsável", author],
                               ["Observação", note || "Sem observação"],
                             ].map(([label, value]) => (
@@ -1624,6 +1644,7 @@ function MaintenanceForm({
                         type="submit"
                         disabled={
                           saving ||
+                          photoBusy ||
                           user.readOnly ||
                           fleetLoading ||
                           Boolean(fleetError) ||
@@ -1643,7 +1664,7 @@ function MaintenanceForm({
                         Etapa {step + 1} de 3 ·{" "}
                         {step === 2
                           ? "Os dados serão salvos ao confirmar."
-                          : "Seu progresso fica aqui enquanto esta tela estiver aberta."}
+                          : "Rascunho salvo neste aparelho."}
                       </p>
                     </footer>
                   </form>
@@ -1690,7 +1711,6 @@ function MaintenanceForm({
               <span className="mp-plate">{search || "Todas"}</span>
             </div>
             <div className="mp-history-label">
-              <h3>{manager ? "Registros recebidos" : "Seus lançamentos"}</h3>
               <button
                 className="mp-cancel-edit"
                 disabled={saving || recordsLoading}
