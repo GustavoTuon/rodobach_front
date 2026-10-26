@@ -264,6 +264,7 @@ beforeEach(() => {
     }),
   };
   window.RB_API = {
+    listPlantaoPaymentMethods: vi.fn(async () => ({methods:[{code:"1",company:"1",name:"DEPÓSITO - INTER"}]})),
     getPlantaoOdometer: vi.fn().mockResolvedValue({odometer:125430.7,source:"telemetria",date:new Date().toISOString()}),
     listPlantao: vi.fn(async () => ({
       records: JSON.parse(localStorage.getItem(KEY) || "[]"),
@@ -642,12 +643,32 @@ it("mantém os controles financeiros apenas na conferência", async () => {
   expect(screen.queryByLabelText("Pagamento")).toBeNull();
 });
 
+it("permite tentar novamente quando o cadastro de formas de pagamento falha", async () => {
+  await ready();
+  await submit();
+  window.RB_API.listPlantaoPaymentMethods.mockRejectedValueOnce(new Error("indisponível"));
+  fireEvent.click(screen.getAllByRole("button", {name:"Conferência"})[0]);
+  fireEvent.click(await screen.findByRole("button", {name:"Registrar pagamento — ABC1234"}));
+  await screen.findByText("Não foi possível carregar as formas de pagamento.");
+  expect(screen.getByRole("button", {name:"Salvar pagamento"}).disabled).toBe(true);
+  fireEvent.click(screen.getByRole("button", {name:"Tentar carregar novamente"}));
+  await waitFor(()=>expect(screen.getByRole('button',{name:/Forma de pagamento Selecione/}).disabled).toBe(false));
+  fireEvent.click(screen.getByRole('button',{name:/Forma de pagamento Selecione/}));
+  await screen.findByRole("option", {name:"DEPÓSITO - INTER"});
+  expect(screen.getByRole("button", {name:"Salvar pagamento"}).disabled).toBe(true);
+});
+
 it("registra a data no modal, mantém o formulário em falha e permite corrigir o pagamento", async () => {
   await ready();
   await submit();
   fireEvent.click(screen.getAllByRole("button", { name: "Conferência" })[0]);
   fireEvent.click(await screen.findByRole("button", { name: "Registrar pagamento — ABC1234" }));
   fireEvent.change(screen.getByLabelText("Data do pagamento"), { target: { value: "2026-09-30" } });
+  await waitFor(()=>expect(screen.getByRole('button',{name:/Forma de pagamento Selecione/}).disabled).toBe(false));
+  fireEvent.click(screen.getByRole('button',{name:/Forma de pagamento Selecione/}));
+  await screen.findByRole("option", {name:"DEPÓSITO - INTER"});
+  fireEvent.change(screen.getByRole('combobox',{name:'Buscar forma de pagamento'}),{target:{value:'deposito'}});
+  fireEvent.keyDown(screen.getByRole('combobox',{name:'Buscar forma de pagamento'}),{key:'Enter'});
   let record = JSON.parse(localStorage.getItem(KEY))[0];
   window.RB_API.updatePlantaoControl = vi.fn().mockRejectedValueOnce(new Error("Falha ao salvar pagamento")).mockImplementation(async (_id, body) => {
     record = { ...record, ...body, paid: Boolean(body.paymentDate), version: record.version + 1 };
@@ -659,7 +680,7 @@ it("registra a data no modal, mantém o formulário em falha e permite corrigir 
   fireEvent.click(screen.getByRole("button", { name: "Salvar pagamento" }));
   await screen.findByText("Pago em 30/09/2026");
   expect(screen.queryByRole("dialog")).toBeNull();
-  expect(window.RB_API.updatePlantaoControl).toHaveBeenLastCalledWith(record.id, { version: 1, paymentDate: "2026-09-30" }, true);
+  expect(window.RB_API.updatePlantaoControl).toHaveBeenLastCalledWith(record.id, { version: 1, paymentDate: "2026-09-30", paymentMethod:{code:"1",company:"1"} }, true);
   fireEvent.click(screen.getByRole("button", { name: "Editar pagamento — ABC1234" }));
   expect(screen.getByLabelText("Data do pagamento").value).toBe("2026-09-30");
   fireEvent.click(screen.getByRole("button", { name: "Remover registro de pagamento" }));

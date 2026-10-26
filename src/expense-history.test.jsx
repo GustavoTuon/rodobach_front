@@ -24,7 +24,8 @@ it("agrupa por placa com detalhes recolhidos e totais sem erro decimal",()=>{
   expect(detail.open).toBe(false);
   fireEvent.click(detail.querySelector("summary"));
   expect(detail.open).toBe(true);
-  expect(expenseTotals(records)).toEqual({total:170.3,pending:120.1,checked:50.2,fuel:100.1,maintenance:50.2,other:20});
+  expect(expenseTotals(records)).toEqual({total:170.3,pending:120.1,checked:50.2,fuel:100.1,maintenance:50.2,other:20,unloading:0});
+  expect(expenseTotals([{service:'Descarga',amount:150,checked:false}])).toEqual({total:150,pending:150,checked:0,fuel:0,maintenance:0,other:0,unloading:150});
 });
 it("motorista vê o mês da placa atual e guarda as placas antigas no histórico",()=>{
   const {container,rerender}=render(<ExpenseHistory records={records} isDriver currentPlate="ABC1234" renderRecord={()=>null}/>);
