@@ -3,12 +3,12 @@ import React from "react";
 const money = value => value.toLocaleString("pt-BR", {style:"currency",currency:"BRL"});
 const day = row => row.expenseDate || new Date(row.date).toLocaleDateString("en-CA",{timeZone:"America/Sao_Paulo"});
 export function expenseTotals(rows) {
-  const sums = {total:0,pending:0,checked:0,fuel:0,maintenance:0,other:0};
+  const sums = {total:0,pending:0,checked:0,fuel:0,maintenance:0,other:0,unloading:0};
   for (const row of rows) {
     const cents = Math.round(Number(row.amount) * 100);
     sums.total += cents;
     sums[row.checked ? "checked" : "pending"] += cents;
-    sums[row.service === "Abastecimento" ? "fuel" : row.service === "Outros" ? "other" : "maintenance"] += cents;
+    sums[row.service === "Abastecimento" ? "fuel" : row.service === 'Descarga' ? 'unloading' : row.service === "Outros" ? "other" : "maintenance"] += cents;
   }
   return Object.fromEntries(Object.entries(sums).map(([key,value])=>[key,value/100]));
 }
@@ -19,7 +19,7 @@ export function ExpenseSummary({records}) {
     <h3>Resumo do período</h3><p>{records.length} {records.length === 1 ? "despesa" : "despesas"} · Valores dos filtros selecionados</p>
     <div className="mp-summary-grid">{[["Total registrado","total"],["A conferir","pending"],["Conferido","checked"]].map(([label,key])=>
       <div key={key}><span>{label}</span><strong>{money(sums[key])}</strong></div>)}</div>
-    <div className="mp-category-totals">{[["Abastecimento","fuel"],["Manutenção","maintenance"],["Outros","other"]].map(([label,key])=>
+    <div className="mp-category-totals">{[["Abastecimento","fuel"],["Manutenção","maintenance"],["Descarga","unloading"],["Outros","other"]].map(([label,key])=>
       <div key={key}><span>{label}</span><b>{money(sums[key])}</b></div>)}</div>
   </section>;
 }

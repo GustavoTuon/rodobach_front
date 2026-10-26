@@ -3,6 +3,7 @@ import "./maintenance-demo.css";
 import ExpenseHistory, { ExpenseSummary } from "./expense-history.jsx";
 import DriverExpenseWizard, {prepareReceipt} from "./driver-expense-wizard.jsx";
 import ExpensePhotoAssist from "./expense-photo-assist.jsx";
+import PaymentMethodPicker from './payment-method-picker.jsx';
 import {readExpenseDraft,clearExpenseDraft,useExpenseDraft} from "./expense-draft.js";
 
 const money = (value) =>
@@ -550,6 +551,10 @@ function MaintenanceForm({
   const [expenseDate, setExpenseDate] = useState(maintenanceDraft?.expenseDate || today);
   const [paymentRecord, setPaymentRecord] = useState(null);
   const [paymentDate, setPaymentDate] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentMethods, setPaymentMethods] = useState([]);
+  const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
+  const [paymentMethodsError, setPaymentMethodsError] = useState("");
   const [paymentError, setPaymentError] = useState("");
   const [paidFilter, setPaidFilter] = useState("");
   const [postedFilter, setPostedFilter] = useState("");
@@ -656,7 +661,7 @@ function MaintenanceForm({
       r.plate.includes(normalize(search)) &&
       (!dateFrom || expenseDay(r) >= dateFrom) &&
       (!dateTo || expenseDay(r) <= dateTo) &&
-      `${r.supplier || ""} ${r.document || ""} ${r.author || ""} ${r.note || ""}`
+      `${r.supplier || ""} ${r.document || ""} ${r.author || ""} ${r.note || ""} ${r.service || ''} ${r.unloading?.trip?.number || ''} ${r.unloading?.cte?.number || r.unloading?.cte?.code || ''} ${r.unloading?.cte?.customerName || ''}`
         .toLocaleLowerCase("pt-BR")
         .includes(textSearch.toLocaleLowerCase("pt-BR")),
   );
@@ -671,6 +676,7 @@ function MaintenanceForm({
         r.amount,
         r.service,
         supplierKey,
+        ...(r.service==='Descarga' ? [r.unloading?.trip?.company,r.unloading?.trip?.number,r.unloading?.cte?.company,r.unloading?.cte?.series,r.unloading?.cte?.code] : []),
       ]),
     ];
     if (r.document && supplierKey)
@@ -778,13 +784,13 @@ function MaintenanceForm({
     )
     .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
 
-  async function updateControl(record, field, value) {
+  async function updateControl(record, field, value, extra = {}) {
     if (!manager || user.readOnly || savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
     setError("");
     try {
-      const result = await window.RB_API.updatePlantaoControl(record.id, { version: record.version, [field]: value }, manager);
+      const result = await window.RB_API.updatePlantaoControl(record.id, { version: record.version, [field]: value, ...extra }, manager);
       setRecords(items => items.map(item => item.id === record.id ? result.record : item));
       setHistory(null);
       setMessage("Controle atualizado e registrado no histórico.");
@@ -799,10 +805,24 @@ function MaintenanceForm({
       setSaving(false);
     }
   }
+  async function loadPaymentMethods() {
+    setPaymentMethodsLoading(true);
+    setPaymentMethodsError("");
+    setPaymentMethods([]);
+    try {
+      const result = await window.RB_API.listPlantaoPaymentMethods();
+      setPaymentMethods(result.methods);
+      if (!result.methods.length) setPaymentMethodsError("Nenhuma forma de pagamento ativa no cadastro.");
+    } catch {
+      setPaymentMethodsError("Não foi possível carregar as formas de pagamento.");
+    } finally { setPaymentMethodsLoading(false); }
+  }
   function openPayment(record) {
     setPaymentRecord(record);
     setPaymentDate(record.paymentDate || today());
+    setPaymentMethod(record.paymentMethod ? `${record.paymentMethod.company}:${record.paymentMethod.code}` : "");
     setPaymentError("");
+    loadPaymentMethods();
   }
   async function savePayment(event) {
     event.preventDefault();
@@ -810,8 +830,13 @@ function MaintenanceForm({
       setPaymentError("Informe a data do pagamento, sem data futura.");
       return;
     }
+    const method = paymentMethods.find(item => `${item.company}:${item.code}` === paymentMethod);
+    if (!method || paymentMethodsLoading || paymentMethodsError) {
+      setPaymentError("Selecione uma forma de pagamento do cadastro.");
+      return;
+    }
     setPaymentError("");
-    if (await updateControl(paymentRecord, "paymentDate", paymentDate)) setPaymentRecord(null);
+    if (await updateControl(paymentRecord, "paymentDate", paymentDate, {paymentMethod:{code:method.code,company:method.company}})) setPaymentRecord(null);
   }
   async function confirmRecord(record) {
     if (!canReview || user.readOnly || savingRef.current) return;
@@ -1060,6 +1085,13 @@ function MaintenanceForm({
                         <span><small>LANÇAMENTO</small><strong>{r.posted ? "Lançado" : r.posted === false ? "Não lançado" : "Não informado"}</strong></span>
                       </div>
                     </div>}
+                    {r.unloading && <div className="mp-cost-details">
+                      <span>Viagem ERP <b>{r.unloading.trip.number} · Empresa {r.unloading.trip.company}</b></span>
+                      <span>CT-e <b>{r.unloading.cte.number || r.unloading.cte.code} · Série {r.unloading.cte.series} · Empresa {r.unloading.cte.company}</b></span>
+                      <span>Cliente do CT-e <b>{r.unloading.cte.customerName}</b></span>
+                      <span>Reembolso da descarga <b>{r.unloading.reimbursement ? 'Sim' : 'Não'}</b></span>
+                    </div>}
+                    {r.paid && <p className="mp-field-help">Forma de pagamento: {r.paymentMethod?.name || "Não informada"}</p>}
                     {duplicates.has(r.id) && (
                       <p className="mp-duplicate-warning">
                         Possível duplicidade. Compare os comprovantes antes de
@@ -1205,6 +1237,8 @@ function MaintenanceForm({
                               {new Date(h.ocorrido_em).toLocaleString("pt-BR", {
                                 timeZone: "America/Sao_Paulo",
                               })}
+                              {h.evento === "status" && <p>Pagamento: {h.depois?.data_pagamento ? displayDay(String(h.depois.data_pagamento).slice(0,10)) : "Não registrado"} · Forma: {h.depois?.forma_pagamento_nome || "Não informada"}</p>}
+                              {h.depois?.descarga && <p>Descarga · Viagem {h.depois.descarga.trip.number} · CT-e {h.depois.descarga.cte.number || h.depois.descarga.cte.code} · {h.depois.descarga.cte.customerName} · Reembolso: {h.depois.descarga.reimbursement ? 'Sim' : 'Não'}</p>}
                               {h.evento === "edit" && (
                                 <p>
                                   Antes: {h.antes.placa} ·{" "}
@@ -1275,11 +1309,14 @@ function MaintenanceForm({
             </header>
             <div className="mp-payment-summary"><span>{paymentRecord.plate} · {paymentRecord.service}</span><strong>{money(paymentRecord.amount)}</strong></div>
             <label>Data do pagamento<input type="date" value={paymentDate} required max={today()} disabled={saving || photoBusy} onChange={(e) => setPaymentDate(e.target.value)} /></label>
+            <PaymentMethodPicker methods={paymentMethods} value={paymentMethod} onChange={setPaymentMethod} loading={paymentMethodsLoading} disabled={saving || paymentMethodsLoading || Boolean(paymentMethodsError)}/>
+            {paymentRecord.paymentMethod && !paymentMethodsLoading && !paymentMethods.some(method => `${method.company}:${method.code}` === paymentMethod) && <p className="mp-field-help">Forma registrada anteriormente: {paymentRecord.paymentMethod.name}. Selecione uma opção ativa para salvar.</p>}
+            {paymentMethodsError && <div role="alert"><p>{paymentMethodsError}</p><button type="button" onClick={loadPaymentMethods}>Tentar carregar novamente</button></div>}
             <p className="mp-field-help">Ao salvar a data, esta manutenção será marcada como paga.</p>
             {paymentError && <p className="mp-feedback error" role="alert">{paymentError}</p>}
             <div className="mp-payment-modal-actions">
               <button className="mp-cancel-edit" type="button" disabled={saving || photoBusy} onClick={() => setPaymentRecord(null)}>Cancelar</button>
-              <button className="mp-submit" type="submit" disabled={saving || !paymentDate}>{saving ? "Salvando…" : "Salvar pagamento"}<Icon name="check" size={18} /></button>
+              <button className="mp-submit" type="submit" disabled={saving || !paymentDate || !paymentMethod || paymentMethodsLoading || Boolean(paymentMethodsError)}>{saving ? "Salvando…" : "Salvar pagamento"}<Icon name="check" size={18} /></button>
             </div>
             {paymentRecord.paid && <button className="mp-undo-payment" type="button" disabled={saving || photoBusy} onClick={async () => {
               setPaymentError("");
