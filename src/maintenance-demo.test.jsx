@@ -101,7 +101,7 @@ it("permite somente conferência sem liberar novos lançamentos", async () => {
 it("seleciona fornecedor do sistema e salva nome, código e empresa no histórico", async () => {
   await ready();
   await details();
-  fireEvent.change(screen.getByLabelText("Fornecedor"), {
+  fireEvent.change(screen.getByLabelText("Fornecedor — obrigatório"), {
     target: { value: "Oficina" },
   });
   fireEvent.click(
@@ -118,7 +118,7 @@ it("seleciona fornecedor do sistema e salva nome, código e empresa no históric
 it("permite fornecedor digitado quando a consulta falha e remove vínculo ao editar", async () => {
   await ready();
   await details();
-  fireEvent.change(screen.getByLabelText("Fornecedor"), {
+  fireEvent.change(screen.getByLabelText("Fornecedor — obrigatório"), {
     target: { value: "Oficina" },
   });
   fireEvent.click(
@@ -127,7 +127,7 @@ it("permite fornecedor digitado quando a consulta falha e remove vínculo ao edi
   window.RB_API.searchFornecedoresManutencao.mockRejectedValue(
     new Error("offline"),
   );
-  fireEvent.change(screen.getByLabelText("Fornecedor"), {
+  fireEvent.change(screen.getByLabelText("Fornecedor — obrigatório"), {
     target: { value: "Borracharia da estrada" },
   });
   await screen.findByText(
@@ -152,7 +152,7 @@ it("limita o valor a números e duas casas decimais", () => {
 it("preserva o progresso ao fechar e retomar, e permite voltar antes de registrar", async () => {
   await ready();
   await details();
-  fireEvent.change(screen.getByLabelText("Fornecedor"), {
+  fireEvent.change(screen.getByLabelText("Fornecedor — obrigatório"), {
     target: { value: "Oficina da estrada" },
   });
   fireEvent.click(screen.getByRole("button", { name: "Fechar lançamento" }));
@@ -161,7 +161,8 @@ it("preserva o progresso ao fechar e retomar, e permite voltar antes de registra
   expect(
     screen.getByRole("heading", { name: "O que foi feito?" }),
   ).toBeTruthy();
-  expect(screen.getByLabelText("Fornecedor").value).toBe("Oficina da estrada");
+  expect(screen.getByLabelText("Fornecedor — obrigatório").value).toBe("Oficina da estrada");
+  fireEvent.click(screen.getByLabelText("Sem documento fiscal",{exact:true}));
   fireEvent.change(screen.getByLabelText("Justificativa sem nota"), {target:{value:"Fornecedor nao emitiu a nota."}});
   fireEvent.click(
     screen.getByRole("button", { name: "Continuar", exact: true }),
@@ -198,6 +199,8 @@ it("bloqueia data futura na primeira etapa e mantém o modal aberto", async () =
 });
 it("pede comprovante nos detalhes antes de abrir a revisão da manutenção",async()=>{
  await ready();await details();
+ fireEvent.change(screen.getByLabelText("Fornecedor — obrigatório"),{target:{value:"Oficina Teste"}});
+ fireEvent.click(screen.getByLabelText("Sem documento fiscal",{exact:true}));
  fireEvent.click(screen.getByRole("button",{name:"Continuar",exact:true}));
  expect(screen.getByRole("alert").textContent).toContain("justifique");
  expect(screen.getByRole("heading",{name:"O que foi feito?"})).toBeTruthy();
@@ -264,6 +267,7 @@ beforeEach(() => {
     }),
   };
   window.RB_API = {
+    listPlantaoUnloadingTrips:vi.fn().mockResolvedValue({trips:[]}),
     listPlantaoPaymentMethods: vi.fn(async () => ({methods:[{code:"1",company:"1",name:"DEPÓSITO - INTER"}]})),
     getPlantaoOdometer: vi.fn().mockResolvedValue({odometer:125430.7,source:"telemetria",date:new Date().toISOString()}),
     listPlantao: vi.fn(async () => ({
@@ -351,6 +355,9 @@ async function details() {
   );
 }
 async function finish() {
+  if (!screen.getByLabelText("Fornecedor — obrigatório").value) fireEvent.change(screen.getByLabelText("Fornecedor — obrigatório"),{target:{value:"Oficina Teste"}});
+  fireEvent.click(screen.getByLabelText("Sem documento fiscal",{exact:true}));
+  fireEvent.click(screen.getByLabelText("Sem documento fiscal",{exact:true}));
   fireEvent.change(screen.getByLabelText("Justificativa sem nota"), {target:{value:"Fornecedor nao emitiu a nota."}});
   for (
     let i = 0;
@@ -485,7 +492,7 @@ it("mostra placa, data e comprovante e salva edição com controle de versão", 
   fireEvent.change(screen.getByLabelText("Data da despesa"), {
     target: { value: "2026-09-30" },
   });
-  fireEvent.change(screen.getByLabelText(/Nota \/ comprovante/), {
+  fireEvent.change(screen.getByLabelText(/Número da nota \/ comprovante/), {
     target: { value: "NF-321" },
   });
   await submit();
@@ -716,9 +723,10 @@ it("motorista registra abastecimento com km antes dos valores em sete etapas e a
   fireEvent.change(screen.getByLabelText("Valor do ARLA (R$)"), {target:{value:"80.50"}});
 
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
-  fireEvent.change(screen.getByLabelText("Posto — opcional"), {target:{value:"Posto Teste"}});
+  fireEvent.change(screen.getByLabelText("Posto / fornecedor — obrigatório"), {target:{value:"Posto Teste"}});
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
   expect(screen.getByLabelText("Foto da nota ou comprovante — opcional")).toBeTruthy();
+  fireEvent.click(screen.getByLabelText("Sem documento fiscal",{exact:true}));
   fireEvent.change(screen.getByLabelText("Justificativa sem nota"),{target:{value:"Fornecedor nao emitiu a nota."}});
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
   window.RB_API.createPlantao.mockRejectedValueOnce(new Error("Sem conexão"));

@@ -67,7 +67,7 @@ it("falha na telemetria permite tentar novamente sem digitar km",async()=>{
 function toLocation(){next();fireEvent.change(screen.getByLabelText("Litros abastecidos"),{target:{value:"100"}});fireEvent.change(screen.getByLabelText("Valor total da despesa (R$)"),{target:{value:"650"}});next();}
 it("exige nota ou justificativa antes da revisão",async()=>{
  mount(vi.fn().mockResolvedValue({odometer:197611.7,source:"telemetria",date:new Date().toISOString()}));next();
- await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("197611,7"));toLocation();next();next();
+ await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("197611,7"));toLocation();fireEvent.change(screen.getByLabelText("Posto / fornecedor — obrigatório"),{target:{value:"Posto Teste"}});next();fireEvent.click(screen.getByLabelText("Sem documento fiscal",{exact:true}));next();
  expect(screen.getByRole("alert").textContent).toContain("justifique");
  fireEvent.change(screen.getByLabelText("Justificativa sem nota"),{target:{value:"Fornecedor nao emitiu a nota."}});next();
  expect(screen.getByRole("button",{name:"Enviar para conferência"})).toBeTruthy();

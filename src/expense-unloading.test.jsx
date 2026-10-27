@@ -36,7 +36,7 @@ it('envia descarga com viagem e CT-e do ERP e reembolso explicitamente não',asy
   next();
   expect(screen.queryByLabelText('Hodômetro (km)')).toBeNull();
   fireEvent.change(screen.getByLabelText('Valor total da despesa (R$)'),{target:{value:'150,00'}});
-  next();expect(screen.getByText('Cliente ERP')).toBeTruthy();next();
+  next();expect(screen.getByText('Cliente ERP')).toBeTruthy();fireEvent.change(screen.getByLabelText('Fornecedor — obrigatório'),{target:{value:'Chapa Teste'}});next();fireEvent.click(screen.getByLabelText("Sem documento fiscal",{exact:true}));
   fireEvent.change(screen.getByLabelText('Justificativa sem nota'),{target:{value:'Serviço de chapa sem emissão de nota.'}});
   fireEvent.change(screen.getByLabelText('Descreva os custos da descarga'),{target:{value:'Chapa para descarga'}});
   next();expect(screen.getByText('Reembolso da descarga')).toBeTruthy();

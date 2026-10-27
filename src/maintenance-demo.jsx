@@ -4,6 +4,8 @@ import ExpenseHistory, { ExpenseSummary } from "./expense-history.jsx";
 import DriverExpenseWizard, {prepareReceipt} from "./driver-expense-wizard.jsx";
 import ExpensePhotoAssist from "./expense-photo-assist.jsx";
 import PaymentMethodPicker from './payment-method-picker.jsx';
+import ExpenseDocumentFields, {documentTypes} from "./expense-document-fields.jsx";
+import ExpenseUnloading from "./expense-unloading.jsx";
 import {readExpenseDraft,clearExpenseDraft,useExpenseDraft} from "./expense-draft.js";
 
 const money = (value) =>
@@ -386,10 +388,11 @@ function SupplierSelect({ value, onChange }) {
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
       }}
     >
-      <label htmlFor="mp-supplier">Fornecedor</label>
+      <label htmlFor="mp-supplier">Fornecedor — obrigatório</label>
       <input
         ref={input}
         id="mp-supplier"
+        required
         role="combobox"
         aria-expanded={open}
         aria-controls="mp-suppliers"
@@ -539,6 +542,9 @@ function MaintenanceForm({
 }) {
   const [driverWizard, setDriverWizard] = useState(null);
   const [maintenanceDraft] = useState(()=>readExpenseDraft(user,"maintenance"));
+  const [documentType,setDocumentType] = useState(maintenanceDraft?.documentType || "");
+  const [tireFireNumber,setTireFireNumber] = useState(maintenanceDraft?.tireFireNumber || "");
+  const [expenseTrip,setExpenseTrip] = useState(maintenanceDraft?.expenseTrip || null);
   const [receiptReason,setReceiptReason] = useState(maintenanceDraft?.receiptReason || "");
   const [maintenancePhotos,setMaintenancePhotos] = useState(maintenanceDraft?.photos || {});
   const [photoBusy,setPhotoBusy] = useState(false);
@@ -595,7 +601,7 @@ function MaintenanceForm({
   const [note, setNote] = useState(maintenanceDraft?.note || "");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const draftWarning = useExpenseDraft(user,"maintenance",editing,{expenseDate,document,plate,amount,service,note,supplier,receiptReason,photos:maintenancePhotos},wizardOpen && !completed);
+  const draftWarning = useExpenseDraft(user,"maintenance",editing,{expenseDate,document,plate,amount,service,note,supplier,receiptReason,documentType,tireFireNumber,expenseTrip,photos:maintenancePhotos},wizardOpen && !completed);
   useEffect(() => {
     let active = true;
     setFleetLoading(true);
@@ -661,7 +667,7 @@ function MaintenanceForm({
       r.plate.includes(normalize(search)) &&
       (!dateFrom || expenseDay(r) >= dateFrom) &&
       (!dateTo || expenseDay(r) <= dateTo) &&
-      `${r.supplier || ""} ${r.document || ""} ${r.author || ""} ${r.note || ""} ${r.service || ''} ${r.unloading?.trip?.number || ''} ${r.unloading?.cte?.number || r.unloading?.cte?.code || ''} ${r.unloading?.cte?.customerName || ''}`
+      `${r.supplier || ""} ${r.document || ""} ${r.author || ""} ${r.note || ""} ${r.tireFireNumber || ""} ${r.trip?.number || ""} ${r.service || ''} ${r.unloading?.trip?.number || ''} ${r.unloading?.cte?.number || r.unloading?.cte?.code || ''} ${r.unloading?.cte?.customerName || ''}`
         .toLocaleLowerCase("pt-BR")
         .includes(textSearch.toLocaleLowerCase("pt-BR")),
   );
@@ -694,7 +700,7 @@ function MaintenanceForm({
     }
   }
   function cancelEdit() {
-    setReceiptReason("");setMaintenancePhotos({});
+    setReceiptReason("");setMaintenancePhotos({});setDocumentType("");setTireFireNumber("");setExpenseTrip(null);
     setStep(0);
     setEditing(null);
     setAmount("");
@@ -711,6 +717,9 @@ function MaintenanceForm({
     if (r.source === "motorista") { setDriverWizard({record:r}); return; }
     const draft = readExpenseDraft(user,"maintenance",r);
     setReceiptReason(draft?.receiptReason ?? r.receiptReason ?? "");
+    setDocumentType(draft?.documentType ?? r.documentType ?? "");
+    setTireFireNumber(draft?.tireFireNumber ?? r.tireFireNumber ?? "");
+    setExpenseTrip(draft?.expenseTrip ?? (r.trip ? {trip:r.trip} : null));
     setMaintenancePhotos(draft?.photos || {});
     setEditing(r);
     setPlate(draft?.plate ?? r.plate);
@@ -898,6 +907,9 @@ function MaintenanceForm({
       }
     }
     if (step === 1) {
+      if (!supplier.nome.trim()) {setError("Informe o fornecedor, mesmo que não esteja cadastrado.");return;}
+      if (!documentType) {setError("Selecione o tipo de documento fiscal ou informe que não há documento.");return;}
+      if (documentType === 'nf_servico' && !document.trim()) {setError("Informe o número da nota fiscal de serviço.");return;}
       const hasInvoice = maintenancePhotos.invoice !== undefined ? Boolean(maintenancePhotos.invoice) : Boolean(editing?.photoKinds?.invoice || editing?.hasReceipt);
       if (!hasInvoice && receiptReason.trim().length < 10) {
         setError("Anexe a nota ou justifique a ausência com pelo menos 10 caracteres.");
@@ -941,6 +953,7 @@ function MaintenanceForm({
     }
     const hasInvoice=maintenancePhotos.invoice !== undefined ? Boolean(maintenancePhotos.invoice) : Boolean(editing?.photoKinds?.invoice || editing?.hasReceipt);
     if (!hasInvoice && receiptReason.trim().length<10) {setError("Anexe a nota ou justifique a ausência com pelo menos 10 caracteres.");return;}
+    if (!supplier.nome.trim() || !documentType || (documentType==='nf_servico' && !document.trim())) {setError("Informe o fornecedor, o tipo de documento e o número da nota fiscal de serviço, quando aplicável.");return;}
     savingRef.current = true;
     setSaving(true);
     setError("");
@@ -948,7 +961,9 @@ function MaintenanceForm({
     try {
       const body = {
         expenseDate,
-        receiptReason,photos:maintenancePhotos,
+        receiptReason,photos:maintenancePhotos,documentType,
+        tireFireNumber:service === 'Borracharia' ? tireFireNumber.trim() : '',
+        trip:expenseTrip?.trip ? {company:expenseTrip.trip.company,number:expenseTrip.trip.number} : null,
         document: document.trim(),
         plate,
         amount: value,
@@ -972,7 +987,7 @@ function MaintenanceForm({
       );
       setCompleted(true);
       try {clearExpenseDraft(user,"maintenance",editing);} catch { /* Expense already saved. */ }
-      setReceiptReason("");setMaintenancePhotos({});
+      setReceiptReason("");setMaintenancePhotos({});setDocumentType("");setTireFireNumber("");setExpenseTrip(null);
       setPlate("");
       setService("Borracharia");
       setEditing(null);
@@ -1085,6 +1100,7 @@ function MaintenanceForm({
                         <span><small>LANÇAMENTO</small><strong>{r.posted ? "Lançado" : r.posted === false ? "Não lançado" : "Não informado"}</strong></span>
                       </div>
                     </div>}
+                    <div className="mp-cost-details"><span>Documento fiscal <b>{documentTypes[r.documentType] || 'Não informado'}</b></span>{r.tireFireNumber && <span>Número de fogo <b>{r.tireFireNumber}</b></span>}{r.trip && <span>Viagem ERP <b>{r.trip.number} · Empresa {r.trip.company}</b></span>}</div>
                     {r.unloading && <div className="mp-cost-details">
                       <span>Viagem ERP <b>{r.unloading.trip.number} · Empresa {r.unloading.trip.company}</b></span>
                       <span>CT-e <b>{r.unloading.cte.number || r.unloading.cte.code} · Série {r.unloading.cte.series} · Empresa {r.unloading.cte.company}</b></span>
@@ -1485,7 +1501,7 @@ function MaintenanceForm({
                               fleet.length === 0
                             }
                             onChange={(value) => {
-                              setPlate(value);
+                              setPlate(value);setExpenseTrip(null);
                               setMessage("");
                             }}
                           />
@@ -1574,16 +1590,9 @@ function MaintenanceForm({
                           value={supplier}
                           onChange={setSupplier}
                         />
-                        <label>
-                          Nota / comprovante{" "}
-                          <span className="mp-optional">(opcional)</span>
-                          <input
-                            value={document}
-                            maxLength={80}
-                            placeholder="Número do documento"
-                            onChange={(e) => setDocument(e.target.value)}
-                          />
-                        </label>
+                        <ExpenseDocumentFields type={documentType} onTypeChange={setDocumentType} number={document} onNumberChange={setDocument}/>
+                        {service==='Borracharia' && <label>Número de fogo do pneu — opcional<input value={tireFireNumber} maxLength={80} onChange={e=>setTireFireNumber(e.target.value)} placeholder="Identificação do pneu que recebeu o serviço" /></label>}
+                        {fleet.includes(plate) && <ExpenseUnloading key={plate} plate={plate} value={expenseTrip} onChange={setExpenseTrip} tripOnly/>}
                         <fieldset>
                           <legend>Tipo de manutenção</legend>
                           <div className="mp-services">
@@ -1643,6 +1652,9 @@ function MaintenanceForm({
                             {[
                               ["Data da despesa", displayDay(expenseDate)],
                               ["Fornecedor", supplier.nome || "Não informado"],
+                              ["Tipo de documento", documentTypes[documentType] || "Não informado"],
+                              ["Número de fogo", service==='Borracharia' ? tireFireNumber || "Não informado" : "—"],
+                              ["Viagem", expenseTrip?.trip?.number || "Sem vínculo"],
                               ["Comprovante", document || "Não informado"],
                               ["Nota anexada", (maintenancePhotos.invoice !== undefined ? maintenancePhotos.invoice : editing?.photoKinds?.invoice || editing?.hasReceipt) ? "Sim" : "Não"],
                               ["Justificativa sem nota", receiptReason || "—"],
