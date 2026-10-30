@@ -1,7 +1,10 @@
+import ExpensePaymentDetails from "./expense-payment-details.jsx";
+import SupplierSelect from "./expense-supplier-select.jsx";
+import ExpenseWhatsappSummary from "./expense-whatsapp-summary.jsx";
 import React, { useEffect, useRef, useState } from "react";
 import ExpenseDocumentFields, {documentTypes} from "./expense-document-fields.jsx";
 import ExpensePhotoAssist from "./expense-photo-assist.jsx";
-import ExpenseUnloading, {cteLabel} from './expense-unloading.jsx';
+import ExpenseUnloading, {cteLabel,documentItinerary} from './expense-unloading.jsx';
 import {readExpenseDraft,clearExpenseDraft,useExpenseDraft} from "./expense-draft.js";
 
 const today = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
@@ -49,6 +52,9 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
   const [draft] = useState(()=>readExpenseDraft(user,"expense",record));
   const [step, setStep] = useState(0);
   const [done, setDone] = useState(false);
+  const [savedRecord,setSavedRecord] = useState(null);
+  const [paymentDetails,setPaymentDetails] = useState(draft?.paymentDetails ?? record?.paymentDetails ?? null);
+  const [supplierSelection,setSupplierSelection] = useState(draft?.supplierSelection ?? {codigo:record?.supplierCode,empresa:record?.supplierCompany});
   const [category, setCategory] = useState(draft?.category ?? (record?.service || ""));
   const [documentType,setDocumentType]=useState(draft?.documentType ?? record?.documentType ?? '');
   const [tireFireNumber,setTireFireNumber]=useState(draft?.tireFireNumber ?? record?.tireFireNumber ?? '');
@@ -56,7 +62,7 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
   const [unloading,setUnloading]=useState(draft?.unloading ?? record?.unloading ?? null);
   const [plate, setPlate] = useState(draft?.plate ?? (record?.plate || (user.expenseProfile === "motorista" ? fleet[0] || "" : "")));
   const [date, setDate] = useState(draft?.date ?? (record?.expenseDate || today()));
-  function changePlate(value) {setPlate(value);setUnloading(null);setExpenseTrip(null);}
+  function changePlate(value) {if(value===plate)return;setPlate(value);setUnloading(null);setExpenseTrip(null);}
   const [dateConfirmed, setDateConfirmed] = useState(Boolean(draft?.date || record?.expenseDate));
   function editDate(value) { setDate(value); setDateConfirmed(true); }
   const [expenseTime,setExpenseTime] = useState(draft?.expenseTime ?? record?.expenseTime ?? "");
@@ -70,7 +76,7 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
   const [locationLoading,setLocationLoading]=useState(false);
   const [locationError,setLocationError]=useState("");
   const [locationAttempt,setLocationAttempt]=useState(0);
-  const locationEdited=useRef(Boolean(record || draft)), locationPlate=useRef(plate), locationAuto=useRef(false);
+  const locationEdited=useRef(Boolean(record || draft?.location)), locationPlate=useRef(plate), locationAuto=useRef(false);
   function editLocation(value){locationEdited.current=true;locationAuto.current=false;setLocation(value);}
   useEffect(()=>{
     let active=true;
@@ -126,12 +132,12 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const busy = useRef(false);
-  const draftWarning = useExpenseDraft(user,"expense",record,{category,plate,date,expenseTime,amount,liters,supplier,location,note,documentNumber,photos,fuelType,customerName,fuelAmount,hasArla,arlaLiters,arlaAmount,receiptReason,unloading,documentType,tireFireNumber,expenseTrip},!done && Boolean(category || photos.invoice));
+  const draftWarning = useExpenseDraft(user,"expense",record,{category,plate,date,expenseTime,amount,liters,supplier,location,note,documentNumber,photos,fuelType,customerName,fuelAmount,hasArla,arlaLiters,arlaAmount,receiptReason,unloading,documentType,tireFireNumber,expenseTrip,paymentDetails,supplierSelection},!done && Boolean(category || photos.invoice));
   const knownPhotos=record?.photoKinds || {invoice:record?.hasReceipt};
   const hasPhoto=["odometer","pump","invoice"].some(kind=>photos[kind] !== undefined ? Boolean(photos[kind]) : knownPhotos[kind]);
   const applySuggestion=(field,value)=>{
     const formatted=typeof value === "number" ? String(value).replace(".",",") : value;
-    ({expenseTime:setExpenseTime,fuelType:setFuelType,customerName:setCustomerName,liters:setLiters,amount:setAmount,fuelAmount:setFuelAmount,date:editDate,supplier:setSupplier,location:editLocation,documentNumber:setDocumentNumber})[field]?.(formatted);
+    ({expenseTime:setExpenseTime,fuelType:setFuelType,customerName:setCustomerName,liters:setLiters,amount:setAmount,fuelAmount:setFuelAmount,date:editDate,supplier:value=>{setSupplier(value);setSupplierSelection({});},location:editLocation,documentNumber:setDocumentNumber})[field]?.(formatted);
   };
   const loadSavedPhotos=async()=>{
     if(!record?.id)return {};
@@ -143,10 +149,12 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
   const stepNumber = stepIndexes.indexOf(step) + 1;
   const [showTimeCorrection, setShowTimeCorrection] = useState(false);
   function validate() {
+    if (step === lastStep && paymentDetails && (!paymentDetails.holderName.trim() || !paymentDetails.pixKey.trim())) return "Preencha o nome do titular e a chave PIX, ou desative os dados para pagamento.";
     if (!category) return "Escolha o tipo de despesa.";
     if (step >= 1 && (!fleet.includes(plate) || fleetLoading || fleetError)) return "Selecione uma placa cadastrada na frota.";
     if (step >= 1 && (!date || date > today())) return "Informe a data da despesa, sem data futura.";
-    if (step >= 1 && category === 'Descarga' && (!unloading?.trip || !unloading?.cte || typeof unloading.reimbursement !== 'boolean')) return 'Selecione a viagem, o CT-e e informe se haverá reembolso da descarga.';
+    if (step >= 1 && fuel && !expenseTrip?.trip) return "Vincule uma viagem da placa para registrar o abastecimento.";
+    if (step >= 1 && category === 'Descarga' && (!unloading?.trip || !unloading?.cte || typeof unloading.reimbursement !== 'boolean')) return 'Selecione a viagem, o documento (CT-e ou orçamento) e informe se haverá reembolso da descarga.';
     const sameSavedReading=record && record.plate===plate && record.expenseDate===date && !record.expenseTime && !expenseTime && record.odometer!=null;
     if (fuel && !expenseTime && !sameSavedReading) return "O horário não foi identificado. Leia a nota ou informe o horário em Ajustar horário da nota nesta primeira etapa.";
     if (expenseTime && new Date(`${date}T${expenseTime.length===5 ? expenseTime+":00" : expenseTime}-03:00`)>new Date()) return "O horário da despesa não pode estar no futuro.";
@@ -176,14 +184,15 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
     try {
       const body = { source: record?.source || "motorista", service: category, plate, expenseDate: date, expenseTime:expenseTime || null, receiptReason, documentType,tireFireNumber:category==='Manutenção' ? tireFireNumber.trim() : '',trip:category!=='Descarga' && expenseTrip?.trip ? {company:expenseTrip.trip.company,number:expenseTrip.trip.number} : null, amount: number(amount),
         ...(category==='Descarga' ? {unloading:{trip:{company:unloading.trip.company,number:unloading.trip.number},cte:{company:unloading.cte.company,series:unloading.cte.series,code:unloading.cte.code},reimbursement:unloading.reimbursement}} : {}),
-        liters: fuel ? number(liters) : null, odometer: odometer === "" ? null : number(odometer), supplier: supplier.trim(),
+        liters: fuel ? number(liters) : null, odometer: odometer === "" ? null : number(odometer), supplier: supplier.trim(), supplierCode:supplierSelection.codigo ?? null,supplierCompany:supplierSelection.empresa ?? null,
+        paymentDetails:paymentDetails ? {holderName:paymentDetails.holderName.trim(),pixKey:paymentDetails.pixKey.trim()} : null,
         fuelType: fuelType.trim(), customerName: customerName.trim(), location: location.trim(), note: note.trim(), document: documentNumber.trim(),
         arlaLiters: fuel && hasArla ? number(arlaLiters) : null, arlaAmount: fuel && hasArla ? number(arlaAmount) : null,
         photos, fuelAmount: fuel && fuelAmount ? number(fuelAmount) : null,
       };
       const result = record ? await window.RB_API.updatePlantao(record.id, { ...body, version: record.version }, manager) : await window.RB_API.createPlantao(body);
       try {clearExpenseDraft(user,"expense",record);} catch { /* Saving the expense already succeeded. */ }
-      onSaved(result.record); setDone(true);
+      setSavedRecord(result.record); onSaved(result.record); setDone(true);
     } catch (error) { setError(error.message || "Não foi possível enviar. Seus dados continuam aqui para tentar novamente."); }
     finally { busy.current = false; setSaving(false); }
   }
@@ -194,6 +203,7 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
       <h2 id="mp-edit-title" data-step-title tabIndex={-1}>{record ? "Despesa atualizada!" : "Despesa enviada!"}</h2>
       <p>{plate} · {category} · {currency(number(amount))}</p>
       <p>Seu registro chegou à conferência. Acompanhe o pagamento e o lançamento na sua lista.</p>
+      <ExpenseWhatsappSummary record={savedRecord}/>
       <button className="mp-submit" onClick={onClose}>Ver minhas despesas</button>
     </div> : <form className="mp-form mp-wizard driver-wizard" onSubmit={advance} noValidate>
       <header className="mp-wizard-header">
@@ -201,7 +211,7 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
           <h2 id="mp-edit-title" data-step-title tabIndex={-1}>{["O que aconteceu na viagem?", "Em qual veículo e dia?", "Qual é a quilometragem?", fuel ? "Quantos litros e qual o valor?" : "Qual foi o valor da despesa?", fuel ? "Em qual posto abasteceu?" : "Quem forneceu o serviço?", "Confira a nota ou justificativa", "Tudo certo para enviar?"][step]}</h2></div>
           <button type="button" className="mp-close" aria-label="Fechar despesa" disabled={saving || photoLoading} onClick={onClose}>×</button></div>
         <div className="mp-progress" role="progressbar" aria-label="Progresso da despesa" aria-valuemin={0} aria-valuemax={stepIndexes.length} aria-valuenow={stepNumber}><span style={{width:`${stepNumber / stepIndexes.length * 100}%`}} /></div>
-        <ol className="mp-steps driver-steps" style={{gridTemplateColumns:`repeat(${stepIndexes.length}, minmax(0, 1fr))`}}>{stepIndexes.map((i, position) => <li key={steps[i]} className={i <= step ? "is-active" : ""} aria-current={i === step ? "step" : undefined}><span>{i < step ? "✓" : position + 1}</span>{steps[i]}</li>)}</ol>
+        <ol className="mp-steps driver-steps" style={{gridTemplateColumns:`repeat(${stepIndexes.length}, minmax(0, 1fr))`}}>{stepIndexes.map((i, position) => <li key={steps[i]} className={i <= step ? "is-active" : ""} aria-current={i === step ? "step" : undefined}><span>{i < step ? "✓" : position + 1}</span>{i < step ? <button type="button" className="mp-step-back" aria-label={`Voltar para ${steps[i]}`} disabled={saving || photoLoading} onClick={()=>{setStep(i);setError("");}}>{steps[i]}</button> : steps[i]}</li>)}</ol>
       </header>
       <div className="mp-wizard-body">
         {step !== 0 && draftWarning && <p role="status">{draftWarning}</p>}
@@ -226,7 +236,7 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
         {step === 1 && <><FleetSelect fleet={fleet} value={plate} onChange={changePlate} loading={fleetLoading} disabled={user.expenseProfile === "motorista" || fleetLoading || Boolean(fleetError)} />
           {fleetError && <p role="alert">{fleetError} <button type="button" onClick={onRetryFleet}>Tentar carregar frota</button></p>}
           <label>Data da despesa<input type="date" max={today()} value={date} onChange={e => editDate(e.target.value)} /></label>
-          {fleet.includes(plate) && (category==='Descarga' ? <ExpenseUnloading key={plate} plate={plate} value={unloading} onChange={setUnloading}/> : <ExpenseUnloading key={plate} plate={plate} value={expenseTrip} onChange={setExpenseTrip} tripOnly/>)}
+          {fleet.includes(plate) && (category==='Descarga' ? <ExpenseUnloading key={plate} plate={plate} value={unloading} onChange={setUnloading}/> : <ExpenseUnloading key={plate} plate={plate} value={expenseTrip} onChange={setExpenseTrip} tripOnly required={fuel}/>)}
           <p className="mp-field-help">Registrado por {user.nome || user.login}.</p></>}
         {step === 2 && <><label>Hodômetro (km){!fuel && " — opcional"}<input type="text" readOnly aria-describedby="driver-km-help" placeholder="Aguardando telemetria" value={odometer} /></label><small id="driver-km-help" className="mp-field-help">Preenchido somente pela telemetria da placa e da data selecionadas.</small>
           {kmLoading && <p role="status">Buscando o último km do veículo…</p>}
@@ -252,8 +262,7 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
           </div>}
           {fuel && number(liters) > 0 && number(fuelAmount) > 0 && number(fuelAmount) <= number(amount) && <p className="driver-unit-price">Preço do combustível por litro: <strong>{currency(number(fuelAmount) / number(liters))}</strong></p>}</>}
         {step === 4 && <>
-          {category==='Descarga' ? <p>Cliente do CT-e: <strong>{unloading?.cte?.customerName}</strong></p> : <label>Cliente / destinatário da nota — opcional<input value={customerName} maxLength={160} onChange={e=>setCustomerName(e.target.value)} /></label>}
-          <label>{fuel ? "Posto / fornecedor — obrigatório" : "Fornecedor — obrigatório"}<input required value={supplier} maxLength={120} enterKeyHint="next" onChange={e => setSupplier(e.target.value)} /></label>
+          <SupplierSelect label={fuel ? "Posto / fornecedor — obrigatório" : "Fornecedor — obrigatório"} value={{...supplierSelection,nome:supplier}} onChange={value=>{setSupplier(value.nome);setSupplierSelection(value);}} />
           <label>Cidade / local — opcional<input value={location} maxLength={160} enterKeyHint="next" onChange={e => editLocation(e.target.value)} /></label>
           {locationLoading && <p role="status">Buscando a localização do veículo…</p>}
           {locationError && <p role="status">{locationError} <button className="driver-reference-use" type="button" onClick={()=>setLocationAttempt(n=>n+1)}>Tentar novamente</button></p>}
@@ -277,12 +286,13 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
           {category==='Manutenção' && <label>Número de fogo do pneu — opcional<input maxLength={80} value={tireFireNumber} onChange={e=>setTireFireNumber(e.target.value)} /></label>}
           <label>{category === "Descarga" ? "Descreva os custos da descarga" : category === "Outros" ? "Descreva a despesa" : "O que foi feito? — opcional"}<textarea maxLength={300} rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder={category==='Descarga' ? 'Ex.: chapa, movimentação de carga e outros serviços.' : "Conte o que aconteceu para ajudar a conferência."} /></label></>}
         {step === lastStep && <section className="mp-review"><div className="mp-review-total"><span>{category} · {plate}</span><strong>{currency(number(amount))}</strong></div><dl>
-          {category==='Descarga' && [["Viagem do ERP",`${unloading.trip.number} · Empresa ${unloading.trip.company}`],["CT-e",cteLabel(unloading.cte)],["Cliente do CT-e",unloading.cte.customerName],["Reembolso da descarga",unloading.reimbursement ? 'Sim' : 'Não']].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
-          {[["Tipo de documento",documentTypes[documentType] || "Não informado"],["Número de fogo",tireFireNumber || "—"],["Viagem opcional",category!=="Descarga" ? expenseTrip?.trip?.number || "Sem vínculo" : "—"],["Data", date.split("-").reverse().join("/")], ["Horário da nota", expenseTime || "Não informado"], ["Justificativa sem nota", receiptReason || "—"], ["Cliente da nota", customerName || "Não informado"], ["Combustível", fuelType || "Não informado"], ["Fornecedor", supplier || "Não informado"], ["Local", location || "Não informado"], ...(fuel ? [["Litros", liters], ["Valor do combustível",fuelAmount ? currency(number(fuelAmount)) : "Não informado"]] : []), ...(fuel && hasArla ? [["Litros de ARLA",arlaLiters],["Valor do ARLA",currency(number(arlaAmount))]] : []), ["Hodômetro", odometer ? `${odometer} km` : "Não informado"], ["Comprovante", documentNumber || "Não informado"], ["Foto", hasPhoto ? "Anexada" : "Sem foto"], ["Observação", note || "Sem observação"]].filter(([label]) => (label !== "Combustível" || fuel) && (label !== "Hodômetro" || fuel || odometer) && (label !== "Horário da nota" || fuel || expenseTime)).map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+          {category==='Descarga' && [["Viagem do ERP",`${unloading.trip.number} · Empresa ${unloading.trip.company}`],["Documento",cteLabel(unloading.cte)],["Itinerário",documentItinerary(unloading.cte)],["Cliente do documento",unloading.cte.customerName],["Reembolso da descarga",unloading.reimbursement ? 'Sim' : 'Não']].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+          {[["Tipo de documento",documentTypes[documentType] || "Não informado"],["Número de fogo",tireFireNumber || "—"],[fuel ? "Viagem do abastecimento" : "Viagem opcional",category!=="Descarga" ? expenseTrip?.trip?.number || "Sem vínculo" : "—"],["Data", date.split("-").reverse().join("/")], ["Horário da nota", expenseTime || "Não informado"], ["Justificativa sem nota", receiptReason || "—"], ["Combustível", fuelType || "Não informado"], ["Fornecedor", supplier || "Não informado"], ["Local", location || "Não informado"], ...(fuel ? [["Litros", liters], ["Valor do combustível",fuelAmount ? currency(number(fuelAmount)) : "Não informado"]] : []), ...(fuel && hasArla ? [["Litros de ARLA",arlaLiters],["Valor do ARLA",currency(number(arlaAmount))]] : []), ["Hodômetro", odometer ? `${odometer} km` : "Não informado"], ["Comprovante", documentNumber || "Não informado"], ["Foto", hasPhoto ? "Anexada" : "Sem foto"], ["Observação", note || "Sem observação"]].filter(([label]) => (label !== "Combustível" || fuel) && (label !== "Hodômetro" || fuel || odometer) && (label !== "Horário da nota" || fuel || expenseTime)).map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
         </dl></section>}
+        {step === lastStep && <ExpensePaymentDetails paymentDetails={paymentDetails} setPaymentDetails={setPaymentDetails}/>}
         {error && <p className="mp-feedback error" role="alert">{error}</p>}
       </div>
-      <footer className="mp-wizard-actions"><button className="mp-cancel-edit" type="button" disabled={saving || photoLoading} onClick={() => step ? (setStep(stepIndexes[stepNumber - 2]),setError("")) : onClose()}>{step ? "Voltar" : "Continuar depois"}</button>
+      <footer className="mp-wizard-actions"><button className="mp-cancel-edit" type="button" disabled={saving || photoLoading} onClick={() => step ? (setStep(stepIndexes[stepNumber - 2]),setError("")) : onClose()}>{step ? "Voltar" : "Voltar às despesas"}</button>
         <button className="mp-submit" type="submit" disabled={saving || photoLoading || user.readOnly}>{saving ? "Enviando…" : step === lastStep ? record ? "Salvar despesa" : "Enviar para conferência" : "Próximo passo"}<span aria-hidden="true">→</span></button>
         <p>{step === lastStep ? "Seu registro será salvo ao enviar." : `${stepNumber} de ${stepIndexes.length} etapas`}</p></footer>
     </form>}

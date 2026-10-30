@@ -36,15 +36,8 @@ const cv2StoredArray = (key, fallback) => {
   try { const value = JSON.parse(window.localStorage.getItem(key)); return Array.isArray(value) ? value : fallback; }
   catch { return fallback; }
 };
-const CV2_COMMERCIAL_BY_LOGIN = {
-  maicon: "MAICON STEINBACH",
-  mauricio: "MAURICIO STEINBACK",
-};
-const cv2CommercialForUser = (user) =>
-  CV2_COMMERCIAL_BY_LOGIN[String(user?.login || "").trim().toLowerCase()] || "";
-
 const emptyCarga = () => ({
-  data: CV2_TODAY(), cliente: "", clienteFinal: "", tomadorServico: "", vendedor: "",
+  data: CV2_TODAY(), cliente: "", clienteFinal: "", tomadorServico: "", vendedor: "", responsavel: null,
   origem: "", ufOrigem: "", destino: "", ufDestino: "", material: "", peso: "", volumes: "",
   valorCliente: "", condicaoPagamento: "", observacoes: "", paradas: [], calculoPreco: {},
 });
@@ -189,10 +182,12 @@ function cv2DuplicateCarga(source) {
 }
 
 export function Cv2CargaForm({ initial, duplicateFrom, user, onClose, onSaved }) {
-  const userCommercial = cv2CommercialForUser(user);
+  const [responsaveis, setResponsaveis] = useState([]);
+  const [responsaveisError, setResponsaveisError] = useState("");
+  useEffect(() => { let active=true; window.RB_API.listCargaResponsaveis().then(items=>{if(active)setResponsaveis(items);}).catch(error=>{if(active)setResponsaveisError(cv2Error(error));}); return ()=>{active=false;}; }, []);
   const [form, setForm] = useState(() => duplicateFrom ? cv2DuplicateCarga(duplicateFrom) : initial
     ? { ...emptyCarga(), ...initial }
-    : { ...emptyCarga(), vendedor: userCommercial });
+    : emptyCarga());
   const [saving, setSaving] = useState(false);
   const [calculating, setCalculating] = useState(false);
   const [pricing, setPricing] = useState(initial?.calculoPreco?.custoEstimado !== undefined ? initial.calculoPreco : null);
@@ -238,7 +233,7 @@ export function Cv2CargaForm({ initial, duplicateFrom, user, onClose, onSaved })
             <Cv2Field label="Data"><input type="date" value={form.data} onChange={(e) => set("data", e.target.value)} /></Cv2Field>
             <Cv2Autocomplete label="Cliente inicial" hint="Onde a carga começa" value={form.cliente} onChange={(value) => set("cliente", value)}
               search={window.RB_API.searchViagemClientes} placeholder="Onde a carga começa"
-              onSelect={(item) => setForm((current) => ({ ...current, cliente: item.nome, origem: item.cidade || current.origem, ufOrigem: item.uf || current.ufOrigem, condicaoPagamento: item.condicaoPagamento || current.condicaoPagamento, vendedor: userCommercial || item.vendedor || current.vendedor }))}
+              onSelect={(item) => setForm((current) => ({ ...current, cliente: item.nome, origem: item.cidade || current.origem, ufOrigem: item.uf || current.ufOrigem, condicaoPagamento: item.condicaoPagamento || current.condicaoPagamento, responsavel: item.responsavel || current.responsavel }))}
               renderOption={(item) => <><strong>{item.nome}</strong><span>{[item.documento, item.cidade, item.uf].filter(Boolean).join(" · ")}</span></>} />
             <Cv2Autocomplete label="Cliente final" hint="Onde a carga será entregue" value={form.clienteFinal} onChange={(value) => set("clienteFinal", value)}
               search={window.RB_API.searchViagemClientes} placeholder="Onde a carga será entregue"
@@ -246,13 +241,17 @@ export function Cv2CargaForm({ initial, duplicateFrom, user, onClose, onSaved })
               renderOption={(item) => <><strong>{item.nome}</strong><span>{[item.documento, item.cidade, item.uf].filter(Boolean).join(" · ")}</span></>} />
             <Cv2Autocomplete label="Tomador do serviço" hint="Quem vai pagar o frete" value={form.tomadorServico} onChange={(value) => set("tomadorServico", value)}
               search={window.RB_API.searchViagemClientes} placeholder="Quem vai pagar o frete"
-              onSelect={(item) => setForm((current) => ({ ...current, tomadorServico: item.nome, condicaoPagamento: item.condicaoPagamento || current.condicaoPagamento, vendedor: userCommercial || item.vendedor || current.vendedor }))}
+              onSelect={(item) => setForm((current) => ({ ...current, tomadorServico: item.nome, condicaoPagamento: item.condicaoPagamento || current.condicaoPagamento, responsavel: item.responsavel || current.responsavel }))}
               renderOption={(item) => <><strong>{item.nome}</strong><span>{[item.documento, item.cidade, item.uf].filter(Boolean).join(" · ")}</span></>} />
-            {userCommercial
-              ? <Cv2Field label="Vendedor" hint="Preenchido pelo usuário logado"><input value={form.vendedor} readOnly /></Cv2Field>
-              : <Cv2Autocomplete label="Vendedor" value={form.vendedor} onChange={(value) => set("vendedor", value)}
-                search={window.RB_API.searchViagemVendedores} placeholder="Selecione ou digite o vendedor"
-                onSelect={(item) => set("vendedor", item.nome)} renderOption={(item) => <><strong>{item.nome}</strong>{item.fantasia && <span>{item.fantasia}</span>}</>} />}
+            <Cv2Field label="Responsável" hint="Quem negociou o frete, conforme cadastro do ERP">
+              <select aria-label="Responsável" required value={form.responsavel ? `${form.responsavel.empresa}:${form.responsavel.codigo}` : ""}
+                onChange={event=>set("responsavel",responsaveis.find(item=>`${item.empresa}:${item.codigo}`===event.target.value) || null)}>
+                <option value="">Selecione o responsável</option>
+                {form.responsavel && !responsaveis.some(item=>item.codigo===form.responsavel.codigo && item.empresa===form.responsavel.empresa) && <option value={`${form.responsavel.empresa}:${form.responsavel.codigo}`} disabled>{form.responsavel.nome} (indisponível)</option>}
+                {responsaveis.map(item=><option key={`${item.empresa}:${item.codigo}`} value={`${item.empresa}:${item.codigo}`}>{item.nome}</option>)}
+              </select>
+              {responsaveisError && <small role="alert">{responsaveisError}</small>}
+            </Cv2Field>
             <Cv2Field label="Condição de pagamento"><input value={form.condicaoPagamento} onChange={(e) => set("condicaoPagamento", e.target.value)} placeholder="Ex.: 30 dias" /></Cv2Field>
             <Cv2Field label="Valor do cliente (R$)"><input type="number" min="0" step="0.01" value={form.valorCliente} onChange={(e) => set("valorCliente", e.target.value)} /></Cv2Field>
           </div>
@@ -567,7 +566,7 @@ function cv2LoadPrintData(carga) {
       { label: "Cliente (coleta)", value: carga.cliente, detail: [carga.origem, carga.ufOrigem].filter(Boolean).join("/") },
       { label: "Entrega", value: carga.clienteFinal, detail: [carga.destino, carga.ufDestino].filter(Boolean).join("/") },
       { label: "Tomador", value: carga.tomadorServico }, { label: "Material", value: carga.material },
-      { label: "Condição de pagamento", value: carga.condicaoPagamento }, { label: "Vendedor", value: carga.vendedor },
+      { label: "Condição de pagamento", value: carga.condicaoPagamento }, { label: "Responsável", value: carga.responsavel?.nome || "Não informado" },
       { label: "Viagem", value: carga.numeroViagem }, { label: "Placa / motorista", value: [carga.placa, carga.motorista].filter(Boolean).join(" · ") },
     ]}, ...(carga.paradas || []).map((stop, index) => ({ title: `Parada ${index + 1} · ${stop.tipo === "coleta" ? "Coleta" : "Entrega"}`, items: [
       { label: "Cliente/local", value: stop.cliente }, { label: "Cidade / UF", value: [stop.cidade, stop.uf].filter(Boolean).join("/") },
@@ -837,7 +836,7 @@ const CargasViagensV2 = ({ user }) => {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("aguardando_viagem");
   const [financialStatus, setFinancialStatus] = useState("");
-  const [seller, setSeller] = useState(() => cv2CommercialForUser(user));
+  const [seller, setSeller] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [cargaFilters, setCargaFilters] = useState(emptyCargaFilters());
   const [filterOptions, setFilterOptions] = useState({ empresas: [], origens: [], ufsOrigem: [], destinos: [], ufsDestino: [], materiais: [], vendedores: [] });
@@ -859,7 +858,7 @@ const CargasViagensV2 = ({ user }) => {
       if (stats.status === "fulfilled") setSummary(stats.value);
       if (options.status === "fulfilled") {
         setFilterOptions(options.value);
-        if (seller && options.value.vendedores?.length && !options.value.vendedores.includes(seller)) setSeller("");
+        if (seller && options.value.responsaveis?.length && !options.value.responsaveis.some(item=>item.nome===seller)) setSeller("");
       }
       if (stats.status === "rejected" || options.status === "rejected") {
         metadataLoaded.current = false;
@@ -874,8 +873,8 @@ const CargasViagensV2 = ({ user }) => {
     if (refreshMeta || !metadataLoaded.current) refreshMetadata();
     try {
       const request = tab === "cargas"
-        ? window.RB_API.listCargasV2({ q: query, status, financeiro: financialStatus, vendedor: seller, ...cargaFilters, page, pageSize })
-        : window.RB_API.listViagensV2({ q: query, status, financeiro: financialStatus, vendedor: seller, page, pageSize });
+        ? window.RB_API.listCargasV2({ q: query, status, financeiro: financialStatus, responsavel: seller, ...cargaFilters, page, pageSize })
+        : window.RB_API.listViagensV2({ q: query, status, financeiro: financialStatus, responsavel: seller, page, pageSize });
       const result = await request;
       if (version !== loadVersion.current) return;
       const rows = Array.isArray(result) ? result : result.items || [];
@@ -969,7 +968,7 @@ const CargasViagensV2 = ({ user }) => {
       <button className="cv2-kpi paid" onClick={() => useStatusShortcut("", "quitado")}><span>Quitadas</span><b>{summary.viagens_quitadas || 0}</b></button>
     </div>}
     <div className="cv2-tabbar"><div className="cv2-tabs"><button className={tab === "cargas" ? "active" : ""} onClick={() => { setTab("cargas"); setPage(1); setStatus("aguardando_viagem"); setFinancialStatus(""); setQuery(""); }}>Cargas <small>{summary.cargas || 0}</small></button><button className={tab === "viagens" ? "active" : ""} onClick={() => { setTab("viagens"); setPage(1); setStatus(""); setFinancialStatus(""); setQuery(""); }}>Viagens <small>{summary.viagens || 0}</small></button></div></div>
-    <div className="cv2-seller-bar"><label><span>Vendedor exibido</span><select value={seller} onChange={(event) => { setPage(1); setSeller(event.target.value); }}><option value="">Todos os vendedores ativos</option>{(filterOptions.vendedores || []).map((item) => <option key={item} value={item}>{item}</option>)}</select></label>{seller ? <small>A tela está mostrando somente cargas e viagens de <b>{seller}</b>.</small> : <small>A tela está mostrando cargas e viagens de <b>todos os vendedores ativos</b>.</small>}</div>
+    <div className="cv2-seller-bar"><label><span>Responsável exibido</span><select value={seller} onChange={(event) => { setPage(1); setSeller(event.target.value); }}><option value="">Todos os responsáveis</option>{(filterOptions.responsaveis || []).map((item) => <option key={`${item.empresa}:${item.codigo}`} value={item.nome}>{item.nome}</option>)}</select></label>{seller ? <small>A tela está mostrando somente cargas e viagens de <b>{seller}</b>.</small> : <small>A tela está mostrando cargas e viagens de <b>todos os responsáveis</b>.</small>}</div>
     <div className="cv2-toolbar"><div className="cv2-search"><Icon name="search" /><input value={query} onChange={(e) => { setPage(1); setQuery(e.target.value); }} placeholder={tab === "cargas" ? "Buscar carga, cliente, cidade, placa..." : "Buscar viagem, placa, motorista ou CT-e..."} /></div><div className="cv2-filters">
       <button className={!status && !financialStatus ? "active" : ""} onClick={() => { setPage(1); setStatus(""); setFinancialStatus(""); }}>Todas</button>
       {tab === "cargas" && <button className={status === "aguardando_viagem" ? "active" : ""} onClick={() => { setPage(1); setStatus("aguardando_viagem"); setFinancialStatus(""); }}>Somente carga</button>}

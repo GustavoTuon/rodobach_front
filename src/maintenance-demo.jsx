@@ -1,11 +1,20 @@
+import ExpenseDetailStatus from './expense-detail-status.jsx';
+import ExpenseDetailFacts from './expense-detail-facts.jsx';
+import ExpenseReportDialog from './expense-report-dialog.jsx';
+import ExpenseReimbursement from './expense-reimbursement.jsx';
+import {reimbursementOf,reimbursementLabels} from './expense-report.js';
+import ExpensePaymentDetails from "./expense-payment-details.jsx";
+import SupplierSelect from "./expense-supplier-select.jsx";
+import ExpenseWhatsappSummary from "./expense-whatsapp-summary.jsx";
 import React, { useEffect, useRef, useState } from "react";
 import "./maintenance-demo.css";
-import ExpenseHistory, { ExpenseSummary } from "./expense-history.jsx";
+import ExpenseHistory, { ExpenseSummary, isExpenseChecked } from "./expense-history.jsx";
 import DriverExpenseWizard, {prepareReceipt} from "./driver-expense-wizard.jsx";
 import ExpensePhotoAssist from "./expense-photo-assist.jsx";
 import PaymentMethodPicker from './payment-method-picker.jsx';
+import ExpenseTripFilter from './expense-trip-filter.jsx';
 import ExpenseDocumentFields, {documentTypes} from "./expense-document-fields.jsx";
-import ExpenseUnloading from "./expense-unloading.jsx";
+import ExpenseUnloading, {cteLabel,documentItinerary} from "./expense-unloading.jsx";
 import {readExpenseDraft,clearExpenseDraft,useExpenseDraft} from "./expense-draft.js";
 
 const money = (value) =>
@@ -344,161 +353,6 @@ function FleetSelect({ fleet, value, onChange, disabled, loading }) {
   );
 }
 
-function SupplierSelect({ value, onChange }) {
-  const [open, setOpen] = useState(false);
-  const [options, setOptions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
-  const [active, setActive] = useState(-1);
-  const input = useRef(null);
-  useEffect(() => {
-    if (!open) return;
-    let live = true;
-    setLoading(true);
-    setError(false);
-    setOptions([]);
-    setActive(-1);
-    const timer = setTimeout(() => {
-      window.RB_API.searchFornecedoresManutencao(value.nome)
-        .then((data) => {
-          if (live) setOptions(data.fornecedores || []);
-        })
-        .catch(() => {
-          if (live) setError(true);
-        })
-        .finally(() => {
-          if (live) setLoading(false);
-        });
-    }, 250);
-    return () => {
-      live = false;
-      clearTimeout(timer);
-    };
-  }, [value.nome, open]);
-  function choose(item) {
-    onChange(item);
-    input.current?.focus();
-    setOpen(false);
-    setActive(-1);
-  }
-  return (
-    <div
-      className="mp-fleet-select mp-supplier"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
-      }}
-    >
-      <label htmlFor="mp-supplier">Fornecedor — obrigatório</label>
-      <input
-        ref={input}
-        id="mp-supplier"
-        required
-        role="combobox"
-        aria-expanded={open}
-        aria-controls="mp-suppliers"
-        aria-autocomplete="list"
-        aria-activedescendant={
-          open && active >= 0 ? `mp-supplier-${active}` : undefined
-        }
-        value={value.nome}
-        maxLength={120}
-        autoComplete="off"
-        placeholder="Busque ou digite o nome do fornecedor"
-        onFocus={() => setOpen(true)}
-        onClick={() => setOpen(true)}
-        onChange={(event) => {
-          onChange({ nome: event.target.value });
-          setOpen(true);
-          setActive(-1);
-          setOptions([]);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            setOpen(false);
-          }
-          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-            event.preventDefault();
-            setOpen(true);
-            setActive((index) =>
-              options.length
-                ? (index +
-                    (event.key === "ArrowDown" ? 1 : -1) +
-                    options.length) %
-                  options.length
-                : -1,
-            );
-          }
-          if (event.key === "Enter" && open) {
-            event.preventDefault();
-            if (options[active]) choose(options[active]);
-            else if (value.nome.trim()) choose({ nome: value.nome.trim() });
-          }
-        }}
-      />
-      {open && (
-        <div className="mp-fleet-dropdown">
-          <div className="mp-fleet-caption">FORNECEDORES DO SISTEMA</div>
-          {loading && (
-            <p className="mp-fleet-empty" role="status">
-              Buscando fornecedores…
-            </p>
-          )}
-          {error && (
-            <p className="mp-fleet-empty">
-              Não foi possível consultar. Você pode digitar o nome.
-            </p>
-          )}
-          <div
-            id="mp-suppliers"
-            role="listbox"
-            aria-label="Fornecedores do sistema"
-          >
-            {options.map((item, index) => (
-              <div
-                key={`${item.empresa}-${item.codigo}`}
-                id={`mp-supplier-${index}`}
-                role="option"
-                aria-selected={
-                  value.codigo === item.codigo && value.empresa === item.empresa
-                }
-                className={`mp-fleet-option ${active === index ? "is-active" : ""}`}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => choose(item)}
-              >
-                <strong>{item.nome}</strong>
-                <small>
-                  Cód. {item.codigo} · Emp. {item.empresa}
-                </small>
-              </div>
-            ))}
-          </div>
-          {!loading && !error && !options.length && (
-            <p className="mp-fleet-empty">
-              Nenhum fornecedor encontrado. Use o nome digitado.
-            </p>
-          )}
-          {value.nome.trim() && (
-            <button
-              type="button"
-              className="mp-supplier-manual"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => choose({ nome: value.nome.trim() })}
-            >
-              <Icon name="plus" size={16} />
-              Usar “{value.nome.trim()}” sem cadastro
-            </button>
-          )}
-        </div>
-      )}
-      <p className="mp-field-help">
-        {value.codigo != null
-          ? "Fornecedor selecionado no cadastro do sistema."
-          : "Não encontrou? Digite o nome para este lançamento."}
-      </p>
-    </div>
-  );
-}
 
 function MaintenanceDialog({ children, onClose, saving, step }) {
   const ref = useRef(null);
@@ -562,12 +416,16 @@ function MaintenanceForm({
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
   const [paymentMethodsError, setPaymentMethodsError] = useState("");
   const [paymentError, setPaymentError] = useState("");
+  const [reportOpen,setReportOpen] = useState(false);
+  const [managementTab,setManagementTab] = useState("payments");
+  const [reimbursementFilter,setReimbursementFilter] = useState("");
   const [paidFilter, setPaidFilter] = useState("");
   const [postedFilter, setPostedFilter] = useState("");
   const [document, setDocument] = useState(maintenanceDraft?.document || "");
-  const [dateFrom, setDateFrom] = useState(() => `${today().slice(0,7)}-01`);
-  const [dateTo, setDateTo] = useState(today);
+  const [dateFrom, setDateFrom] = useState(() => initialView === "manager" ? `${today().slice(0,7)}-01` : "");
+  const [dateTo, setDateTo] = useState(() => initialView === "manager" ? today() : "");
   const [textSearch, setTextSearch] = useState("");
+  const [tripFilter, setTripFilter] = useState("");
   const [deleting, setDeleting] = useState(null);
   const [deleteReason, setDeleteReason] = useState("");
   const [history, setHistory] = useState(null);
@@ -596,12 +454,14 @@ function MaintenanceForm({
   const [search, setSearch] = useState("");
   const [amount, setAmount] = useState(maintenanceDraft?.amount || "");
   const [supplier, setSupplier] = useState(maintenanceDraft?.supplier || { nome: "" });
+  const [paymentDetails,setPaymentDetails] = useState(maintenanceDraft?.paymentDetails ?? null);
+  const [savedMaintenance,setSavedMaintenance] = useState(null);
   const author = user.nome || user.login;
   const [service, setService] = useState(maintenanceDraft?.service || "Borracharia");
   const [note, setNote] = useState(maintenanceDraft?.note || "");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const draftWarning = useExpenseDraft(user,"maintenance",editing,{expenseDate,document,plate,amount,service,note,supplier,receiptReason,documentType,tireFireNumber,expenseTrip,photos:maintenancePhotos},wizardOpen && !completed);
+  const draftWarning = useExpenseDraft(user,"maintenance",editing,{expenseDate,document,plate,amount,service,note,supplier,receiptReason,documentType,tireFireNumber,expenseTrip,paymentDetails,photos:maintenancePhotos},wizardOpen && !completed);
   useEffect(() => {
     let active = true;
     setFleetLoading(true);
@@ -659,12 +519,17 @@ function MaintenanceForm({
       active = false;
     };
   }, [manager, recordsAttempt]);
+  const recordTrip = r => r.unloading?.trip || r.trip;
+  const tripKey = trip => trip ? `${trip.company}:${trip.number}` : "unlinked";
+  const tripOptions = [...new Map(records.map(recordTrip).filter(Boolean).map(trip=>[tripKey(trip),trip])).entries()]
+    .sort((a,b)=>String(a[1].number).localeCompare(String(b[1].number),undefined,{numeric:true}));
   const scoped = records.filter(
     (r) =>
       (!manager || !sourceFilter || (r.authorProfile || "unknown") === sourceFilter) &&
       (!manager || !paidFilter || String(r.paid ?? "unknown") === paidFilter) &&
       (!manager || !postedFilter || String(r.posted ?? "unknown") === postedFilter) &&
       r.plate.includes(normalize(search)) &&
+      (!tripFilter || tripKey(recordTrip(r)) === tripFilter) &&
       (!dateFrom || expenseDay(r) >= dateFrom) &&
       (!dateTo || expenseDay(r) <= dateTo) &&
       `${r.supplier || ""} ${r.document || ""} ${r.author || ""} ${r.note || ""} ${r.tireFireNumber || ""} ${r.trip?.number || ""} ${r.service || ''} ${r.unloading?.trip?.number || ''} ${r.unloading?.cte?.number || r.unloading?.cte?.code || ''} ${r.unloading?.cte?.customerName || ''}`
@@ -700,6 +565,7 @@ function MaintenanceForm({
     }
   }
   function cancelEdit() {
+    setPaymentDetails(null);setSavedMaintenance(null);
     setReceiptReason("");setMaintenancePhotos({});setDocumentType("");setTireFireNumber("");setExpenseTrip(null);
     setStep(0);
     setEditing(null);
@@ -713,7 +579,7 @@ function MaintenanceForm({
     setService("Borracharia");
   }
   function editRecord(r) {
-    if (saving || user.readOnly || r.checked) return;
+    if (saving || user.readOnly || isExpenseChecked(r) || r.paid) return;
     if (r.source === "motorista") { setDriverWizard({record:r}); return; }
     const draft = readExpenseDraft(user,"maintenance",r);
     setReceiptReason(draft?.receiptReason ?? r.receiptReason ?? "");
@@ -721,6 +587,7 @@ function MaintenanceForm({
     setTireFireNumber(draft?.tireFireNumber ?? r.tireFireNumber ?? "");
     setExpenseTrip(draft?.expenseTrip ?? (r.trip ? {trip:r.trip} : null));
     setMaintenancePhotos(draft?.photos || {});
+    setPaymentDetails(draft?.paymentDetails !== undefined ? draft.paymentDetails : r.paymentDetails ?? null);
     setEditing(r);
     setPlate(draft?.plate ?? r.plate);
     setAmount(draft?.amount ?? r.amount.toFixed(2).replace(".", ","));
@@ -786,10 +653,12 @@ function MaintenanceForm({
       );
     }
   }
+  const matchesStatus = (r,key) => key === "all" || (key === "pending" ? r.paid !== true : key === "unchecked" ? !isExpenseChecked(r) : r.posted !== true);
   const visible = scoped
+    .filter(r => !manager || !reimbursementFilter || reimbursementOf(r).status === reimbursementFilter)
     .filter(
       (r) =>
-        filter === "all" || (filter === "pending" ? !r.checked : r.checked),
+        matchesStatus(r,filter),
     )
     .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
 
@@ -951,6 +820,7 @@ function MaintenanceForm({
       setError("Entre no sistema novamente para registrar a manutenção.");
       return;
     }
+    if (paymentDetails && (!paymentDetails.holderName.trim() || !paymentDetails.pixKey.trim())) {setError("Preencha o nome do titular e a chave PIX, ou desative os dados para pagamento.");return;}
     const hasInvoice=maintenancePhotos.invoice !== undefined ? Boolean(maintenancePhotos.invoice) : Boolean(editing?.photoKinds?.invoice || editing?.hasReceipt);
     if (!hasInvoice && receiptReason.trim().length<10) {setError("Anexe a nota ou justifique a ausência com pelo menos 10 caracteres.");return;}
     if (!supplier.nome.trim() || !documentType || (documentType==='nf_servico' && !document.trim())) {setError("Informe o fornecedor, o tipo de documento e o número da nota fiscal de serviço, quando aplicável.");return;}
@@ -970,6 +840,7 @@ function MaintenanceForm({
         service,
         note: note.trim(),
         supplier: supplier.nome.trim(),
+        paymentDetails:paymentDetails ? {holderName:paymentDetails.holderName.trim(),pixKey:paymentDetails.pixKey.trim()} : null,
         supplierCode: supplier.codigo ?? null,
         supplierCompany: supplier.empresa ?? null,
       };
@@ -985,6 +856,8 @@ function MaintenanceForm({
           ? items.map((r) => (r.id === editing.id ? result.record : r))
           : [result.record, ...items],
       );
+      setSavedMaintenance(result.record);
+      setPaymentDetails(null);
       setCompleted(true);
       try {clearExpenseDraft(user,"maintenance",editing);} catch { /* Expense already saved. */ }
       setReceiptReason("");setMaintenancePhotos({});setDocumentType("");setTireFireNumber("");setExpenseTrip(null);
@@ -1022,17 +895,23 @@ function MaintenanceForm({
     setHistory(null);
     setRecords([]);
     setView(next);
+    setTripFilter("");
     setSourceFilter("");
     setDriverWizard(null);
     setWizardOpen(false);
     setPaidFilter("");
     setPostedFilter("");
     setFilter("all");
+    setSearch(""); setTripFilter("");
+    setTextSearch("");
+    setDateFrom(next === "manager" ? `${today().slice(0,7)}-01` : "");
+    setDateTo(next === "manager" ? today() : "");
     setMessage("");
     setError("");
   }
   const renderExpenseRecord = (r) => (
-                  <div className="mp-record" key={r.id}>
+                  <div className="mp-record mp-record-compact" key={r.id}>
+                    <ExpenseDetailStatus record={r}/>
                     <div className="mp-record-main">
                       <span
                         className={`mp-service-icon ${r.service === "Elétrica" ? "peach" : ""}`}
@@ -1053,30 +932,9 @@ function MaintenanceForm({
                       </div>
                       <strong>{money(r.amount)}</strong>
                     </div>
-                    <div className="mp-cost-details">
-                      {r.expenseTime && <span>Horário da nota <b>{r.expenseTime}</b></span>}
-                      <span>
-                        Data da despesa <b>{displayDay(expenseDay(r))}</b>
-                      </span>
-                      <span>
-                        Comprovante <b>{r.document || "Não informado"}</b>
-                      </span>
-                    </div>
-                    {!r.photoKinds?.invoice && <p className="mp-duplicate-warning">Sem nota anexada · {r.receiptReason || "Justificativa não registrada"}</p>}
-                    {r.source !== "motorista" && r.photoKinds?.invoice && <button className="mp-cancel-edit" onClick={()=>showReceipt(r)}>Ver comprovante</button>}
-                    {r.paid && !r.checked && <p className="mp-duplicate-warning">Pago, aguardando conferência</p>}
-                    {r.source === "motorista" && <div className="mp-cost-details driver-expense-details">
-                      {r.fuelType && <span>Combustível <b>{r.fuelType}</b></span>}
-                      {r.customerName && <span>Cliente da nota <b>{r.customerName}</b></span>}
-                      {r.odometerDate && <span>Leitura da telemetria <b>{new Date(r.odometerDate).toLocaleString("pt-BR", {timeZone:"America/Sao_Paulo"})}</b></span>}
-                      {r.arlaLiters != null && <span>ARLA <b>{r.arlaLiters.toLocaleString("pt-BR")} L · {money(r.arlaAmount)}</b></span>}
-                      {r.fuelAmount != null && <span>Combustível <b>{money(r.fuelAmount)}</b></span>}
-                      {r.liters != null && <span>Abastecimento <b>{Number(r.liters).toLocaleString("pt-BR")} L</b></span>}
-                      {r.odometer != null && <span>Hodômetro <b>{Number(r.odometer).toLocaleString("pt-BR")} km</b></span>}
-                      {r.location && <span>Local <b>{r.location}</b></span>}
-                      {r.hasReceipt && <button className="mp-cancel-edit" onClick={() => showReceipt(r)}>Ver comprovante</button>}
-                    </div>}
-                    {manager && <div className="mp-payment-controls">
+                    <ExpenseDetailFacts record={r} onReceipt={showReceipt}/>
+                    <section className="mp-detail-section"><h4>Pagamento e lançamento</h4>
+                    {manager && managementTab === "payments" && <div className="mp-payment-controls">
                       <button type="button" className={`mp-payment-button ${r.paid ? "is-paid" : ""}`}
                         disabled={saving || user.readOnly} onClick={() => openPayment(r)}
                         aria-label={`${r.paid ? "Editar pagamento" : "Registrar pagamento"} — ${r.plate}`}>
@@ -1100,14 +958,21 @@ function MaintenanceForm({
                         <span><small>LANÇAMENTO</small><strong>{r.posted ? "Lançado" : r.posted === false ? "Não lançado" : "Não informado"}</strong></span>
                       </div>
                     </div>}
-                    <div className="mp-cost-details"><span>Documento fiscal <b>{documentTypes[r.documentType] || 'Não informado'}</b></span>{r.tireFireNumber && <span>Número de fogo <b>{r.tireFireNumber}</b></span>}{r.trip && <span>Viagem ERP <b>{r.trip.number} · Empresa {r.trip.company}</b></span>}</div>
+                    {manager && <ExpenseReimbursement key={`${r.id}:${r.version}`} record={r} disabled={saving || user.readOnly} onSave={value=>updateControl(r,"reimbursement",value)}/>}
+                    {r.paymentDetails && <section className="mp-detail-section"><h4>Dados para pagamento</h4><dl className="mp-detail-grid"><div><dt>Titular da conta</dt><dd>{r.paymentDetails.holderName}</dd></div><div><dt>Chave PIX</dt><dd>{r.paymentDetails.pixKey}</dd></div></dl></section>}
+                    {manager ? <details className="mp-finance-share"><summary>Resumo para o financeiro / WhatsApp</summary><ExpenseWhatsappSummary record={r} compact/></details> : <ExpenseWhatsappSummary record={r}/>}
+                    {r.paid && <p className="mp-field-help">Forma de pagamento: {r.paymentMethod?.name || "Não informada"}</p>}
+                    </section>
+                    <section className="mp-detail-section mp-trip-section"><h4>Viagem e documento vinculado</h4>
+                    {!r.unloading && <div className="mp-cost-details"><span>Viagem ERP <b>{r.trip ? `${r.trip.number} · Empresa ${r.trip.company}` : 'Sem viagem vinculada'}</b></span></div>}
                     {r.unloading && <div className="mp-cost-details">
                       <span>Viagem ERP <b>{r.unloading.trip.number} · Empresa {r.unloading.trip.company}</b></span>
-                      <span>CT-e <b>{r.unloading.cte.number || r.unloading.cte.code} · Série {r.unloading.cte.series} · Empresa {r.unloading.cte.company}</b></span>
-                      <span>Cliente do CT-e <b>{r.unloading.cte.customerName}</b></span>
-                      <span>Reembolso da descarga <b>{r.unloading.reimbursement ? 'Sim' : 'Não'}</b></span>
+                      <span>Documento <b>{cteLabel(r.unloading.cte)}</b></span><span>Itinerário <b>{documentItinerary(r.unloading.cte)}</b></span>
+                      <span>Cliente do documento <b>{r.unloading.cte.customerName}</b></span>
+                      <span>Situação do reembolso <b>{reimbursementLabels[reimbursementOf(r).status]}</b></span>
                     </div>}
-                    {r.paid && <p className="mp-field-help">Forma de pagamento: {r.paymentMethod?.name || "Não informada"}</p>}
+                    </section>
+                    <section className="mp-detail-section"><h4>Registro e conferência</h4>
                     {duplicates.has(r.id) && (
                       <p className="mp-duplicate-warning">
                         Possível duplicidade. Compare os comprovantes antes de
@@ -1128,35 +993,28 @@ function MaintenanceForm({
                         })}
                       </span>
                       <span
-                        className={`mp-status ${r.checked ? "checked" : ""}`}
+                        className={`mp-status ${isExpenseChecked(r) ? "checked" : ""}`}
                       >
-                        {r.checked ? <Icon name="check" size={12} /> : <i />}
-                        {r.checked ? "Conferido" : "Pendente"}
+                        {isExpenseChecked(r) ? <Icon name="check" size={12} /> : <i />}
+                        {isExpenseChecked(r) ? "Conferido" : "Pendente"}
                       </span>
                     </div>
                     <div className="mp-record-bottom">
-                      <span>Lançado por {r.author}</span>
-                      {manager && !r.checked && (
-                        <button
-                          disabled={saving || user.readOnly}
-                          onClick={() => confirmRecord(r)}
-                        >
-                          <Icon name="check" size={15} />
-                          Conferir
-                        </button>
-                      )}
+                      <span>Registrado por {r.author}</span>
+
                     </div>
-                    {r.checked && (
+                    {isExpenseChecked(r) && (
                       <p className="mp-checked-detail">
-                        Conferido por {r.checkedBy || "usuário autorizado"}
+                        {r.checkedBy ? `Conferido por ${r.checkedBy}` : "Conferido por usuário autorizado"}
                         {r.checkedAt
                           ? ` em ${new Date(r.checkedAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`
                           : ""}
                         . Edição e exclusão bloqueadas.
                       </p>
                     )}
+                    </section>
                     <div className="mp-cost-actions">
-                      {!r.checked &&
+                      {!isExpenseChecked(r) && !r.paid &&
                         !user.readOnly &&
                         (manager || String(r.authorId) === String(user.id)) && (
                           <>
@@ -1254,7 +1112,8 @@ function MaintenanceForm({
                                 timeZone: "America/Sao_Paulo",
                               })}
                               {h.evento === "status" && <p>Pagamento: {h.depois?.data_pagamento ? displayDay(String(h.depois.data_pagamento).slice(0,10)) : "Não registrado"} · Forma: {h.depois?.forma_pagamento_nome || "Não informada"}</p>}
-                              {h.depois?.descarga && <p>Descarga · Viagem {h.depois.descarga.trip.number} · CT-e {h.depois.descarga.cte.number || h.depois.descarga.cte.code} · {h.depois.descarga.cte.customerName} · Reembolso: {h.depois.descarga.reimbursement ? 'Sim' : 'Não'}</p>}
+                              {h.depois?.reembolso && <p>Reembolso: {reimbursementLabels[h.depois.reembolso.status]} · {h.depois.reembolso.customer} · {h.depois.reembolso.document} {h.depois.reembolso.receivedDate && `· Recebido em ${displayDay(h.depois.reembolso.receivedDate)}`}</p>}
+                              {h.depois?.descarga && <p>Descarga · Viagem {h.depois.descarga.trip.number} · {cteLabel(h.depois.descarga.cte)} · {documentItinerary(h.depois.descarga.cte)} · {h.depois.descarga.cte.customerName} · Reembolso: {h.depois.descarga.reimbursement ? 'Sim' : 'Não'}</p>}
                               {h.evento === "edit" && (
                                 <p>
                                   Antes: {h.antes.placa} ·{" "}
@@ -1283,7 +1142,7 @@ function MaintenanceForm({
                   </div>
   );
   return (
-    <div className={`mp-app ${embedded ? "mp-embedded" : ""}`}>
+    <div className={`mp-app ${embedded ? "mp-embedded" : ""} ${manager ? "mp-manager" : ""}`}>
       <header className="mp-topbar">
         <a className="mp-brand" href="/manutencao-plantao">
           <img className="mp-client-logo" src="/brand/rodobach.png" alt="Rodobach Transportes Rodoviários" width="191" height="52" />
@@ -1311,9 +1170,11 @@ function MaintenanceForm({
           setRecords(items => items.some(item => item.id === record.id) ? items.map(item => item.id === record.id ? record : item) : [record, ...items]);
           setHistory(null);
         }} />}
+      {reportOpen && manager && <ExpenseReportDialog records={records} initialFilters={{dateFrom,dateTo,plate:search,trip:tripFilter,paid:paidFilter,posted:postedFilter,reimbursement:reimbursementFilter,text:textSearch,source:sourceFilter,status:filter}} Dialog={MaintenanceDialog} onClose={()=>setReportOpen(false)}/>}
       {receiptView && <MaintenanceDialog onClose={() => setReceiptView(null)} saving={false} step="receipt">
         <div className="mp-form mp-payment-modal"><div className="mp-section-title"><h2 id="mp-edit-title" data-step-title tabIndex={-1}>Comprovante da despesa</h2><button className="mp-close" onClick={() => setReceiptView(null)} aria-label="Fechar comprovante">×</button></div>
           {receiptView.loading ? <p role="status">Carregando foto…</p> : receiptView.error ? <p role="alert">{receiptView.error}</p> : <div>{Object.entries(receiptView.photos || {invoice:receiptView.receipt}).filter(([,photo])=>photo).map(([kind,photo])=><figure key={kind}><figcaption>{{odometer:"Painel / hodômetro",pump:"Bomba de combustível",invoice:"Nota / comprovante"}[kind]}</figcaption><img className="driver-receipt" src={photo} alt={kind === "invoice" ? "Foto do comprovante da despesa" : `Foto de ${kind === "pump" ? "bomba" : "painel"}`} /></figure>)}</div>}
+          <button type="button" className="mp-cancel-edit" onClick={() => setReceiptView(null)}>Voltar aos detalhes</button>
         </div>
       </MaintenanceDialog>}
       {manager && paymentRecord && (
@@ -1328,7 +1189,7 @@ function MaintenanceForm({
             <PaymentMethodPicker methods={paymentMethods} value={paymentMethod} onChange={setPaymentMethod} loading={paymentMethodsLoading} disabled={saving || paymentMethodsLoading || Boolean(paymentMethodsError)}/>
             {paymentRecord.paymentMethod && !paymentMethodsLoading && !paymentMethods.some(method => `${method.company}:${method.code}` === paymentMethod) && <p className="mp-field-help">Forma registrada anteriormente: {paymentRecord.paymentMethod.name}. Selecione uma opção ativa para salvar.</p>}
             {paymentMethodsError && <div role="alert"><p>{paymentMethodsError}</p><button type="button" onClick={loadPaymentMethods}>Tentar carregar novamente</button></div>}
-            <p className="mp-field-help">Ao salvar a data, esta manutenção será marcada como paga.</p>
+            <p className="mp-field-help">Ao salvar, a despesa será marcada como paga e conferida automaticamente.</p>
             {paymentError && <p className="mp-feedback error" role="alert">{paymentError}</p>}
             <div className="mp-payment-modal-actions">
               <button className="mp-cancel-edit" type="button" disabled={saving || photoBusy} onClick={() => setPaymentRecord(null)}>Cancelar</button>
@@ -1348,7 +1209,7 @@ function MaintenanceForm({
             <h1>
               {manager ? (
                 <>
-                  Tudo pronto para <em>conferir.</em>
+                  Despesas da <em>frota.</em>
                 </>
               ) : (
                 <>
@@ -1370,7 +1231,7 @@ function MaintenanceForm({
               aria-pressed={!manager}
             >
               <Icon name="truck" />
-              Minhas despesas
+              Despesas da frota
             </button>
             <button
               hidden={!canReview}
@@ -1392,12 +1253,12 @@ function MaintenanceForm({
               <button type="button" disabled={fleetLoading} onClick={() => setFleetAttempt(n => n + 1)}>Atualizar vínculo</button>
             </div>}
             {!manager && <div className="driver-start-card">
-              <div className="driver-start-top"><span className="driver-road-icon" aria-hidden="true">↗</span><span className="driver-badge">SUAS DESPESAS EM UM SÓ LUGAR</span></div>
+              <div className="driver-start-top"><span className="driver-road-icon" aria-hidden="true">↗</span><span className="driver-badge">DESPESAS DA FROTA EM UM SÓ LUGAR</span></div>
               <h2>Cada despesa, um registro completo.</h2>
               <p>Escolha o tipo, preencha as etapas e envie para a equipe. Você acompanha tudo por aqui.</p>
               <div className="driver-route"><span>1 · Escolha</span><i /><span>2 · Preencha</span><i /><span>3 · Acompanhe</span></div>
               <button className="mp-submit" disabled={user.readOnly || (isDriver && (fleetLoading || Boolean(fleetError) || !fleet.length))} onClick={() => { if (editing || amount || plate) openWizard(); else setDriverWizard({record:null}); }}><Icon name="plus" />Registrar despesa<Icon name="arrow" /></button>
-              <small>{records.length} despesa(s) registrada(s) · Seu histórico fica sempre disponível.</small>
+              <small>{records.length} despesa(s) registrada(s) · Histórico compartilhado da frota.</small>
             </div>}
             {wizardOpen && (
               <MaintenanceDialog
@@ -1415,6 +1276,7 @@ function MaintenanceForm({
                       Tudo certo. Pode seguir!
                     </h2>
                     <p role="status">{message}</p>
+                    <ExpenseWhatsappSummary record={savedMaintenance}/>
                     <button className="mp-submit" onClick={closeWizard}>
                       Ver lançamentos
                       <Icon name="arrow" />
@@ -1478,7 +1340,7 @@ function MaintenanceForm({
                                   index + 1
                                 )}
                               </span>
-                              {label}
+                              {index < step ? <button type="button" className="mp-step-back" aria-label={`Voltar para ${label}`} disabled={saving || photoBusy} onClick={() => {setStep(index);setError("");}}>{label}</button> : label}
                             </li>
                           ),
                         )}
@@ -1669,6 +1531,7 @@ function MaintenanceForm({
                           </dl>
                         </section>
                       )}
+                      {step === 2 && <ExpensePaymentDetails paymentDetails={paymentDetails} setPaymentDetails={setPaymentDetails}/>}
                       {error && (
                         <div className="mp-feedback error" role="alert">
                           {error}
@@ -1683,10 +1546,10 @@ function MaintenanceForm({
                         onClick={() =>
                           step
                             ? (setStep((n) => n - 1), setError(""))
-                            : closeWizard()
+                            : editing ? closeWizard() : (closeWizard(), setDriverWizard({record:null}))
                         }
                       >
-                        {step ? "Voltar" : "Continuar depois"}
+                        {step ? "Voltar" : editing ? "Voltar" : "Voltar ao tipo"}
                       </button>
                       <button
                         className="mp-submit"
@@ -1720,17 +1583,6 @@ function MaintenanceForm({
                 )}
               </MaintenanceDialog>
             )}
-            {manager && (
-              <div className="mp-manager-note">
-                <span className="mp-note-icon">
-                  <Icon name="list" size={26} />
-                </span>
-                <h2>Conferência simplificada</h2>
-                <p>
-                  Confira os registros de colaboradores e motoristas, os comprovantes e os status financeiros.
-                </p>
-              </div>
-            )}
             {error && !wizardOpen && (
               <div className="mp-feedback error" role="alert">
                 {error}
@@ -1747,19 +1599,20 @@ function MaintenanceForm({
             <div className="mp-section-title">
               <div>
                 <p className="mp-eyebrow">
-                  {manager ? "CONTROLE DE DESPESAS" : "SUAS DESPESAS"}
+                  {manager ? "CONTROLE DE DESPESAS" : "DESPESAS DA FROTA"}
                 </p>
                 <h2>
                   {manager
                     ? "Lançamentos da frota"
                     : search
                       ? "Histórico da placa"
-                      : "Meus lançamentos"}
+                      : "Todos os lançamentos"}
                 </h2>
               </div>
               <span className="mp-plate">{search || "Todas"}</span>
             </div>
             <div className="mp-history-label">
+              {manager && <button type="button" className="mp-cancel-edit" disabled={recordsLoading || Boolean(recordsError)} onClick={()=>setReportOpen(true)}>Baixar relatório CSV</button>}
               <button
                 className="mp-cancel-edit"
                 disabled={saving || recordsLoading}
@@ -1772,7 +1625,16 @@ function MaintenanceForm({
                 Atualizar lista
               </button>
             </div>
+            {manager && !recordsLoading && !recordsError && <ExpenseSummary records={visible} />}
+            {manager && <>
+              <div className="mp-management-tabs" role="tablist" aria-label="Controle de despesas">
+                {[["payments","Pagamentos"],["review","Conferência"],["reimbursements","Reembolsos"]].map(([key,label])=><button type="button" role="tab" key={key} aria-selected={managementTab===key} onClick={()=>{setManagementTab(key);setFilter(key==='review' ? 'unchecked' : 'all');setPaidFilter('');setPostedFilter('');setReimbursementFilter('');}}>{label}</button>)}
+              </div>
+              <p className="mp-control-notice">{managementTab==='payments' ? 'Registre pagamentos e acompanhe os lançamentos no ERP.' : managementTab==='review' ? 'Confira notas e valores. O pagamento não substitui esta conferência.' : 'Destaque o que precisa cobrar do cliente e registre o reembolso recebido.'}</p>
+              {managementTab==='reimbursements' && <label>Situação do reembolso exibida<select value={reimbursementFilter} onChange={e=>setReimbursementFilter(e.target.value)}><option value="">Todas as situações</option>{Object.entries(reimbursementLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>}
+            </>}
             <div className="mp-period-filters">
+                <ExpenseTripFilter value={tripFilter} onChange={setTripFilter} options={tripOptions}/>
                 {(
                   <label>
                     Buscar placa
@@ -1807,7 +1669,7 @@ function MaintenanceForm({
             <details className="mp-filter-panel">
               <summary>
                 Filtrar lançamentos{" "}
-                {(search || dateFrom || dateTo || textSearch || paidFilter || postedFilter || sourceFilter) && (
+                {(search || tripFilter || dateFrom || dateTo || textSearch || paidFilter || postedFilter || sourceFilter) && (
                   <span>Filtros ativos</span>
                 )}
               </summary>
@@ -1827,10 +1689,10 @@ function MaintenanceForm({
                     placeholder="Filtrar lançamentos"
                   />
                 </label>
-                {(search || dateFrom || dateTo || textSearch || paidFilter || postedFilter || sourceFilter) && (
+                {(search || tripFilter || dateFrom || dateTo || textSearch || paidFilter || postedFilter || sourceFilter) && (
                   <button
                     onClick={() => {
-                      setSearch("");
+                      setSearch(""); setTripFilter("");
                       setDateFrom("");
                       setDateTo("");
                       setTextSearch("");
@@ -1848,23 +1710,25 @@ function MaintenanceForm({
               <p role="alert">O início do período deve ser anterior ao fim.</p>
             )}
             <p hidden={!manager} className="mp-control-notice">
-              Conferido significa revisado. Confira também o comprovante e o
-              pagamento no financeiro antes de pagar ou reembolsar.
+              Aguardando pagamento mostra despesas sem pagamento registrado. Aguardando lançamento mostra despesas ainda não marcadas como lançadas, mesmo que já estejam pagas.
             </p>
+            {!manager && <p className="mp-control-notice">Aqui aparecem os lançamentos de todos os usuários, incluindo despesas pendentes, conferidas e pagas. Consulte os detalhes, comprovantes e histórico. Após a conferência, a edição fica bloqueada.</p>}
             <div className="mp-filters">
               {[
                 ["all", "Todos"],
-                ["pending", "Pendentes"],
-                ["checked", "Conferidos"],
+                ["pending", "Aguardando pagamento"],
+                ["unposted", "Aguardando lançamento"],
+                ["unchecked", "Aguardando conferência"],
               ].map(([key, label]) => (
                 <button
                   key={key}
+                  aria-label={label}
                   aria-pressed={filter === key}
                   className={filter === key ? "active" : ""}
                   onClick={() => setFilter(key)}
                 >
                   {label}
-                  {key === "all" && <span>{scoped.length}</span>}
+                  <span aria-hidden="true">{scoped.filter(r=>matchesStatus(r,key) && (!manager || !reimbursementFilter || reimbursementOf(r).status===reimbursementFilter)).length}</span>
                 </button>
               ))}
             </div>
@@ -1884,18 +1748,20 @@ function MaintenanceForm({
               {!recordsLoading && !recordsError && visible.length === 0 ? (
                 <div className="mp-empty">
                   <Icon name="list" size={32} />
-                  <h3>Nenhum lançamento por aqui</h3>
+                  <h3>{records.length ? "Nenhuma despesa corresponde aos filtros" : "Nenhum lançamento por aqui"}</h3>
                   <p>
                     {manager
                       ? "Tente outra placa ou outro filtro."
-                      : "Registre uma manutenção ou ajuste os filtros para ver seus lançamentos."}
+                      : records.length ? "Os registros continuam no histórico. Ajuste os filtros para encontrá-los." : "Ainda não há despesas cadastradas na frota."}
                   </p>
+                  {records.length > 0 && <button type="button" className="mp-secondary" onClick={() => { setFilter("all"); setReimbursementFilter(""); setSearch(""); setTripFilter(""); setTextSearch(""); setDateFrom(""); setDateTo(""); setSourceFilter(""); setPaidFilter(""); setPostedFilter(""); }}>Mostrar todo o histórico</button>}
+                  {!manager && canReview && records.length === 0 && <button type="button" className="mp-secondary" onClick={() => changeView("manager")}>Ver despesas da frota</button>}
                 </div>
               ) : (
-                <ExpenseHistory records={visible} isDriver={isDriver && !manager} currentPlate={expenseAccess?.plate} renderRecord={renderExpenseRecord} />
+                <ExpenseHistory onReview={manager ? confirmRecord : undefined} onReceipt={manager ? showReceipt : undefined} reviewDisabled={saving || user.readOnly} expandGroups={manager && managementTab === "review"} records={visible} isDriver={isDriver && !manager} currentPlate={expenseAccess?.plate} renderRecord={renderExpenseRecord} />
               )}
             </div>
-            {!recordsLoading && !recordsError && <ExpenseSummary records={visible} />}
+            {!manager && !recordsLoading && !recordsError && <ExpenseSummary records={visible} />}
             <p className="mp-history-help">
               <Icon name="check" size={16} />
               Registrou aqui? Não precisa lembrar depois.
@@ -1919,7 +1785,7 @@ function MaintenanceForm({
           onClick={() => changeView("driver")}
         >
           <Icon name="truck" />
-          <span>Minhas despesas</span>
+          <span>Despesas da frota</span>
         </button>
         <button
           hidden={!canReview}

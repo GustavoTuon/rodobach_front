@@ -4,7 +4,7 @@ import {afterEach,expect,it,vi} from 'vitest';
 import {act,cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
 afterEach(()=>{cleanup();vi.restoreAllMocks();});
 async function components(api={}) {
-  window.React=React;window.Icon=()=>null;window.RB_API={searchCidades:vi.fn(async()=>[]),...api};
+  window.React=React;window.Icon=()=>null;window.RB_API={listCargaResponsaveis:vi.fn(async()=>[{codigo:"1",empresa:"1",nome:"Responsavel ERP"}]),searchCidades:vi.fn(async()=>[]),...api};
   return import('./cargas-viagens-v2.jsx');
 }
 it('remove apenas o CT-e legado 1283, desfaz e salva mantendo orçamento da série O',async()=>{
@@ -30,12 +30,14 @@ it('cadastra carga com parada, remove outra parada e preserva valores após erro
   fireEvent.change(screen.getByPlaceholderText('Cidade'),{target:{value:'Teste'}});
   fireEvent.click(screen.getByRole('button',{name:'+ Adicionar parada'}));
   fireEvent.click(screen.getAllByRole('button',{name:'Remover parada'})[1]);
+  await screen.findByRole('option',{name:'Responsavel ERP'}); fireEvent.change(screen.getByLabelText('Responsável'),{target:{value:'1:1'}});
   fireEvent.click(screen.getByRole('button',{name:'Cadastrar carga',exact:true}));
   await screen.findByText('Falha de rede');
   expect(screen.getByLabelText('Valor do cliente (R$)').value).toBe('1250');
+  await screen.findByRole('option',{name:'Responsavel ERP'}); fireEvent.change(screen.getByLabelText('Responsável'),{target:{value:'1:1'}});
   fireEvent.click(screen.getByRole('button',{name:'Cadastrar carga',exact:true}));
   await waitFor(()=>expect(save).toHaveBeenCalledTimes(2));
-  expect(save.mock.calls[1][0]).toMatchObject({valorCliente:'1250',vendedor:'MAICON STEINBACH',paradas:[{cidade:'Teste'}]});
+  expect(save.mock.calls[1][0]).toMatchObject({valorCliente:'1250',responsavel:{codigo:'1',empresa:'1',nome:'Responsavel ERP'},paradas:[{cidade:'Teste'}]});
 });
 it('edita carga sem recriar e consulta histórico de preço',async()=>{
   const history={historico:{quantidade:2,media:900},suficienteParaCusto:false};
@@ -44,6 +46,7 @@ it('edita carga sem recriar e consulta histórico de preço',async()=>{
   render(<Cv2CargaForm initial={{id:9,codigo:'C-9',origem:'A',destino:'B',paradas:[]}} user={{}} onClose={()=>{}} onSaved={()=>{}}/>);
   fireEvent.click(screen.getByRole('button',{name:'Consultar histórico'}));
   await screen.findByText('2 frete(s)');
+  await screen.findByRole('option',{name:'Responsavel ERP'}); fireEvent.change(screen.getByLabelText('Responsável'),{target:{value:'1:1'}});
   fireEvent.click(screen.getByRole('button',{name:'Salvar alterações'}));
   await waitFor(()=>expect(update).toHaveBeenCalledWith(9,expect.objectContaining({calculoPreco:history})));
 });
