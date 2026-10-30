@@ -1,0 +1,8 @@
+import React from 'react';
+import {documentTypes} from './expense-document-fields.jsx';
+const money=value=>Number(value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+export default function ExpenseDetailFacts({record:r,onReceipt}) {
+  const date=r.expenseDate || new Date(r.date).toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'});
+  const fields=[['Fornecedor / empresa',r.supplier || 'Não informado'],['Data da despesa',[date.split('-').reverse().join('/'),r.expenseTime].filter(Boolean).join(' · ')],['Comprovante',r.document || 'Não informado'],['Documento fiscal',documentTypes[r.documentType] || 'Não informado'],['Local',r.location],['Cliente da nota',r.customerName],['Número de fogo',r.tireFireNumber],['Combustível',r.fuelType],['Litros',r.liters!=null ? `${r.liters.toLocaleString('pt-BR')} L` : null],['Hodômetro',r.odometer!=null ? `${Number(r.odometer).toLocaleString('pt-BR')} km` : null],['Valor do combustível',r.fuelAmount!=null ? money(r.fuelAmount) : null],['ARLA',r.arlaLiters!=null ? `${r.arlaLiters.toLocaleString('pt-BR')} L · ${money(r.arlaAmount)}` : null],['Leitura da telemetria',r.odometerDate ? new Date(r.odometerDate).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}) : null]];
+  return <section className="mp-detail-section mp-expense-facts"><div className="mp-facts-heading"><h4>Dados da despesa</h4>{r.hasReceipt && <button type="button" className="mp-cancel-edit" onClick={()=>onReceipt(r)}>Ver comprovante</button>}</div><dl>{fields.filter(([,value])=>value).map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>{!r.photoKinds?.invoice && <p className="mp-facts-note">Nota fiscal: {r.receiptReason || 'Não anexada'}</p>}</section>;
+}

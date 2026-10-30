@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 async function setup() {
   window.React = React; window.Icon = () => null;
-  window.RB_API = {
+  window.RB_API={listCargaResponsaveis:vi.fn(async()=>[{codigo:"1",empresa:"1",nome:"Responsavel ERP"}]),
     searchCidades: vi.fn(async () => [{ nome: 'Curitiba', uf: 'PR' }]),
     searchViagemClientes: vi.fn(async () => [{ nome: 'Filial Centro', documento: '123', cidade: 'Joinville', uf: 'SC', endereco: 'Rua Central, 10' }]),
     createCargaV2: vi.fn(async () => ({ id: 1 })),
@@ -30,6 +30,7 @@ it('seleciona cidade/UF e cliente/endereço somente da parada escolhida e salva 
   expect(screen.getAllByPlaceholderText('Endereço')[1].value).toBe('Rua Central, 10');
   expect(screen.getByLabelText('Cidade de destino').value).toBe('');
   fireEvent.change(screen.getAllByPlaceholderText('Endereço')[1], { target: { value: 'Portão dos fundos' } });
+  await screen.findByRole('option',{name:'Responsavel ERP'}); fireEvent.change(screen.getByLabelText('Responsável'),{target:{value:'1:1'}});
   fireEvent.click(screen.getByRole('button', { name: 'Cadastrar carga', exact: true }));
   await waitFor(() => expect(window.RB_API.createCargaV2).toHaveBeenCalledWith(expect.objectContaining({ paradas: [expect.objectContaining({ cidade: '', cliente: '' }), expect.objectContaining({ cidade: 'Joinville', uf: 'SC', cliente: 'Filial Centro', endereco: 'Portão dos fundos' })] })));
 });

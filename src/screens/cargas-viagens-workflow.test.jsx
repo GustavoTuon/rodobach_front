@@ -48,20 +48,20 @@ it('mantém documentos após falha ao salvar e impede alterações durante envio
   expect(screen.getByRole('button',{name:/Desvincular CT-e/}).disabled).toBe(false);
   expect(save.mock.calls[0]).toEqual([1,docs]);
 });
-it('oferece vínculo em carga sem viagem e permite selecionar todos os vendedores',async()=>{
+it('oferece vínculo em carga sem viagem e permite selecionar todos os responsáveis',async()=>{
   window.React=React;window.Icon=()=>null;
   window.RB_API={
     listCargasV2:vi.fn(async()=>({items:[{id:1,codigo:'C-QA',status:'aguardando_viagem',documentos:[],paradas:[],financeiro:{status:'sem_cte'}}],total:1,totalPages:1})),
     getCargasViagensV2Resumo:vi.fn(async()=>({cargas:1})),
-    getCargasViagensV2Filtros:vi.fn(async()=>({empresas:['Cliente'],vendedores:['MAICON STEINBACH']})),
+    getCargasViagensV2Filtros:vi.fn(async()=>({empresas:['Cliente'],responsaveis:[{codigo:'1',empresa:'1',nome:'MAICON STEINBACH'}]})),
   };
   await import('./cargas-viagens-v2.jsx');
   const Screen=window.CargasViagensV2;
   render(<Screen user={{login:'maicon'}}/>);
   const link=await screen.findByRole('button',{name:'Vincular CT-e'});
-  fireEvent.change(screen.getByRole('combobox',{name:'Vendedor exibido'}),{target:{value:''}});
-  await waitFor(()=>expect(window.RB_API.listCargasV2).toHaveBeenLastCalledWith(expect.objectContaining({vendedor:''})));
-  expect(screen.getByRole('combobox',{name:'Vendedor exibido'}).value).toBe('');
+  fireEvent.change(screen.getByRole('combobox',{name:'Responsável exibido'}),{target:{value:''}});
+  await waitFor(()=>expect(window.RB_API.listCargasV2).toHaveBeenLastCalledWith(expect.objectContaining({responsavel:''})));
+  expect(screen.getByRole('combobox',{name:'Responsável exibido'}).value).toBe('');
   fireEvent.click(link);
   expect(within(screen.getByRole('dialog')).getByText('Gerenciar CT-es · C-QA')).toBeTruthy();
   fireEvent.click(screen.getByRole('button',{name:'Fechar',exact:true}));

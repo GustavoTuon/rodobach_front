@@ -7,7 +7,7 @@ afterEach(()=>{cleanup();vi.restoreAllMocks();});
 it('abre fora do rodapé da viagem e fecha sem fechar os detalhes',async()=>{
   window.React=React;window.Icon=()=>null;
   const trip={id:1,numero:'V-1',cargas:[{id:1,documentos:[]}]};
-  window.RB_API={getViagemV2:vi.fn(async()=>trip),getCargaV2:vi.fn(async()=>({id:1,paradas:[]}))};
+  window.RB_API={listCargaResponsaveis:vi.fn(async()=>[{codigo:"1",empresa:"1",nome:"Responsavel ERP"}]),getViagemV2:vi.fn(async()=>trip),getCargaV2:vi.fn(async()=>({id:1,paradas:[]}))};
   const closeTrip=vi.fn();
   const {Cv2TripDetails}=await import('./cargas-viagens-v2.jsx');
   render(<Cv2TripDetails viagem={trip} onClose={closeTrip} />);
@@ -24,13 +24,14 @@ const load={id:1,codigo:'C-1',cliente:'Coleta',clienteFinal:'Entrega final',orig
 it('duplica volumes da carga e permite editar volumes da entrega antes de salvar',async()=>{
   window.React=React;window.Icon=()=>null;
   const save=vi.fn(async()=>({id:2}));
-  window.RB_API={createCargaV2:save};
+  window.RB_API={listCargaResponsaveis:vi.fn(async()=>[{codigo:"1",empresa:"1",nome:"Responsavel ERP"}]),createCargaV2:save};
   const {Cv2CargaForm}=await import('./cargas-viagens-v2.jsx');
   render(<Cv2CargaForm duplicateFrom={load} onClose={()=>{}} onSaved={()=>{}} />);
   expect(screen.getByLabelText('Quantidade de volumes').value).toBe('23');
   expect(screen.getByLabelText('Volumes da parada 1').value).toBe('10');
   fireEvent.change(screen.getByLabelText('Quantidade de volumes'),{target:{value:'30'}});
   fireEvent.change(screen.getByLabelText('Volumes da parada 1'),{target:{value:'12'}});
+  await screen.findByRole('option',{name:'Responsavel ERP'}); fireEvent.change(screen.getByLabelText('Responsável'),{target:{value:'1:1'}});
   fireEvent.click(screen.getByText('Cadastrar carga'));
   await waitFor(()=>expect(save).toHaveBeenCalled());
   expect(save.mock.calls[0][0]).toMatchObject({volumes:'30',paradas:[{volumes:'12'}]});
@@ -49,7 +50,7 @@ it('distribui total nas entregas sem duplicar; preserva pendências e não expõ
 });
 it('permite revisar ordem e imprimir dados completos das cargas',async()=>{
   window.React=React;window.Icon=()=>null;
-  window.RB_API={getViagemV2:vi.fn(async()=>({id:1,numero:'V-1',cargas:[{id:1}]})),getCargaV2:vi.fn(async()=>load)};
+  window.RB_API={listCargaResponsaveis:vi.fn(async()=>[{codigo:"1",empresa:"1",nome:"Responsavel ERP"}]),getViagemV2:vi.fn(async()=>({id:1,numero:'V-1',cargas:[{id:1}]})),getCargaV2:vi.fn(async()=>load)};
   const {Cv2ItineraryButton}=await import('./cargas-viagens-v2.jsx');
   const popup={document:{write:vi.fn(),close:vi.fn(),getElementById:()=>null}};
   vi.spyOn(window,'open').mockReturnValue(popup);
@@ -63,7 +64,7 @@ it('permite revisar ordem e imprimir dados completos das cargas',async()=>{
   expect(window.RB_API.getCargaV2).toHaveBeenCalledWith(1);
 });
 it('não libera impressão parcial quando uma carga falha',async()=>{
-  window.React=React;window.RB_API={getViagemV2:vi.fn(async()=>({id:1,cargas:[{id:1}]})),getCargaV2:vi.fn(async()=>{throw new Error('Falha ao consultar carga');})};
+  window.React=React;window.RB_API={listCargaResponsaveis:vi.fn(async()=>[{codigo:"1",empresa:"1",nome:"Responsavel ERP"}]),getViagemV2:vi.fn(async()=>({id:1,cargas:[{id:1}]})),getCargaV2:vi.fn(async()=>{throw new Error('Falha ao consultar carga');})};
   const {Cv2ItineraryButton}=await import('./cargas-viagens-v2.jsx');
   render(<Cv2ItineraryButton viagemId={1} />);
   fireEvent.click(screen.getByText('Itinerário / conferência'));

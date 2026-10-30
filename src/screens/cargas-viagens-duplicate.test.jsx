@@ -8,7 +8,7 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 it('exibe a lista enquanto resumo e filtros ainda estão consultando', async () => {
   window.React = React; window.Icon = () => null;
   const list = vi.fn(async () => ({ items: [{ id: 9, codigo: 'C-9', cliente: 'Lista disponível', documentos: [], status: 'aguardando_viagem' }], total: 1, totalPages: 1 }));
-  window.RB_API = {
+  window.RB_API = { listCargaResponsaveis: vi.fn(async()=>[{codigo:"1",empresa:"1",nome:"Responsavel ERP"}]),
     listCargasV2: list,
     getCargasViagensV2Resumo: vi.fn(() => new Promise(() => {})),
     getCargasViagensV2Filtros: vi.fn(() => new Promise(() => {})),
@@ -27,7 +27,7 @@ it('busca cadastro completo antes de duplicar e trata falha sem abrir cópia inc
   window.React = React; window.Icon = () => null;
   const carga = { id: 9, codigo: 'C-9', cliente: 'Cliente', documentos: [], status: 'aguardando_viagem' };
   const get = vi.fn().mockRejectedValueOnce(new Error('Banco indisponível')).mockResolvedValueOnce({ ...carga, material: 'Madeira', observacoes: 'Instrução completa', paradas: [{ tipo: 'entrega', cidade: 'Curitiba', uf: 'PR', cliente: 'Filial', endereco: 'Rua completa', nf: '', observacoes: '' }] });
-  window.RB_API = {
+  window.RB_API = { listCargaResponsaveis: vi.fn(async()=>[{codigo:"1",empresa:"1",nome:"Responsavel ERP"}]),
     listCargasV2: vi.fn(async () => ({ items: [carga], total: 1, totalPages: 1 })),
     getCargasViagensV2Resumo: vi.fn(async () => ({ cargas: 1 })),
     getCargasViagensV2Filtros: vi.fn(async () => ({ empresas: [], origens: [], ufsOrigem: [], destinos: [], ufsDestino: [], materiais: [], vendedores: [] })),
@@ -51,15 +51,19 @@ it('preserva alterações após falha e bloqueia novo envio durante salvamento',
   window.React = React; window.Icon = () => null;
   let finish;
   const create = vi.fn().mockRejectedValueOnce(new Error('Serviço indisponível')).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-  window.RB_API = { createCargaV2: create };
+  window.RB_API = { listCargaResponsaveis: vi.fn(async()=>[{codigo:"1",empresa:"1",nome:"Responsavel ERP"}]), createCargaV2: create };
   const { Cv2CargaForm } = await import('./cargas-viagens-v2.jsx');
   const saved = vi.fn();
   render(<Cv2CargaForm duplicateFrom={{ id: 9, codigo: 'C-9', cliente: 'Cliente' }} user={{}} onClose={() => {}} onSaved={saved} />);
   fireEvent.change(screen.getByLabelText('Observações'), { target: { value: 'Novo endereço' } });
+  await screen.findByRole('option', {name:'Responsavel ERP'});
+  fireEvent.change(screen.getByLabelText('Responsável'),{target:{value:'1:1'}});
   fireEvent.click(screen.getByRole('button', { name: 'Cadastrar carga', exact: true }));
   await screen.findByText('Serviço indisponível');
   expect(screen.getByLabelText('Observações').value).toBe('Novo endereço');
   expect(saved).not.toHaveBeenCalled();
+  await screen.findByRole('option', {name:'Responsavel ERP'});
+  fireEvent.change(screen.getByLabelText('Responsável'),{target:{value:'1:1'}});
   fireEvent.click(screen.getByRole('button', { name: 'Cadastrar carga', exact: true }));
   const saving = screen.getByRole('button', { name: 'Salvando...' });
   expect(saving.disabled).toBe(true);
@@ -74,7 +78,7 @@ it('duplica os dados editáveis, permite alterar endereço e cria outra carga se
   window.Icon = () => null;
   const create = vi.fn(async () => ({ id: 20, codigo: 'C-20' }));
   const update = vi.fn();
-  window.RB_API = { createCargaV2: create, updateCargaV2: update };
+  window.RB_API = { listCargaResponsaveis: vi.fn(async()=>[{codigo:"1",empresa:"1",nome:"Responsavel ERP"}]), createCargaV2: create, updateCargaV2: update };
   const { Cv2CargaForm } = await import('./cargas-viagens-v2.jsx');
   const source = {
     id: 9, codigo: 'C-9', data: '2026-10-23', cliente: 'Cliente inicial',
@@ -93,6 +97,8 @@ it('duplica os dados editáveis, permite alterar endereço e cria outra carga se
   expect(create).not.toHaveBeenCalled();
   expect(screen.getByPlaceholderText('Endereço').value).toBe('Rua A');
   fireEvent.change(screen.getByPlaceholderText('Endereço'), { target: { value: 'Rua B' } });
+  await screen.findByRole('option', {name:'Responsavel ERP'});
+  fireEvent.change(screen.getByLabelText('Responsável'),{target:{value:'1:1'}});
   fireEvent.click(screen.getByRole('button', { name: 'Cadastrar carga', exact: true }));
   await waitFor(() => expect(saved).toHaveBeenCalledWith({ id: 20, codigo: 'C-20' }));
   const payload = create.mock.calls[0][0];
@@ -106,7 +112,7 @@ it('duplica os dados editáveis, permite alterar endereço e cria outra carga se
 
 it('cancelar a cópia não cadastra nem altera a carga original', async () => {
   window.React = React; window.Icon = () => null;
-  window.RB_API = { createCargaV2: vi.fn(), updateCargaV2: vi.fn() };
+  window.RB_API = { listCargaResponsaveis: vi.fn(async()=>[{codigo:"1",empresa:"1",nome:"Responsavel ERP"}]), createCargaV2: vi.fn(), updateCargaV2: vi.fn() };
   const { Cv2CargaForm } = await import('./cargas-viagens-v2.jsx');
   const close = vi.fn();
   render(<Cv2CargaForm duplicateFrom={{ id: 9, codigo: 'C-9' }} user={{}} onClose={close} onSaved={vi.fn()} />);

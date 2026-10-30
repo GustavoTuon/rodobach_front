@@ -1,3 +1,5 @@
+import ResultadoMonthlyChart, {monthRange} from '../resultado-monthly-chart.jsx';
+
 const rvNum = (value) => Number(value) || 0;
 const rvMoney = (value) => rvNum(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const rvPct = (value) => value === null || value === undefined ? "—" : `${rvNum(value).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`;
@@ -43,6 +45,7 @@ const ResultadoVeiculos = () => {
   const [costs, setCosts] = React.useState(null);
   const [revenue, setRevenue] = React.useState(null);
   const [linkedSet, setLinkedSet] = React.useState(null);
+  const [chart, setChart] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
   const [fleetStatus, setFleetStatus] = React.useState("all");
@@ -52,7 +55,7 @@ const ResultadoVeiculos = () => {
   const [selectedItem, setSelectedItem] = React.useState(null);
   const [tableSort, setTableSort] = React.useState({ key: "data", direction: "desc" });
 
-  React.useEffect(() => { saveFilters("resultado-veiculos", { ...applied, period }); }, [JSON.stringify(applied), period]);
+  React.useEffect(() => { saveFilters("resultado-veiculos", { startDate:applied.startDate,endDate:applied.endDate,placa:applied.placa, period }); }, [JSON.stringify(applied), period]);
 
   React.useEffect(() => {
     window.RB_API.getCustosVeiculosFiltros().then((data) => setOptions(data || { placas: [] })).catch(() => {});
@@ -67,6 +70,7 @@ const ResultadoVeiculos = () => {
       if (!active) return;
       if (!payload.custos) throw new Error("A API local ainda não foi atualizada. Reinicie o backend e tente novamente.");
       setCosts(payload.custos); setRevenue(payload.receitas || null); setLinkedSet(payload.conjunto || null);
+      if (!applied.chartMonth) setChart({rows:payload.custos.monthly || [],range:{startDate:applied.startDate,endDate:applied.endDate}});
     }).catch((err) => { if (active) setError(err?.message || "Não foi possível carregar o resultado dos veículos."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -128,6 +132,12 @@ const ResultadoVeiculos = () => {
 
   const setPeriodValue = (key) => { setPeriod(key); if (key !== "custom") { const range = rvRange(key); setStartDate(range.startDate); setEndDate(range.endDate); } };
   const apply = () => setApplied({ startDate, endDate, placa: plate });
+  const selectMonth = (month) => {
+    const selected = month && month !== applied.chartMonth ? month : null;
+    const range = selected ? monthRange(selected, chart.range) : chart.range;
+    setStartDate(range.startDate); setEndDate(range.endDate); setPeriod('custom');
+    setApplied({...range,placa:applied.placa,chartMonth:selected});
+  };
   const selectVehicle = (value) => { setPlate(value); setApplied({ startDate, endDate, placa: value }); window.scrollTo({ top: 0, behavior: "smooth" }); };
   const selectExpense = (row) => { setDetailTab("expenses"); setDetailFilter({ kind: "expense", value: row.tipo }); setTimeout(() => document.querySelector(".rv-detail")?.scrollIntoView({ behavior: "smooth" }), 0); };
   const selectCustomer = (row) => { setDetailTab("revenues"); setDetailFilter({ kind: "revenue", value: row.cliente }); setTimeout(() => document.querySelector(".rv-detail")?.scrollIntoView({ behavior: "smooth" }), 0); };
@@ -152,6 +162,7 @@ const ResultadoVeiculos = () => {
       <div className="rv-kpis"><RvKpi label="Receita" value={rvMoney(summary.receitaTotal)} note="Quanto faturou" tone="#22c55e" variation={variation.receita?.variacaoPercentual}/><RvKpi label="Custos" value={rvMoney(summary.custoTotal)} note="Quanto foi gasto" tone="#f59e0b" variation={variation.custo?.variacaoPercentual}/><RvKpi label={noRevenue ? "Sem receita" : positive ? "Lucro" : "Prejuízo"} value={noRevenue ? rvMoney(summary.custoTotal) : rvMoney(summary.lucroTotal)} note={noRevenue ? "Custos sem receita registrada" : positive ? "Sobrou depois dos custos" : "Os custos passaram da receita"} tone={noRevenue ? "#f59e0b" : positive ? "#22c55e" : "#ef4444"} variation={variation.resultado?.variacaoPercentual}/><RvKpi label="Margem" value={noRevenue ? "—" : rvPct(summary.margem)} note={noRevenue ? "Não calculada sem receita" : positive ? "Lucro sobre a receita" : "Prejuízo sobre a receita"} tone={positive ? "#3b82f6" : "#ef4444"}/></div>
       <div className="rv-sentence">{noRevenue ? <>Este veículo teve <b>{rvMoney(summary.custoTotal)}</b> em custos, mas não teve receita registrada no período.</> : <>Este {selectedVehicle ? "veículo" : "grupo"} faturou <b>{rvMoney(summary.receitaTotal)}</b> e teve <b>{rvMoney(summary.custoTotal)}</b> em custos. Resultado: <strong className={positive ? "positive" : "negative"}>{positive ? "lucro" : "prejuízo"} de {rvMoney(Math.abs(rvNum(summary.lucroTotal)))}</strong>.</>}</div>
       {selectedVehicle && <div className="rv-metrics"><div><strong>{selectedVehicle.viagens || selectedVehicle.conhecimentos || 0}</strong><span>{selectedVehicle.viagens ? "viagens identificadas" : "CT-es"}</span></div><div><strong>{summary.distanciaKm ? `${rvNum(summary.distanciaKm).toLocaleString("pt-BR")} km` : "KM não disponível"}</strong><span>distância confiável no período</span></div><div><strong>{summary.custoPorKm !== null ? `${rvMoney(summary.custoPorKm)}/km` : "—"}</strong><span>custo do conjunto por km</span></div><div><strong>{summary.distanciaKm ? `${rvMoney(summary.receitaTotal / summary.distanciaKm)}/km` : "—"}</strong><span>receita por km</span></div></div>}
+      {chart && <ResultadoMonthlyChart rows={chart.rows} range={chart.range} selected={applied.chartMonth} onSelect={selectMonth} onClear={()=>selectMonth(null)}/>}
       {selectedVehicle ? <>
         <div className="rv-columns"><div><RvBars title="Onde estou gastando?" subtitle="Clique em uma categoria para ver os lançamentos." rows={categories} total={rvNum(summary.custoTotal)} valueField="custo" labelField="tipo" onSelect={selectExpense} empty="Nenhuma despesa encontrada."/>{topCategory && <div className="rv-highlight">Maior gasto: <b>{topCategory.tipo}</b> — {rvMoney(topCategory.custo)} — {rvPct(rvNum(topCategory.custo) / Math.max(1, rvNum(summary.custoTotal)) * 100)} dos custos</div>}</div><RvBars title="De onde veio a receita?" subtitle={`${revenues.length} CT-es no período · clique no cliente para detalhar.`} rows={customers} total={rvNum(summary.receitaTotal)} valueField="receitaTotal" labelField="cliente" onSelect={selectCustomer} empty="Nenhuma receita encontrada para este veículo."/></div>
         {!!alerts.length && <section className="card rv-alerts"><h2>Pontos de atenção</h2><div>{alerts.slice(0, 3).map((item) => <p key={item}>⚠ {item}</p>)}</div></section>}

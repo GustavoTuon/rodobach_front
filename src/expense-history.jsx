@@ -1,13 +1,15 @@
+import {reimbursementOf,reimbursementLabels} from './expense-report.js';
 import React from "react";
 
 const money = value => value.toLocaleString("pt-BR", {style:"currency",currency:"BRL"});
 const day = row => row.expenseDate || new Date(row.date).toLocaleDateString("en-CA",{timeZone:"America/Sao_Paulo"});
+export const isExpenseChecked = record => Boolean(record.checked);
 export function expenseTotals(rows) {
   const sums = {total:0,pending:0,checked:0,fuel:0,maintenance:0,other:0,unloading:0};
   for (const row of rows) {
     const cents = Math.round(Number(row.amount) * 100);
     sums.total += cents;
-    sums[row.checked ? "checked" : "pending"] += cents;
+    sums[isExpenseChecked(row) ? "checked" : "pending"] += cents;
     sums[row.service === "Abastecimento" ? "fuel" : row.service === 'Descarga' ? 'unloading' : row.service === "Outros" ? "other" : "maintenance"] += cents;
   }
   return Object.fromEntries(Object.entries(sums).map(([key,value])=>[key,value/100]));
@@ -24,7 +26,7 @@ export function ExpenseSummary({records}) {
   </section>;
 }
 
-export default function ExpenseHistory({records, isDriver, currentPlate, renderRecord}) {
+export default function ExpenseHistory({records, isDriver, currentPlate, renderRecord, onReview, onReceipt, reviewDisabled=false, expandGroups=false}) {
   const sorted = [...records].sort((a,b)=>day(b).localeCompare(day(a)) || String(b.date).localeCompare(String(a.date)));
   function recordRows(rows) {
     return rows.map(row=><article className="mp-expense-row" key={row.id}>
@@ -33,19 +35,27 @@ export default function ExpenseHistory({records, isDriver, currentPlate, renderR
         <span className="mp-expense-description"><strong>{row.service}</strong><span>{row.supplier || "Fornecedor não informado"}</span>
           <span className="mp-expense-evidence">{row.photoKinds?.invoice || row.hasReceipt ? "Nota anexada" : row.receiptReason ? "Ausência de nota justificada" : "Sem comprovante registrado"}</span>
         </span>
-        <span className="mp-expense-amount"><b>{money(Number(row.amount))}</b><span className={`mp-status ${row.checked ? "checked" : ""}`}>{row.checked ? "Conferido" : "A conferir"}</span>{row.paid && <small>{row.checked ? "Pago" : "Pago, aguardando conferência"}</small>}</span>
-        <span className="mp-expense-toggle"><span className="mp-expense-view">Ver detalhes</span><span className="mp-expense-hide">Fechar detalhes</span><span aria-hidden="true">⌄</span><span className="mp-sr-only"> de {row.service} em {day(row).split("-").reverse().join("/")}</span></span>
+        <span className="mp-expense-amount"><b>{money(Number(row.amount))}</b><span className={`mp-status ${isExpenseChecked(row) ? "checked" : ""}`}>{isExpenseChecked(row) ? "Conferido" : "A conferir"}</span>{row.paid && <small>Pago</small>}{reimbursementOf(row).status !== "nao_aplicavel" && <small className={`mp-reimbursement-badge ${reimbursementOf(row).status}`}>{reimbursementLabels[reimbursementOf(row).status]}</small>}</span>
+        <span className="mp-expense-toggle"><span className="mp-expense-view">Ver detalhes</span><span className="mp-expense-hide">Fechar detalhes</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg><span className="mp-sr-only"> de {row.service} em {day(row).split("-").reverse().join("/")}</span></span>
       </summary>
         {renderRecord(row)}
       </details>
+      {onReview && <div className="mp-row-review">
+        <span className={isExpenseChecked(row) ? "mp-review-done" : "mp-review-pending"}>
+          {isExpenseChecked(row) ? `Conferido por ${row.checkedBy || "usuário autorizado"}${row.checkedAt ? ` em ${new Date(row.checkedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}` : ""}` : row.paid ? "Pago · conferência pendente" : "Conferência pendente"}
+        </span>
+        <div>{onReceipt && row.hasReceipt && <button type="button" className="mp-review-receipt" onClick={()=>onReceipt(row)}>Abrir comprovante</button>}
+          {!isExpenseChecked(row) && <button type="button" className="mp-review-confirm" disabled={reviewDisabled} onClick={()=>onReview(row)}>Marcar como conferido</button>}
+        </div>
+      </div>}
     </article>);
   }
   function plateGroups(rows) {
     const plates = [...new Set(rows.map(row=>row.plate))].sort();
     return plates.map(plate=>{
       const items=rows.filter(row=>row.plate===plate), sums=expenseTotals(items);
-      return <details className="mp-plate-group" key={plate}>
-        <summary><span className="mp-group-identity"><strong>{plate}</strong><span>{items.length} {items.length === 1 ? "despesa" : "despesas"}</span></span><span className="mp-group-value">Total no período <b>{money(sums.total)}</b></span><span className={`mp-group-value ${items.some(item=>!item.checked) ? "has-pending" : "all-checked"}`}>{items.some(item=>!item.checked) ? "A conferir" : "Tudo conferido"}<b>{items.some(item=>!item.checked) ? money(sums.pending) : "✓"}</b></span><span className="mp-group-chevron" aria-hidden="true">⌄</span></summary>
+      return <details className="mp-plate-group" key={plate} open={expandGroups || undefined}>
+        <summary><span className="mp-group-identity"><strong>{plate}</strong><span>{items.length} {items.length === 1 ? "despesa" : "despesas"}</span></span><span className="mp-group-value">Total no período <b>{money(sums.total)}</b></span><span className={`mp-group-value ${items.some(item=>!isExpenseChecked(item)) ? "has-pending" : "all-checked"}`}>{items.some(item=>!isExpenseChecked(item)) ? "A conferir" : "Tudo conferido"}<b>{items.some(item=>!isExpenseChecked(item)) ? money(sums.pending) : "✓"}</b></span><span className="mp-group-chevron" aria-hidden="true">⌄</span></summary>
         <div className="mp-group-records">{recordRows(items)}</div>
       </details>;
     });

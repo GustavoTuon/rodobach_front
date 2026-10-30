@@ -8,7 +8,7 @@ afterEach(()=>{cleanup();localStorage.clear();});
 const fleet=["ABC1234","DEF4G56"];
 const Dialog=({children})=><div>{children}</div>;
 const FleetSelect=({value,onChange})=><label>Placa<input value={value} onChange={e=>onChange(e.target.value)}/></label>;
-function mount(api,locationApi){window.RB_API={getPlantaoOdometer:api,getPlantaoLocation:locationApi};render(<Wizard user={{login:"teste"}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);fireEvent.click(screen.getByRole("button",{name:/Abastecimento/}));fireEvent.change(screen.getByLabelText("Horário da nota"),{target:{value:"00:00:00"}});next();fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"ABC1234"}});}
+function mount(api,locationApi){localStorage.setItem("rodobach:expense-draft:v1:teste:expense:new",JSON.stringify({version:null,data:{plate:"ABC1234",expenseTrip:{trip:{company:"1",number:"880"}}}}));window.RB_API={getPlantaoOdometer:api,getPlantaoLocation:locationApi,listPlantaoUnloadingTrips:vi.fn(async()=>({trips:[{company:"1",number:"881"}]}))};render(<Wizard user={{login:"teste"}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);fireEvent.click(screen.getByRole("button",{name:/Abastecimento/}));fireEvent.change(screen.getByLabelText("Horário da nota"),{target:{value:"00:00:00"}});next();fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"ABC1234"}});}
 function next(){fireEvent.click(screen.getByRole("button",{name:"Próximo passo"}));}
 it("Outros pula KM e volta à placa sem exigir telemetria",()=>{
  const telemetry=vi.fn();window.RB_API={getPlantaoOdometer:telemetry};
@@ -20,6 +20,16 @@ it("Outros pula KM e volta à placa sem exigir telemetria",()=>{
  expect(screen.getByRole("progressbar").getAttribute("aria-valuemax")).toBe("6");
  expect(telemetry).not.toHaveBeenCalled();
  fireEvent.click(screen.getByRole("button",{name:"Voltar"}));expect(screen.getByLabelText("Placa").value).toBe("ABC1234");
+});
+it("atalho de etapa permite corrigir a placa sem perder os valores",()=>{
+ window.RB_API={};
+ render(<Wizard user={{login:"teste"}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);
+ fireEvent.click(screen.getByRole("button",{name:/Outros/}));next();
+ fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"ABC1234"}});next();
+ fireEvent.change(screen.getByLabelText("Valor total da despesa (R$)"),{target:{value:"123,45"}});next();
+ fireEvent.click(screen.getByRole("button",{name:"Voltar para Veículo"}));
+ fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"DEF4G56"}});next();
+ expect(screen.getByLabelText("Valor total da despesa (R$)").value).toBe("123,45");
 });
 it("abre a correção de horário quando o abastecimento não tem hora reconhecida",()=>{
  window.RB_API={};render(<Wizard user={{login:"teste"}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);
@@ -43,7 +53,7 @@ it("usa somente telemetria e remove as fotos de painel e bomba",async()=>{
  expect(screen.queryByText("Foto do painel")).toBeNull();
  next();expect(screen.queryByText("Foto da bomba")).toBeNull();expect(screen.queryByText("Ler nota do abastecimento")).toBeNull();
  fireEvent.click(screen.getByRole("button",{name:"Voltar"}));fireEvent.click(screen.getByRole("button",{name:"Voltar"}));
- fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"DEF4G56"}});next();
+ fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"DEF4G56"}});fireEvent.click(screen.getByRole("button",{name:/Selecionar viagem/}));fireEvent.click(await screen.findByRole("button",{name:/Viagem 881/}));next();
  await screen.findByText(/Sem leitura de telemetria/);
  expect(screen.getByLabelText("Hodômetro (km)").value).toBe("");next();expect(screen.getByRole("alert").textContent).toContain("telemetria");
 });
@@ -52,7 +62,7 @@ it("consulta o dia da despesa e descarta resposta atrasada de outra placa",async
  const api=vi.fn().mockImplementationOnce(()=>new Promise(r=>{resolve=r;})).mockResolvedValue({odometer:222222,source:"telemetria",date:"2025-01-02T12:00:00Z"});
  mount(api);
  fireEvent.change(screen.getByLabelText("Data da despesa"),{target:{value:"2025-01-02"}});
- fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"DEF4G56"}});next();
+ fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"DEF4G56"}});fireEvent.click(screen.getByRole("button",{name:/Selecionar viagem/}));fireEvent.click(await screen.findByRole("button",{name:/Viagem 881/}));next();
  await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("222222"));
  expect(api).toHaveBeenLastCalledWith("DEF4G56","2025-01-02","00:00:00");
  resolve({odometer:111111,source:"telemetria",date:new Date().toISOString()});
@@ -67,14 +77,14 @@ it("falha na telemetria permite tentar novamente sem digitar km",async()=>{
 function toLocation(){next();fireEvent.change(screen.getByLabelText("Litros abastecidos"),{target:{value:"100"}});fireEvent.change(screen.getByLabelText("Valor total da despesa (R$)"),{target:{value:"650"}});next();}
 it("exige nota ou justificativa antes da revisão",async()=>{
  mount(vi.fn().mockResolvedValue({odometer:197611.7,source:"telemetria",date:new Date().toISOString()}));next();
- await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("197611,7"));toLocation();next();next();
+ await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("197611,7"));toLocation();fireEvent.change(screen.getByLabelText("Posto / fornecedor — obrigatório"),{target:{value:"Posto Teste"}});next();fireEvent.click(screen.getByLabelText("Sem documento fiscal",{exact:true}));next();
  expect(screen.getByRole("alert").textContent).toContain("justifique");
  fireEvent.change(screen.getByLabelText("Justificativa sem nota"),{target:{value:"Fornecedor nao emitiu a nota."}});next();
  expect(screen.getByRole("button",{name:"Enviar para conferência"})).toBeTruthy();
 });
 it("preserva KM salvo ao editar valores e consulta de novo se o horário mudar",async()=>{
  const api=vi.fn().mockResolvedValue({odometer:200000,source:"telemetria",date:"2026-09-30T15:00:00Z"});window.RB_API={getPlantaoOdometer:api};
- render(<Wizard record={{id:"edit",version:1,service:"Abastecimento",plate:"ABC1234",expenseDate:"2026-09-30",expenseTime:"10:30:00",amount:500,liters:100,odometer:197611.7}} user={{id:42}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);
+ render(<Wizard record={{trip:{company:"1",number:"880"},id:"edit",version:1,service:"Abastecimento",plate:"ABC1234",expenseDate:"2026-09-30",expenseTime:"10:30:00",amount:500,liters:100,odometer:197611.7}} user={{id:42}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);
  next();next();expect(screen.getByLabelText("Hodômetro (km)").value).toBe("197611,7");expect(api).not.toHaveBeenCalled();
  fireEvent.click(screen.getByRole("button",{name:"Voltar"}));fireEvent.click(screen.getByRole("button",{name:"Voltar"}));fireEvent.change(screen.getByLabelText("Horário da nota"),{target:{value:"12:00:00"}});next();next();
  await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("200000"));
@@ -87,7 +97,7 @@ it("preenche localização, preserva correção e usa nova posição ao trocar d
  fireEvent.change(screen.getByLabelText("Cidade / local — opcional"),{target:{value:"Posto na rodovia"}});
  fireEvent.click(screen.getByRole("button",{name:"Voltar"}));next();expect(screen.getByLabelText("Cidade / local — opcional").value).toBe("Posto na rodovia");
  for(let i=0;i<3;i++)fireEvent.click(screen.getByRole("button",{name:"Voltar"}));
- fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"DEF4G56"}});next();await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("197611,7"));toLocation();
+ fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"DEF4G56"}});fireEvent.click(screen.getByRole("button",{name:/Selecionar viagem/}));fireEvent.click(await screen.findByRole("button",{name:/Viagem 881/}));next();await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("197611,7"));toLocation();
  await waitFor(()=>expect(screen.getByLabelText("Cidade / local — opcional").value).toBe("Curitiba / PR"));
 });
 it("localização tardia não sobrescreve digitação manual",async()=>{
