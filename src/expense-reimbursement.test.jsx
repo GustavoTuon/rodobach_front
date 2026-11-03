@@ -71,3 +71,45 @@ it('prepara o download CSV e libera a URL após o clique',()=>{
   expect(document.querySelector('a')).toBeNull();
   vi.runAllTimers();expect(revoke).toHaveBeenCalledWith('blob:report');
 });
+
+it('explica as etapas e permite descartar alterações sem gravar',()=>{
+  const save=vi.fn();
+  render(<ExpenseReimbursement record={{id:'discard'}} onSave={save}/>);
+  expect(screen.getByText('Nenhuma alteração pendente')).toBeTruthy();
+  fireEvent.click(screen.getByRole('radio',{name:'Reembolso a cobrar'}));
+  fireEvent.change(screen.getByLabelText('Cliente do reembolso'),{target:{value:'Cliente teste'}});
+  expect(screen.getByText('Alterações ainda não salvas')).toBeTruthy();
+  expect(screen.getByText('A cobrança ainda precisa ser enviada.')).toBeTruthy();
+  fireEvent.click(screen.getByRole('button',{name:'Descartar alterações'}));
+  expect(screen.getByRole('radio',{name:'Sem reembolso'}).checked).toBe(true);
+  expect(screen.queryByLabelText('Cliente do reembolso')).toBeNull();
+  expect(save).not.toHaveBeenCalled();
+});
+
+it('bloqueia envios duplicados e edição enquanto salva e anuncia sucesso',async()=>{
+  let resolve;
+  const save=vi.fn(()=>new Promise(done=>{resolve=done;}));
+  render(<ExpenseReimbursement record={{id:'pending'}} onSave={save}/>);
+  const button=screen.getByRole('button',{name:'Salvar reembolso'});
+  fireEvent.click(button);fireEvent.click(button);
+  expect(save).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole('button',{name:'Salvando…'}).disabled).toBe(true);
+  expect(screen.getByRole('radio',{name:'Reembolso recebido'}).closest('fieldset').disabled).toBe(true);
+  resolve(true);
+  await screen.findByText('Reembolso salvo.');
+  expect(screen.getByRole('button',{name:'Salvar reembolso'}).disabled).toBe(false);
+});
+
+it('exige cliente e impede recebimento com data futura',async()=>{
+  const save=vi.fn();
+  render(<ExpenseReimbursement record={{id:'validation'}} onSave={save}/>);
+  fireEvent.click(screen.getByRole('radio',{name:'Reembolso recebido'}));
+  fireEvent.click(screen.getByRole('button',{name:'Salvar reembolso'}));
+  expect(screen.getByRole('alert').textContent).toContain('cliente');
+  fireEvent.change(screen.getByLabelText('Cliente do reembolso'),{target:{value:'Cliente'}});
+  fireEvent.change(screen.getByLabelText('CT-e / documento de cobrança'),{target:{value:'CT-e 123'}});
+  fireEvent.change(screen.getByLabelText('Data do recebimento'),{target:{value:'2099-01-01'}});
+  fireEvent.click(screen.getByRole('button',{name:'Salvar reembolso'}));
+  expect(screen.getByRole('alert').textContent).toContain('sem data futura');
+  expect(save).not.toHaveBeenCalled();
+});

@@ -28,7 +28,7 @@ const decimalInput = (raw, precision) => {
 const categories = [
   ["Descarga", "📦", "Chapa e outros custos de descarga"],
   ["Abastecimento", "⛽", "Combustível, litros e quilometragem"],
-  ["Manutenção", "🔧", "Serviços e reparos no veículo"],
+  ["Manutenção", "🔧", "Borracharia, mecânica, elétrica e outros serviços"],
   ["Outros", "🧾", "Pedágio, estacionamento e outras despesas"],
 ];
 export async function prepareReceipt(file) {

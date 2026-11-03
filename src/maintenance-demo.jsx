@@ -1,4 +1,5 @@
 import ExpenseDetailStatus from './expense-detail-status.jsx';
+import ExpenseTirePicker from './expense-tire-picker.jsx';
 import ExpenseDetailFacts from './expense-detail-facts.jsx';
 import ExpenseReportDialog from './expense-report-dialog.jsx';
 import ExpenseReimbursement from './expense-reimbursement.jsx';
@@ -81,7 +82,6 @@ function Icon({ name, size = 20 }) {
 }
 
 export default function MaintenanceDemo({
-  initialView,
   embedded = false,
 } = {}) {
   const [user, setUser] = useState(null);
@@ -141,39 +141,17 @@ export default function MaintenanceDemo({
       <div className="mp-app mp-access">Entre no sistema para continuar.</div>
     );
   }
-  const canRegister =
-    user.admin || user.permissions?.["manutencao-plantao"] === true;
-  const canReview =
-    user.admin || user.permissions?.["conferencia-manutencao"] === true;
-  const requested =
-    initialView ||
-    (new URLSearchParams(window.location.search).get("visao") === "conferencia"
-      ? "manager"
-      : new URLSearchParams(window.location.search).get("visao") === "motorista" ? "motorist" : null);
-  if (
-    (!canRegister && !canReview) ||
-    (requested === "manager" && !canReview) ||
-    (["driver", "motorist"].includes(requested) && !canRegister)
-  )
-    return (
-      <div className="mp-app mp-access">
-        <p role="alert">
-          Seu usuário não possui liberação para esta tela. Solicite acesso ao
-          administrador.
-        </p>
-        <a href="/">Voltar ao sistema</a>
-      </div>
-    );
-  return (
-    <MaintenanceForm
-      key={`${user.id}-${requested}`}
-      user={user}
-      initialView={requested || (canRegister ? "driver" : "manager")}
-      canRegister={canRegister}
-      canReview={canReview}
-      embedded={embedded}
-    />
+  const allowed = key => user.admin || user.permissions?.[key] === true;
+  const staffAction = key => user.expenseProfile !== "motorista" && allowed(key);
+  const canRegister = allowed("manutencao-plantao");
+  const canReview = staffAction("conferencia-manutencao");
+  const canPay = staffAction("pagamento-despesas");
+  const canPost = staffAction("lancamento-despesas");
+  const canReimburse = staffAction("reembolso-despesas");
+  if (!canRegister && !canReview && !canPay && !canPost && !canReimburse) return (
+    <div className="mp-app mp-access"><p role="alert">Seu usuário não possui liberação para esta tela. Solicite acesso ao administrador.</p><a href="/">Voltar ao sistema</a></div>
   );
+  return <MaintenanceForm key={user.id} user={user} canRegister={canRegister} canReview={canReview} canPay={canPay} canPost={canPost} canReimburse={canReimburse} embedded={embedded}/>;
 }
 
 export function sanitizeAmount(raw) {
@@ -389,15 +367,18 @@ function MaintenanceDialog({ children, onClose, saving, step }) {
 
 function MaintenanceForm({
   user,
-  initialView,
   canRegister,
   canReview,
+  canPay,
+  canPost,
+  canReimburse,
   embedded,
 }) {
   const [driverWizard, setDriverWizard] = useState(null);
   const [maintenanceDraft] = useState(()=>readExpenseDraft(user,"maintenance"));
   const [documentType,setDocumentType] = useState(maintenanceDraft?.documentType || "");
   const [tireFireNumber,setTireFireNumber] = useState(maintenanceDraft?.tireFireNumber || "");
+  const [tire,setTire] = useState(maintenanceDraft?.tire || null);
   const [expenseTrip,setExpenseTrip] = useState(maintenanceDraft?.expenseTrip || null);
   const [receiptReason,setReceiptReason] = useState(maintenanceDraft?.receiptReason || "");
   const [maintenancePhotos,setMaintenancePhotos] = useState(maintenanceDraft?.photos || {});
@@ -417,20 +398,18 @@ function MaintenanceForm({
   const [paymentMethodsError, setPaymentMethodsError] = useState("");
   const [paymentError, setPaymentError] = useState("");
   const [reportOpen,setReportOpen] = useState(false);
-  const [managementTab,setManagementTab] = useState("payments");
   const [reimbursementFilter,setReimbursementFilter] = useState("");
   const [paidFilter, setPaidFilter] = useState("");
   const [postedFilter, setPostedFilter] = useState("");
   const [document, setDocument] = useState(maintenanceDraft?.document || "");
-  const [dateFrom, setDateFrom] = useState(() => initialView === "manager" ? `${today().slice(0,7)}-01` : "");
-  const [dateTo, setDateTo] = useState(() => initialView === "manager" ? today() : "");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [textSearch, setTextSearch] = useState("");
   const [tripFilter, setTripFilter] = useState("");
   const [deleting, setDeleting] = useState(null);
   const [deleteReason, setDeleteReason] = useState("");
   const [history, setHistory] = useState(null);
   const [records, setRecords] = useState([]);
-  const [view, setView] = useState(initialView);
   const [recordsLoading, setRecordsLoading] = useState(true);
   const [recordsAttempt, setRecordsAttempt] = useState(0);
   const [recordsError, setRecordsError] = useState("");
@@ -450,7 +429,7 @@ function MaintenanceForm({
     window.addEventListener("focus", refresh);
     return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); };
   }, [isDriver, wizardOpen, driverWizard]);
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState(canReview && !canPay && !canPost ? "unchecked" : "all");
   const [search, setSearch] = useState("");
   const [amount, setAmount] = useState(maintenanceDraft?.amount || "");
   const [supplier, setSupplier] = useState(maintenanceDraft?.supplier || { nome: "" });
@@ -461,7 +440,7 @@ function MaintenanceForm({
   const [note, setNote] = useState(maintenanceDraft?.note || "");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const draftWarning = useExpenseDraft(user,"maintenance",editing,{expenseDate,document,plate,amount,service,note,supplier,receiptReason,documentType,tireFireNumber,expenseTrip,paymentDetails,photos:maintenancePhotos},wizardOpen && !completed);
+  const draftWarning = useExpenseDraft(user,"maintenance",editing,{expenseDate,document,plate,amount,service,note,supplier,receiptReason,documentType,tireFireNumber,tire,expenseTrip,paymentDetails,photos:maintenancePhotos},wizardOpen && !completed);
   useEffect(() => {
     let active = true;
     setFleetLoading(true);
@@ -496,13 +475,13 @@ function MaintenanceForm({
       active = false;
     };
   }, [fleetAttempt]);
-  const manager = view === "manager" && canReview;
+  const manager = !isDriver;
   useEffect(() => {
     let active = true;
     setRecordsLoading(true);
     setRecordsError("");
     setRecords([]);
-    window.RB_API.listPlantao(manager)
+    window.RB_API.listPlantao(false)
       .then((data) => {
         if (active) setRecords(data.records);
       })
@@ -565,6 +544,7 @@ function MaintenanceForm({
     }
   }
   function cancelEdit() {
+    setTire(null);
     setPaymentDetails(null);setSavedMaintenance(null);
     setReceiptReason("");setMaintenancePhotos({});setDocumentType("");setTireFireNumber("");setExpenseTrip(null);
     setStep(0);
@@ -580,11 +560,12 @@ function MaintenanceForm({
   }
   function editRecord(r) {
     if (saving || user.readOnly || isExpenseChecked(r) || r.paid) return;
-    if (r.source === "motorista") { setDriverWizard({record:r}); return; }
+    if (r.source === "motorista" && r.service !== 'Borracharia') { setDriverWizard({record:r}); return; }
     const draft = readExpenseDraft(user,"maintenance",r);
     setReceiptReason(draft?.receiptReason ?? r.receiptReason ?? "");
     setDocumentType(draft?.documentType ?? r.documentType ?? "");
     setTireFireNumber(draft?.tireFireNumber ?? r.tireFireNumber ?? "");
+    setTire(draft?.tire !== undefined ? draft.tire : r.tire ?? null);
     setExpenseTrip(draft?.expenseTrip ?? (r.trip ? {trip:r.trip} : null));
     setMaintenancePhotos(draft?.photos || {});
     setPaymentDetails(draft?.paymentDetails !== undefined ? draft.paymentDetails : r.paymentDetails ?? null);
@@ -615,7 +596,7 @@ function MaintenanceForm({
       await window.RB_API.deletePlantao(
         r.id,
         { version: r.version, reason: deleteReason.trim() },
-        manager,
+        false,
       );
       setRecords((items) => items.filter((item) => item.id !== r.id));
       setDeleting(null);
@@ -634,14 +615,14 @@ function MaintenanceForm({
   async function showReceipt(r) {
     setReceiptView({id:r.id,loading:true});
     try {
-      const result = await window.RB_API.receiptPlantao(r.id, manager);
+      const result = await window.RB_API.receiptPlantao(r.id, false);
       setReceiptView(current => current?.id === r.id ? {id:r.id,receipt:result.receipt,photos:result.photos} : current);
     } catch(error) {setReceiptView(current => current?.id === r.id ? {id:r.id,error:error.message} : current);}
   }
   async function showHistory(r) {
     setHistory({ id: r.id, loading: true, items: [] });
     try {
-      const result = await window.RB_API.historyPlantao(r.id, manager);
+      const result = await window.RB_API.historyPlantao(r.id, false);
       setHistory((current) =>
         current?.id === r.id ? { id: r.id, items: result.history } : current,
       );
@@ -653,9 +634,9 @@ function MaintenanceForm({
       );
     }
   }
-  const matchesStatus = (r,key) => key === "all" || (key === "pending" ? r.paid !== true : key === "unchecked" ? !isExpenseChecked(r) : r.posted !== true);
+  const matchesStatus = (r,key) => key === "all" || (key === "pending" ? r.paid !== true : key === "unchecked" ? !isExpenseChecked(r) : key === "checked" ? isExpenseChecked(r) : r.posted !== true);
   const visible = scoped
-    .filter(r => !manager || !reimbursementFilter || reimbursementOf(r).status === reimbursementFilter)
+    .filter(r => !reimbursementFilter || reimbursementOf(r).status === reimbursementFilter)
     .filter(
       (r) =>
         matchesStatus(r,filter),
@@ -663,12 +644,12 @@ function MaintenanceForm({
     .sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
 
   async function updateControl(record, field, value, extra = {}) {
-    if (!manager || user.readOnly || savingRef.current) return;
+    if (user.readOnly || savingRef.current || !(field === "paymentDate" ? canPay : field === "posted" ? canPost : field === "reimbursement" ? canReimburse : false)) return;
     savingRef.current = true;
     setSaving(true);
     setError("");
     try {
-      const result = await window.RB_API.updatePlantaoControl(record.id, { version: record.version, [field]: value, ...extra }, manager);
+      const result = await window.RB_API.updatePlantaoControl(record.id, { version: record.version, [field]: value, ...extra }, false);
       setRecords(items => items.map(item => item.id === record.id ? result.record : item));
       setHistory(null);
       setMessage("Controle atualizado e registrado no histórico.");
@@ -696,6 +677,7 @@ function MaintenanceForm({
     } finally { setPaymentMethodsLoading(false); }
   }
   function openPayment(record) {
+    if (!canPay || user.readOnly) return;
     setPaymentRecord(record);
     setPaymentDate(record.paymentDate || today());
     setPaymentMethod(record.paymentMethod ? `${record.paymentMethod.company}:${record.paymentMethod.code}` : "");
@@ -739,7 +721,7 @@ function MaintenanceForm({
   }
   function openWizard() {
     if (!canRegister || user.readOnly) return;
-    if (isDriver && !editing) setPlate(fleet[0] || "");
+    if (isDriver && !editing) {if(plate !== (fleet[0] || '')){setTire(null);setTireFireNumber('');}setPlate(fleet[0] || "");}
     setMessage("");
     setError("");
     setCompleted(false);
@@ -791,7 +773,7 @@ function MaintenanceForm({
   async function submit(event) {
     event.preventDefault();
     if (
-      (!canRegister && !(editing && canReview)) ||
+      !canRegister ||
       user.readOnly ||
       savingRef.current || photoBusy
     )
@@ -832,7 +814,8 @@ function MaintenanceForm({
       const body = {
         expenseDate,
         receiptReason,photos:maintenancePhotos,documentType,
-        tireFireNumber:service === 'Borracharia' ? tireFireNumber.trim() : '',
+        tireFireNumber:service === 'Borracharia' && (!tire || tire.plate === plate) ? tireFireNumber.trim() : '',
+        tire:service === 'Borracharia' && tire?.plate === plate ? {code:tire.code,company:tire.company} : null,
         trip:expenseTrip?.trip ? {company:expenseTrip.trip.company,number:expenseTrip.trip.number} : null,
         document: document.trim(),
         plate,
@@ -848,7 +831,7 @@ function MaintenanceForm({
         ? await window.RB_API.updatePlantao(
             editing.id,
             { ...body, version: editing.version },
-            manager,
+            false,
           )
         : await window.RB_API.createPlantao(body);
       setRecords((items) =>
@@ -860,7 +843,7 @@ function MaintenanceForm({
       setPaymentDetails(null);
       setCompleted(true);
       try {clearExpenseDraft(user,"maintenance",editing);} catch { /* Expense already saved. */ }
-      setReceiptReason("");setMaintenancePhotos({});setDocumentType("");setTireFireNumber("");setExpenseTrip(null);
+      setReceiptReason("");setMaintenancePhotos({});setDocumentType("");setTireFireNumber("");setTire(null);setExpenseTrip(null);
       setPlate("");
       setService("Borracharia");
       setEditing(null);
@@ -881,33 +864,6 @@ function MaintenanceForm({
       savingRef.current = false;
       setSaving(false);
     }
-  }
-  function changeView(next) {
-    if (
-      saving ||
-      (next === "manager" && !canReview) ||
-      (["driver", "motorist"].includes(next) && !canRegister)
-    )
-      return;
-    if (next === view || (next !== "manager" && !manager)) return;
-    cancelEdit();
-    setDeleting(null);
-    setHistory(null);
-    setRecords([]);
-    setView(next);
-    setTripFilter("");
-    setSourceFilter("");
-    setDriverWizard(null);
-    setWizardOpen(false);
-    setPaidFilter("");
-    setPostedFilter("");
-    setFilter("all");
-    setSearch(""); setTripFilter("");
-    setTextSearch("");
-    setDateFrom(next === "manager" ? `${today().slice(0,7)}-01` : "");
-    setDateTo(next === "manager" ? today() : "");
-    setMessage("");
-    setError("");
   }
   const renderExpenseRecord = (r) => (
                   <div className="mp-record mp-record-compact" key={r.id}>
@@ -934,31 +890,16 @@ function MaintenanceForm({
                     </div>
                     <ExpenseDetailFacts record={r} onReceipt={showReceipt}/>
                     <section className="mp-detail-section"><h4>Pagamento e lançamento</h4>
-                    {manager && managementTab === "payments" && <div className="mp-payment-controls">
-                      <button type="button" className={`mp-payment-button ${r.paid ? "is-paid" : ""}`}
-                        disabled={saving || user.readOnly} onClick={() => openPayment(r)}
-                        aria-label={`${r.paid ? "Editar pagamento" : "Registrar pagamento"} — ${r.plate}`}>
-                        <span className="mp-payment-symbol"><Icon name={r.paid ? "check" : "calendar"} size={19} /></span>
-                        <span><small>PAGAMENTO</small><strong>{r.paymentDate ? `Pago em ${displayDay(r.paymentDate)}` : r.paid ? "Pago · informar data" : "Registrar pagamento"}</strong></span>
-                        <Icon name="arrow" size={16} />
-                      </button>
-                      <label className={`mp-posted-check ${r.posted ? "is-posted" : ""}`}>
-                        <input type="checkbox" checked={r.posted === true} disabled={saving || user.readOnly}
-                          aria-label={`Lançado — ${r.plate}`} onChange={(e) => updateControl(r, "posted", e.target.checked)} />
-                        <span><small>LANÇAMENTO</small><strong>{r.posted ? "Lançado" : "Marcar como lançado"}</strong></span>
-                      </label>
-                    </div>}
-                    {!manager && <div className="mp-payment-controls mp-financial-status" aria-label="Status financeiro">
-                      <div className={`mp-payment-button ${r.paid ? "is-paid" : ""}`}>
-                        <span className="mp-payment-symbol"><Icon name={r.paid ? "check" : "clock"} size={19} /></span>
-                        <span><small>PAGAMENTO</small><strong>{r.paymentDate ? `Pago em ${displayDay(r.paymentDate)}` : r.paid ? "Pago · data não informada" : r.paid === false ? "Não pago" : "Não informado"}</strong></span>
+                    <div className="mp-payment-controls mp-financial-status" aria-label="Status financeiro">
+                      <div className={`mp-payment-button ${r.paid ? "is-paid" : ""}`}><span><small>PAGAMENTO</small><strong>{r.paymentDate ? `Pago em ${displayDay(r.paymentDate)}` : r.paid ? "Pago · data não informada" : r.paid === false ? "Não pago" : "Não informado"}</strong></span>
+                        {canPay && !user.readOnly && <button type="button" className="mp-finance-action" disabled={saving} aria-label={`${r.paid ? "Editar pagamento" : "Registrar pagamento"} — ${r.plate}`} onClick={()=>openPayment(r)}>{r.paid ? "Editar pagamento" : "Registrar pagamento"}</button>}
                       </div>
-                      <div className={`mp-posted-check ${r.posted ? "is-posted" : ""}`}>
-                        <span className="mp-payment-symbol"><Icon name={r.posted ? "check" : "clock"} size={19} /></span>
-                        <span><small>LANÇAMENTO</small><strong>{r.posted ? "Lançado" : r.posted === false ? "Não lançado" : "Não informado"}</strong></span>
+                      <div className={`mp-posted-check ${r.posted ? "is-posted" : ""}`}><span><small>LANÇAMENTO NO ERP</small><strong>{r.posted ? "Lançado" : r.posted === false ? "Não lançado" : "Não informado"}</strong></span>
+                        {canPost && !user.readOnly && <label className="mp-posted-action"><input type="checkbox" checked={r.posted===true} disabled={saving} aria-label={`Lançado — ${r.plate}`} onChange={e=>updateControl(r,"posted",e.target.checked)}/><span>{r.posted ? "Lançamento confirmado" : "Confirmar lançamento"}</span></label>}
                       </div>
-                    </div>}
-                    {manager && <ExpenseReimbursement key={`${r.id}:${r.version}`} record={r} disabled={saving || user.readOnly} onSave={value=>updateControl(r,"reimbursement",value)}/>}
+                    </div>
+                    <p className="mp-finance-help">O lançamento confirma um registro já feito no ERP. A confirmação é salva automaticamente.</p>
+                    {canReimburse && !user.readOnly && <ExpenseReimbursement key={`${r.id}:${r.version}`} record={r} disabled={saving || user.readOnly} onSave={value=>updateControl(r,"reimbursement",value)}/>}
                     {r.paymentDetails && <section className="mp-detail-section"><h4>Dados para pagamento</h4><dl className="mp-detail-grid"><div><dt>Titular da conta</dt><dd>{r.paymentDetails.holderName}</dd></div><div><dt>Chave PIX</dt><dd>{r.paymentDetails.pixKey}</dd></div></dl></section>}
                     {manager ? <details className="mp-finance-share"><summary>Resumo para o financeiro / WhatsApp</summary><ExpenseWhatsappSummary record={r} compact/></details> : <ExpenseWhatsappSummary record={r}/>}
                     {r.paid && <p className="mp-field-help">Forma de pagamento: {r.paymentMethod?.name || "Não informada"}</p>}
@@ -1016,7 +957,7 @@ function MaintenanceForm({
                     <div className="mp-cost-actions">
                       {!isExpenseChecked(r) && !r.paid &&
                         !user.readOnly &&
-                        (manager || String(r.authorId) === String(user.id)) && (
+                        (canRegister && (user.admin || String(r.authorId) === String(user.id))) && (
                           <>
                             <button
                               disabled={saving || photoBusy}
@@ -1126,7 +1067,7 @@ function MaintenanceForm({
                                   {money(Number(h.depois.valor))} ·{" "}
                                   {String(h.depois.data_despesa)} ·{" "}
                                   {h.depois.fornecedor || "Sem fornecedor"} ·{" "}
-                                  {h.depois.documento || "Sem comprovante"} {manager && <>· Pago: {controlLabel(h.depois.pago)}{h.depois.data_pagamento ? ` em ${displayDay(String(h.depois.data_pagamento).slice(0, 10))}` : ""} · Lançado: {controlLabel(h.depois.lancado)}</>}
+                                  {h.depois.documento || "Sem comprovante"} {h.depois.numero_fogo && <>· Pneu: {h.depois.numero_fogo}{h.depois.pneu_vinculado?.positionName ? ` · ${h.depois.pneu_vinculado.positionName}` : ' · informado manualmente'}</>} {manager && <>· Pago: {controlLabel(h.depois.pago)}{h.depois.data_pagamento ? ` em ${displayDay(String(h.depois.data_pagamento).slice(0, 10))}` : ""} · Lançado: {controlLabel(h.depois.lancado)}</>}
                                 </p>
                               )}
                             </div>
@@ -1153,7 +1094,7 @@ function MaintenanceForm({
         </a>
       </header>
       {driverWizard && <DriverExpenseWizard record={driverWizard.record} user={user} fleet={fleet} fleetLoading={fleetLoading} fleetError={fleetError}
-        onRetryFleet={() => setFleetAttempt(n => n + 1)} manager={manager} Dialog={MaintenanceDialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}
+        onRetryFleet={() => setFleetAttempt(n => n + 1)} manager={false} Dialog={MaintenanceDialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}
         onMaintenance={receipt => {
           if (receipt) {
             setMaintenancePhotos(current=>({...current,...receipt.photos}));
@@ -1161,7 +1102,7 @@ function MaintenanceForm({
             if(receipt.amount) setAmount(receipt.amount);
             if(receipt.supplier) setSupplier({nome:receipt.supplier});
             if(receipt.documentNumber) setDocument(receipt.documentNumber);
-            if(receipt.plate) setPlate(receipt.plate);
+            if(receipt.plate && receipt.plate !== plate) {setPlate(receipt.plate);setTire(null);setTireFireNumber('');}
             setStep(0);
           }
           try {clearExpenseDraft(user,"expense");} catch {} setDriverWizard(null); openWizard();
@@ -1177,7 +1118,7 @@ function MaintenanceForm({
           <button type="button" className="mp-cancel-edit" onClick={() => setReceiptView(null)}>Voltar aos detalhes</button>
         </div>
       </MaintenanceDialog>}
-      {manager && paymentRecord && (
+      {canPay && paymentRecord && (
         <MaintenanceDialog onClose={() => setPaymentRecord(null)} saving={saving} step="payment">
           <form className="mp-form mp-payment-modal" onSubmit={savePayment}>
             <header className="mp-section-title">
@@ -1203,47 +1144,7 @@ function MaintenanceForm({
         </MaintenanceDialog>
       )}
       <main className="mp-main">
-        <div className="mp-heading">
-          <div>
-            <p className="mp-eyebrow">{manager ? "CENTRAL DE CONFERÊNCIA" : "DESPESAS DE COLABORADORES E MOTORISTAS"}</p>
-            <h1>
-              {manager ? (
-                <>
-                  Despesas da <em>frota.</em>
-                </>
-              ) : (
-                <>
-                  Cuide da sua <em>jornada.</em>
-                </>
-              )}
-            </h1>
-            <p className="mp-subtitle">
-              {manager
-                ? "Manutenções e despesas da viagem. Tudo no mesmo lugar."
-                : "Abastecimento, manutenção e outros custos. Registre e acompanhe por aqui."}
-            </p>
-          </div>
-          <div className="mp-view" aria-label="Área de trabalho">
-            <button
-              hidden={!canRegister}
-              className={!manager ? "active" : ""}
-              onClick={() => changeView("driver")}
-              aria-pressed={!manager}
-            >
-              <Icon name="truck" />
-              Despesas da frota
-            </button>
-            <button
-              hidden={!canReview}
-              className={manager ? "active" : ""}
-              onClick={() => changeView("manager")}
-              aria-pressed={manager}
-            >
-              <Icon name="list" />
-              Conferência
-            </button>
-          </div>
-        </div>
+        <div className="mp-heading"><div><p className="mp-eyebrow">CONTROLE DE DESPESAS</p><h1>Despesas da <em>frota.</em></h1><p className="mp-subtitle">Registre e acompanhe despesas, conferência e pagamentos no mesmo lugar.</p></div></div>
         <div className="mp-layout">
           <section className="mp-entry">
             {!manager && isDriver && <div className="mp-feedback" role="status">
@@ -1252,7 +1153,7 @@ function MaintenanceForm({
               {expenseAccess?.plate && <p>Placa: <strong>{expenseAccess.plate}</strong> · Identificação em {new Date(expenseAccess.observedAt).toLocaleString("pt-BR")}</p>}
               <button type="button" disabled={fleetLoading} onClick={() => setFleetAttempt(n => n + 1)}>Atualizar vínculo</button>
             </div>}
-            {!manager && <div className="driver-start-card">
+            {canRegister && <div className="driver-start-card">
               <div className="driver-start-top"><span className="driver-road-icon" aria-hidden="true">↗</span><span className="driver-badge">DESPESAS DA FROTA EM UM SÓ LUGAR</span></div>
               <h2>Cada despesa, um registro completo.</h2>
               <p>Escolha o tipo, preencha as etapas e envie para a equipe. Você acompanha tudo por aqui.</p>
@@ -1363,6 +1264,7 @@ function MaintenanceForm({
                               fleet.length === 0
                             }
                             onChange={(value) => {
+                              if(value !== plate) {setTire(null);setTireFireNumber('');}
                               setPlate(value);setExpenseTrip(null);
                               setMessage("");
                             }}
@@ -1448,13 +1350,6 @@ function MaintenanceForm({
                         <p className="mp-step-intro">
                           Mais um passo! Complete os detalhes da manutenção.
                         </p>
-                        <SupplierSelect
-                          value={supplier}
-                          onChange={setSupplier}
-                        />
-                        <ExpenseDocumentFields type={documentType} onTypeChange={setDocumentType} number={document} onNumberChange={setDocument}/>
-                        {service==='Borracharia' && <label>Número de fogo do pneu — opcional<input value={tireFireNumber} maxLength={80} onChange={e=>setTireFireNumber(e.target.value)} placeholder="Identificação do pneu que recebeu o serviço" /></label>}
-                        {fleet.includes(plate) && <ExpenseUnloading key={plate} plate={plate} value={expenseTrip} onChange={setExpenseTrip} tripOnly/>}
                         <fieldset>
                           <legend>Tipo de manutenção</legend>
                           <div className="mp-services">
@@ -1469,17 +1364,24 @@ function MaintenanceForm({
                                 key={item}
                                 aria-pressed={service === item}
                                 className={service === item ? "selected" : ""}
-                                onClick={() => setService(item)}
+                                onClick={() => {setService(item);if(item !== service){setTire(null);setTireFireNumber('');}}}
                               >
                                 {item}
                               </button>
                             ))}
                           </div>
                         </fieldset>
+                        {step===1 && service==='Borracharia' && <ExpenseTirePicker key={`tire:${plate}`}  plate={plate} value={tire?.plate === plate ? tire : null} number={tireFireNumber} onChange={(selected,number)=>{setTire(selected);setTireFireNumber(number);}} disabled={saving || photoBusy}/>}
+                        <SupplierSelect
+                          value={supplier}
+                          onChange={setSupplier}
+                        />
+                        <ExpenseDocumentFields type={documentType} onTypeChange={setDocumentType} number={document} onNumberChange={setDocument}/>
+                        {fleet.includes(plate) && <ExpenseUnloading key={plate} plate={plate} value={expenseTrip} onChange={setExpenseTrip} tripOnly/>}
                         <ExpensePhotoAssist photos={maintenancePhotos} knownPhotos={editing?.photoKinds || {}} photoKinds={["invoice"]} suggestionFields={["supplier","documentNumber"]}
                           preparePhoto={prepareReceipt} onPhoto={(kind,photo)=>setMaintenancePhotos(current=>({...current,[kind]:photo}))}
                           onApply={(field,value)=>field==="supplier" ? setSupplier({nome:value}) : field==="documentNumber" ? setDocument(value) : null}
-                          onLoadSaved={async()=>editing ? (await window.RB_API.receiptPlantao(editing.id,manager)).photos : {}} onBusy={setPhotoBusy} values={{supplier:supplier.nome,documentNumber:document}} />
+                          onLoadSaved={async()=>editing ? (await window.RB_API.receiptPlantao(editing.id,false)).photos : {}} onBusy={setPhotoBusy} values={{supplier:supplier.nome,documentNumber:document}} />
                         {!(maintenancePhotos.invoice !== undefined ? maintenancePhotos.invoice : editing?.photoKinds?.invoice) && <label>Justificativa sem nota<textarea value={receiptReason} onChange={e=>setReceiptReason(e.target.value)} minLength={10} maxLength={300} placeholder="Explique por que não há nota ou comprovante." /></label>}
                         <label>
                           Uma observação{" "}
@@ -1516,6 +1418,7 @@ function MaintenanceForm({
                               ["Fornecedor", supplier.nome || "Não informado"],
                               ["Tipo de documento", documentTypes[documentType] || "Não informado"],
                               ["Número de fogo", service==='Borracharia' ? tireFireNumber || "Não informado" : "—"],
+                              ...(service==='Borracharia' && tire ? [["Pneu vinculado",[tire.positionName,tire.brand,tire.size].filter(Boolean).join(' · ') || 'Identificado no cadastro']] : []),
                               ["Viagem", expenseTrip?.trip?.number || "Sem vínculo"],
                               ["Comprovante", document || "Não informado"],
                               ["Nota anexada", (maintenancePhotos.invoice !== undefined ? maintenancePhotos.invoice : editing?.photoKinds?.invoice || editing?.hasReceipt) ? "Sim" : "Não"],
@@ -1626,13 +1529,7 @@ function MaintenanceForm({
               </button>
             </div>
             {manager && !recordsLoading && !recordsError && <ExpenseSummary records={visible} />}
-            {manager && <>
-              <div className="mp-management-tabs" role="tablist" aria-label="Controle de despesas">
-                {[["payments","Pagamentos"],["review","Conferência"],["reimbursements","Reembolsos"]].map(([key,label])=><button type="button" role="tab" key={key} aria-selected={managementTab===key} onClick={()=>{setManagementTab(key);setFilter(key==='review' ? 'unchecked' : 'all');setPaidFilter('');setPostedFilter('');setReimbursementFilter('');}}>{label}</button>)}
-              </div>
-              <p className="mp-control-notice">{managementTab==='payments' ? 'Registre pagamentos e acompanhe os lançamentos no ERP.' : managementTab==='review' ? 'Confira notas e valores. O pagamento não substitui esta conferência.' : 'Destaque o que precisa cobrar do cliente e registre o reembolso recebido.'}</p>
-              {managementTab==='reimbursements' && <label>Situação do reembolso exibida<select value={reimbursementFilter} onChange={e=>setReimbursementFilter(e.target.value)}><option value="">Todas as situações</option>{Object.entries(reimbursementLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>}
-            </>}
+            <label>Situação do reembolso<select value={reimbursementFilter} onChange={e=>setReimbursementFilter(e.target.value)}><option value="">Todas as situações</option>{Object.entries(reimbursementLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
             <div className="mp-period-filters">
                 <ExpenseTripFilter value={tripFilter} onChange={setTripFilter} options={tripOptions}/>
                 {(
@@ -1719,6 +1616,7 @@ function MaintenanceForm({
                 ["pending", "Aguardando pagamento"],
                 ["unposted", "Aguardando lançamento"],
                 ["unchecked", "Aguardando conferência"],
+                ["checked", "Conferidas"],
               ].map(([key, label]) => (
                 <button
                   key={key}
@@ -1728,7 +1626,7 @@ function MaintenanceForm({
                   onClick={() => setFilter(key)}
                 >
                   {label}
-                  <span aria-hidden="true">{scoped.filter(r=>matchesStatus(r,key) && (!manager || !reimbursementFilter || reimbursementOf(r).status===reimbursementFilter)).length}</span>
+                  <span aria-hidden="true">{scoped.filter(r=>matchesStatus(r,key) && (!reimbursementFilter || reimbursementOf(r).status===reimbursementFilter)).length}</span>
                 </button>
               ))}
             </div>
@@ -1755,10 +1653,9 @@ function MaintenanceForm({
                       : records.length ? "Os registros continuam no histórico. Ajuste os filtros para encontrá-los." : "Ainda não há despesas cadastradas na frota."}
                   </p>
                   {records.length > 0 && <button type="button" className="mp-secondary" onClick={() => { setFilter("all"); setReimbursementFilter(""); setSearch(""); setTripFilter(""); setTextSearch(""); setDateFrom(""); setDateTo(""); setSourceFilter(""); setPaidFilter(""); setPostedFilter(""); }}>Mostrar todo o histórico</button>}
-                  {!manager && canReview && records.length === 0 && <button type="button" className="mp-secondary" onClick={() => changeView("manager")}>Ver despesas da frota</button>}
                 </div>
               ) : (
-                <ExpenseHistory onReview={manager ? confirmRecord : undefined} onReceipt={manager ? showReceipt : undefined} reviewDisabled={saving || user.readOnly} expandGroups={manager && managementTab === "review"} records={visible} isDriver={isDriver && !manager} currentPlate={expenseAccess?.plate} renderRecord={renderExpenseRecord} />
+                <ExpenseHistory onReview={canReview && !user.readOnly ? confirmRecord : undefined} onReceipt={showReceipt} reviewDisabled={saving || user.readOnly} expandGroups={canReview && filter === "unchecked"} records={visible} isDriver={isDriver && !manager} currentPlate={expenseAccess?.plate} renderRecord={renderExpenseRecord} />
               )}
             </div>
             {!manager && !recordsLoading && !recordsError && <ExpenseSummary records={visible} />}
@@ -1778,24 +1675,7 @@ function MaintenanceForm({
           </p>
         </footer>
       </main>
-      <nav className="mp-mobile-nav" aria-label="Áreas do portal">
-        <button
-          hidden={!canRegister}
-          className={!manager ? "active" : ""}
-          onClick={() => changeView("driver")}
-        >
-          <Icon name="truck" />
-          <span>Despesas da frota</span>
-        </button>
-        <button
-          hidden={!canReview}
-          className={manager ? "active" : ""}
-          onClick={() => changeView("manager")}
-        >
-          <Icon name="list" />
-          <span>Conferência</span>
-        </button>
-      </nav>
+
     </div>
   );
 }

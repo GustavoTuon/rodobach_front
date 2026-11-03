@@ -21,7 +21,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/ {
 }; /*EDITMODE-END*/
 
 const NAV = [
-  {id:"manutencao-plantao",label:"Manutenção de plantão",icon:"wrench",title:"Manutenção de plantão",subgroup:"frota",section:"frota",permissionsAny:["manutencao-plantao","conferencia-manutencao"],href:"/manutencao-plantao"},
+  {id:"manutencao-plantao",label:"Despesas",icon:"wrench",title:"Despesas",subgroup:"frota",section:"frota",permissionsAny:["manutencao-plantao", "conferencia-manutencao", "pagamento-despesas", "lancamento-despesas", "reembolso-despesas"],href:"/manutencao-plantao"},
   {
     id: "diretoria",
     label: "Diretoria",
