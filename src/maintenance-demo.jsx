@@ -802,7 +802,7 @@ function MaintenanceForm({
       setError("Entre no sistema novamente para registrar a manutenção.");
       return;
     }
-    if (paymentDetails && (!paymentDetails.holderName.trim() || !paymentDetails.pixKey.trim())) {setError("Preencha o nome do titular e a chave PIX, ou desative os dados para pagamento.");return;}
+    if (!paymentDetails?.holderName?.trim() || !paymentDetails?.pixKey?.trim()) {setError("Preencha o nome do titular e a chave PIX para registrar a manutenção.");return;}
     const hasInvoice=maintenancePhotos.invoice !== undefined ? Boolean(maintenancePhotos.invoice) : Boolean(editing?.photoKinds?.invoice || editing?.hasReceipt);
     if (!hasInvoice && receiptReason.trim().length<10) {setError("Anexe a nota ou justifique a ausência com pelo menos 10 caracteres.");return;}
     if (!supplier.nome.trim() || !documentType || (documentType==='nf_servico' && !document.trim())) {setError("Informe o fornecedor, o tipo de documento e o número da nota fiscal de serviço, quando aplicável.");return;}
@@ -1434,7 +1434,7 @@ function MaintenanceForm({
                           </dl>
                         </section>
                       )}
-                      {step === 2 && <ExpensePaymentDetails paymentDetails={paymentDetails} setPaymentDetails={setPaymentDetails}/>}
+                      {step === 2 && <ExpensePaymentDetails required paymentDetails={paymentDetails} setPaymentDetails={setPaymentDetails}/>}
                       {error && (
                         <div className="mp-feedback error" role="alert">
                           {error}

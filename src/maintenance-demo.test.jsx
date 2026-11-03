@@ -50,11 +50,14 @@ it("salva PIX na manutenção e oferece resumo após concluir", async () => {
   fireEvent.click(screen.getByLabelText("Sem documento fiscal",{exact:true}));
   fireEvent.change(screen.getByLabelText("Justificativa sem nota"),{target:{value:"Fornecedor não emitiu a nota."}});
   fireEvent.click(screen.getByRole("button",{name:"Continuar",exact:true}));
-  fireEvent.click(screen.getByLabelText("Informar dados para pagamento via PIX"));
+  expect(screen.queryByLabelText("Informar dados para pagamento via PIX")).toBeNull();
   fireEvent.click(screen.getByRole("button",{name:"Registrar manutenção"}));
   expect(screen.getByRole("alert").textContent).toContain("titular");
   expect(window.RB_API.createPlantao).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText("Nome do titular da conta"),{target:{value:" Titular Teste "}});
+  fireEvent.change(screen.getByLabelText("Chave PIX"),{target:{value:"   "}});
+  fireEvent.click(screen.getByRole("button",{name:"Registrar manutenção"}));
+  expect(window.RB_API.createPlantao).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText("Chave PIX"),{target:{value:" teste@example.com "}});
   fireEvent.click(screen.getByRole("button",{name:"Voltar",exact:true}));
   fireEvent.click(screen.getByRole("button",{name:"Continuar",exact:true}));
@@ -436,6 +439,8 @@ async function finish() {
     );
     if (screen.queryByRole("alert")) return;
   }
+  fireEvent.change(screen.getByLabelText("Nome do titular da conta"),{target:{value:"Titular Teste"}});
+  fireEvent.change(screen.getByLabelText("Chave PIX"),{target:{value:"teste@example.com"}});
   fireEvent.click(
     screen.getByRole("button", {
       name: /Registrar manutenção|Salvar alterações/,
