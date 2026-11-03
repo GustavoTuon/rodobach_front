@@ -13,6 +13,7 @@ export function formatExpenseWhatsapp(record) {
   if (trip) lines.push(`Viagem: ${clean(trip.number)} · Empresa ${clean(trip.company)}`);
   if (record.unloading?.cte) lines.push(`Documento: ${cteLabel(record.unloading.cte)}`, `Rota: ${documentItinerary(record.unloading.cte)}`);
   if (record.location) lines.push(`Local: ${clean(record.location)}`);
+  if (record.tireFireNumber) lines.push(`Pneu: ${clean(record.tireFireNumber)}${record.tire?.positionName ? ` · ${clean(record.tire.positionName)}` : ' · número informado manualmente'}`);
   if (record.note) lines.push(`Descrição: ${clean(record.note)}`);
   lines.push('', `Pagamento: ${record.paid ? 'Pago' : 'Aguardando pagamento'}`);
   if (record.paymentDetails) lines.push('', '*Dados para pagamento via PIX*', `Titular: ${clean(record.paymentDetails.holderName)}`, `Chave PIX: ${clean(record.paymentDetails.pixKey)}`);

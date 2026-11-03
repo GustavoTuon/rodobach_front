@@ -2027,6 +2027,8 @@ button.mp-payment-button:hover:not(:disabled) { border-color: var(--accent); }
 .mp-reimbursement-document .mp-fleet-option small{font-size:12px;line-height:1.4;color:var(--muted);overflow-wrap:anywhere}
 @media(max-width:600px){.mp-reimbursement-document .mp-fleet-dropdown{min-width:0;width:100%}}
 .mp-manager .mp-main{max-width:1320px;padding-top:26px}
+.mp-app .mp-filters{flex-wrap:wrap}
+.mp-app .mp-filters button{min-width:0}
 .mp-manager .mp-heading{margin-bottom:24px;align-items:center}
 .mp-manager .mp-heading h1{font-size:32px;line-height:1.15}
 .mp-manager .mp-heading h1 em{font:inherit;color:#356dad}
@@ -2110,3 +2112,34 @@ button.mp-payment-button:hover:not(:disabled) { border-color: var(--accent); }
 .mp-manager .mp-record-compact .mp-payment-button,.mp-manager .mp-record-compact .mp-posted-check{padding:10px 12px;min-height:48px}
 @media(max-width:850px){.mp-record-compact .mp-detail-statuses,.mp-expense-facts dl,.mp-manager .mp-record-compact .mp-trip-section .mp-cost-details{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.mp-record-compact .mp-detail-statuses{gap:7px}.mp-detail-status{padding:10px}.mp-detail-status>strong{font-size:13px}.mp-expense-facts dl,.mp-manager .mp-record-compact .mp-trip-section .mp-cost-details{grid-template-columns:1fr}.mp-manager .mp-record-compact{padding:10px}}
+/* Financial actions: consistent targets and explicit reimbursement stages. */
+.mp-financial-status { grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 0; padding-top: 0; }
+.mp-financial-status > div { flex-wrap: wrap; justify-content: space-between; gap: 14px; }
+.mp-financial-status > div > span { flex: 1; min-width: 140px; }
+.mp-app .mp-finance-action, .mp-app .mp-posted-action { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 44px; padding: 10px 16px; border: 1px solid #2b639f; border-radius: 10px; background: #326fae; color: #fff; font: inherit; font-size: 13px; font-weight: 600; line-height: 1.4; cursor: pointer; text-align: center; margin: 0; }
+.mp-app .mp-posted-action { background: var(--surface, #fff); color: #285f99; }
+.mp-app .is-posted .mp-posted-action { border-color: #378260; color: #216b48; background: #f0faf4; }
+.mp-app .mp-finance-action:hover:not(:disabled) { background: #24588f; }
+.mp-app .mp-posted-action:hover { border-color: #24588f; background: #edf4ff; }
+.mp-app .mp-finance-action:focus-visible, .mp-app .mp-posted-action:focus-within { outline: 3px solid #7babdf; outline-offset: 3px; }
+.mp-app .mp-finance-action:disabled, .mp-app .mp-posted-action:has(input:disabled) { opacity: .6; cursor: wait; }
+.mp-app .mp-posted-action input { accent-color: #326fae; }
+.mp-finance-help, .mp-reimbursement-intro { font-size: 13px; line-height: 1.6; color: var(--muted, #526177); margin: 12px 0; }
+.mp-reimbursement-status { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.mp-reimbursement-status label { align-items: flex-start; padding: 14px 12px; min-width: 0; }
+.mp-reimbursement-status input[type=radio] { flex: 0 0 16px; margin-top: 3px; }
+.mp-reimbursement-status strong { display: block; font-size: 13px; line-height: 1.5; }
+.mp-reimbursement-status small { display: block; font-size: 12px; font-weight: 400; line-height: 1.5; margin-top: 5px; color: var(--muted, #526177); }
+.mp-reimbursement-status label:hover { border-color: #3672b4; }
+.mp-reimbursement-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid var(--border, #d4ddeb); padding-top: 14px; }
+.mp-reimbursement-footer > span { color: var(--muted, #526177); font-size: 12px; }
+.mp-reimbursement-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.mp-reimbursement-actions .mp-cancel-edit { min-height: 44px; }
+.mp-reimbursement > [role=alert] { padding: 12px; border: 1px solid #e6b6b6; border-radius: 8px; background: #fff4f4; color: #9b2626; }
+@media (max-width: 1000px) { .mp-reimbursement-status { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+  .mp-financial-status, .mp-reimbursement-status { grid-template-columns: 1fr; }
+  .mp-financial-status .mp-finance-action, .mp-financial-status .mp-posted-action { width: 100%; }
+  .mp-reimbursement-actions { width: 100%; }
+  .mp-reimbursement-actions > button { flex: 1; }
+}

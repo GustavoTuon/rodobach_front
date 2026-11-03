@@ -18,7 +18,7 @@ export function filterReportRecords(records,filters) {
       && (!f.checked || String(Boolean(row.checked))===f.checked)
       && (!f.source || (row.authorProfile || 'unknown')===f.source)
       && (!f.reimbursement || reimbursementOf(row).status===f.reimbursement)
-      && (f.status==='all' || (f.status==='pending' ? row.paid!==true : f.status==='unposted' ? row.posted!==true : !row.checked))
+      && (f.status==='all' || (f.status==='pending' ? row.paid!==true : f.status==='unposted' ? row.posted!==true : f.status==='checked' ? Boolean(row.checked) : !row.checked))
       && normalize([row.supplier,row.document,row.author,row.note,row.tireFireNumber,trip?.number,row.service,row.unloading?.cte?.number || row.unloading?.cte?.code,row.unloading?.cte?.customerName].join(' ')).includes(normalize(f.text));
   });
 }
@@ -49,7 +49,7 @@ export default function ExpenseReportDialog({records,initialFilters,Dialog,onClo
         {[['paid','Pagamento'],['checked','Conferência'],['posted','Lançado no ERP']].map(([key,label])=><label key={key}>{label}<select value={filters[key]} onChange={e=>set(key,e.target.value)}><option value="">Todos</option><option value="true">Sim</option><option value="false">Não</option>{key!=='checked' && <option value="unknown">Não informado</option>}</select></label>)}
         <label>Reembolso<select value={filters.reimbursement} onChange={e=>set('reimbursement',e.target.value)}><option value="">Todas as situações</option>{Object.entries(reimbursementLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
         <label>Perfil de quem lançou<select value={filters.source} onChange={e=>set('source',e.target.value)}><option value="">Todos</option><option value="colaborador">Colaborador</option><option value="motorista">Motorista</option><option value="unknown">Perfil não registrado</option></select></label>
-        <label>Pendência<select value={filters.status} onChange={e=>set('status',e.target.value)}><option value="all">Todas</option><option value="pending">Aguardando pagamento</option><option value="unposted">Aguardando lançamento</option><option value="unchecked">Aguardando conferência</option></select></label>
+        <label>Pendência<select value={filters.status} onChange={e=>set('status',e.target.value)}><option value="all">Todas</option><option value="pending">Aguardando pagamento</option><option value="unposted">Aguardando lançamento</option><option value="unchecked">Aguardando conferência</option><option value="checked">Conferidas</option></select></label>
         <label>Buscar fornecedor, documento ou descrição<input value={filters.text} onChange={e=>set('text',e.target.value)}/></label>
       </div><button type="button" className="mp-cancel-edit" onClick={()=>setFilters({...empty})}>Limpar filtros do relatório</button></fieldset>
       <fieldset><legend>Informações no arquivo</legend><div className="mp-report-column-actions"><button type="button" onClick={()=>setColumns([...expenseReportColumns])}>Selecionar todas</button><button type="button" onClick={()=>setColumns([])}>Desmarcar todas</button></div><div className="mp-report-columns">{expenseReportColumns.map(label=><label key={label}><input type="checkbox" checked={columns.includes(label)} onChange={e=>setColumns(current=>e.target.checked ? [...current,label] : current.filter(item=>item!==label))}/>{label}</label>)}</div></fieldset>

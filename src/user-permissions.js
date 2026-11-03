@@ -34,8 +34,11 @@ export const PERMISSION_GROUPS = [
     item("manutencao", "Alertas de Manutenção", "Planos e automações de manutenção, com acesso às funções de componentes."),
   ]},
   { id: "plantao", label: "Despesas e manutenção de plantão", telas: [
-    item("manutencao_plantao", "Manutenção de plantão — lançar", "Registrar despesas e gerenciar os próprios lançamentos pendentes. Placas disponíveis conforme o perfil de despesas."),
-    item("conferencia_manutencao", "Manutenção de plantão — conferir", "Conferir despesas da frota, controlar pagamentos e corrigir lançamentos pendentes. Independente da permissão de lançar."),
+    item("manutencao_plantao", "Despesas — registrar", "Registrar despesas e gerenciar os próprios lançamentos pendentes. Placas disponíveis conforme o perfil de despesas."),
+    item("pagamento_despesas", "Despesas — registrar pagamentos", "Registrar pagamentos. Os demais status continuam visíveis."),
+    item("lancamento_despesas", "Despesas — marcar lançamento no erp", "Marcar lançamento no ERP. Os demais status continuam visíveis."),
+    item("reembolso_despesas", "Despesas — controlar reembolsos", "Controlar reembolsos. Os demais status continuam visíveis."),
+    item("conferencia_manutencao", "Despesas — conferir", "Marcar despesas como conferidas. Não libera pagamentos, lançamento no ERP ou edição de despesas de outros usuários."),
   ]},
   { id: "sistema", label: "Ferramentas e sistema", telas: [
     item("automacoes_n8n", "Automações n8n", "Acesso às automações e integrações n8n.", true),

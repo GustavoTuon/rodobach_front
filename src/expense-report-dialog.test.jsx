@@ -11,6 +11,7 @@ it('aplica período e identidade da viagem e mantém conferência independente d
   expect(filterReportRecords(records,{trip:'1:15',checked:'false'})).toEqual([records[0]]);
   expect(filterReportRecords(records,{trip:'2:15'})).toEqual([records[1]]);
   expect(filterReportRecords(records,{dateFrom:'2026-10-01',status:'pending'})).toEqual([]);
+  expect(filterReportRecords(records,{status:'checked'})).toEqual([records[1]]);
 });
 it('edita filtros sem baixar, seleciona colunas e só exporta ao confirmar',()=>{
   const download=vi.fn(),close=vi.fn();

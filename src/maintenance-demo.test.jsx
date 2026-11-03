@@ -12,6 +12,37 @@ import {
 } from "@testing-library/react";
 import MaintenanceDemo, { sanitizeAmount } from "./maintenance-demo.jsx";
 const KEY = "rodobach-maintenance-demo-v2";
+it('vincula pneu na borracharia, salva identidade e limpa ao trocar de placa',async()=>{
+ const tire={code:'123',company:'2',plate:'ABC1234',positionName:'Dianteiro direito',brand:'Marca'};
+ window.RB_API.listPlantaoTires.mockResolvedValue({tires:[tire]});
+ await ready();await details();
+ fireEvent.click(await screen.findByRole('button',{name:/NÚMERO DO PNEU.*123/}));
+ expect(screen.getByText('✓ Pneu 123 vinculado')).toBeTruthy();
+ await finish();
+ expect(window.RB_API.createPlantao).toHaveBeenCalledWith(expect.objectContaining({tire:{code:'123',company:'2'},tireFireNumber:'123'}));
+ await openForm();await details();
+ fireEvent.click(await screen.findByRole('button',{name:/NÚMERO DO PNEU.*123/}));
+ fireEvent.click(screen.getByRole('button',{name:'Voltar',exact:true}));
+ fireEvent.change(screen.getByLabelText('Placa do veículo'),{target:{value:'DEF4G56'}});
+ window.RB_API.listPlantaoTires.mockResolvedValue({tires:[]});
+ fireEvent.click(screen.getByRole('button',{name:'Continuar',exact:true}));
+ await screen.findByText(/Nenhum pneu cadastrado/);
+ expect(screen.queryByText('✓ Pneu 123 vinculado')).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Não encontrei o pneu / informar número'}));
+ expect(screen.getByLabelText('Número de fogo do pneu — opcional').value).toBe('');
+});
+it.each(['manutencao-plantao','pagamento-despesas','lancamento-despesas','reembolso-despesas'])("permissão isolada %s mantém status visíveis e libera apenas sua ação",async key=>{
+ localStorage.setItem(KEY,JSON.stringify([{id:'isolated',authorId:99,plate:'ABC1234',amount:100,service:'Borracharia',date:new Date().toISOString(),version:1,paid:true,posted:true,checked:true}]));
+ window.RB_AUTH.me.mockResolvedValue({user:{id:42,login:'isolated',permissions:{[key]:true}}});
+ render(<MaintenanceDemo/>);
+ const row=await screen.findByRole('article');
+ expect(row.textContent).toContain('Pago');expect(row.textContent).toContain('Lançado');expect(row.textContent).toContain('Conferido');
+ expect(Boolean(screen.queryByRole('button',{name:/Editar pagamento/}))).toBe(key==='pagamento-despesas');
+ expect(Boolean(screen.queryByLabelText('Lançado — ABC1234'))).toBe(key==='lancamento-despesas');
+ expect(Boolean(screen.queryByRole('button',{name:'Salvar reembolso'}))).toBe(key==='reembolso-despesas');
+ expect(screen.queryByRole('button',{name:'Marcar como conferido'})).toBeNull();
+ expect(screen.queryByRole('button',{name:'Editar',exact:true})).toBeNull();
+});
 it("salva PIX na manutenção e oferece resumo após concluir", async () => {
   await ready();
   await details();
@@ -64,12 +95,9 @@ it("reúne despesas antigas e de motorista inclusive pelo acesso antigo", async 
   expect(screen.queryByRole("button", {name: "Colaborador", exact: true})).toBeNull();
   expect(screen.queryByRole("button", {name: "Motorista", exact: true})).toBeNull();
   expect(window.RB_API.listPlantao).toHaveBeenCalledWith(false);
-  fireEvent.click(screen.getAllByRole("button", {name: "Despesas da frota", exact: true})[0]);
   expect(screen.getAllByRole("article")).toHaveLength(2);
-  fireEvent.click(screen.getAllByRole("button", {name: "Conferência", exact: true})[0]);
-  await waitFor(() => expect(window.RB_API.listPlantao).toHaveBeenCalledWith(true));
+  await waitFor(() => expect(window.RB_API.listPlantao).toHaveBeenCalledWith(false));
   await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(2));
-  fireEvent.click(screen.getAllByRole("button", {name: "Despesas da frota", exact: true})[0]);
   await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(2));
 });
 it("filtra o histórico sem usar a placa do formulário", async () => {
@@ -85,7 +113,7 @@ it("filtra o histórico sem usar a placa do formulário", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
   expect(screen.getAllByRole("article")).toHaveLength(2);
 });
-it("não mostra conferência para usuário que só pode lançar e bloqueia acesso direto", async () => {
+it("acesso antigo abre tela única sem liberar conferência a quem só registra", async () => {
   window.RB_AUTH.me.mockResolvedValue({
     user: {
       id: 42,
@@ -100,10 +128,8 @@ it("não mostra conferência para usuário que só pode lançar e bloqueia acess
   cleanup();
   window.RB_API.listPlantao.mockClear();
   render(<MaintenanceDemo initialView="manager" />);
-  expect((await screen.findByRole("alert")).textContent).toContain(
-    "não possui liberação",
-  );
-  expect(window.RB_API.listPlantao).not.toHaveBeenCalled();
+  await waitFor(()=>expect(window.RB_API.listPlantao).toHaveBeenCalledWith(false));
+  expect(screen.queryByRole("button", {name:"Marcar como conferido"})).toBeNull();
 });
 it("permite somente conferência sem liberar novos lançamentos", async () => {
   window.RB_AUTH.me.mockResolvedValue({
@@ -117,7 +143,7 @@ it("permite somente conferência sem liberar novos lançamentos", async () => {
   await screen.findByText("Lançamentos da frota");
   expect(screen.queryByRole("button", { name: "Despesas da frota" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Nova manutenção" })).toBeNull();
-  expect(window.RB_API.listPlantao).toHaveBeenCalledWith(true);
+  expect(window.RB_API.listPlantao).toHaveBeenCalledWith(false);
 });
 it("seleciona fornecedor do sistema e salva nome, código e empresa no histórico", async () => {
   await ready();
@@ -205,7 +231,7 @@ it("volta ao tipo e à placa sem perder o preenchimento da manutenção", async 
   fireEvent.click(screen.getByRole("button",{name:"Voltar para Veículo e valor"}));
   expect(screen.getByLabelText("Valor da despesa").value).toBe("1250,90");
   fireEvent.click(screen.getByRole("button",{name:"Voltar ao tipo"}));
-  expect(screen.getByRole("button",{name:/Serviços e reparos/})).toBeTruthy();
+  expect(screen.getByRole("button",{name:/Borracharia, mecânica, elétrica/})).toBeTruthy();
   await openForm();
   expect(screen.getByLabelText("Placa do veículo").value).toBe("ABC1234");
   expect(screen.getByLabelText("Valor da despesa").value).toBe("1250,90");
@@ -299,11 +325,15 @@ beforeEach(() => {
         permissions: {
           "manutencao-plantao": true,
           "conferencia-manutencao": true,
+          "pagamento-despesas": true,
+          "lancamento-despesas": true,
+          "reembolso-despesas": true,
         },
       },
     }),
   };
   window.RB_API = {
+    listPlantaoTires:vi.fn().mockResolvedValue({tires:[]}),
     listPlantaoUnloadingTrips:vi.fn().mockResolvedValue({trips:[]}),
     listPlantaoPaymentMethods: vi.fn(async () => ({methods:[{code:"1",company:"1",name:"DEPÓSITO - INTER"}]})),
     getPlantaoOdometer: vi.fn().mockResolvedValue({odometer:125430.7,source:"telemetria",date:new Date().toISOString()}),
@@ -366,8 +396,8 @@ async function openForm() {
         name: "Registrar despesa",
       })[0],
     );
-  if (screen.queryByRole("button", {name: /Serviços e reparos/})) {
-    fireEvent.click(screen.getByRole("button", {name: /Serviços e reparos/}));
+  if (screen.queryByRole("button", {name: /Borracharia, mecânica, elétrica/})) {
+    fireEvent.click(screen.getByRole("button", {name: /Borracharia, mecânica, elétrica/}));
     fireEvent.click(screen.getByRole("button", {name: "Próximo passo"}));
   }
   await waitFor(() =>
@@ -481,8 +511,6 @@ it("bloqueia placas fora da frota, valor inválido e falhas ao salvar", async ()
 it("permite conferir registros pendentes", async () => {
   await ready();
   await submit();
-  fireEvent.click(screen.getAllByRole("button", { name: "Conferência" })[0]);
-  fireEvent.click(await screen.findByRole('tab',{name:'Conferência'}));
   fireEvent.click(screen.getByRole("button", { name: "Aguardando pagamento" }));
   fireEvent.click(
     await screen.findByRole("button", { name: "Marcar como conferido", exact: true }),
@@ -506,7 +534,7 @@ it("exibe erro de frota e permite tentar novamente", async () => {
   fireEvent.click(
     (await screen.findAllByRole("button", { name: "Registrar despesa" }))[0],
   );
-  fireEvent.click(screen.getByRole("button", {name: /Serviços e reparos/}));
+  fireEvent.click(screen.getByRole("button", {name: /Borracharia, mecânica, elétrica/}));
   fireEvent.click(screen.getByRole("button", {name: "Próximo passo"}));
   expect(await screen.findByRole("alert")).toBeTruthy();
   expect(
@@ -583,59 +611,19 @@ it("exclusão exige motivo, permite cancelar e preserva registro em caso de falh
   fireEvent.click(screen.getByRole("button", { name: "Confirmar exclusão" }));
   await waitFor(() => expect(screen.queryByRole("article")).toBeNull());
 });
-it("conferente pode editar sem permissão de cadastro e conferidos ficam protegidos", async () => {
-  localStorage.setItem(
-    KEY,
-    JSON.stringify([
-      {
-        id: "test",
-        authorId: 42,
-        author: "maria",
-        plate: "ABC1234",
-        amount: 200,
-        service: "Borracharia",
-        date: "2026-09-30T12:00:00Z",
-        expenseDate: "2026-09-30",
-        version: 1,
-      },
-    ]),
-  );
-  window.RB_AUTH.me.mockResolvedValue({
-    user: {
-      id: 43,
-      login: "financeiro",
-      permissions: { "conferencia-manutencao": true },
-    },
-  });
-  window.RB_API.updatePlantao = vi.fn(async (_id, body) => ({
-    record: {
-      ...JSON.parse(localStorage.getItem(KEY))[0],
-      ...body,
-      checked: true,
-      checkedBy: "financeiro",
-    },
-  }));
-  render(<MaintenanceDemo />);
-  fireEvent.click(await screen.findByRole("button", {name:"Todo o período"}));
-  fireEvent.click(
-    await screen.findByRole("button", { name: "Editar", exact: true }),
-  );
-  await finish();
-  await waitFor(() =>
-    expect(window.RB_API.updatePlantao).toHaveBeenCalledWith(
-      "test",
-      expect.objectContaining({ version: 1 }),
-      true,
-    ),
-  );
-  await waitFor(() =>
-    expect(
-      screen.queryByRole("button", { name: "Excluir", exact: true }),
-    ).toBeNull(),
-  );
-  expect(
-    screen.queryByRole("button", { name: "Editar", exact: true }),
-  ).toBeNull();
+it("conferente consulta status e confere sem editar ou controlar pagamentos", async () => {
+  localStorage.setItem(KEY,JSON.stringify([{id:"test",authorId:99,plate:"ABC1234",amount:200,service:"Borracharia",date:new Date().toISOString(),version:1,paid:true,posted:true}]));
+  window.RB_AUTH.me.mockResolvedValue({user:{id:43,login:"duda",permissions:{"conferencia-manutencao":true}}});
+  render(<MaintenanceDemo/>);
+  await screen.findByRole("article");
+  expect(screen.getByRole("button",{name:"Aguardando conferência"}).getAttribute("aria-pressed")).toBe("true");
+  expect(screen.getByRole("article").textContent).toContain("Pago");
+  expect(screen.getByRole("article").textContent).toContain("Lançado");
+  expect(screen.queryByRole("button",{name:"Editar",exact:true})).toBeNull();
+  expect(screen.queryByRole("button",{name:/Registrar despesa|Editar pagamento|Salvar reembolso/})).toBeNull();
+  expect(screen.queryByLabelText("Lançado — ABC1234")).toBeNull();
+  fireEvent.click(screen.getByRole("button",{name:"Marcar como conferido"}));
+  await waitFor(()=>expect(window.RB_API.checkPlantao).toHaveBeenCalledWith("test",1));
 });
 it("filtra por data e comprovante e mantém o formulário se duplicidade for rejeitada", async () => {
   await ready();
@@ -663,7 +651,7 @@ it("filtra por data e comprovante e mantém o formulário se duplicidade for rej
   expect(screen.getAllByRole("article")).toHaveLength(1);
 });
 
-it("mantém os controles financeiros apenas na conferência", async () => {
+it("controles autorizados ficam na própria despesa", async () => {
   await ready();
   expect(screen.getByAltText("Rodobach Transportes Rodoviários")).toBeTruthy();
   await details();
@@ -675,25 +663,23 @@ it("mantém os controles financeiros apenas na conferência", async () => {
   expect(record).not.toHaveProperty("posted");
   expect(screen.queryByLabelText("Pago — ABC1234")).toBeNull();
   fireEvent.click(screen.getByText("Filtrar lançamentos"));
-  expect(screen.queryByLabelText("Pagamento")).toBeNull();
-  fireEvent.click(screen.getAllByRole("button", { name: "Conferência" })[0]);
+  expect(screen.getByLabelText("Pagamento")).toBeTruthy();
   await screen.findByLabelText("Lançado — ABC1234");
   window.RB_API.updatePlantaoControl = vi.fn(async (_id, body) => ({ record: { ...record, ...body, paid: false, version: 2 } }));
   fireEvent.click(screen.getByLabelText("Lançado — ABC1234"));
-  await waitFor(() => expect(window.RB_API.updatePlantaoControl).toHaveBeenCalledWith(record.id, { version: 1, posted: true }, true));
+  await waitFor(() => expect(window.RB_API.updatePlantaoControl).toHaveBeenCalledWith(record.id, { version: 1, posted: true }, false));
   await waitFor(() => expect(screen.getByLabelText("Lançado — ABC1234").checked).toBe(true));
   fireEvent.change(screen.getByLabelText("Pagamento"), { target: { value: "true" } });
   expect(screen.queryByRole("article")).toBeNull();
-  fireEvent.click(screen.getAllByRole("button", { name: "Despesas da frota" })[0]);
+  fireEvent.change(screen.getByLabelText("Pagamento"), {target:{value:""}});
   await screen.findByRole("article");
-  expect(screen.queryByLabelText("Pagamento")).toBeNull();
+  expect(screen.getByLabelText("Pagamento")).toBeTruthy();
 });
 
 it("registra reembolso recebido no detalhe da aba pagamentos", async () => {
   await ready();
   await submit();
-  expect(screen.queryByRole('button', {name:'Salvar reembolso'})).toBeNull();
-  fireEvent.click(screen.getAllByRole('button', {name:'Conferência'})[0]);
+  expect(screen.getByRole('button', {name:'Salvar reembolso'})).toBeTruthy();
   const status = await screen.findByRole('radio', {name:'Reembolso recebido'});
   const record = JSON.parse(localStorage.getItem(KEY))[0];
   window.RB_API.updatePlantaoControl = vi.fn(async (_id, body) => ({record:{...record,...body,version:2}}));
@@ -704,7 +690,7 @@ it("registra reembolso recebido no detalhe da aba pagamentos", async () => {
   fireEvent.click(screen.getByRole('button', {name:'Salvar reembolso'}));
   await waitFor(() => expect(window.RB_API.updatePlantaoControl).toHaveBeenCalledWith(record.id, {
     version:1,reimbursement:{status:'recebido',customer:'Cliente teste',document:'CT-e 123',receivedDate:'2026-09-30',note:''},
-  }, true));
+  }, false));
   await screen.findByText('Reembolsado');
   expect(screen.getByRole('radio', {name:'Reembolso recebido'}).checked).toBe(true);
 });
@@ -713,7 +699,6 @@ it("permite tentar novamente quando o cadastro de formas de pagamento falha", as
   await ready();
   await submit();
   window.RB_API.listPlantaoPaymentMethods.mockRejectedValueOnce(new Error("indisponível"));
-  fireEvent.click(screen.getAllByRole("button", {name:"Conferência"})[0]);
   fireEvent.click(await screen.findByRole("button", {name:"Registrar pagamento — ABC1234"}));
   await screen.findByText("Não foi possível carregar as formas de pagamento.");
   expect(screen.getByRole("button", {name:"Salvar pagamento"}).disabled).toBe(true);
@@ -727,7 +712,6 @@ it("permite tentar novamente quando o cadastro de formas de pagamento falha", as
 it("registra a data no modal, mantém o formulário em falha e permite corrigir o pagamento", async () => {
   await ready();
   await submit();
-  fireEvent.click(screen.getAllByRole("button", { name: "Conferência" })[0]);
   fireEvent.click(await screen.findByRole("button", { name: "Registrar pagamento — ABC1234" }));
   fireEvent.change(screen.getByLabelText("Data do pagamento"), { target: { value: "2026-09-30" } });
   await waitFor(()=>expect(screen.getByRole('button',{name:/Forma de pagamento Selecione/}).disabled).toBe(false));
@@ -746,19 +730,18 @@ it("registra a data no modal, mantém o formulário em falha e permite corrigir 
   fireEvent.click(screen.getByRole("button", { name: "Salvar pagamento" }));
   await screen.findByText("Pago em 30/09/2026");
   expect(screen.queryByRole("dialog")).toBeNull();
-  expect(window.RB_API.updatePlantaoControl).toHaveBeenLastCalledWith(record.id, { version: 1, paymentDate: "2026-09-30", paymentMethod:{code:"1",company:"1"} }, true);
+  expect(window.RB_API.updatePlantaoControl).toHaveBeenLastCalledWith(record.id, { version: 1, paymentDate: "2026-09-30", paymentMethod:{code:"1",company:"1"} }, false);
   fireEvent.click(screen.getByRole("button", { name: "Editar pagamento — ABC1234" }));
   expect(screen.getByLabelText("Data do pagamento").value).toBe("2026-09-30");
   fireEvent.click(screen.getByRole("button", { name: "Remover registro de pagamento" }));
   await screen.findByRole("button", { name: "Registrar pagamento — ABC1234" });
-  expect(window.RB_API.updatePlantaoControl).toHaveBeenLastCalledWith(record.id, { version: 2, paymentDate: null }, true);
+  expect(window.RB_API.updatePlantaoControl).toHaveBeenLastCalledWith(record.id, { version: 2, paymentDate: null }, false);
 });
 
 it("motorista registra abastecimento com km antes dos valores em sete etapas e a conferência recebe os detalhes", async () => {
   window.RB_API.listPlantaoUnloadingTrips=vi.fn(async()=>({trips:[{company:'1',number:'880'}]}));
   render(<MaintenanceDemo />);
-  fireEvent.click((await screen.findAllByRole("button", {name:"Despesas da frota",exact:true}))[0]);
-  fireEvent.click(screen.getByRole("button", {name:"Registrar despesa"}));
+  fireEvent.click(await screen.findByRole("button", {name:"Registrar despesa"}));
   fireEvent.click(screen.getByRole("button", {name:/Abastecimento/}));
   fireEvent.change(screen.getByLabelText("Horário da nota"), {target:{value:"00:00:00"}});
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
@@ -800,9 +783,7 @@ it("motorista registra abastecimento com km antes dos valores em sete etapas e a
   expect(record).not.toHaveProperty("paid");
   fireEvent.click(screen.getByRole("button", {name:"Ver minhas despesas"}));
   expect(screen.getByRole("article").textContent).toContain("200,5 L");
-  fireEvent.click(screen.getAllByRole("button", {name:"Despesas da frota",exact:true})[0]);
   expect(screen.getByRole("article").textContent).toContain("200,5 L");
-  fireEvent.click(screen.getAllByRole("button", {name:"Conferência",exact:true})[0]);
   expect((await screen.findByRole("article")).textContent).toContain("Colaborador");
   fireEvent.click(screen.getByRole("button", {name:"Editar",exact:true}));
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));

@@ -13,11 +13,12 @@ it("permite salvar separadamente lançamento, conferência e Painel TV",async()=
  vi.stubGlobal("RB_API",{listUsuarios:vi.fn().mockResolvedValue({usuarios:[user]}),updateUsuario});
  render(<window.GerenciarUsuarios/>);
  fireEvent.click(await screen.findByRole("button",{name:"Editar",exact:true}));
- expect(screen.getByRole("switch",{name:/plantão — lançar/}).getAttribute("aria-checked")).toBe("true");
- fireEvent.click(screen.getByRole("switch",{name:/plantão — conferir/}));
+ expect(screen.getByRole("switch",{name:"Despesas — registrar",exact:true}).getAttribute("aria-checked")).toBe("true");
+ fireEvent.click(screen.getByRole("switch",{name:/Despesas — conferir/}));
  fireEvent.click(screen.getByRole("switch",{name:"Painel TV"}));
+ fireEvent.click(screen.getByRole("switch",{name:"Despesas — registrar pagamentos"}));
  fireEvent.click(screen.getByRole("button",{name:"Salvar",exact:true}));
- await waitFor(()=>expect(updateUsuario).toHaveBeenCalledWith(42,expect.objectContaining({perm_manutencao_plantao:true,perm_conferencia_manutencao:true,perm_painel_tv:false})));
+ await waitFor(()=>expect(updateUsuario).toHaveBeenCalledWith(42,expect.objectContaining({perm_manutencao_plantao:true,perm_conferencia_manutencao:true,perm_painel_tv:false,perm_pagamento_despesas:true,perm_lancamento_despesas:false,perm_reembolso_despesas:false})));
 });
 it("não herda acesso ao Painel TV do Status Carga",()=>{
  const nav=[{id:"painel-tv"},{id:"manutencao-plantao"},{id:"conferencia-manutencao"}];
