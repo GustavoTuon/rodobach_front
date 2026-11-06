@@ -63,7 +63,7 @@ export default function MaintenanceAudit({api, revision = 0, plan, onClearPlan})
       {run ? `${dateTime(run.iniciado_em)} · ${{executando: 'Em execução', concluido: 'Concluída', com_falhas: 'Concluída com falhas', falha: 'Falhou'}[run.status] || run.status} · ${run.aceitos} aceito(s) · ${run.falhas} falha(s)` : 'Nenhuma execução registrada pelo novo histórico.'}
       {run?.erro && <div role="alert">{run.erro}</div>}
       <div className="muted" style={{marginTop: 5}}>
-        {data.agendamentoDiario ? `Envios programados diariamente às ${data.agendamentoDiario}.` : 'Responsável pelos envios: backend de manutenção, em processo separado.'} Abrir esta tela não inicia os envios; confira a última execução acima.
+        {data.executorManutencao==='n8n' ? 'Agendamento pelo n8n às 08:00 (Brasília). Confira se o fluxo está ativo na tela Automações n8n.' : data.agendamentoDiario ? `Envios programados diariamente às ${data.agendamentoDiario}.` : 'Responsável pelos envios: backend de manutenção, em processo separado.'} Abrir esta tela não inicia os envios; confira a última execução acima.
         {!data.whatsappConfigurado && ' WhatsApp não configurado nesta API.'}
         {data.somenteConsulta && ' Ambiente em modo somente consulta.'}
       </div>

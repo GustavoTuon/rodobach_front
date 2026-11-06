@@ -2,7 +2,7 @@
 import React from 'react';
 import {it,expect,vi,afterEach} from 'vitest';
 import {render,screen,fireEvent,cleanup,waitFor} from '@testing-library/react';
-import Notes,{readNoteDraft} from './screens/bloco-notas.jsx';
+import Notes,{readNoteDraft} from './screens/note-editor.jsx';
 afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks();});
 const user={id:42};
 function api(){window.RB_API={listNotes:vi.fn().mockResolvedValue({notes:[],hasMore:false}),notePlates:vi.fn().mockResolvedValue({plates:['ABC1234']}),saveNote:vi.fn(async note=>({note:{...note,version:1,updatedAt:'2026-11-05T15:00:00Z'}}))};}

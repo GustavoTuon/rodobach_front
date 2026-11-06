@@ -12104,3 +12104,120 @@ button.ec-chip { cursor:pointer; }
 .ec-trace h3 { margin:0 0 12px; font-size:15px; }
 .ec-trace p { overflow-wrap:anywhere; }
 .ec-trace details { margin-top:16px; }
+
+/* Operational fine control */
+.multas-table { min-width: 1280px; }
+.multas-table .multa-description { white-space: normal; min-width: 200px; max-width: 280px; line-height: 1.5; margin-top: 5px; color: var(--muted); }
+.multa-auto-link { border: 0; background: none; color: inherit; padding: 0; font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.multa-check { display: flex; align-items: center; gap: 8px; white-space: nowrap; cursor: pointer; }
+.multas-page .multa-check input { width: 18px; height: 18px; margin: 0; accent-color: #22c55e; }
+.multa-paid { color: #22c55e; }
+.multa-observation { min-width: 130px; max-width: 220px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.multas-reports { padding: 16px; }
+.multas-reports > summary { cursor: pointer; font-weight: 600; }
+.multas-reports .multas-management { margin-top: 18px; }
+
+/* Fine workspace: compact groups, following the on-call expense history. */
+.multas-filtros > summary { cursor: pointer; font-size: 12px; padding: 3px; }
+.multas-filtros > summary span { margin-left: 12px; }
+.multas-filtros[open] .multas-filter-grid { margin-top: 16px; }
+.multas-group-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 22px 0 8px; }
+.multas-group-toolbar h2 { margin: 0 0 4px; font-size: 16px; }
+.multas-group-toolbar .muted, .multas-points-note { font-size: 11px; }
+.multas-points-note { color: var(--text-3); margin: 8px 0 16px; }
+.multas-group-switch { display: flex; padding: 4px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.multas-group-switch button { background: transparent; border: 0; border-radius: 7px; color: var(--text-3); padding: 9px 16px; font: inherit; font-size: 12px; cursor: pointer; }
+.multas-group-switch button[aria-pressed="true"] { background: var(--accent-soft); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent); }
+.multa-group { margin-bottom: 12px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.multa-group-header { width: 100%; border: 0; background: var(--accent-soft); color: var(--text); display: grid; grid-template-columns: minmax(220px, 1.5fr) minmax(110px,.65fr) minmax(140px,.8fr) minmax(170px,1fr) 18px; gap: 24px; align-items: center; padding: 20px; text-align: left; font: inherit; cursor: pointer; }
+.multa-group-header[aria-expanded="true"] { box-shadow: inset 3px 0 var(--accent); border-bottom: 1px solid var(--border); }
+.multa-group-header small { display: block; color: var(--text-3); font-size: 11px; margin-top: 5px; }
+.multa-group-person { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.multa-group-person strong { font-size: 14px; overflow-wrap: anywhere; }
+.multa-avatar { flex-shrink: 0; display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--border); border-radius: 12px; color: var(--accent); background: var(--surface); font-size: 13px; font-weight: 700; }
+.multa-group-points b { font-size: 24px; line-height: 1; }
+.multa-group-value strong { display: block; margin-top: 5px; font-size: 14px; }
+.multa-group-progress > span:first-child { font-size: 11px; font-weight: 600; }
+.multa-progress-track { display: block; height: 6px; overflow: hidden; border-radius: 8px; background: var(--border); margin: 9px 0 6px; }
+.multa-progress-track i { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width .25s; }
+.multa-group.complete .multa-progress-track i { background: #22a06b; }
+.multa-complete-label { color: #22a06b; }
+.multa-group-records { padding: 0 20px; }
+.multa-record + .multa-record { border-top: 1px solid var(--border); }
+.multa-record-main { display: grid; grid-template-columns: 105px minmax(180px,1fr) 120px auto; align-items: center; gap: 22px; padding: 22px 0 16px; }
+.multa-record small { display: block; color: var(--text-3); font-size: 11px; margin-top: 5px; }
+.multa-record-date strong { font-size: 12px; font-weight: 500; }
+.multa-record-description > strong { font-size: 12px; line-height: 1.6; display: block; }
+.multa-record-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.multa-record-tags span { border-radius: 5px; padding: 3px 7px; background: var(--accent-soft); color: var(--text-3); font-size: 10px; }
+.multa-record-value { text-align: right; }
+.multa-record-actions { border-top: 1px dashed var(--border); display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 12px 0 18px; font-size: 11px; }
+.multa-record-buttons { display: flex; gap: 8px; }
+.multas-empty { padding: 32px; text-align: center; }
+.multa-indication-modal { width: min(480px, calc(100vw - 32px)); }
+.multa-indication-modal .modal-body label { display: block; margin: 16px 0; font-size: 12px; }
+.multa-indication-modal label input, .multa-indication-modal label select { display: block; margin-top: 7px; }
+.multas-workspace .multa-paid { color: #22a06b; }
+.multas-workspace .multa-overdue { color: #e35858; }
+@media (max-width: 1000px) {
+  .multa-group-header { grid-template-columns: minmax(170px,1fr) 100px 150px 18px; gap: 16px; }
+  .multa-group-progress { grid-column: 1 / 4; grid-row: 2; }
+  .multa-group-chevron { grid-column: 4; grid-row: 1; }
+  .multa-record-main { grid-template-columns: 85px minmax(160px,1fr) 105px; gap: 12px; }
+  .multa-record-main > .btn { grid-column: 2 / 4; justify-self: end; }
+}
+@media (max-width: 600px) {
+  .multas-group-toolbar { align-items: stretch; flex-direction: column; }
+  .multas-group-switch button { flex: 1; }
+  .multa-group-header { padding: 16px; grid-template-columns: minmax(0,1fr) 70px 16px; gap: 14px; }
+  .multa-avatar { display: none; }
+  .multa-group-chevron { grid-column: 3; }
+  .multa-group-value { grid-column: 1; grid-row: 2; }
+  .multa-group-progress { grid-column: 1 / 4; grid-row: 3; }
+  .multa-group-records { padding: 0 14px; }
+  .multa-record-main { grid-template-columns: minmax(0,1fr) auto; }
+  .multa-record-date { grid-column: 1 / 3; }
+  .multa-record-description { grid-column: 1 / 3; }
+  .multa-record-value { text-align: left; }
+  .multa-record-main > .btn { grid-column: 2; }
+  .multa-record-actions { align-items: stretch; flex-direction: column; }
+  .multa-record-buttons { flex-wrap: wrap; }
+  .multas-pagination { flex-wrap: wrap; justify-content: center; }
+  .multas-filtros > summary span { display: none; }
+}
+
+/* Individual fines: distinct cards and three independent checkpoints. */
+.multas-page .multa-group-records { padding: 18px; background: var(--bg); display: grid; gap: 16px; }
+.multas-page .multa-record { border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface); padding: 0 20px; box-shadow: var(--shadow-sm); overflow: hidden; }
+.multas-page .multa-record.is-complete { border-color: var(--ok-border); }
+.multas-page .multa-record-main { padding-top: 20px; }
+.multas-page .multa-record-description > strong { font-size: 13px; }
+.multas-page .multa-record-value > strong { font-size: 17px; }
+.multa-record-context { display: grid; grid-template-columns: minmax(160px, .6fr) minmax(0, 1.4fr); gap: 16px; padding: 14px 16px; margin-bottom: 16px; border-radius: 8px; background: var(--surface-2); }
+.multa-record-context span { display: block; font-size: 10px; color: var(--text-3); margin-bottom: 5px; }
+.multa-record-context strong { font-size: 12px; font-weight: 500; overflow-wrap: anywhere; }
+.multa-checkpoints { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin-bottom: 18px; }
+.multa-checkpoint { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-radius: 9px; border: 1px solid var(--neutral-border); background: var(--neutral-bg); }
+.multa-checkpoint.done { border-color: var(--ok-border); background: var(--ok-bg); }
+.multa-checkpoint.pending { border-color: var(--warn-border); background: var(--warn-bg); }
+.multa-checkpoint-icon { display: grid; place-items: center; flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; border: 1px solid currentColor; color: var(--text-3); }
+.multa-checkpoint.done .multa-checkpoint-icon, .multa-checkpoint.done strong { color: var(--ok); }
+.multa-checkpoint.pending .multa-checkpoint-icon, .multa-checkpoint.pending strong { color: var(--warn); }
+.multa-checkpoint strong { display: block; font-size: 12px; margin-top: 4px; }
+.multas-page .multa-checkpoint small { margin-top: 0; line-height: 1.5; }
+.multas-page .multa-checkpoint strong + small { margin-top: 4px; }
+.multas-page .multa-record-actions { border-top-style: solid; }
+@media(max-width:700px) {
+  .multas-page .multa-group-records { padding: 10px; gap: 12px; }
+  .multas-page .multa-record { padding: 0 12px; }
+  .multa-record-context, .multa-checkpoints { grid-template-columns: 1fr; gap: 8px; }
+  .multa-checkpoint { padding: 10px 12px; }
+}
+
+.multa-autocomplete .trip-autocomplete-list button[aria-selected="true"] { background: var(--hover); }
+
+/* Prominent vehicle identity on each fine, in either grouping mode. */
+.multa-vehicle-identity { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin-bottom: 12px; }
+.multa-vehicle-plate { display: inline-block; padding: 7px 12px; border: 1px solid var(--accent-border); border-radius: 7px; background: var(--accent-soft); color: var(--text); font-family: var(--font-mono); font-size: 23px; font-weight: 800; line-height: 1.2; letter-spacing: 1.2px; white-space: nowrap; }
+.multa-vehicle-driver { color: var(--text-3); font-size: 11px; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .multa-vehicle-plate { font-size: 21px; } }
