@@ -9,12 +9,12 @@ async function setup(api = {}) {
   vi.spyOn(window, 'open').mockReturnValue(popup);
   return { ...await import('./cargas-viagens-v2.jsx'), popup };
 }
-const load = id => ({ id, codigo: `C-${id}`, cliente: 'Cliente', peso: 10, valorCliente: 100, documentos: [], paradas: [{ tipo: 'entrega', endereco: `Rua ${id}`, cidade: 'Cidade', uf: 'SC', nf: '123' }], observacoes: '<script>malicioso()</script>' });
+const load = id => ({ id, codigo: `C-${id}`, cliente: 'Cliente', peso: 10, volumes: id === 2 ? 0 : null, valorCliente: 100, documentos: [], paradas: [{ tipo: 'entrega', endereco: `Rua ${id}`, cidade: 'Cidade', uf: 'SC', nf: '123' }], observacoes: '<script>malicioso()</script>' });
 
 it('agrupa nome e local de coleta e entrega em sete colunas no A4', async () => {
   const fixture = { ...load(4463), cliente: 'NATREB EQUIPAMENTOS INDUSTRIAIS E TRANSPORTES',
     origem: 'MORRO DA FUMAÇA', ufOrigem: 'SC', clienteFinal: 'CERÂMICA RINCÃO EIRELI - EPP', destino: 'RINCÃO', ufDestino: 'SP',
-    tomadorServico: 'PAGADOR COM NOME EMPRESARIAL EXTENSO LTDA', material: 'AUTOMAÇÃO', valorCliente: 12000 };
+    tomadorServico: 'PAGADOR COM NOME EMPRESARIAL EXTENSO LTDA', material: 'AUTOMAÇÃO', volumes: 12, valorCliente: 12000 };
   const { Cv2PrintLoadsButton, popup } = await setup({ getCargaV2: vi.fn(async () => fixture) });
   render(<Cv2PrintLoadsButton ids={[fixture.id]}>Imprimir</Cv2PrintLoadsButton>);
   fireEvent.click(screen.getByRole('button', { name: 'Imprimir' }));
@@ -24,6 +24,8 @@ it('agrupa nome e local de coleta e entrega em sete colunas no A4', async () => 
   expect([...doc.querySelectorAll('th')].map(cell => cell.textContent)).toEqual(['Carga', 'Cliente (coleta)', 'Entrega', 'Tomador', 'CT-e', 'Peso / vol.', 'Valor']);
   const cells = [...doc.querySelectorAll('tbody tr:first-child td')].map(cell => cell.textContent);
   expect(cells).toHaveLength(7);
+  expect(doc.querySelector(".load-material").textContent).toBe(fixture.material);
+  expect(doc.querySelector(".load-volumes").textContent).toBe("Vol.: 12");
   expect(doc.querySelector('tbody td:nth-child(2) b').textContent).toBe(fixture.cliente);
   expect(doc.querySelector('tbody td:nth-child(2) small').textContent).toBe('MORRO DA FUMAÇA/SC');
   expect(doc.querySelector('tbody td:nth-child(3) b').textContent).toBe(fixture.clienteFinal);
@@ -50,6 +52,8 @@ it('imprime cargas completas em uma janela com folhas separadas, ordem e HTML se
   const html = popup.document.write.mock.calls[1][0];
   const doc = new DOMParser().parseFromString(html, 'text/html');
   expect(doc.querySelectorAll('main.sheet')).toHaveLength(2);
+  expect(doc.querySelectorAll('.load-volumes')).toHaveLength(0);
+  expect(doc.querySelectorAll('.load-material')).toHaveLength(0);
   expect([...doc.querySelectorAll('main.sheet .code b')].map(node => node.textContent)).toEqual(['C-2', '\u00a0', 'C-1', '\u00a0']);
   expect(html).toContain('break-before:page');
   expect(html).toContain('Rua 1'); expect(html).toContain('Rua 2');
@@ -100,4 +104,23 @@ it('seleciona cargas da lista, imprime apenas as marcadas e limpa ao trocar filt
   expect(get).toHaveBeenCalledWith(2); expect(get).toHaveBeenCalledOnce();
   fireEvent.click(screen.getByRole('button', { name: 'Todas', exact: true }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Imprimir selecionadas (0)' }).disabled).toBe(true));
+});
+
+it.each([
+  {material:'EMBALAGENS <PLÁSTICAS> & ALUMÍNIO',volumes:12,peso:18709},
+  {material:null,volumes:null,peso:0},
+  {material:'',volumes:0,peso:0},
+])('folha da viagem preserva dados com material=$material e volumes=$volumes',async fields=>{
+  const {Cv2TripDetails,popup}=await setup();
+  const carga={...load(4522),...fields,valorCliente:2000};
+  render(<Cv2TripDetails viagem={{id:1777,numero:'V-2026-1777',placa:'LXG1J87',cargas:[carga]}} onClose={()=>{}} onLinkCte={()=>{}}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Imprimir folha da viagem'}));
+  const doc=new DOMParser().parseFromString(popup.document.write.mock.calls.at(-1)[0],'text/html');
+  expect(doc.querySelectorAll('tbody tr')).toHaveLength(1);
+  expect(doc.querySelectorAll('tbody td')).toHaveLength(7);
+  expect(doc.querySelector('.load-material')?.textContent || '').toBe(fields.material || '');
+  expect(doc.querySelector('.load-volumes')?.textContent || '').toBe(fields.volumes>0 ? 'Vol.: 12' : '');
+  expect(doc.querySelector('.weight-cell b').textContent).toBe(fields.peso ? '18.709 kg' : '0 kg');
+  expect(doc.querySelector('tbody td:last-child').textContent.replace(/\s/g,' ')).toBe('R$ 2.000,00');
+  expect(doc.querySelector('script')).toBeNull();
 });

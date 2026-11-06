@@ -38,7 +38,7 @@ it.each(['manutencao-plantao','pagamento-despesas','lancamento-despesas','reembo
  const row=await screen.findByRole('article');
  expect(row.textContent).toContain('Pago');expect(row.textContent).toContain('Lançado');expect(row.textContent).toContain('Conferido');
  expect(Boolean(screen.queryByRole('button',{name:/Editar pagamento/}))).toBe(key==='pagamento-despesas');
- expect(Boolean(screen.queryByRole('button',{name:'Editar lançamento'}))).toBe(key==='lancamento-despesas');
+ expect(Boolean(screen.queryByRole('button',{name:'Vincular documento ERP'}))).toBe(key==='lancamento-despesas');
  expect(Boolean(screen.queryByRole('button',{name:'Salvar reembolso'}))).toBe(key==='reembolso-despesas');
  expect(screen.queryByRole('button',{name:'Marcar como conferido'})).toBeNull();
  expect(screen.queryByRole('button',{name:'Editar',exact:true})).toBeNull();
@@ -363,9 +363,9 @@ beforeEach(() => {
       );
       return { record };
     }),
-    checkPlantao: vi.fn(async (id) => {
+    checkPlantao: vi.fn(async (id, _version, changes = {}) => {
       const records = JSON.parse(localStorage.getItem(KEY) || "[]");
-      const record = { ...records.find((r) => r.id === id), checked: true };
+      const record = { ...records.find((r) => r.id === id), ...changes, checked: changes.checked !== false };
       localStorage.setItem(
         KEY,
         JSON.stringify(records.map((r) => (r.id === id ? record : r))),
@@ -520,6 +520,8 @@ it("permite conferir registros pendentes", async () => {
   fireEvent.click(
     await screen.findByRole("button", { name: "Marcar como conferido", exact: true }),
   );
+  expect(window.RB_API.checkPlantao).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button',{name:'Salvar e conferir'}));
   await waitFor(() => expect(screen.queryByRole("button", { name: "Marcar como conferido", exact: true })).toBeNull());
   expect(screen.getAllByRole("article")).toHaveLength(1);
   fireEvent.click(screen.getByRole("button", { name: "Aguardando lançamento" }));
@@ -628,7 +630,18 @@ it("conferente consulta status e confere sem editar ou controlar pagamentos", as
   expect(screen.queryByRole("button",{name:/Registrar despesa|Editar pagamento|Salvar reembolso/})).toBeNull();
   expect(screen.queryByLabelText("Lançado — ABC1234")).toBeNull();
   fireEvent.click(screen.getByRole("button",{name:"Marcar como conferido"}));
-  await waitFor(()=>expect(window.RB_API.checkPlantao).toHaveBeenCalledWith("test",1));
+  expect(window.RB_API.checkPlantao).not.toHaveBeenCalled();
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Cancelar'}));
+  expect(window.RB_API.checkPlantao).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button',{name:'Marcar como conferido'}));
+  fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Número do documento no financeiro'),{target:{value:'123'}});
+  fireEvent.click(screen.getByRole('button',{name:'Salvar e conferir'}));
+  await waitFor(()=>expect(window.RB_API.checkPlantao).toHaveBeenCalledWith("test",1,{posted:true,erpDocument:'123'}));
+  await waitFor(()=>expect(screen.queryByRole('dialog')).toBeNull());
+  fireEvent.click(screen.getByRole('button',{name:'Conferidas',exact:true}));
+  fireEvent.click(screen.getByRole('button',{name:'Desfazer conferência'}));
+  fireEvent.click(screen.getByRole('button',{name:'Confirmar reversão'}));
+  await waitFor(()=>expect(window.RB_API.checkPlantao).toHaveBeenCalledWith("test",1,{checked:false}));
 });
 it("filtra por data e comprovante e mantém o formulário se duplicidade for rejeitada", async () => {
   await ready();
@@ -669,9 +682,9 @@ it("controles autorizados ficam na própria despesa", async () => {
   expect(screen.queryByLabelText("Pago — ABC1234")).toBeNull();
   fireEvent.click(screen.getByText("Filtrar lançamentos"));
   expect(screen.getByLabelText("Pagamento")).toBeTruthy();
-  await screen.findByRole('button', {name:'Registrar lançamento'});
+  await screen.findByRole('button', {name:'Vincular documento ERP'});
   window.RB_API.updatePlantaoControl = vi.fn(async (_id, body) => ({ record: { ...record, ...body, paid: false, version: 2 } }));
-  fireEvent.click(screen.getByRole('button', {name:'Registrar lançamento'}));
+  fireEvent.click(screen.getByRole('button', {name:'Vincular documento ERP'}));
   const dialog = screen.getByRole('dialog');
   fireEvent.change(within(dialog).getByLabelText('Número do documento no financeiro'), {target:{value:'123'}});
   fireEvent.click(within(dialog).getByLabelText('Lançamento confirmado no ERP'));
@@ -679,7 +692,7 @@ it("controles autorizados ficam na própria despesa", async () => {
   fireEvent.click(within(dialog).getByRole('button', {name:'Salvar lançamento'}));
   await waitFor(() => expect(window.RB_API.updatePlantaoControl).toHaveBeenCalledWith(record.id, { version: 1, posted: true, erpDocument: '123' }, false));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  expect(screen.getByRole('button', {name:'Editar lançamento'})).toBeTruthy();
+  expect(screen.getByRole('button', {name:'Editar vínculo ERP'})).toBeTruthy();
   expect(screen.getAllByText('Documento financeiro: 123').length).toBeGreaterThan(0);
   fireEvent.change(screen.getByLabelText("Pagamento"), { target: { value: "true" } });
   expect(screen.queryByRole("article")).toBeNull();

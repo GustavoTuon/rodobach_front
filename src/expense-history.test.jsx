@@ -110,3 +110,14 @@ it("filtra viagens por empresa e numero, incluindo descarga e registros sem vinc
   fireEvent.click(screen.getByRole('button',{name:'Limpar filtros'}));
   expect(container.querySelectorAll('.mp-expense-row')).toHaveLength(3);
 });
+
+it('vínculo ERP abre pela conferência sem expandir os detalhes',()=>{
+  const posting=vi.fn(),review=vi.fn();
+  const {container,rerender}=render(<ExpenseHistory records={[records[0]]} expandGroups onReview={review} onPosting={posting} renderRecord={()=>null}/>);
+  expect(container.querySelector('.mp-expense-detail').open).toBe(false);
+  fireEvent.click(screen.getByRole('button',{name:'Vincular documento ERP'}));
+  expect(posting).toHaveBeenCalledWith(records[0]);
+  expect(review).not.toHaveBeenCalled();
+  rerender(<ExpenseHistory records={[{...records[0],erpDocument:'123',checked:true}]} expandGroups onPosting={posting} reviewDisabled renderRecord={()=>null}/>);
+  expect(screen.getByRole('button',{name:'Editar vínculo ERP'}).disabled).toBe(true);
+});

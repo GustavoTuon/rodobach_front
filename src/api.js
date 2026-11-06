@@ -429,7 +429,7 @@ window.RB_API = {
   deletePlantao: (id, body, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}`, {method:"DELETE",body:JSON.stringify(body)}),
   receiptPlantao: (id, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}/comprovante`),
   historyPlantao: (id, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}/historico`),
-  checkPlantao: (id, version) => apiRequest(`/manutencao-plantao/conferencia/${encodeURIComponent(id)}`, {method:"PATCH",body:JSON.stringify({version})}),
+  checkPlantao: (id, version, changes = {}) => apiRequest(`/manutencao-plantao/conferencia/${encodeURIComponent(id)}`, {method:"PATCH",body:JSON.stringify({version,...changes})}),
   searchFornecedoresManutencao: (q = "") => apiRequest(`/manutencao/fornecedores${buildQuery({ q })}`),
   listComponentesPosicao: (placa) =>
     apiRequest(`/manutencao/componentes-posicao${buildQuery({ placa })}`),

@@ -1,7 +1,7 @@
 import React,{useState,useRef,useEffect} from 'react';
 import './expense-posting.css';
 
-export default function ExpensePosting({record,onSave,onClose,saving}) {
+export default function ExpensePosting({record,onSave,onClose,saving,review=false}) {
   const [document,setDocument]=useState(record.erpDocument || '');
   const [posted,setPosted]=useState(record.posted === true);
   const [query,setQuery]=useState(record.document || '');
@@ -22,7 +22,7 @@ export default function ExpensePosting({record,onSave,onClose,saving}) {
     if(await onSave(record,'posted',posted,{erpDocument:document.trim()}))onClose();
     else setError('Não foi possível salvar. Feche e atualize a lista antes de tentar novamente.');
   }}>
-    <header className="mp-section-title"><h2 id="mp-edit-title" data-step-title tabIndex={-1}>Lançamento no ERP</h2><button type="button" className="mp-close" aria-label="Fechar lançamento" disabled={saving} onClick={onClose}>×</button></header>
+    <header className="mp-section-title"><h2 id="mp-edit-title" data-step-title tabIndex={-1}>{review ? "Conferir despesa e vincular documento" : "Lançamento no ERP"}</h2><button type="button" className="mp-close" aria-label="Fechar lançamento" disabled={saving} onClick={onClose}>×</button></header>
     <div className="mp-posting-summary"><div><strong>{record.plate}</strong><span>{record.supplier}</span></div><strong>{Number(record.amount).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</strong></div>
     <label>Número do documento no financeiro<input value={document} maxLength={80} disabled={saving} onChange={event=>setDocument(event.target.value)}/></label>
     <p className="mp-field-help">Digite o número ou selecione um documento de contas a pagar. O documento fiscal da despesa permanece separado.</p>
@@ -40,8 +40,8 @@ export default function ExpensePosting({record,onSave,onClose,saving}) {
       {results.hasMore && <p>Exibindo 30 resultados. Refine a busca para encontrar o documento.</p>}
     </div>}
     <label className="mp-posted-action"><input type="checkbox" checked={posted} disabled={saving} onChange={event=>setPosted(event.target.checked)}/><span>Lançamento confirmado no ERP</span></label>
-    <p className="mp-field-help">O registro mantém pagamento e conferência independentes.</p>
+    <p className="mp-field-help">{review ? "Confira o documento antes de salvar. A despesa será marcada como conferida somente ao confirmar abaixo." : "O registro mantém pagamento e conferência independentes."}</p>
     {error && <p role="alert" className="mp-feedback error">{error}</p>}
-    <div className="mp-payment-modal-actions"><button type="button" className="mp-cancel-edit" disabled={saving} onClick={onClose}>Cancelar</button><button className="mp-submit" disabled={saving}>{saving ? 'Salvando…' : 'Salvar lançamento'}</button></div>
+    <div className="mp-payment-modal-actions"><button type="button" className="mp-cancel-edit" disabled={saving} onClick={onClose}>Cancelar</button><button className="mp-submit" disabled={saving}>{saving ? 'Salvando…' : review ? 'Salvar e conferir' : 'Salvar lançamento'}</button></div>
   </form>;
 }
