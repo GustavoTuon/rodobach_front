@@ -1,3 +1,4 @@
+import ExpensePosting from './expense-posting.jsx';
 import ExpenseDetailStatus from './expense-detail-status.jsx';
 import ExpenseTirePicker from './expense-tire-picker.jsx';
 import ExpenseDetailFacts from './expense-detail-facts.jsx';
@@ -397,6 +398,7 @@ function MaintenanceForm({
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
   const [paymentMethodsError, setPaymentMethodsError] = useState("");
   const [paymentError, setPaymentError] = useState("");
+  const [postingRecord,setPostingRecord] = useState(null);
   const [reportOpen,setReportOpen] = useState(false);
   const [reimbursementFilter,setReimbursementFilter] = useState("");
   const [paidFilter, setPaidFilter] = useState("");
@@ -802,7 +804,7 @@ function MaintenanceForm({
       setError("Entre no sistema novamente para registrar a manutenção.");
       return;
     }
-    if (paymentDetails && (!paymentDetails.holderName.trim() || !paymentDetails.pixKey.trim())) {setError("Preencha o nome do titular e a chave PIX, ou desative os dados para pagamento.");return;}
+    if (!paymentDetails?.holderName?.trim() || !paymentDetails?.pixKey?.trim()) {setError("Preencha o nome do titular e a chave PIX para registrar a manutenção.");return;}
     const hasInvoice=maintenancePhotos.invoice !== undefined ? Boolean(maintenancePhotos.invoice) : Boolean(editing?.photoKinds?.invoice || editing?.hasReceipt);
     if (!hasInvoice && receiptReason.trim().length<10) {setError("Anexe a nota ou justifique a ausência com pelo menos 10 caracteres.");return;}
     if (!supplier.nome.trim() || !documentType || (documentType==='nf_servico' && !document.trim())) {setError("Informe o fornecedor, o tipo de documento e o número da nota fiscal de serviço, quando aplicável.");return;}
@@ -895,10 +897,11 @@ function MaintenanceForm({
                         {canPay && !user.readOnly && <button type="button" className="mp-finance-action" disabled={saving} aria-label={`${r.paid ? "Editar pagamento" : "Registrar pagamento"} — ${r.plate}`} onClick={()=>openPayment(r)}>{r.paid ? "Editar pagamento" : "Registrar pagamento"}</button>}
                       </div>
                       <div className={`mp-posted-check ${r.posted ? "is-posted" : ""}`}><span><small>LANÇAMENTO NO ERP</small><strong>{r.posted ? "Lançado" : r.posted === false ? "Não lançado" : "Não informado"}</strong></span>
-                        {canPost && !user.readOnly && <label className="mp-posted-action"><input type="checkbox" checked={r.posted===true} disabled={saving} aria-label={`Lançado — ${r.plate}`} onChange={e=>updateControl(r,"posted",e.target.checked)}/><span>{r.posted ? "Lançamento confirmado" : "Confirmar lançamento"}</span></label>}
+                        {canPost && !user.readOnly && <button type="button" className="mp-finance-action" disabled={saving} onClick={()=>setPostingRecord(r)}>{r.posted ? "Editar lançamento" : "Registrar lançamento"}</button>}
+                        {r.erpDocument && <small>Documento financeiro: {r.erpDocument}</small>}
                       </div>
                     </div>
-                    <p className="mp-finance-help">O lançamento confirma um registro já feito no ERP. A confirmação é salva automaticamente.</p>
+                    <p className="mp-finance-help">Registre o número do documento e confirme o lançamento já feito no ERP.</p>
                     {canReimburse && !user.readOnly && <ExpenseReimbursement key={`${r.id}:${r.version}`} record={r} disabled={saving || user.readOnly} onSave={value=>updateControl(r,"reimbursement",value)}/>}
                     {r.paymentDetails && <section className="mp-detail-section"><h4>Dados para pagamento</h4><dl className="mp-detail-grid"><div><dt>Titular da conta</dt><dd>{r.paymentDetails.holderName}</dd></div><div><dt>Chave PIX</dt><dd>{r.paymentDetails.pixKey}</dd></div></dl></section>}
                     {manager ? <details className="mp-finance-share"><summary>Resumo para o financeiro / WhatsApp</summary><ExpenseWhatsappSummary record={r} compact/></details> : <ExpenseWhatsappSummary record={r}/>}
@@ -1118,6 +1121,7 @@ function MaintenanceForm({
           <button type="button" className="mp-cancel-edit" onClick={() => setReceiptView(null)}>Voltar aos detalhes</button>
         </div>
       </MaintenanceDialog>}
+      {canPost && postingRecord && <MaintenanceDialog onClose={()=>setPostingRecord(null)} saving={saving} step="posting"><ExpensePosting record={postingRecord} onSave={updateControl} onClose={()=>setPostingRecord(null)} saving={saving}/></MaintenanceDialog>}
       {canPay && paymentRecord && (
         <MaintenanceDialog onClose={() => setPaymentRecord(null)} saving={saving} step="payment">
           <form className="mp-form mp-payment-modal" onSubmit={savePayment}>
@@ -1130,7 +1134,7 @@ function MaintenanceForm({
             <PaymentMethodPicker methods={paymentMethods} value={paymentMethod} onChange={setPaymentMethod} loading={paymentMethodsLoading} disabled={saving || paymentMethodsLoading || Boolean(paymentMethodsError)}/>
             {paymentRecord.paymentMethod && !paymentMethodsLoading && !paymentMethods.some(method => `${method.company}:${method.code}` === paymentMethod) && <p className="mp-field-help">Forma registrada anteriormente: {paymentRecord.paymentMethod.name}. Selecione uma opção ativa para salvar.</p>}
             {paymentMethodsError && <div role="alert"><p>{paymentMethodsError}</p><button type="button" onClick={loadPaymentMethods}>Tentar carregar novamente</button></div>}
-            <p className="mp-field-help">Ao salvar, a despesa será marcada como paga e conferida automaticamente.</p>
+            <p className="mp-field-help">Ao salvar, a despesa será marcada como paga. A conferência é feita separadamente pelos usuários autorizados.</p>
             {paymentError && <p className="mp-feedback error" role="alert">{paymentError}</p>}
             <div className="mp-payment-modal-actions">
               <button className="mp-cancel-edit" type="button" disabled={saving || photoBusy} onClick={() => setPaymentRecord(null)}>Cancelar</button>
@@ -1434,7 +1438,7 @@ function MaintenanceForm({
                           </dl>
                         </section>
                       )}
-                      {step === 2 && <ExpensePaymentDetails paymentDetails={paymentDetails} setPaymentDetails={setPaymentDetails}/>}
+                      {step === 2 && <ExpensePaymentDetails required paymentDetails={paymentDetails} setPaymentDetails={setPaymentDetails}/>}
                       {error && (
                         <div className="mp-feedback error" role="alert">
                           {error}
