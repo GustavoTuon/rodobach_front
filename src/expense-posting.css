@@ -1,0 +1,22 @@
+.mp-posting-modal .mp-section-title h2 { margin: 0; }
+.mp-posting-modal [data-step-title]:focus:not(:focus-visible) { outline: none; }
+.mp-posting-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; padding: 16px; border-radius: 12px; background: var(--surface-2); font-size: 14px; }
+.mp-posting-summary > div { display: grid; gap: 5px; min-width: 0; }
+.mp-posting-summary span { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.mp-posting-summary > strong { white-space: nowrap; }
+.mp-posting-modal .mp-field-help { margin: 8px 0 0; line-height: 1.6; }
+.mp-posting-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; margin: 24px 0; }
+.mp-app .mp-posting-search .mp-finance-action { min-height: 46px; }
+.mp-app .mp-posting-modal .mp-posted-action { display: flex; justify-content: flex-start; width: 100%; box-sizing: border-box; gap: 12px; padding: 16px; text-align: left; }
+.mp-app .mp-posting-modal .mp-posted-action input { width: 20px; height: 20px; min-height: 20px; flex: 0 0 20px; margin: 0; padding: 0; border-radius: 4px; cursor: pointer; }
+.mp-app .mp-posting-modal .mp-posted-action:has(input:checked) { border-color: #378260; color: #216b48; background: #f0faf4; }
+.mp-posting-results { display: grid; gap: 8px; max-height: 260px; overflow-y: auto; margin-bottom: 24px; }
+.mp-posting-results .mp-fleet-option { flex-direction: column; align-items: flex-start; gap: 5px; padding: 12px; text-align: left; }
+.mp-posting-results .mp-fleet-option strong { font-family: inherit; font-size: 13px; letter-spacing: 0; overflow-wrap: anywhere; }
+.mp-posting-results small { color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
+.mp-posting-modal .mp-payment-modal-actions { padding-top: 20px; border-top: 1px solid var(--border); }
+@media (max-width: 540px) {
+  .mp-posting-search { grid-template-columns: 1fr; }
+  .mp-posting-summary { align-items: flex-start; flex-wrap: wrap; }
+  .mp-posting-modal .mp-payment-modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+}

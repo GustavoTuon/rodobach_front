@@ -21,6 +21,8 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/ {
 }; /*EDITMODE-END*/
 
 const NAV = [
+  {id:"bloco-notas",label:"Bloco de notas",icon:"file",title:"Bloco de notas",section:"ferramentas",permission:"bloco-notas"},
+  {id:"painel-faturamento",label:"TV · Faturamento",icon:"chart",title:"Faturamento da frota",section:"ferramentas",permission:"faturamento-diario"},
   {id:"manutencao-plantao",label:"Despesas",icon:"wrench",title:"Despesas",subgroup:"frota",section:"frota",permissionsAny:["manutencao-plantao", "conferencia-manutencao", "pagamento-despesas", "lancamento-despesas", "reembolso-despesas"],href:"/manutencao-plantao"},
   {
     id: "diretoria",
@@ -597,6 +599,12 @@ const App = () => {
       break;
     case "painel-tv":
       body = <PainelTv user={auth.user} />;
+      break;
+    case "painel-faturamento":
+      body = <PainelFaturamento />;
+      break;
+    case "bloco-notas":
+      body = <BlocoNotas key={auth.user.id} user={auth.user} />;
       break;
     case "manutencao-plantao":
       body = <ManutencaoPlantao initialView="driver"/>;
