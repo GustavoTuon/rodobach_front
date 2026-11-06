@@ -1,4 +1,5 @@
 import { createScreenLoader } from "./screen-loader.js";
+import { useAppearancePreferences } from "./appearance-preferences.js";
 // Norte Telemetria — App shell, router, sidebar, Tweaks
 import { getNavForUser as filterNavForUser, getCurrentScreen } from "./permissions.js";
 
@@ -394,9 +395,9 @@ function setRoute(r) {
 
 // â”€â”€ Componente principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const App = () => {
-  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [route, setRouteState] = useState(readRoute());
   const [auth, setAuth] = useState({ checking: true, user: null });
+  const [t, setTweak] = useAppearancePreferences(auth.user, TWEAK_DEFAULTS);
   const [authError, setAuthError] = useState(null);
   const [authAttempt, setAuthAttempt] = useState(0);
   const [loadedScreen, setLoadedScreen] = useState(null);
