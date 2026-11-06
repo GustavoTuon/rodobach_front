@@ -41,6 +41,7 @@ export const PERMISSION_GROUPS = [
     item("conferencia_manutencao", "Despesas — conferir", "Marcar despesas como conferidas. Não libera pagamentos, lançamento no ERP ou edição de despesas de outros usuários."),
   ]},
   { id: "sistema", label: "Ferramentas e sistema", telas: [
+    item("bloco_notas", "Bloco de notas", "Tarefas e anotações pessoais por veículo. Administradores têm acesso; os demais precisam de liberação individual."),
     item("automacoes_n8n", "Automações n8n", "Acesso às automações e integrações n8n.", true),
     item("painel_tv", "Painel TV", "Painel de acompanhamento da frota."),
     item("settings", "Configurações", "Acesso às configurações do sistema."),

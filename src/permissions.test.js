@@ -36,3 +36,10 @@ describe("getNavForUser", () => {
     expect(getNavForUser(nav, { admin: true, permissions: {} })).toEqual(nav);
   });
 });
+
+it('bloco de notas aparece apenas para admin ou concessão individual',()=>{
+ const notes=[{id:'bloco-notas',permission:'bloco-notas'}];
+ expect(getNavForUser(notes,{admin:false,permissions:{}})).toEqual([]);
+ expect(getNavForUser(notes,{admin:true,permissions:{}})).toEqual(notes);
+ expect(getNavForUser(notes,{admin:false,permissions:{'bloco-notas':true}})).toEqual(notes);
+});
