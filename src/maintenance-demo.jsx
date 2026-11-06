@@ -398,6 +398,8 @@ function MaintenanceForm({
   const [paymentMethodsLoading, setPaymentMethodsLoading] = useState(false);
   const [paymentMethodsError, setPaymentMethodsError] = useState("");
   const [paymentError, setPaymentError] = useState("");
+  const [reviewRecord,setReviewRecord] = useState(null);
+  const [undoReviewRecord,setUndoReviewRecord] = useState(null);
   const [postingRecord,setPostingRecord] = useState(null);
   const [reportOpen,setReportOpen] = useState(false);
   const [reimbursementFilter,setReimbursementFilter] = useState("");
@@ -700,7 +702,7 @@ function MaintenanceForm({
     setPaymentError("");
     if (await updateControl(paymentRecord, "paymentDate", paymentDate, {paymentMethod:{code:method.code,company:method.company}})) setPaymentRecord(null);
   }
-  async function confirmRecord(record) {
+  async function confirmRecord(record, changes = {}) {
     if (!canReview || user.readOnly || savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
@@ -709,13 +711,17 @@ function MaintenanceForm({
       const result = await window.RB_API.checkPlantao(
         record.id,
         record.version,
+        changes,
       );
       setRecords((items) =>
         items.map((item) => (item.id === record.id ? result.record : item)),
       );
-      setMessage(`Lançamento da placa ${record.plate} conferido.`);
+      setHistory(null);
+      setMessage(changes.checked === false ? `Conferência da placa ${record.plate} desfeita.` : `Lançamento da placa ${record.plate} conferido.`);
+      return true;
     } catch (error) {
-      setError(error.message || "Não foi possível conferir o lançamento.");
+      setError(error.message || "Não foi possível atualizar a conferência.");
+      return false;
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -891,17 +897,12 @@ function MaintenanceForm({
                       <strong>{money(r.amount)}</strong>
                     </div>
                     <ExpenseDetailFacts record={r} onReceipt={showReceipt}/>
-                    <section className="mp-detail-section"><h4>Pagamento e lançamento</h4>
+                    <section className="mp-detail-section"><h4>Pagamento</h4>
                     <div className="mp-payment-controls mp-financial-status" aria-label="Status financeiro">
                       <div className={`mp-payment-button ${r.paid ? "is-paid" : ""}`}><span><small>PAGAMENTO</small><strong>{r.paymentDate ? `Pago em ${displayDay(r.paymentDate)}` : r.paid ? "Pago · data não informada" : r.paid === false ? "Não pago" : "Não informado"}</strong></span>
                         {canPay && !user.readOnly && <button type="button" className="mp-finance-action" disabled={saving} aria-label={`${r.paid ? "Editar pagamento" : "Registrar pagamento"} — ${r.plate}`} onClick={()=>openPayment(r)}>{r.paid ? "Editar pagamento" : "Registrar pagamento"}</button>}
                       </div>
-                      <div className={`mp-posted-check ${r.posted ? "is-posted" : ""}`}><span><small>LANÇAMENTO NO ERP</small><strong>{r.posted ? "Lançado" : r.posted === false ? "Não lançado" : "Não informado"}</strong></span>
-                        {canPost && !user.readOnly && <button type="button" className="mp-finance-action" disabled={saving} onClick={()=>setPostingRecord(r)}>{r.posted ? "Editar lançamento" : "Registrar lançamento"}</button>}
-                        {r.erpDocument && <small>Documento financeiro: {r.erpDocument}</small>}
-                      </div>
                     </div>
-                    <p className="mp-finance-help">Registre o número do documento e confirme o lançamento já feito no ERP.</p>
                     {canReimburse && !user.readOnly && <ExpenseReimbursement key={`${r.id}:${r.version}`} record={r} disabled={saving || user.readOnly} onSave={value=>updateControl(r,"reimbursement",value)}/>}
                     {r.paymentDetails && <section className="mp-detail-section"><h4>Dados para pagamento</h4><dl className="mp-detail-grid"><div><dt>Titular da conta</dt><dd>{r.paymentDetails.holderName}</dd></div><div><dt>Chave PIX</dt><dd>{r.paymentDetails.pixKey}</dd></div></dl></section>}
                     {manager ? <details className="mp-finance-share"><summary>Resumo para o financeiro / WhatsApp</summary><ExpenseWhatsappSummary record={r} compact/></details> : <ExpenseWhatsappSummary record={r}/>}
@@ -1048,6 +1049,7 @@ function MaintenanceForm({
                                   edit: "Editado",
                                   delete: "Excluído",
                                   check: "Conferido",
+                                  uncheck: "Conferência desfeita",
                                   status: "Controle atualizado",
                                 }[h.evento] || h.evento}
                               </strong>{" "}
@@ -1121,6 +1123,13 @@ function MaintenanceForm({
           <button type="button" className="mp-cancel-edit" onClick={() => setReceiptView(null)}>Voltar aos detalhes</button>
         </div>
       </MaintenanceDialog>}
+      {canReview && reviewRecord && <MaintenanceDialog onClose={()=>setReviewRecord(null)} saving={saving} step="review"><ExpensePosting review record={reviewRecord} onSave={(record,_field,posted,extra)=>confirmRecord(record,{posted,...extra})} onClose={()=>setReviewRecord(null)} saving={saving}/></MaintenanceDialog>}
+      {canReview && undoReviewRecord && <MaintenanceDialog onClose={()=>setUndoReviewRecord(null)} saving={saving} step="undo-review"><div className="mp-form mp-payment-modal">
+        <header className="mp-section-title"><h2 id="mp-edit-title" data-step-title tabIndex={-1}>Desfazer conferência</h2></header>
+        <p>A despesa de {undoReviewRecord.plate}, no valor de {money(undoReviewRecord.amount)}, voltará para a fila de conferência. O pagamento e o documento vinculado serão mantidos.</p>
+        {error && <p role="alert" className="mp-feedback error">{error}</p>}
+        <div className="mp-payment-modal-actions"><button type="button" className="mp-cancel-edit" disabled={saving} onClick={()=>setUndoReviewRecord(null)}>Cancelar</button><button type="button" className="mp-submit" disabled={saving} onClick={async()=>{if(await confirmRecord(undoReviewRecord,{checked:false}))setUndoReviewRecord(null);}}>{saving ? "Salvando…" : "Confirmar reversão"}</button></div>
+      </div></MaintenanceDialog>}
       {canPost && postingRecord && <MaintenanceDialog onClose={()=>setPostingRecord(null)} saving={saving} step="posting"><ExpensePosting record={postingRecord} onSave={updateControl} onClose={()=>setPostingRecord(null)} saving={saving}/></MaintenanceDialog>}
       {canPay && paymentRecord && (
         <MaintenanceDialog onClose={() => setPaymentRecord(null)} saving={saving} step="payment">
@@ -1659,7 +1668,7 @@ function MaintenanceForm({
                   {records.length > 0 && <button type="button" className="mp-secondary" onClick={() => { setFilter("all"); setReimbursementFilter(""); setSearch(""); setTripFilter(""); setTextSearch(""); setDateFrom(""); setDateTo(""); setSourceFilter(""); setPaidFilter(""); setPostedFilter(""); }}>Mostrar todo o histórico</button>}
                 </div>
               ) : (
-                <ExpenseHistory onReview={canReview && !user.readOnly ? confirmRecord : undefined} onReceipt={showReceipt} reviewDisabled={saving || user.readOnly} expandGroups={canReview && filter === "unchecked"} records={visible} isDriver={isDriver && !manager} currentPlate={expenseAccess?.plate} renderRecord={renderExpenseRecord} />
+                <ExpenseHistory onPosting={canPost && !user.readOnly ? setPostingRecord : undefined} onReview={canReview && !user.readOnly ? setReviewRecord : undefined} onUndoReview={canReview && !user.readOnly ? record=>{setError("");setUndoReviewRecord(record);} : undefined} onReceipt={showReceipt} reviewDisabled={saving || user.readOnly} expandGroups={canReview && filter === "unchecked"} records={visible} isDriver={isDriver && !manager} currentPlate={expenseAccess?.plate} renderRecord={renderExpenseRecord} />
               )}
             </div>
             {!manager && !recordsLoading && !recordsError && <ExpenseSummary records={visible} />}
