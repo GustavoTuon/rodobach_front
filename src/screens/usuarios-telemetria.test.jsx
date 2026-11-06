@@ -59,3 +59,17 @@ it("cadastro vincula motorista por ID e desabilita poderes de conferência", asy
   fireEvent.click(screen.getByRole("button",{name:"Salvar",exact:true}));
   await waitFor(()=>expect(RB_API.createUsuario).toHaveBeenCalledWith(expect.objectContaining({perfil_despesas:"motorista",telemetria_motorista_id:"987",admin:false,perm_manutencao_plantao:true,perm_conferencia_manutencao:false})));
 });
+
+it("Bloco de notas começa desligado, pode ser liberado e salvo individualmente",async()=>{
+ RB_API.listUsuarios.mockResolvedValue({usuarios:[{id:2,login:'teste',ativo:true,perm_bloco_notas:false}]});
+ render(React.createElement(window.GerenciarUsuarios));fireEvent.click(await screen.findByRole('button',{name:'Editar'}));
+ const toggle=screen.getByRole('switch',{name:'Bloco de notas'});expect(toggle.getAttribute('aria-checked')).toBe('false');
+ fireEvent.click(toggle);fireEvent.click(screen.getByRole('button',{name:'Salvar',exact:true}));
+ await waitFor(()=>expect(RB_API.updateUsuario).toHaveBeenCalledWith(2,expect.objectContaining({perm_bloco_notas:true})));
+});
+it("Bloco de notas é automático para admin e volta ao padrão desligado ao remover admin",()=>{
+ render(React.createElement(window.GerenciarUsuarios));fireEvent.click(screen.getByRole('button',{name:/Novo usuário/}));
+ const toggle=screen.getByRole('switch',{name:'Bloco de notas'});expect(toggle.getAttribute('aria-checked')).toBe('false');
+ fireEvent.click(screen.getByRole('switch',{name:/Administrador/}));expect(toggle.getAttribute('aria-checked')).toBe('true');expect(toggle.disabled).toBe(true);
+ fireEvent.click(screen.getByRole('switch',{name:/Administrador/}));expect(toggle.getAttribute('aria-checked')).toBe('false');expect(toggle.disabled).toBe(false);
+});
