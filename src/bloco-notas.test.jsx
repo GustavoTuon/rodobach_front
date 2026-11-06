@@ -32,3 +32,12 @@ it('conflito oferece cópia sem perder a anotação local',async()=>{
  expect(screen.getByLabelText('Anotação').value).toBe('Texto local');
  await waitFor(()=>expect(readNoteDraft('rodobach:notes:draft:42').version).toBe(0));
 });
+
+it('consulta nota de outro autor sem permitir editar e ainda permite criar uma própria',async()=>{
+ api();const note={id:'shared',title:'Lembrete da equipe',text:'Verificar pneus',plate:'ABC1234',version:1,authorId:77,authorName:'Colega',canEdit:false};
+ window.RB_API.listNotes.mockResolvedValue({notes:[note],hasMore:false});window.RB_API.getNote=vi.fn().mockResolvedValue({note});
+ render(<Notes user={user}/>);fireEvent.click(await screen.findByRole('button',{name:/Lembrete da equipe/}));
+ expect(await screen.findByText('Criada por Colega')).toBeTruthy();expect(screen.getByLabelText('Anotação').disabled).toBe(true);
+ expect(screen.getByRole('button',{name:'Salvar anotação'}).disabled).toBe(true);expect(screen.queryByRole('button',{name:'Excluir'})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:/Nova anotação/}));expect(screen.getByLabelText('Anotação').disabled).toBe(false);
+});

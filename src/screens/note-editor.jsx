@@ -10,6 +10,7 @@ const BlocoNotas=forwardRef(function BlocoNotas({user,plate,compact=false},ref) 
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[opening,setOpening]=useState(false);
  const [error,setError]=useState(''),[listError,setListError]=useState(''),[message,setMessage]=useState(''),[conflict,setConflict]=useState(false);
  const [draftError,setDraftError]=useState(false),[plates,setPlates]=useState([]),[platesError,setPlatesError]=useState(false);
+ const noteReadOnly=user.readOnly||note?.canEdit===false;
  const busy=useRef(false),openRequest=useRef(0),editor=useRef(null);
  useEffect(()=>{if(note&&window.innerWidth<=600)editor.current?.scrollIntoView?.({block:'start'});},[note?.id]);
  useEffect(()=>{
@@ -41,16 +42,16 @@ const BlocoNotas=forwardRef(function BlocoNotas({user,plate,compact=false},ref) 
  }
  function edit(field,value){setNote(current=>({...current,[field]:value}));setDirty(true);setMessage('');}
  async function save(event){
-  event.preventDefault();if(busy.current||user.readOnly||!note)return;
+  event.preventDefault();if(busy.current||noteReadOnly||!note)return;
   if(!note.title.trim()&&!note.plate){setError('Informe um título ou selecione uma placa.');return;}
   if(!note.text.trim()){setError('Escreva o texto da anotação.');return;}
   busy.current=true;setSaving(true);setError('');setMessage('');
-  try{const data=await window.RB_API.saveNote(payload(note));setNote(data.note);setDirty(false);clearDraft();setConflict(false);setMessage('Salvo no sistema. Disponível no celular e no PC com o mesmo usuário.');setTick(value=>value+1);}
+  try{const data=await window.RB_API.saveNote(payload(note));setNote(data.note);setDirty(false);clearDraft();setConflict(false);setMessage('Salvo no sistema. Visível para todos com acesso ao Bloco de notas.');setTick(value=>value+1);}
   catch(error){setError(error.message);setConflict(error.status===409||error.status===404);}
   finally{busy.current=false;setSaving(false);}
  }
  async function remove(){
-  if(busy.current||!note?.version||!window.confirm('Excluir esta anotação? Ela deixará de aparecer no celular e no PC.'))return;
+  if(busy.current||noteReadOnly||!note?.version||!window.confirm('Excluir esta anotação? Ela deixará de aparecer para todos.'))return;
   busy.current=true;setSaving(true);setError('');
   try{await window.RB_API.deleteNote(note.id,note.version);clearDraft();setNote(null);setDirty(false);setMessage('Anotação excluída.');setTick(value=>value+1);}
   catch(error){setError(error.message);}finally{busy.current=false;setSaving(false);}
@@ -61,27 +62,28 @@ const BlocoNotas=forwardRef(function BlocoNotas({user,plate,compact=false},ref) 
   <header className="bn-heading"><div><span>SEU ESPAÇO DE ANOTAÇÕES</span><h1>{plate?'Anotações do veículo':'Bloco de notas'}<span>.</span></h1><p>Anote no celular. Continue no computador.</p></div>{!compact&&<button className="bn-primary" onClick={fresh} disabled={user.readOnly||saving||opening}>＋ Nova anotação</button>}</header>
   <div className="bn-layout">
    <aside className="bn-sidebar"><label className="bn-search">Buscar anotações<input type="search" value={query} maxLength={120} placeholder="Título, placa ou texto" onChange={event=>setQuery(event.target.value)}/></label>
-    <div className="bn-list-heading"><span>MINHAS NOTAS · {notes.length}{more?'+':''}</span><button onClick={()=>setTick(value=>value+1)} disabled={loading}>{loading?'Atualizando…':'Atualizar'}</button></div>
+    <div className="bn-list-heading"><span>NOTAS COMPARTILHADAS · {notes.length}{more?'+':''}</span><button onClick={()=>setTick(value=>value+1)} disabled={loading}>{loading?'Atualizando…':'Atualizar'}</button></div>
     {listError && <p className="bn-error" role="alert">{listError}</p>}
-    {!loading&&!listError&&!notes.length&&<p className="bn-empty-list">{query?'Nenhuma nota encontrada.':'Suas anotações salvas vão aparecer aqui.'}</p>}
-    <div className="bn-list">{notes.map(row=><button key={row.id} className={`bn-note ${note?.id===row.id?'is-selected':''}`} aria-pressed={note?.id===row.id} onClick={()=>open(row.id)} disabled={saving||opening}><strong>{row.title||row.plate}</strong>{row.plate&&<span className="bn-plate">{row.plate}</span>}<p>{row.text}</p><small>{when(row.updatedAt)}</small></button>)}</div>
+    {!loading&&!listError&&!notes.length&&<p className="bn-empty-list">{query?'Nenhuma nota encontrada.':'As anotações da equipe vão aparecer aqui.'}</p>}
+    <div className="bn-list">{notes.map(row=><button key={row.id} className={`bn-note ${note?.id===row.id?'is-selected':''}`} aria-pressed={note?.id===row.id} onClick={()=>open(row.id)} disabled={saving||opening}><strong>{row.title||row.plate}</strong>{row.plate&&<span className="bn-plate">{row.plate}</span>}<p>{row.text}</p><small>{row.authorName ? `Por ${row.authorName} · ` : ""}{when(row.updatedAt)}</small></button>)}</div>
     {more&&<p className="bn-help">Exibindo as 100 notas mais recentes. Use a busca para encontrar as anteriores.</p>}
-    <p className="bn-private">Notas pessoais · visíveis apenas para seu usuário.</p>
+    <p className="bn-private">Notas compartilhadas com todos que têm acesso ao Bloco de notas.</p>
    </aside>
    <main className="bn-editor-wrap" ref={editor}>
     {error&&<p role="alert" className="bn-error">{error}</p>}{message&&<p role="status" className="bn-success">{message}</p>}
     {changedElsewhere&&<p className="bn-error">Há uma versão mais recente em outro aparelho. <button disabled={saving||opening} onClick={()=>open(note.id)}>Reabrir versão salva</button></p>}
     {opening&&<p role="status">Abrindo anotação…</p>}
     {note ? <form className="bn-editor" onSubmit={save}>
+      {note.authorName&&<p className="bn-help">Criada por {note.authorName}</p>}
       <div className="bn-paper-head"><span>{note.version?'ANOTAÇÃO':'NOVA ANOTAÇÃO'}</span><span role="status">{dirty ? draftError ? 'Rascunho sem proteção local' : 'Rascunho neste aparelho · falta salvar' : note.version ? `Salvo · ${when(note.updatedAt)}` : 'Ainda não salva'}</span></div>
-      <div className="bn-fields"><label>Título<input value={note.title} maxLength={120} placeholder="O que você precisa lembrar?" onChange={event=>edit('title',event.target.value)} disabled={saving||opening||user.readOnly}/></label><label>Placa (opcional)<input list="bn-plates" value={note.plate} maxLength={7} pattern="[A-Z]{3}[0-9][A-Z0-9][0-9]{2}|" placeholder="Selecione ou digite" onChange={event=>edit('plate',event.target.value.toUpperCase().replace(/[^A-Z0-9]/g,''))} disabled={Boolean(plate)||saving||opening||user.readOnly}/><datalist id="bn-plates">{plates.map(plate=><option value={plate} key={plate}/>)}</datalist></label></div>
+      <div className="bn-fields"><label>Título<input value={note.title} maxLength={120} placeholder="O que você precisa lembrar?" onChange={event=>edit('title',event.target.value)} disabled={saving||opening||noteReadOnly}/></label><label>Placa (opcional)<input list="bn-plates" value={note.plate} maxLength={7} pattern="[A-Z]{3}[0-9][A-Z0-9][0-9]{2}|" placeholder="Selecione ou digite" onChange={event=>edit('plate',event.target.value.toUpperCase().replace(/[^A-Z0-9]/g,''))} disabled={Boolean(plate)||saving||opening||noteReadOnly}/><datalist id="bn-plates">{plates.map(plate=><option value={plate} key={plate}/>)}</datalist></label></div>
       {platesError&&<p className="bn-help">Cadastro de placas indisponível. Você pode digitar a placa ou usar apenas um título.</p>}
-      <label className="bn-text-label">Anotação<textarea value={note.text} maxLength={20000} placeholder="Escreva aqui… serviço para fazer, lembrete, conversa com o motorista, o que precisar." onChange={event=>edit('text',event.target.value)} disabled={saving||opening||user.readOnly}/></label>
+      <label className="bn-text-label">Anotação<textarea value={note.text} maxLength={20000} placeholder="Escreva aqui… serviço para fazer, lembrete, conversa com o motorista, o que precisar." onChange={event=>edit('text',event.target.value)} disabled={saving||opening||noteReadOnly}/></label>
       <div className="bn-wordcount">{note.text.length.toLocaleString('pt-BR')} / 20.000 caracteres</div>
       {draftError&&dirty&&<p className="bn-error">Não foi possível guardar o rascunho neste aparelho. Salve no sistema antes de sair.</p>}
-      {user.readOnly&&<p className="bn-help">Seu acesso permite somente consultar as notas.</p>}
-      <footer className="bn-actions">{note.version>0&&!user.readOnly&&<button type="button" className="bn-delete" disabled={saving||opening} onClick={remove}>Excluir</button>}<span/>{conflict&&!user.readOnly&&<button type="button" disabled={saving} onClick={()=>{setNote(current=>({...current,id:crypto.randomUUID(),version:0}));setDirty(true);setConflict(false);setError('');}}>Manter texto como nova nota</button>}<button type="submit" className="bn-primary" disabled={saving||opening||user.readOnly||(!dirty&&note.version>0)}>{saving?'Salvando…':'Salvar anotação'}</button></footer>
-     </form> : <div className="bn-welcome"><span aria-hidden="true">✎</span><h2>Uma ideia, uma placa, um lembrete.</h2><p>Crie uma anotação ou escolha uma da lista.<br/>Tudo que você salvar fica disponível nos seus aparelhos.</p>{!compact&&<button className="bn-primary" onClick={fresh} disabled={user.readOnly}>Criar minha primeira nota</button>}</div>}
+      {noteReadOnly&&<p className="bn-help">{user.readOnly?'Seu acesso permite somente consultar as notas.':'Anotação compartilhada. Apenas o autor pode editar ou excluir.'}</p>}
+      <footer className="bn-actions">{note.version>0&&!noteReadOnly&&<button type="button" className="bn-delete" disabled={saving||opening} onClick={remove}>Excluir</button>}<span/>{conflict&&!user.readOnly&&<button type="button" disabled={saving} onClick={()=>{setNote(current=>({...current,id:crypto.randomUUID(),version:0,canEdit:true,authorId:user.id,authorName:user.login}));setDirty(true);setConflict(false);setError('');}}>Manter texto como nova nota</button>}<button type="submit" className="bn-primary" disabled={saving||opening||noteReadOnly||(!dirty&&note.version>0)}>{saving?'Salvando…':'Salvar anotação'}</button></footer>
+     </form> : <div className="bn-welcome"><span aria-hidden="true">✎</span><h2>Uma ideia, uma placa, um lembrete.</h2><p>Crie uma anotação ou escolha uma da lista.<br/>As notas salvas ficam disponíveis para a equipe autorizada.</p>{!compact&&<button className="bn-primary" onClick={fresh} disabled={user.readOnly}>Criar minha primeira nota</button>}</div>}
    </main>
   </div>
  </section>;

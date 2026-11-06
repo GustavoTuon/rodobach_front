@@ -66,7 +66,7 @@ export default function BlocoNotas({user}) {
     <div className="bn-list">{visible.map(v=><button key={v.plate} className={`bn-note ${selected===v.plate?'is-selected':''}`} aria-pressed={selected===v.plate} onClick={()=>setSelected(v.plate)}><span className="bn-plate-model"><strong>{v.plate}</strong><span>{v.model}</span></span><p>{pending(v.plate)?`${pending(v.plate)} tarefa(s) pendente(s)`:'Nenhuma tarefa pendente'}{v.archived?' · Fora do cadastro atual':''}</p></button>)}</div>
     {!loading&&!visible.length&&<p className="bn-help">Nenhum veículo encontrado.</p>}
     <button className={`bn-note ${selected==='all-notes'?'is-selected':''}`} onClick={()=>setSelected('all-notes')}>Todas as anotações<small>Inclui suas notas antigas e sem placa</small></button>
-    <p className="bn-private">Tarefas e notas pessoais · disponíveis nos seus aparelhos. Rascunhos ficam neste aparelho até salvar.</p>
+    <p className="bn-private">Notas compartilhadas com a equipe autorizada. Tarefas pessoais. Rascunhos ficam neste aparelho até salvar.</p>
    </aside>
    <main className="bn-editor-wrap" ref={detail}>
     {current&&<><div className="bn-vehicle-heading"><div><h2>{current.plate} <span className="bn-model">{current.model}</span></h2></div><span>{currentTasks.filter(t=>t.done).length} de {currentTasks.length} concluídas</span></div>
