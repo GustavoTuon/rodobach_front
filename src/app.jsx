@@ -91,7 +91,7 @@ const NAV = [
     group: "resultados",
     section: "financeiro",
   },
-  {id:"consulta-viagens",label:"Consulta de viagens",icon:"route",title:"Consulta de viagens",group:"resultados",section:"financeiro",permission:"lucro-viagens"},
+  {id:"consulta-viagens",label:"Controle de viagens",icon:"route",title:"Controle de viagens",group:"resultados",section:"financeiro",permission:"lucro-viagens"},
   {
     id: "clientes",
     label: "Análise",
@@ -408,6 +408,7 @@ const App = () => {
   const [sidebarExpanded, setSidebarExpanded] = useState(
     () => window.innerWidth > 960,
   );
+  const [costFocused, setCostFocused] = useState(true);
   const [frotaMenu, setFrotaMenu] = useState(null);
   const [financeiroMenu, setFinanceiroMenu] = useState(null);
   const [viagensMenu, setViagensMenu] = useState(null);
@@ -547,6 +548,7 @@ const App = () => {
 
   const go = (screen) => setRoute({ screen });
   const onNavigate = (screen) => {
+    if(screen === "evolucao-custos") setCostFocused(true);
     const standalone = visibleNav.find(item => item.id === screen)?.href;
     if (standalone) { window.location.assign(standalone); return; }
     if (visibleNav.some((n) => n.id === screen)) {
@@ -651,7 +653,7 @@ const App = () => {
       body = financialBody(<ComparativoFaturamento onNavigate={onNavigate} />);
       break;
     case "evolucao-custos":
-      body = <EvolucaoCustos />;
+      body = <EvolucaoCustos focused={costFocused} onToggleFocus={() => setCostFocused(value => !value)} />;
       break;
     case "resultado-veiculos":
       body = <ResultadoVeiculos onNavigate={onNavigate} />;
@@ -814,7 +816,7 @@ const App = () => {
 
   return (
     <div
-      className={`app-shell ${sidebarExpanded ? "sidebar-is-expanded" : "sidebar-is-collapsed"}`}
+      className={`app-shell ${currentScreen === "evolucao-custos" && costFocused ? "cost-focus-mode" : ""} ${sidebarExpanded ? "sidebar-is-expanded" : "sidebar-is-collapsed"}`}
     >
       {sidebarExpanded && (
         <button
@@ -1029,7 +1031,7 @@ const App = () => {
       )}
 
       <MainContent
-        renderKey={`${currentScreen}:${t.theme}:${t.density}:${auth.user.id || auth.user.login || "user"}`}
+        renderKey={`${currentScreen}:${t.theme}:${t.density}:${auth.user.id || auth.user.login || "user"}:${currentScreen === "evolucao-custos" ? costFocused : ""}`}
       >
         {body}
       </MainContent>
