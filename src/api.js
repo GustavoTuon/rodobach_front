@@ -1,6 +1,6 @@
 import { trackLoadingActivity } from "./loading-activity.js";
 import { fetchWithTimeout } from "./http.js";
-const LOCAL_API_BASE = "http://localhost:3333/api";
+const LOCAL_API_BASE = import.meta.env.DEV ? "/api" : "http://localhost:3333/api";
 const PRODUCTION_API_BASE =
   "https://rodobach-rodobach-back-consultoria.eupgpd.easypanel.host/api";
 
@@ -196,6 +196,14 @@ window.RB_API = {
     }),
   getViagemAuditoria: (id) => apiRequest(`/viagens/${id}/auditoria`),
   listConsultaViagens: (filters = {}) => apiRequest(`/financeiro/consulta-viagens${buildQuery(filters)}`),
+  listControleViagens: (filters = {}) => apiRequest(`/financeiro/controle-viagens${buildQuery(filters)}`),
+  getControleViagem: id => apiRequest(`/financeiro/controle-viagens/${encodeURIComponent(id)}`),
+  saveControleViagem: data => apiRequest(`/financeiro/controle-viagens${data.id ? `/${encodeURIComponent(data.id)}` : ''}`, {method:data.id?'PUT':'POST',body:JSON.stringify(data)}),
+  importControleViagem: data => apiRequest('/financeiro/controle-viagens/importar',{method:'POST',body:JSON.stringify(data)}),
+  calculateControleDiarias: data => apiRequest('/financeiro/controle-viagens/diarias/calcular',{method:'POST',body:JSON.stringify(data)}),
+  getControleParametrosDiarias: () => apiRequest('/financeiro/controle-viagens/diarias/parametros'),
+  saveControleParametrosDiarias: data => apiRequest('/financeiro/controle-viagens/diarias/parametros',{method:'PUT',body:JSON.stringify(data)}),
+  searchControleDocumentos: params => apiRequest(`/financeiro/controle-viagens/documentos${buildQuery(params)}`),
   getConsultaViagem: (empresa,numero) => apiRequest(`/financeiro/consulta-viagens/${encodeURIComponent(empresa)}/${encodeURIComponent(numero)}`),
   getConsultaViagemIndicadores: (empresa,numero,params = {}) => apiRequest(`/financeiro/consulta-viagens/${encodeURIComponent(empresa)}/${encodeURIComponent(numero)}/indicadores${buildQuery(params)}`),
 

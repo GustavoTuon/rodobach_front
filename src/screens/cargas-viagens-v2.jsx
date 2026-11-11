@@ -662,8 +662,13 @@ export function Cv2ItineraryButton({ viagemId, disabled=false }) {
     }catch(err){if(current===version.current)setError(cv2Error(err));}
     finally{if(current===version.current)setLoading(false);}
   };
-  const move=(index,offset)=>setReport(current=>{
-    const stops=[...current.stops];[stops[index],stops[index+offset]]=[stops[index+offset],stops[index]];
+  const move=(id,target)=>setReport(current=>{
+    if(!current || !Number.isInteger(target) || target<0 || target>=current.stops.length)return current;
+    const index=current.stops.findIndex(stop=>stop.id===id);
+    if(index<0 || index===target)return current;
+    const stops=[...current.stops];
+    const [stop]=stops.splice(index,1);
+    stops.splice(target,0,stop);
     return {...current,stops};
   });
   const print=()=>{
@@ -678,7 +683,15 @@ export function Cv2ItineraryButton({ viagemId, disabled=false }) {
       {error && <div className="cv2-alert error" role="alert">{error}<button className="btn" onClick={prepare}>Tentar novamente</button></div>}
       {loading && <p role="status">Carregando volumes e paradas das cargas…</p>}
       {report && <><div className="cv2-alert info"><b>{report.trip.numero} · {report.trip.placa}</b><p>Volumes previstos: {volumesSummary(report.loads).text}</p><small>A ordem abaixo vale para esta impressão. Revise coletas e entregas antes da saída. Quantidades conferidas serão preenchidas no papel.</small></div>
-        <ol className="cv2-itinerary-list">{report.stops.map((stop,index)=><li key={stop.id}><span className="cv2-erp-step">{index+1}</span><div><b>{stop.tipo==='coleta'?'Coleta':'Entrega'} · {stop.cliente||'Local não informado'}</b><small>{stop.carga} · {[stop.cidade,stop.uf].filter(Boolean).join('/')} · {stop.volumes==null?'Volumes a distribuir':`${formatVolumes(stop.volumes)} volume(s)`}</small>{stop.endereco && <small>{stop.endereco}</small>}</div><button className="btn" aria-label={`Subir parada ${index+1}`} disabled={index===0} onClick={()=>move(index,-1)}>↑</button><button className="btn" aria-label={`Descer parada ${index+1}`} disabled={index===report.stops.length-1} onClick={()=>move(index,1)}>↓</button></li>)}</ol>
+        <p id="cv2-itinerary-order-help" className="cv2-cte-hint">Para mover direto, altere o número da posição e pressione Enter ou saia do campo. As demais paradas se ajustam automaticamente.</p>
+        <ol className="cv2-itinerary-list">{report.stops.map((stop,index)=><li key={stop.id}><input key={index} className="cv2-itinerary-position" type="number" min="1" max={report.stops.length} step="1" defaultValue={index+1} aria-label={`Posição da parada ${index+1}`} aria-describedby="cv2-itinerary-order-help" onFocus={event=>event.target.select()} onBlur={event=>{
+          const target=Number(event.target.value);
+          event.target.value=String(index+1);
+          if(Number.isInteger(target) && target>=1 && target<=report.stops.length)move(stop.id,target-1);
+        }} onKeyDown={event=>{
+          if(event.key==='Enter'){event.preventDefault();event.currentTarget.blur();}
+          if(event.key==='Escape'){event.preventDefault();event.stopPropagation();event.currentTarget.value=String(index+1);event.currentTarget.blur();}
+        }} /><div><b>{stop.tipo==='coleta'?'Coleta':'Entrega'} · {stop.cliente||'Local não informado'}</b><small>{stop.carga} · {[stop.cidade,stop.uf].filter(Boolean).join('/')} · {stop.volumes==null?'Volumes a distribuir':`${formatVolumes(stop.volumes)} volume(s)`}</small>{stop.endereco && <small>{stop.endereco}</small>}</div><button className="btn" aria-label={`Subir parada ${index+1}`} disabled={index===0} onClick={()=>move(stop.id,index-1)}>↑</button><button className="btn" aria-label={`Descer parada ${index+1}`} disabled={index===report.stops.length-1} onClick={()=>move(stop.id,index+1)}>↓</button></li>)}</ol>
       </>}
     </div><footer className="cv2-modal-actions"><button className="btn" onClick={close}>Fechar</button><button className="btn primary" disabled={!report||loading} onClick={print}>Imprimir itinerário</button></footer>
   </Cv2Modal>}</>;

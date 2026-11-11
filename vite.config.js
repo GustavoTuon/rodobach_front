@@ -4,5 +4,9 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react({ jsxRuntime: "classic" })],
   build: { sourcemap: false, target: "es2022" },
-  server: { host: "127.0.0.1", port: 5173 },
+  server: {
+    host: "127.0.0.1",
+    port: 5173,
+    proxy: { "/api": { target: "http://127.0.0.1:3333", changeOrigin: true } },
+  },
 });

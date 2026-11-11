@@ -3,7 +3,7 @@ export const SCREEN_FILES = {
   "bloco-notas": "bloco-notas",
   "painel-faturamento": "painel-faturamento",
   compras: "compras",
-  "consulta-viagens": "consulta-viagens",
+  "consulta-viagens": "controle-viagens",
   "manutencao-plantao": "manutencao-plantao", "conferencia-manutencao": "manutencao-plantao",
   diretoria: "diretoria", simulador: "simulador", viagens: "cargas-viagens-v2",
   "folgas-motoristas": "folgas-motoristas", "status-carga": "status-carga", "painel-tv": "painel-tv",

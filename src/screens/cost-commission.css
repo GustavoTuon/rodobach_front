@@ -1,0 +1,43 @@
+.ec-commission-nav{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:-8px 0 24px;padding:14px 18px;border:1px solid var(--border);border-radius:12px;background:#111f2d}
+.ec-commission-nav>span{font-size:10px;letter-spacing:1.3px;color:#b6cada;margin-right:auto}
+.ec-commission-nav small{display:inline-block;margin-left:8px;letter-spacing:0;color:#77dec1}
+.ec-commission{display:grid;gap:20px;min-width:0}
+.ec-commission-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;background:linear-gradient(120deg,#193c3b,#142130);border:1px solid #355d59;padding:24px;border-radius:12px}
+.ec-commission-intro h2{font-size:24px;letter-spacing:-.6px;margin:8px 0}
+.ec-commission-intro p{font-size:13px;color:var(--text-2);margin:0;line-height:1.6}
+.ec-commission-badge{display:inline-block;align-self:flex-start;max-width:100%;padding:7px 11px;border:1px solid #3d665c;background:#1c3736;border-radius:18px;color:#b5ecdc;font-size:11px;white-space:normal}
+.ec-commission-scope{font-size:12px;color:var(--text-2);line-height:1.7;padding:0 3px}
+.ec-commission-layout{display:grid;grid-template-columns:minmax(280px,.8fr) minmax(0,1.5fr);gap:20px;align-items:start}
+.ec-commission-parameters{display:grid;gap:15px}
+.ec-commission-parameters .ec-panel-head{margin:0}
+.ec-commission-parameters>label,.ec-commission-fields>label{display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--text-2);min-width:0}
+.ec-commission-parameters input:not([type=checkbox]),.ec-commission-parameters select{width:100%;min-height:40px;font:inherit}
+.ec-commission-parameters fieldset{border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;color:var(--text-2);margin:0}
+.ec-commission-parameters fieldset legend{padding:0 5px}
+.ec-commission-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.ec-commission-storage{font-size:11px;color:#a9c4d3;margin:0;line-height:1.6;border-top:1px solid var(--border);padding-top:12px}
+.ec-commission-results{display:grid;gap:18px;min-width:0}
+.ec-commission-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.ec-commission-metrics article{border:1px solid var(--border);background:#101d2a;border-radius:10px;padding:17px;min-width:0}
+.ec-commission-metrics span{font-size:12px;color:var(--text-2);display:block}
+.ec-commission-metrics strong{display:block;font-size:25px;letter-spacing:-.7px;margin:10px 0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.ec-commission-metrics small{display:block;font-size:11px;line-height:1.5;color:var(--text-2)}
+.ec-commission-metrics .ec-commission-total{background:#193b37;border-color:#396c5e}
+.ec-commission-total strong{color:#a5eed5}
+.ec-commission-pending{font-size:12px;line-height:1.6;color:#efd7aa;padding-left:18px;margin:15px 0 0}
+.ec-commission-pending li{margin:5px 0}
+.ec-commission-goal{margin-top:20px;font-size:12px}
+.ec-commission-goal label{display:block;color:var(--text-2);margin-bottom:10px}
+.ec-commission-goal progress{width:100%;height:10px;accent-color:#77dec1}
+.ec-commission-goal p{margin-bottom:0;color:var(--text-2)}
+.ec-commission-check{display:flex;align-items:flex-start;gap:10px;font-size:12px;color:var(--text-2);line-height:1.6;margin-top:12px;cursor:pointer}
+.ec-commission-check input[type=checkbox]{flex:0 0 17px;width:17px;height:17px;margin:2px 0 0;accent-color:#77dec1;padding:0}
+.ec-commission-validation h2,.ec-commission-memory h2{font-size:16px;margin:0 0 15px}
+.ec-commission-memory dl{margin:0}
+.ec-commission-memory dl>div{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--border);font-size:12px}
+.ec-commission-memory dt{color:var(--text-2)}
+.ec-commission-memory dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.ec-commission .ec-footnote{margin:0;line-height:1.65;font-size:11px;color:var(--text-2)}
+.ec-commission-results .ec-footnote{margin-top:15px}
+@media(max-width:1000px){.ec-commission-layout{grid-template-columns:1fr}.ec-commission-intro{align-items:flex-start;flex-direction:column}.ec-commission-parameters{grid-template-columns:1fr}.ec-commission-nav>span{width:100%}}
+@media(max-width:500px){.ec-commission-metrics,.ec-commission-fields{grid-template-columns:1fr}.ec-commission-nav .btn{width:100%}.ec-commission-intro{padding:18px}.ec-commission-intro h2{font-size:21px}.ec-commission-metrics strong{font-size:23px}}

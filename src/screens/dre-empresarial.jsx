@@ -181,6 +181,19 @@ const DreEmpresarial = () => {
   const [showAllThirdPartyPlates, setShowAllThirdPartyPlates] = React.useState(false);
   const [plateRanking, setPlateRanking] = React.useState("custo");
   const [showCteAudit, setShowCteAudit] = React.useState(false);
+  const [summaryHidden, setSummaryHidden] = React.useState(() => {
+    try { return localStorage.getItem("rb-dre-summary-hidden") === "true"; }
+    catch { return false; }
+  });
+
+  const toggleSummary = () => {
+    const next = !summaryHidden;
+    setSummaryHidden(next);
+    setShowCteAudit(false);
+    setHoveredMonth(null);
+    try { localStorage.setItem("rb-dre-summary-hidden", String(next)); }
+    catch { /* A preferência continua válida nesta tela sem armazenamento. */ }
+  };
 
   React.useEffect(() => {
     let active = true;
@@ -345,6 +358,10 @@ const DreEmpresarial = () => {
           <div className="sub">Receita CT-e, impostos e custos financeiros por data de lançamento - {periodLabel}</div>
         </div>
         <div className="actions">
+          <button type="button" className="btn" onClick={toggleSummary} aria-expanded={!summaryHidden} aria-controls="dre-summary">
+            <Icon name={summaryHidden ? "eye" : "eye-off"}/>
+            {summaryHidden ? "Mostrar resumo" : "Ocultar resumo"}
+          </button>
           {DRE_EMP_PERIODS.map((p) => (
             <button key={p.key} className={`btn${!manualFilter && periodo === p.key ? " primary" : ""}`} onClick={() => selectShortcut(p.key)}>{p.label}</button>
           ))}
@@ -384,6 +401,9 @@ const DreEmpresarial = () => {
         </div>
       )}
 
+      {summaryHidden && <div className="muted" role="status" style={{marginBottom: 16, fontSize: 12.5}}>Resumo financeiro oculto.</div>}
+      <div id="dre-summary">
+      {!summaryHidden && <>
       <div className="grid cols-4" style={{marginBottom: 14}}>
         <DreEmpKpi label="Receita Bruta" value={s.receitaBruta} icon="trending-up" tone="#38bdf8" sub={`${dreEmpNum(s.lancamentos)} linhas`}/>
         <DreEmpKpi label="Impostos / Deducoes" value={s.impostos} icon="filter" tone="#f87171" sub="CT-e + financeiro"/>
@@ -492,6 +512,9 @@ const DreEmpresarial = () => {
             )}
           </div>
         </div>
+      </div>
+
+      </>}
       </div>
 
       <div style={{display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6, marginBottom: 10}}>
