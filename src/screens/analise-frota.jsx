@@ -1,3 +1,4 @@
+import {FuelInsights, exportFuelCsv} from './fuel-insights.jsx';
 function afTodayISO() {
   const d = new Date();
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
@@ -486,7 +487,7 @@ const BIFuelReviewTable = ({ rows }) => {
     const direction = sort.dir === "asc" ? 1 : -1;
     return [...afRows(rows)].sort((a, b) => {
       const av = a[sort.key], bv = b[sort.key];
-      if (["litros", "valorLitroTabela", "desconto", "valorLitro", "total", "km", "media"].includes(sort.key)) return direction * (afNum(av) - afNum(bv));
+      if (["litros", "valorLitroTabela", "desconto", "valorLitro", "total", "km", "media", "odometro"].includes(sort.key)) return direction * (afNum(av) - afNum(bv));
       return direction * String(av || "").localeCompare(String(bv || ""), "pt-BR", { numeric:true });
     });
   }, [rows, sort.key, sort.dir]);
@@ -502,14 +503,14 @@ const BIFuelReviewTable = ({ rows }) => {
     <div className="fb-table-wrap">
       <table className="fb-table">
         <thead><tr>
-          {head("data", "Data")}{head("placa", "Placa")}{head("postoNome", "Posto")}{head("postoUf", "UF")}
-          {head("valorLitroTabela", "Preço tabela", true)}{head("desconto", "Desconto", true)}{head("valorLitro", "Preço líquido", true)}{head("litros", "Litros", true)}{head("total", "Total pago", true)}
-          {head("km", "Km rodado", true)}{head("media", "Km/l", true)}
+          {head("data", "Data")}{head("placa", "Placa")}{head("postoNome", "Posto")}{head("postoUf", "UF")}{head("combustivel", "Combustível")}{head("odometro", "Hodômetro", true)}
+          {head("valorLitroTabela", "Preço tabela", true)}{head("desconto", "Desconto", true)}{head("valorLitro", "Preço líquido", true)}{head("litros", "Litros", true)}{head("total", "Valor abastecido", true)}
+          {head("km", "Km rodado", true)}{head("media", "Km/l", true)}{head("kmMotivo", "Conferência do KM")}
         </tr></thead>
         <tbody>{items.map((row, index) => <tr key={`${row.data}-${row.placa}-${row.posto}-${index}`}>
-          <td>{afDate(row.data)}</td><td>{row.placa}</td><td>{row.postoNome || `Posto ${row.posto}`}</td><td>{row.postoUf || "-"}</td>
+          <td>{afDate(row.data)}</td><td>{row.placa}</td><td>{row.postoNome || `Posto ${row.posto}`}</td><td>{row.postoUf || "-"}</td><td>{row.combustivel || "—"}</td><td className="num">{row.odometro>0?afPlain(row.odometro,0):"—"}</td>
           <td className="num">{afBRL(row.valorLitroTabela)}</td><td className="num">{afBRL(row.desconto)}</td><td className="num">{afBRL(row.valorLitro)}</td><td className="num">{afPlain(row.litros, 1)}</td><td className="num">{afBRL(row.total)}</td>
-          <td className="num">{afPlain(row.km)}</td><td className="num">{afPlain(row.media, 2)}</td>
+          <td className="num">{afPlain(row.km)}</td><td className="num">{row.kmValido===false?"—":afPlain(row.media, 2)}</td><td>{row.kmMotivo || (row.kmValido===true?"Consistente":"—")}</td>
         </tr>)}</tbody>
       </table>
     </div>
@@ -540,7 +541,7 @@ const BIPostosTable = ({ rows, initialOrder = "gasto", onMore }) => {
       <table className="fb-table">
         <thead><tr>
           <th className="num">#</th>{head("fornecedor", "Posto")}{head("cidade", "Cidade")}{head("uf", "UF")}
-          {head("precoTabelaMedio", "Preço tabela", true)}{head("desconto", "Descontos", true)}{head("precoMedio", "Preço líquido", true)}{head("maiorPreco", "Maior líquido", true)}{head("total", "Total pago", true)}
+          {head("precoTabelaMedio", "Preço tabela", true)}{head("desconto", "Descontos", true)}{head("precoMedio", "Preço líquido", true)}{head("maiorPreco", "Maior líquido", true)}{head("total", "Valor abastecido", true)}
           {head("litros", "Litros", true)}{head("abastecimentos", "Abastecimentos", true)}{head("participacao", "% do gasto", true)}
           {head("diferencaPreco", "Dif. da média", true)}{head("gastoAcimaMedia", "Valor pago a mais", true)}<th></th>
         </tr></thead>
@@ -574,6 +575,8 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
   const [dataInicio, setDataInicio] = React.useState(defaultPeriod.start);
   const [dataFim, setDataFim] = React.useState(defaultPeriod.end);
   const [placa, setPlaca] = React.useState("");
+  const [combustivel, setCombustivel] = React.useState("diesel");
+  const [fuelOptions, setFuelOptions] = React.useState({placas:[],combustiveis:[]});
   const [centro, setCentro] = React.useState("");
   const [fornecedor, setFornecedor] = React.useState("");
   const [modelo, setModelo] = React.useState("");
@@ -582,12 +585,13 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
   const [tipoCusto, setTipoCusto] = React.useState("");
   const [situacao, setSituacao] = React.useState("");
   const [showAdvanced, setShowAdvanced] = React.useState(false);
-  const [filters, setFilters] = React.useState({ dataInicio:defaultPeriod.start, dataFim:defaultPeriod.end, proprietario:"frota" });
+  const [filters, setFilters] = React.useState({ dataInicio:defaultPeriod.start, dataFim:defaultPeriod.end, proprietario:"frota", combustivel:"diesel" });
   const [data, setData] = React.useState(null);
   const [filterOptions, setFilterOptions] = React.useState({ placas: [], centros: [], tipos: [], situacoes: [], fornecedores: [] });
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
   const [detail, setDetail] = React.useState(null);
+  const [historyPlate, setHistoryPlate] = React.useState("");
   const [fuelView, setFuelView] = React.useState("veiculos");
   const [postoOrder, setPostoOrder] = React.useState("diferenca");
 
@@ -617,20 +621,20 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
     setError("");
     const request = modoAbastecimento ? window.RB_API.getAnaliseAbastecimentos : window.RB_API.getAnaliseFrota;
     request({ ...filters, limit: 260 })
-      .then((payload) => { if (active) setData(payload); })
+      .then((payload) => { if (active) {setData(payload); if(payload.abastecimento?.filterOptions)setFuelOptions(payload.abastecimento.filterOptions);} })
       .catch((err) => { if (active) { setData(null); setError(err?.message || "Não foi possível carregar a análise de frota."); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [JSON.stringify(filters), modoAbastecimento]);
 
-  const applyFilters = () => setFilters({ dataInicio, dataFim, placa, centro, proprietario:"frota", fornecedor, modelo, marca, ano, tipoCusto, situacao });
+  const applyFilters = () => setFilters({ dataInicio, dataFim, placa, combustivel, centro, proprietario:"frota", fornecedor, modelo, marca, ano, tipoCusto, situacao });
   const clearFilters = () => {
     const range = modoAbastecimento ? afPreviousMonthRange() : { start:afDaysAgoISO(120), end:afTodayISO() };
     const start = range.start;
     const end = range.end;
-    setDataInicio(start); setDataFim(end); setPlaca(""); setCentro(""); setFornecedor("");
+    setCombustivel("diesel");setDataInicio(start); setDataFim(end); setPlaca(""); setCentro(""); setFornecedor("");
     setModelo(""); setMarca(""); setAno(""); setTipoCusto(""); setSituacao("");
-    setFilters({ dataInicio:start, dataFim:end, proprietario:"frota" });
+    setFilters({ dataInicio:start, dataFim:end, proprietario:"frota", combustivel:"diesel" });
   };
 
   const geral = data?.visaoGeral || {};
@@ -728,8 +732,6 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
       atual.value += afNum(posto.total); atual.litros += afNum(posto.litros); atual.postos += 1;
       map.set(uf, atual); return map;
     }, new Map()).values()].sort((a, b) => b.value - a.value);
-    const postosAcimaMedia = postos.filter((r) => afNum(r.precoMedio) > precoReferenciaFrota);
-    const sobreprecoTotal = postosAcimaMedia.reduce((sum, r) => sum + afNum(r.gastoAcimaMedia), 0);
     const gastosOrdenados = postos.map((r) => afNum(r.total)).sort((a, b) => a - b);
     const medianaGasto = gastosOrdenados.length ? gastosOrdenados[Math.floor(gastosOrdenados.length / 2)] : 0;
     const matrixGroups = [
@@ -739,39 +741,20 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
       { id:"economicos", title:"Econômicos", sub:"Preço e gasto abaixo dos cortes da matriz", tone:"#2f8f5b", rows:postos.filter((r) => afNum(r.precoMedio) <= precoReferenciaFrota && afNum(r.total) < medianaGasto).sort((a,b) => afNum(a.precoMedio) - afNum(b.precoMedio)) },
     ];
     const localPosto = (r) => [r.cidade, r.uf].filter(Boolean).join("/") || "Não informado";
-    const postoCritico = [...postos].sort((a, b) => afNum(b.gastoAcimaMedia) - afNum(a.gastoAcimaMedia))[0];
-    const summaryText = data
-      ? postoCritico?.gastoAcimaMedia > 0
-        ? <>Atenção: <strong>{postoCritico.fornecedor}</strong> está {afPct(postoCritico.diferencaPreco)} acima do preço médio, gerando cerca de <strong>{afBRL(postoCritico.gastoAcimaMedia)}</strong> em custo excedente.</>
-        : <>Média estimada: <strong>{fuel.mediaFrota==null?'aguardando leituras consistentes':`${afPlain(fuel.mediaFrota, 2)} km/l`}</strong>. {fuel.fontesKm?.telemetria || 0} veículos com cobertura completa.</>
-      : "Carregando resumo executivo...";
     return (
       <div className="fb-screen fb-fuel-screen">
-        {renderExecSummary(summaryText)}
-        {renderKpis([
-          { label:"Total pago", value:afBRL(fuel.valor), hint:`${afPlain(fuel.abastecimentos)} abastecimentos · ${afBRL(fuel.desconto)} em descontos`, icon:"money", tone:"#e74b4b" },
-          { label:"Km observados", value:afPlain(fuel.kmObservado,0), hint:`${fuel.diasComLeitura || 0}/${fuel.diasEsperados || 0} dias por veículo consistentes`, icon:"truck", tone:"#4d8fe8" },
-          { label:"Litros", value:afPlain(fuel.litros, 0), hint:"diesel abastecido", icon:"fuel", tone:"#f0c84b" },
-          { label:"Preço médio ponderado", value:afBRL(precoReferenciaFrota), hint:`média simples ${afBRL(fuel.precoMedio)}/l`, icon:"chart", tone:"#4d8fe8" },
-          { label:"R$/km", value:fuel.reaisKm == null ? "A conferir" : afBRL(fuel.reaisKm), hint:"valor dos veículos com km / km", icon:"speedometer", tone:"#2f8f5b" },
-          { label:"Consumo estimado", value:fuel.mediaFrota==null?'A conferir':`${afPlain(fuel.mediaFrota,2)} km/l`, hint:`${fuel.fontesKm?.telemetria || 0} veículos com período completo`, icon:"speedometer", tone:"#2f8f5b" },
-        ])}
-        <details><summary>Como calculamos preços e descontos</summary><p className="meta">Preço efetivo = total pago ÷ litros. O desconto já está incorporado ao total e não é subtraído novamente. Gasto acima da média dos postos: {afBRL(sobreprecoTotal)}.</p></details>
-        <div className="fb-method-note"><span><strong>Km por fechamento diário do rastreador.</strong> Somente veículos com todos os dias consistentes entram no km/l e R$/km. Dias ausentes, saltos e regressões ficam para conferência. A média é estimada pelos litros abastecidos, não pelo consumo medido do tanque.</span></div>
+
         {fuel.falhaTelemetria && <div className="fb-method-note" role="alert">Histórico diário indisponível. Não foi possível calcular as médias.</div>}
-        {fuel.filtroPostoAtivo && <div className="fb-method-note">Retire o filtro de fornecedor para calcular o consumo com todos os litros do veículo.</div>}
+        {fuel.filtroPostoAtivo && <div className="fb-method-note">Retire o filtro de fornecedor para comparar o consumo dos veículos.</div>}
         <div className="fb-view-toggle">
-          <button className={`btn${fuelView === "veiculos" ? " primary" : ""}`} onClick={() => setFuelView("veiculos")}>Consumo por veículo</button>
-          <button className={`btn${fuelView === "diario" ? " primary" : ""}`} onClick={() => setFuelView("diario")}>Hodômetro diário</button>
+          <button className={`btn${fuelView === "veiculos" ? " primary" : ""}`} onClick={() => setFuelView("veiculos")}>Radar de consumo</button>
+          <button className={`btn${fuelView === "diario" ? " primary" : ""}`} onClick={() => {if(modoAbastecimento){setDetail("abastecimento");return;}setHistoryPlate(""); setFuelView("diario");}}>{modoAbastecimento ? "KM dos abastecimentos" : "Hodômetro diário"}</button>
           <button className={`btn${fuelView === "graficos" ? " primary" : ""}`} onClick={() => setFuelView("graficos")}><Icon name="chart" size={13}/> Gráficos</button>
           <button className={`btn${fuelView === "tabela" ? " primary" : ""}`} onClick={() => setFuelView("tabela")}><Icon name="file" size={13}/> Tabela de postos</button>
           <button className={`btn${fuelView === "matriz" ? " primary" : ""}`} onClick={() => setFuelView("matriz")}><Icon name="dashboard" size={13}/> Matriz</button>
         </div>
-        {fuelView === "diario" ? <FuelDailyHistory key={JSON.stringify(filters)} rows={abastecimento.historicoKm || []}/> : fuelView === "veiculos" ? <BIPanel title="Quilometragem e consumo por veículo" meta="Período completo para calcular a média · parcial para conferir leituras">
-          <div className="fb-km-scroll"><table className="table"><thead><tr><th>Placa / modelo</th><th>Dias consistentes</th><th>Km observados</th><th>Litros abastecidos</th><th>Km/l estimado</th><th>R$/km</th><th>Situação</th></tr></thead><tbody>{afRows(abastecimento.ranking).map(r=><tr key={r.placa}><td><strong>{r.placa}</strong><small className="fb-km-model">{r.modelo}</small></td><td>{r.cobertura?.diasValidos || 0} / {r.cobertura?.diasEsperados || 0}</td><td>{r.cobertura?.diasValidos?afPlain(r.cobertura.kmObservado,0):'—'}</td><td>{afPlain(r.litros,1)}</td><td><strong>{r.media==null?'A conferir':afPlain(r.media,2)}</strong></td><td>{r.reaisKm==null?'—':afBRL(r.reaisKm)}</td><td><span className={`fb-km-status ${r.cobertura?.completo?'ok':'pending'}`}>{r.cobertura?.completo?'Período completo':r.cobertura?.diasValidos?'Período parcial':'Sem km validado'}</span></td></tr>)}</tbody></table></div>
-          {!afRows(abastecimento.ranking).length&&<p className="fb-empty">Nenhum veículo com abastecimentos no filtro.</p>}
-          <p className="meta">As leituras do ERP continuam na revisão dos abastecimentos e não são misturadas às do rastreador.</p>
-        </BIPanel> : fuelView === "tabela" ? (
+        {fuelView === "veiculos" && <FuelInsights key={JSON.stringify(filters)} data={abastecimento} onHistory={selected => {if(modoAbastecimento){setDetail({type:"veiculo",placa:selected});return;}setHistoryPlate(selected); setFuelView("diario");}} onReview={selected => setDetail({type:"veiculo", placa:selected})}/>}
+        {fuelView === "diario" ? <FuelDailyHistory key={JSON.stringify(filters)} rows={(abastecimento.historicoKm || []).filter(r=>!historyPlate || r.placa===historyPlate)}/> : fuelView === "veiculos" ? null : fuelView === "tabela" ? (
           <BIPanel title="Comparativo completo dos postos" meta={`${postos.length} postos no período · clique nos títulos para ordenar`} className="fb-fuel-table-view" action={
             <div className="fb-view-toggle">
               <button className={`btn${postoOrder === "gasto" ? " primary" : ""}`} onClick={() => setPostoOrder("gasto")}>Maior gasto</button>
@@ -799,12 +782,11 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
             ))}
           </div>
         ) : <div className="fb-grid fuel">
-          <BIPanel title="Cobertura das leituras" meta="Qualidade antes de calcular consumo">
-            <strong className="fb-km-big">{fuel.fontesKm?.telemetria || 0} / {fuel.veiculos || 0}</strong><p>veículos com todos os dias consistentes</p>
-            <p className="meta">{afPlain(fuel.diasComLeitura)} de {afPlain(fuel.diasEsperados)} dias por veículo validados.</p>
-            <button className="btn" onClick={()=>setFuelView("diario")}>Conferir histórico diário</button>
+          <BIPanel title={modoAbastecimento ? "KM dos abastecimentos" : "Cobertura das leituras"} meta={modoAbastecimento ? "Distâncias registradas no ERP" : "Qualidade antes de calcular consumo"}>
+            <strong className="fb-km-big">{modoAbastecimento ? afPlain(fuel.kmObservado,0) : fuel.fontesKm?.telemetria || 0}</strong><p>{modoAbastecimento ? "km registrados nos abastecimentos" : "veículos com todos os dias consistentes"}</p>
+            <button className="btn" onClick={()=>modoAbastecimento?setDetail("abastecimento"):setFuelView("diario")}>Conferir registros</button>
           </BIPanel>
-          <BIPanel title="Preço diesel por mês" className="fb-span-2">
+          <BIPanel title="Preço do combustível por mês" className="fb-span-2">
             {afRows(abastecimento.monthly).length===1?<div className="fb-km-single"><strong>{afBRL(abastecimento.monthly[0].precoMedio)}/l</strong><p>{abastecimento.monthly[0].mes} · único mês no filtro</p></div>:<BILine data={abastecimento.monthly} series={[{ key:"precoMedio", label:"Preço médio/litro", color:"#4d8fe8" }]} format={(v) => afBRL(v)} emptyMessage="Sem histórico de preço no período."/>}
           </BIPanel>
           <BIPanel title="Gasto por posto" meta="onde o desembolso está concentrado">
@@ -1044,7 +1026,7 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
         meta:`Código ${posto.codigo} · ${localizacao}${posto.endereco ? ` · ${posto.endereco}` : ""}`,
         summary:[
           { label:"Preço líquido médio", value:afBRL(posto.precoMedio), hint:`preço de tabela médio ${afBRL(posto.precoTabelaMedio)}`, icon:"fuel", tone:"#d68a31" },
-          { label:"Descontos recebidos", value:afBRL(posto.desconto), hint:"já deduzidos do total pago", icon:"trending-up", tone:"#2f8f5b" },
+          { label:"Descontos recebidos", value:afBRL(posto.desconto), hint:"já deduzidos do valor abastecido", icon:"trending-up", tone:"#2f8f5b" },
           { label:"Pago acima da média", value:afPct(posto.diferencaPreco), hint:"diferença do preço médio", icon:"chart", tone:afNum(posto.diferencaPreco) > 0 ? "#e74b4b" : "#2f8f5b" },
           { label:"Custo excedente", value:afBRL(posto.gastoAcimaMedia), hint:"estimativa versus média da frota", icon:"money", tone:"#e74b4b" },
           { label:"Gasto no posto", value:afBRL(posto.total), hint:`${afPlain(posto.abastecimentos)} abastecimentos`, icon:"money", tone:"#4d8fe8" },
@@ -1064,9 +1046,9 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
         rows:afRows(abastecimento.lancamentos).filter((r) => String(r.posto) === String(posto.codigo)),
       };
     }
-    if (detail === "abastecimento") return {
-      title:"Conferência de abastecimentos",
-      meta:`Somente Diesel · ${afPlain(abastecimento.lancamentos?.length)} registros no período`,
+    if (detail === "abastecimento" || detail?.type === "veiculo") return {
+      title:detail?.type === "veiculo" ? `Abastecimentos · ${detail.placa}` : "Conferência de abastecimentos",
+      meta:detail?.type === "veiculo" ? `${abastecimento.combustivelLabel || "Diesel"} · lançamentos da placa no período selecionado` : `${abastecimento.combustivelLabel || "Diesel"} · ${afPlain(abastecimento.lancamentos?.length)} registros no período`,
       interactiveFuel:true,
       columns:[
         { key:"data", label:"Data", render:(r) => afDate(r.data) },
@@ -1081,7 +1063,7 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
         { key:"km", label:"Km rodado", num:true, render:(r) => afPlain(r.km) },
         { key:"media", label:"Km/l", num:true, render:(r) => afPlain(r.media, 2) },
       ],
-      rows: abastecimento.lancamentos,
+      rows: detail?.type === "veiculo" ? abastecimento.lancamentos.filter(r=>r.placa===detail.placa) : abastecimento.lancamentos,
     };
     if (detail === "custos") return {
       title:"Detalhamento de custos",
@@ -1137,7 +1119,7 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
         <div className="fb-top">
           <div className="fb-title">
             <h1>{modoAbastecimento ? "Análise de Abastecimentos" : "Frota BI"}</h1>
-            <div className="sub">{modoAbastecimento ? "Conferência de consumo, preços, veículos e gastos por posto" : "Dashboard executivo de custos, abastecimento, manutenção, lucro e auditoria"}</div>
+            <div className="sub">{modoAbastecimento ? "Identifique aumentos de consumo e acompanhe a evolução de cada veículo" : "Dashboard executivo de custos, abastecimento, manutenção, lucro e auditoria"}</div>
           </div>
           {!modoAbastecimento && (
             <div className="fb-tabs">
@@ -1155,15 +1137,22 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
           )}
         </div>
 
-        <div className="fb-filters-bar">
+        <div className={`fb-filters-bar ${modoAbastecimento ? "fi-filter-layout" : ""}`}>
+          {modoAbastecimento && <div className="fi-presets">{[[1,"Mês anterior fechado"],[3,"Últimos 3 meses fechados"],[6,"Últimos 6 meses fechados"]].map(([months,label])=><button className="btn" key={months} onClick={()=>{
+            const now=new Date(); const start=new Date(now.getFullYear(),now.getMonth()-months,1); const end=new Date(now.getFullYear(),now.getMonth(),0);
+            const iso=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");
+            setDataInicio(iso(start));setDataFim(iso(end));setFilters({...filters,placa,combustivel,centro,fornecedor,modelo,marca,ano,dataInicio:iso(start),dataFim:iso(end)});
+          }}>{label}</button>)}<button className="btn" disabled={loading || !abastecimento.lancamentos?.length} onClick={()=>exportFuelCsv(abastecimento.lancamentos)}>Exportar CSV (Excel)</button></div>}
+
           <div className="fb-filters-row">
             <div className="fb-field"><label>Início</label><input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)}/></div>
             <div className="fb-field"><label>Fim</label><input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)}/></div>
-            <div className="fb-field"><label>Placa</label><input list="af-placas" value={placa} onChange={(e) => setPlaca(e.target.value.toUpperCase())} placeholder="Todas"/></div>
+            {modoAbastecimento && <div className="fb-field"><label htmlFor="fuel-type">Combustível</label><select id="fuel-type" value={combustivel} onChange={e=>setCombustivel(e.target.value)}><option value="diesel">Diesel (todos os tipos)</option><option value="todos">Todos os combustíveis</option>{fuelOptions.combustiveis.map(r=><option key={r.codigo} value={r.codigo}>{r.nome}</option>)}</select></div>}
+            <div className="fb-field"><label htmlFor="fuel-vehicle">Veículo</label>{modoAbastecimento ? <select id="fuel-vehicle" value={placa} onChange={e=>setPlaca(e.target.value)}><option value="">Todos os veículos</option>{placa&&!fuelOptions.placas.includes(placa)&&<option value={placa}>{placa}</option>}{fuelOptions.placas.map(p=><option key={p} value={p}>{p}</option>)}</select> : <input id="fuel-vehicle" list="af-placas" value={placa} onChange={(e) => setPlaca(e.target.value.toUpperCase())} placeholder="Todas"/>}</div>
             <button type="button" className="fb-filters-toggle" onClick={() => setShowAdvanced((v) => !v)}>
               <Icon name="filter" size={13}/> Filtros avançados {showAdvanced ? "▲" : "▼"}
             </button>
-            <button className="btn primary" onClick={applyFilters} style={{ height:32 }}><Icon name="filter" size={13}/> Aplicar</button>
+            <button className="btn primary" onClick={applyFilters} disabled={loading || !dataInicio || !dataFim || dataFim<dataInicio} style={{ height:32 }}><Icon name="filter" size={13}/> Aplicar</button>
             <button className="btn" onClick={clearFilters} style={{ height:32 }}><Icon name="x" size={13}/> Limpar</button>
           </div>
           {showAdvanced && (
@@ -1173,8 +1162,8 @@ const AnaliseFrota = ({ modoAbastecimento = false } = {}) => {
               <div className="fb-field"><label>Modelo</label><input value={modelo} onChange={(e) => setModelo(e.target.value)} placeholder="Todos"/></div>
               <div className="fb-field"><label>Marca</label><input value={marca} onChange={(e) => setMarca(e.target.value)} placeholder="Todas"/></div>
               <div className="fb-field"><label>Ano</label><input value={ano} onChange={(e) => setAno(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="Todos"/></div>
-              <div className="fb-field"><label>Tipo despesa</label><select value={tipoCusto} onChange={(e) => setTipoCusto(e.target.value)}><option value="">Todos</option>{tipoOptions.map((t) => <option key={t} value={t}>{t}</option>)}</select></div>
-              <div className="fb-field"><label>Status</label><select value={situacao} onChange={(e) => setSituacao(e.target.value)}><option value="">Todos</option>{situacaoOptions.map((s) => <option key={s} value={s}>{AF_STATUS_LABEL[s] || s}</option>)}</select></div>
+              {!modoAbastecimento && <div className="fb-field"><label>Tipo despesa</label><select value={tipoCusto} onChange={(e) => setTipoCusto(e.target.value)}><option value="">Todos</option>{tipoOptions.map((t) => <option key={t} value={t}>{t}</option>)}</select></div>}
+              {!modoAbastecimento && <div className="fb-field"><label>Status</label><select value={situacao} onChange={(e) => setSituacao(e.target.value)}><option value="">Todos</option>{situacaoOptions.map((s) => <option key={s} value={s}>{AF_STATUS_LABEL[s] || s}</option>)}</select></div>}
             </div>
           )}
           <datalist id="af-placas">{filterOptions.placas.map((p) => <option key={p} value={p}/>)}</datalist>
