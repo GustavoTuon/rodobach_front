@@ -1,0 +1,328 @@
+.fi {
+  --fi-muted: #a7b1c3;
+  --fi-line: rgba(148, 163, 184, 0.2);
+  color: var(--text, #edf2fa);
+}
+.fi p,
+.fi small,
+.fi-toolbar span {
+  color: var(--fi-muted);
+}
+.fi-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 30px;
+  padding: 28px;
+  border: 1px solid #35466a;
+  border-radius: 18px;
+  background: linear-gradient(
+    115deg,
+    rgba(49, 76, 138, 0.32),
+    rgba(24, 33, 53, 0.15)
+  );
+  margin-bottom: 16px;
+}
+.fi-eyebrow {
+  font-size: 11px;
+  letter-spacing: 1.8px;
+  color: #9ebfff;
+}
+.fi h2 {
+  font-size: 26px;
+  line-height: 1.25;
+  margin: 12px 0;
+}
+.fi p {
+  line-height: 1.6;
+  font-size: 13px;
+}
+.fi-progress {
+  min-width: 210px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 9px;
+}
+.fi-progress strong {
+  font-size: 34px;
+}
+.fi-progress strong span {
+  font-size: 20px;
+  color: var(--fi-muted);
+}
+.fi progress {
+  width: 100%;
+  height: 7px;
+  accent-color: #729dff;
+  border: 0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.fi-missions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.fi-mission {
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  padding: 18px;
+  background: rgba(148, 163, 184, 0.04);
+  border: 1px solid var(--fi-line);
+  border-radius: 13px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+.fi-mission strong {
+  font-size: 26px;
+  grid-row: span 2;
+}
+.fi-mission small {
+  font-size: 12px;
+}
+.fi-mission.riscos strong {
+  color: #ff9696;
+}
+.fi-mission.pendente strong {
+  color: #f1c875;
+}
+.fi-mission.melhora strong {
+  color: #7bd5b0;
+}
+.fi-mission.selected,
+.fi-mission:hover {
+  border-color: #86a7ee;
+  background: rgba(91, 134, 230, 0.12);
+}
+.fi-deltas {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 18px 0;
+  border: 1px solid var(--fi-line);
+  border-radius: 13px;
+}
+.fi-deltas > div {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.fi-deltas strong {
+  font-size: 24px;
+}
+.fi-deltas span {
+  color: var(--fi-muted);
+  font-size: 12px;
+}
+.fi-note {
+  font-size: 12px;
+  padding: 12px 0;
+  color: var(--fi-muted);
+}
+.fi-toolbar {
+  display: flex;
+  gap: 16px;
+  align-items: end;
+  margin: 22px 0 16px;
+  flex-wrap: wrap;
+}
+.fi-toolbar > div {
+  flex: 1;
+}
+.fi h3 {
+  margin: 0 0 5px;
+  font-size: 18px;
+}
+.fi-toolbar span {
+  font-size: 12px;
+}
+.fi-toolbar label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fi-muted);
+}
+.fi-toolbar input,
+.fi-toolbar select {
+  padding: 10px;
+  border: 1px solid var(--fi-line);
+  border-radius: 8px;
+  background: var(--panel, #171c29);
+  color: inherit;
+  min-width: 180px;
+}
+.fi-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.fi-vehicle {
+  border: 1px solid var(--fi-line);
+  border-top: 3px solid #7e8ba6;
+  border-radius: 14px;
+  padding: 19px;
+  background: rgba(148, 163, 184, 0.035);
+}
+.fi-vehicle.alerta {
+  border-top-color: #f18181;
+}
+.fi-vehicle.atencao {
+  border-top-color: #f1c875;
+}
+.fi-vehicle.melhora {
+  border-top-color: #7bd5b0;
+}
+.fi-vehicle header,
+.fi-vehicle footer,
+.fi-coverage {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+.fi-badge {
+  font-size: 10px;
+  border: 1px solid var(--fi-line);
+  padding: 6px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.alerta .fi-badge,
+.alerta .fi-score strong {
+  color: #ff9696;
+}
+.atencao .fi-badge {
+  color: #f1c875;
+}
+.melhora .fi-badge,
+.melhora .fi-score strong {
+  color: #7bd5b0;
+}
+.fi-score {
+  padding: 24px 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fi-score strong {
+  font-size: 28px;
+}
+.fi-score span {
+  font-size: 12px;
+  color: var(--fi-muted);
+}
+.fi-pair {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: rgba(148, 163, 184, 0.06);
+  border-radius: 10px;
+  margin-bottom: 18px;
+}
+.fi-pair div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fi-pair b {
+  font-size: 21px;
+}
+.fi-coverage {
+  font-size: 11px;
+  margin-bottom: 5px;
+}
+.fi-vehicle p {
+  min-height: 42px;
+  font-size: 12px;
+}
+.fi-vehicle footer {
+  border-top: 1px solid var(--fi-line);
+  padding-top: 14px;
+}
+.fi-vehicle footer small {
+  display: block;
+  margin-top: 4px;
+}
+.fi-empty {
+  padding: 35px;
+  text-align: center;
+  border: 1px dashed var(--fi-line);
+  border-radius: 12px;
+}
+.fi-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.fi button:focus-visible {
+  outline: 2px solid #9ebfff;
+  outline-offset: 3px;
+}
+@media (max-width: 1200px) {
+  .fi-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .fi-hero {
+    flex-direction: column;
+    padding: 20px;
+  }
+  .fi-cards,
+  .fi-missions,
+  .fi-deltas {
+    grid-template-columns: 1fr;
+  }
+  .fi-toolbar label {
+    width: 100%;
+  }
+  .fi h2 {
+    font-size: 22px;
+  }
+}
+
+.fb-filters-bar.fi-filter-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+}
+.fi-filter-layout .fi-presets {
+  order: 2;
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.fi-filter-layout .fb-filters-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(130px, 1fr) minmax(
+      190px,
+      1.5fr
+    ) minmax(160px, 1.2fr) auto auto auto;
+  align-items: end;
+  width: 100%;
+}
+.fi-filter-layout .fb-field input,
+.fi-filter-layout .fb-field select {
+  width: 100%;
+  min-width: 0;
+}
+.fi-filter-layout .fb-filters-advanced {
+  order: 1;
+}
+@media (max-width: 1200px) {
+  .fi-filter-layout .fb-filters-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (max-width: 650px) {
+  .fi-filter-layout .fb-filters-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
