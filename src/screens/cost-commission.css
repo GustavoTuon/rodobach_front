@@ -1,11 +1,11 @@
-.ec-commission-nav{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:-8px 0 24px;padding:14px 18px;border:1px solid var(--border);border-radius:12px;background:#111f2d}
-.ec-commission-nav>span{font-size:10px;letter-spacing:1.3px;color:#b6cada;margin-right:auto}
-.ec-commission-nav small{display:inline-block;margin-left:8px;letter-spacing:0;color:#77dec1}
+.ec-commission-nav{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:-8px 0 24px;padding:14px 18px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)}
+.ec-commission-nav>span{font-size:10px;letter-spacing:1.3px;color:var(--text-2);margin-right:auto}
+.ec-commission-nav small{display:inline-block;margin-left:8px;letter-spacing:0;color:var(--accent)}
 .ec-commission{display:grid;gap:20px;min-width:0}
-.ec-commission-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;background:linear-gradient(120deg,#193c3b,#142130);border:1px solid #355d59;padding:24px;border-radius:12px}
+.ec-commission-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;background:linear-gradient(120deg,var(--accent-soft),var(--surface-2));border:1px solid var(--border);padding:24px;border-radius:12px}
 .ec-commission-intro h2{font-size:24px;letter-spacing:-.6px;margin:8px 0}
 .ec-commission-intro p{font-size:13px;color:var(--text-2);margin:0;line-height:1.6}
-.ec-commission-badge{display:inline-block;align-self:flex-start;max-width:100%;padding:7px 11px;border:1px solid #3d665c;background:#1c3736;border-radius:18px;color:#b5ecdc;font-size:11px;white-space:normal}
+.ec-commission-badge{display:inline-block;align-self:flex-start;max-width:100%;padding:7px 11px;border:1px solid var(--border);background:var(--accent-soft);border-radius:18px;color:var(--accent);font-size:11px;white-space:normal}
 .ec-commission-scope{font-size:12px;color:var(--text-2);line-height:1.7;padding:0 3px}
 .ec-commission-layout{display:grid;grid-template-columns:minmax(280px,.8fr) minmax(0,1.5fr);gap:20px;align-items:start}
 .ec-commission-parameters{display:grid;gap:15px}
@@ -15,16 +15,16 @@
 .ec-commission-parameters fieldset{border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;color:var(--text-2);margin:0}
 .ec-commission-parameters fieldset legend{padding:0 5px}
 .ec-commission-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.ec-commission-storage{font-size:11px;color:#a9c4d3;margin:0;line-height:1.6;border-top:1px solid var(--border);padding-top:12px}
+.ec-commission-storage{font-size:11px;color:var(--text-2);margin:0;line-height:1.6;border-top:1px solid var(--border);padding-top:12px}
 .ec-commission-results{display:grid;gap:18px;min-width:0}
 .ec-commission-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.ec-commission-metrics article{border:1px solid var(--border);background:#101d2a;border-radius:10px;padding:17px;min-width:0}
+.ec-commission-metrics article{border:1px solid var(--border);background:var(--surface-2);border-radius:10px;padding:17px;min-width:0}
 .ec-commission-metrics span{font-size:12px;color:var(--text-2);display:block}
 .ec-commission-metrics strong{display:block;font-size:25px;letter-spacing:-.7px;margin:10px 0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
 .ec-commission-metrics small{display:block;font-size:11px;line-height:1.5;color:var(--text-2)}
-.ec-commission-metrics .ec-commission-total{background:#193b37;border-color:#396c5e}
-.ec-commission-total strong{color:#a5eed5}
-.ec-commission-pending{font-size:12px;line-height:1.6;color:#efd7aa;padding-left:18px;margin:15px 0 0}
+.ec-commission-metrics .ec-commission-total{background:var(--accent-soft);border-color:var(--accent-border)}
+.ec-commission-total strong{color:var(--accent)}
+.ec-commission-pending{font-size:12px;line-height:1.6;color:var(--text-2);padding-left:18px;margin:15px 0 0}
 .ec-commission-pending li{margin:5px 0}
 .ec-commission-goal{margin-top:20px;font-size:12px}
 .ec-commission-goal label{display:block;color:var(--text-2);margin-bottom:10px}

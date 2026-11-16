@@ -3,7 +3,7 @@ import React from 'react';
 import {afterEach,expect,it,vi} from 'vitest';
 import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
 import ExpenseReimbursement from './expense-reimbursement.jsx';
-import {downloadExpenseReport} from './expense-report.js';
+import {downloadExpenseReport,matchesReimbursement} from './expense-report.js';
 afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();vi.useRealTimers();});
 
 it('exige referência e data antes de registrar recebimento e salva somente o reembolso',async()=>{
@@ -15,18 +15,20 @@ it('exige referência e data antes de registrar recebimento e salva somente o re
   fireEvent.change(screen.getByLabelText('CT-e / documento de cobrança'),{target:{value:'CT-e 1/1/123'}});
   fireEvent.change(screen.getByLabelText('Data do recebimento'),{target:{value:'2026-09-30'}});
   fireEvent.click(screen.getByRole('button',{name:'Salvar reembolso'}));
-  await waitFor(()=>expect(save).toHaveBeenCalledWith({status:'recebido',customer:'Cliente ERP',document:'CT-e 1/1/123',receivedDate:'2026-09-30',note:''}));
+  await waitFor(()=>expect(save).toHaveBeenCalledWith({status:'recebido',customer:'Cliente ERP',document:'CT-e 1/1/123',erpDocument:null,receivedDate:'2026-09-30',note:''}));
 });
 
-it('busca documentos da viagem e preenche documento e cliente pelo teclado',async()=>{
-  window.RB_API={listPlantaoUnloadingTrips:vi.fn(async()=>({ctes:[{company:'2',series:'1',code:'4762',customerName:'Cliente do ERP'}]}))};
+it('busca CT-e complementar pela despesa e preenche documento e cliente pelo teclado',async()=>{
+  window.RB_API={listPlantaoReimbursementDocuments:vi.fn(async()=>({ctes:[{company:'2',series:'1',code:'4762',customerName:'Cliente do ERP'}]}))};
   const save=vi.fn();
   render(<ExpenseReimbursement record={{id:'a',plate:'ABC1234',unloading:{reimbursement:true,trip:{company:'1',number:'883'}}}} onSave={save}/>);
   const input=screen.getByRole('combobox',{name:'CT-e / documento de cobrança'});
   fireEvent.focus(input);
   await screen.findByRole('option');
-  expect(window.RB_API.listPlantaoUnloadingTrips).toHaveBeenCalledWith('ABC1234',{company:'1',number:'883'});
+  expect(window.RB_API.listPlantaoReimbursementDocuments).toHaveBeenCalledWith('a','');
   fireEvent.change(input,{target:{value:'4762'}});
+  await waitFor(()=>expect(window.RB_API.listPlantaoReimbursementDocuments).toHaveBeenCalledWith('a','4762'));
+  await screen.findByRole('option');
   fireEvent.keyDown(input,{key:'ArrowDown'});
   fireEvent.keyDown(input,{key:'Enter'});
   expect(input.value).toBe('CT-e 4762 · Série 1 · Empresa 2');
@@ -37,12 +39,12 @@ it('busca documentos da viagem e preenche documento e cliente pelo teclado',asyn
 });
 
 it('permite repetir a consulta ao ERP após falha',async()=>{
-  window.RB_API={listPlantaoUnloadingTrips:vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ctes:[]})};
+  window.RB_API={listPlantaoReimbursementDocuments:vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ctes:[]})};
   render(<ExpenseReimbursement record={{id:'b',plate:'ABC1234',unloading:{reimbursement:true,trip:{company:'1',number:'883'}}}} onSave={vi.fn()}/>);
   fireEvent.focus(screen.getByRole('combobox'));
   fireEvent.click(await screen.findByRole('button',{name:'Tentar novamente'}));
-  await screen.findByText('Nenhum documento encontrado. Você pode digitar outro documento de cobrança.');
-  expect(window.RB_API.listPlantaoUnloadingTrips).toHaveBeenCalledTimes(2);
+  await screen.findByText('Nenhum CT-e complementar encontrado para esta placa e período.');
+  expect(window.RB_API.listPlantaoReimbursementDocuments).toHaveBeenCalledTimes(2);
 });
 
 it('mostra falha no formulário e preserva os dados para tentar novamente',async()=>{
@@ -112,4 +114,11 @@ it('exige cliente e impede recebimento com data futura',async()=>{
   fireEvent.click(screen.getByRole('button',{name:'Salvar reembolso'}));
   expect(screen.getByRole('alert').textContent).toContain('sem data futura');
   expect(save).not.toHaveBeenCalled();
+});
+
+it('filtra todos os reembolsos independentemente do pagamento da despesa',()=>{
+  expect(matchesReimbursement({paid:true,reimbursement:{status:'a_cobrar'}},'com_reembolso')).toBe(true);
+  expect(matchesReimbursement({paid:false,reimbursement:{status:'recebido'}},'com_reembolso')).toBe(true);
+  expect(matchesReimbursement({paid:true},'com_reembolso')).toBe(false);
+  expect(matchesReimbursement({paid:true,reimbursement:{status:'a_cobrar'}},'recebido')).toBe(false);
 });

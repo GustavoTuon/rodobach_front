@@ -39,7 +39,8 @@ export default function ExpenseReimbursement({record,onSave,disabled=false}) {
     <div className="mp-cost-filters">
       {value.status!=='nao_aplicavel' && <>
         <label>Cliente do reembolso<input disabled={busy} maxLength={160} value={value.customer} onChange={e=>update('customer',e.target.value)}/></label>
-        <ReimbursementDocument record={record} disabled={busy} value={value.document} onChange={(document,customer)=>setValue(current=>({...current,document,...(customer ? {customer} : {})}))}/>
+        <ReimbursementDocument record={record} disabled={busy} value={value.document} onChange={(document,customer,erpDocument)=>setValue(current=>({...current,document,erpDocument:erpDocument || null,...(customer ? {customer} : {}),...(erpDocument && current.status==='a_cobrar' ? {status:'cobrado'} : {})}))}/>
+        {value.erpDocument && <p className="mp-field-help" role="status">CT-e complementar vinculado ao ERP. Salve para confirmar.</p>}
         {value.status==='recebido' && <label>Data do recebimento<input disabled={busy} type="date" max={today} value={value.receivedDate || ''} onChange={e=>update('receivedDate',e.target.value || null)}/></label>}
         <label>Observações do reembolso<input disabled={busy} maxLength={300} value={value.note} onChange={e=>update('note',e.target.value)}/></label>
       </>}

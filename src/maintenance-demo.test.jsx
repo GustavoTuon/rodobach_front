@@ -163,7 +163,7 @@ it("seleciona fornecedor do sistema e salva nome, código e empresa no históric
     supplierCode: 10,
     supplierCompany: 1,
   });
-  expect(screen.getAllByText("Oficina Central").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("Oficina Central (Cadastrado pelo ERP)").length).toBeGreaterThan(0);
 });
 it("permite fornecedor digitado quando a consulta falha e remove vínculo ao editar", async () => {
   await ready();
@@ -634,7 +634,9 @@ it("conferente consulta status e confere sem editar ou controlar pagamentos", as
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Cancelar'}));
   expect(window.RB_API.checkPlantao).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button',{name:'Marcar como conferido'}));
-  fireEvent.change(within(screen.getByRole('dialog')).getByLabelText('Número do documento no financeiro'),{target:{value:'123'}});
+  window.RB_API.searchPlantaoErpDocuments=vi.fn().mockResolvedValue({documents:[{number:'123',company:'1',series:'A',plate:'ABC1234',amount:100}]});
+  fireEvent.click(screen.getByRole('button',{name:'Buscar documentos'}));
+  fireEvent.click(await screen.findByRole('button',{name:/Documento 123/}));
   fireEvent.click(screen.getByRole('button',{name:'Salvar e conferir'}));
   await waitFor(()=>expect(window.RB_API.checkPlantao).toHaveBeenCalledWith("test",1,{posted:true,erpDocument:'123'}));
   await waitFor(()=>expect(screen.queryByRole('dialog')).toBeNull());
@@ -681,24 +683,26 @@ it("controles autorizados ficam na própria despesa", async () => {
   expect(record).not.toHaveProperty("posted");
   expect(screen.queryByLabelText("Pago — ABC1234")).toBeNull();
   fireEvent.click(screen.getByText("Filtrar lançamentos"));
-  expect(screen.getByLabelText("Pagamento")).toBeTruthy();
+  expect(screen.getByLabelText("Pagamento da despesa")).toBeTruthy();
   await screen.findByRole('button', {name:'Vincular documento ERP'});
   window.RB_API.updatePlantaoControl = vi.fn(async (_id, body) => ({ record: { ...record, ...body, paid: false, version: 2 } }));
   fireEvent.click(screen.getByRole('button', {name:'Vincular documento ERP'}));
   const dialog = screen.getByRole('dialog');
-  fireEvent.change(within(dialog).getByLabelText('Número do documento no financeiro'), {target:{value:'123'}});
-  fireEvent.click(within(dialog).getByLabelText('Lançamento confirmado no ERP'));
+  window.RB_API.searchPlantaoErpDocuments=vi.fn().mockResolvedValue({documents:[{number:'123',company:'1',series:'A',plate:'ABC1234',amount:100}]});
+  fireEvent.click(screen.getByRole('button',{name:'Buscar documentos'}));
+  fireEvent.click(await screen.findByRole('button',{name:/Documento 123/}));
+  expect(within(dialog).getByLabelText('Lançamento confirmado no ERP').checked).toBe(true);
   expect(window.RB_API.updatePlantaoControl).not.toHaveBeenCalled();
   fireEvent.click(within(dialog).getByRole('button', {name:'Salvar lançamento'}));
   await waitFor(() => expect(window.RB_API.updatePlantaoControl).toHaveBeenCalledWith(record.id, { version: 1, posted: true, erpDocument: '123' }, false));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   expect(screen.getByRole('button', {name:'Editar vínculo ERP'})).toBeTruthy();
   expect(screen.getAllByText('Documento financeiro: 123').length).toBeGreaterThan(0);
-  fireEvent.change(screen.getByLabelText("Pagamento"), { target: { value: "true" } });
+  fireEvent.change(screen.getByLabelText("Pagamento da despesa"), { target: { value: "true" } });
   expect(screen.queryByRole("article")).toBeNull();
-  fireEvent.change(screen.getByLabelText("Pagamento"), {target:{value:""}});
+  fireEvent.change(screen.getByLabelText("Pagamento da despesa"), {target:{value:""}});
   await screen.findByRole("article");
-  expect(screen.getByLabelText("Pagamento")).toBeTruthy();
+  expect(screen.getByLabelText("Pagamento da despesa")).toBeTruthy();
 });
 
 it("registra reembolso recebido no detalhe da aba pagamentos", async () => {
@@ -714,7 +718,7 @@ it("registra reembolso recebido no detalhe da aba pagamentos", async () => {
   fireEvent.change(screen.getByLabelText('Data do recebimento'), {target:{value:'2026-09-30'}});
   fireEvent.click(screen.getByRole('button', {name:'Salvar reembolso'}));
   await waitFor(() => expect(window.RB_API.updatePlantaoControl).toHaveBeenCalledWith(record.id, {
-    version:1,reimbursement:{status:'recebido',customer:'Cliente teste',document:'CT-e 123',receivedDate:'2026-09-30',note:''},
+    version:1,reimbursement:{status:'recebido',customer:'Cliente teste',document:'CT-e 123',erpDocument:null,receivedDate:'2026-09-30',note:''},
   }, false));
   await screen.findByText('Reembolsado');
   expect(screen.getByRole('radio', {name:'Reembolso recebido'}).checked).toBe(true);
@@ -817,4 +821,19 @@ it("motorista registra abastecimento com km antes dos valores em sete etapas e a
   fireEvent.click(screen.getByRole("button", {name:"Próximo passo"}));
   expect(screen.getByLabelText("Litros abastecidos").value).toBe("200,5");
   expect(screen.getByLabelText("Litros de ARLA").value).toBe("20,5");
+});
+
+it('abre o reembolso diretamente na lista e permite filtrar despesas com reembolso',async()=>{
+ localStorage.setItem(KEY,JSON.stringify([{id:'reimbursement-action',plate:'ABC1234',amount:100,service:'Descarga',date:new Date().toISOString(),version:1,paid:true,reimbursement:{status:'a_cobrar',customer:'Cliente',document:'',receivedDate:null,note:''}}]));
+ window.RB_AUTH.me.mockResolvedValue({user:{id:42,login:'staff',permissions:{'reembolso-despesas':true}}});
+ render(<MaintenanceDemo/>);
+ const button=await screen.findByRole('button',{name:'Lançar reembolso'});
+ fireEvent.change(screen.getByLabelText('Reembolso'),{target:{value:'aguardando'}});
+ expect(screen.getAllByRole('article')).toHaveLength(1);
+ fireEvent.click(button);
+ const dialog=screen.getByRole('dialog');
+ expect(within(dialog).getByRole('heading',{name:'Lançar reembolso'})).toBeTruthy();
+ expect(within(dialog).getByLabelText('Cliente do reembolso').value).toBe('Cliente');
+ fireEvent.click(within(dialog).getByRole('button',{name:'Fechar'}));
+ expect(screen.queryByRole('dialog')).toBeNull();
 });

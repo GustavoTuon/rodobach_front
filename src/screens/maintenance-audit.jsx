@@ -94,6 +94,7 @@ export default function MaintenanceAudit({api, revision = 0, plan, onClearPlan})
                 <div>Destinatário: {row.numero || '—'}</div>
                 {row.concluido_em && <div>Resposta em: {dateTime(row.concluido_em)}</div>}
                 {row.erro && <div>{row.erro}</div>}
+                {row.dados_novos?.reenvio_autorizado && <div style={{marginTop:6}}>Nova tentativa autorizada em {dateTime(row.dados_novos.reenvio_autorizado.em)} após consulta ao provedor. O resultado original foi preservado.</div>}
                 {row.provedor_id && <div>Protocolo: {row.provedor_id}</div>}
                 {row.provedor_status && <div>Status do provedor: {row.provedor_status}</div>}
                 <details style={{marginTop: 6}}><summary style={{cursor: 'pointer'}}>Ver mensagem registrada</summary><div style={{whiteSpace: 'pre-wrap', marginTop: 8}}>{row.mensagem}</div></details>

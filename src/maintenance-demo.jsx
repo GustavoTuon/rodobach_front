@@ -1,10 +1,12 @@
+import {useExpenseDuplicateWarning} from "./expense-duplicate-warning.jsx";
+import {supplierLabel} from "./expense-supplier-origin.js";
 import ExpensePosting from './expense-posting.jsx';
 import ExpenseDetailStatus from './expense-detail-status.jsx';
 import ExpenseTirePicker from './expense-tire-picker.jsx';
 import ExpenseDetailFacts from './expense-detail-facts.jsx';
 import ExpenseReportDialog from './expense-report-dialog.jsx';
 import ExpenseReimbursement from './expense-reimbursement.jsx';
-import {reimbursementOf,reimbursementLabels} from './expense-report.js';
+import {reimbursementOf,reimbursementLabels,matchesReimbursement} from './expense-report.js';
 import ExpensePaymentDetails from "./expense-payment-details.jsx";
 import SupplierSelect from "./expense-supplier-select.jsx";
 import ExpenseWhatsappSummary from "./expense-whatsapp-summary.jsx";
@@ -375,6 +377,7 @@ function MaintenanceForm({
   canReimburse,
   embedded,
 }) {
+  const duplicateNotice=useExpenseDuplicateWarning();
   const [driverWizard, setDriverWizard] = useState(null);
   const [maintenanceDraft] = useState(()=>readExpenseDraft(user,"maintenance"));
   const [documentType,setDocumentType] = useState(maintenanceDraft?.documentType || "");
@@ -391,6 +394,7 @@ function MaintenanceForm({
   const [completed, setCompleted] = useState(false);
   const [editing, setEditing] = useState(null);
   const [expenseDate, setExpenseDate] = useState(maintenanceDraft?.expenseDate || today);
+  const [reimbursementRecord,setReimbursementRecord] = useState(null);
   const [paymentRecord, setPaymentRecord] = useState(null);
   const [paymentDate, setPaymentDate] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("");
@@ -509,7 +513,7 @@ function MaintenanceForm({
   const scoped = records.filter(
     (r) =>
       (!manager || !sourceFilter || (r.authorProfile || "unknown") === sourceFilter) &&
-      (!manager || !paidFilter || String(r.paid ?? "unknown") === paidFilter) &&
+      (!paidFilter || String(r.paid ?? "unknown") === paidFilter) &&
       (!manager || !postedFilter || String(r.posted ?? "unknown") === postedFilter) &&
       r.plate.includes(normalize(search)) &&
       (!tripFilter || tripKey(recordTrip(r)) === tripFilter) &&
@@ -640,7 +644,7 @@ function MaintenanceForm({
   }
   const matchesStatus = (r,key) => key === "all" || (key === "pending" ? r.paid !== true : key === "unchecked" ? !isExpenseChecked(r) : key === "checked" ? isExpenseChecked(r) : r.posted !== true);
   const visible = scoped
-    .filter(r => !reimbursementFilter || reimbursementOf(r).status === reimbursementFilter)
+    .filter(r => matchesReimbursement(r,reimbursementFilter))
     .filter(
       (r) =>
         matchesStatus(r,filter),
@@ -835,6 +839,7 @@ function MaintenanceForm({
         supplierCode: supplier.codigo ?? null,
         supplierCompany: supplier.empresa ?? null,
       };
+      if(!await duplicateNotice.check(body,editing?.id))return;
       const result = editing
         ? await window.RB_API.updatePlantao(
             editing.id,
@@ -890,7 +895,7 @@ function MaintenanceForm({
                         <h3>{r.service}</h3>
                         {manager && <span className="driver-source-tag">{r.authorProfile === "motorista" ? "Motorista" : r.authorProfile === "colaborador" ? "Colaborador" : "Perfil não registrado"}</span>}
                         {r.supplier && (
-                          <p className="mp-record-supplier">{r.supplier}</p>
+                          <p className="mp-record-supplier">{supplierLabel(r)}</p>
                         )}
                         <p>{r.note || "Sem observação"}</p>
                       </div>
@@ -1116,6 +1121,12 @@ function MaintenanceForm({
           setRecords(items => items.some(item => item.id === record.id) ? items.map(item => item.id === record.id ? record : item) : [record, ...items]);
           setHistory(null);
         }} />}
+      {reimbursementRecord && canReimburse && <MaintenanceDialog onClose={()=>setReimbursementRecord(null)} saving={saving} step="reimbursement"><div className="mp-form mp-payment-modal">
+        <h2 id="mp-edit-title" data-step-title tabIndex={-1}>Lançar reembolso</h2>
+        <p>{reimbursementRecord.plate} · {money(reimbursementRecord.amount)}</p>
+        <ExpenseReimbursement record={reimbursementRecord} disabled={saving} onSave={async value=>{const ok=await updateControl(reimbursementRecord,"reimbursement",value);if(ok)setReimbursementRecord(null);return ok;}}/>
+        <button type="button" className="mp-cancel-edit" disabled={saving} onClick={()=>setReimbursementRecord(null)}>Fechar</button>
+      </div></MaintenanceDialog>}
       {reportOpen && manager && <ExpenseReportDialog records={records} initialFilters={{dateFrom,dateTo,plate:search,trip:tripFilter,paid:paidFilter,posted:postedFilter,reimbursement:reimbursementFilter,text:textSearch,source:sourceFilter,status:filter}} Dialog={MaintenanceDialog} onClose={()=>setReportOpen(false)}/>}
       {receiptView && <MaintenanceDialog onClose={() => setReceiptView(null)} saving={false} step="receipt">
         <div className="mp-form mp-payment-modal"><div className="mp-section-title"><h2 id="mp-edit-title" data-step-title tabIndex={-1}>Comprovante da despesa</h2><button className="mp-close" onClick={() => setReceiptView(null)} aria-label="Fechar comprovante">×</button></div>
@@ -1139,6 +1150,13 @@ function MaintenanceForm({
               <button className="mp-close" type="button" aria-label="Fechar pagamento" disabled={saving || photoBusy} onClick={() => setPaymentRecord(null)}>×</button>
             </header>
             <div className="mp-payment-summary"><span>{paymentRecord.plate} · {paymentRecord.service}</span><strong>{money(paymentRecord.amount)}</strong></div>
+            <section className="mp-payment-recipient" aria-label="Dados para pagamento">
+              <h3>Dados para pagamento</h3>
+              <dl>
+                <div><dt>Nome do titular</dt><dd>{paymentRecord.paymentDetails?.holderName?.trim() || "Não informado"}</dd></div>
+                <div><dt>Chave Pix</dt><dd>{paymentRecord.paymentDetails?.pixKey?.trim() || "Não informada"}</dd></div>
+              </dl>
+            </section>
             <label>Data do pagamento<input type="date" value={paymentDate} required max={today()} disabled={saving || photoBusy} onChange={(e) => setPaymentDate(e.target.value)} /></label>
             <PaymentMethodPicker methods={paymentMethods} value={paymentMethod} onChange={setPaymentMethod} loading={paymentMethodsLoading} disabled={saving || paymentMethodsLoading || Boolean(paymentMethodsError)}/>
             {paymentRecord.paymentMethod && !paymentMethodsLoading && !paymentMethods.some(method => `${method.company}:${method.code}` === paymentMethod) && <p className="mp-field-help">Forma registrada anteriormente: {paymentRecord.paymentMethod.name}. Selecione uma opção ativa para salvar.</p>}
@@ -1428,7 +1446,7 @@ function MaintenanceForm({
                           <dl>
                             {[
                               ["Data da despesa", displayDay(expenseDate)],
-                              ["Fornecedor", supplier.nome || "Não informado"],
+                              ["Fornecedor", supplierLabel(supplier)],
                               ["Tipo de documento", documentTypes[documentType] || "Não informado"],
                               ["Número de fogo", service==='Borracharia' ? tireFireNumber || "Não informado" : "—"],
                               ...(service==='Borracharia' && tire ? [["Pneu vinculado",[tire.positionName,tire.brand,tire.size].filter(Boolean).join(' · ') || 'Identificado no cadastro']] : []),
@@ -1448,6 +1466,7 @@ function MaintenanceForm({
                         </section>
                       )}
                       {step === 2 && <ExpensePaymentDetails required paymentDetails={paymentDetails} setPaymentDetails={setPaymentDetails}/>}
+                      {duplicateNotice.warning}
                       {error && (
                         <div className="mp-feedback error" role="alert">
                           {error}
@@ -1479,7 +1498,7 @@ function MaintenanceForm({
                           fleet.length === 0
                         }
                       >
-                        {saving
+                        {duplicateNotice.warning ? "Aguardando sua decisão…" : saving
                           ? "Salvando…"
                           : step < 2
                             ? "Continuar"
@@ -1542,8 +1561,8 @@ function MaintenanceForm({
               </button>
             </div>
             {manager && !recordsLoading && !recordsError && <ExpenseSummary records={visible} />}
-            <label>Situação do reembolso<select value={reimbursementFilter} onChange={e=>setReimbursementFilter(e.target.value)}><option value="">Todas as situações</option>{Object.entries(reimbursementLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
             <div className="mp-period-filters">
+                <label>Reembolso<select value={reimbursementFilter} onChange={e=>setReimbursementFilter(e.target.value)}><option value="">Todos</option><option value="aguardando">Aguardando reembolso</option><option value="recebido">Reembolsado</option></select></label>
                 <ExpenseTripFilter value={tripFilter} onChange={setTripFilter} options={tripOptions}/>
                 {(
                   <label>
@@ -1579,13 +1598,13 @@ function MaintenanceForm({
             <details className="mp-filter-panel">
               <summary>
                 Filtrar lançamentos{" "}
-                {(search || tripFilter || dateFrom || dateTo || textSearch || paidFilter || postedFilter || sourceFilter) && (
+                {(search || tripFilter || dateFrom || dateTo || textSearch || paidFilter || postedFilter || sourceFilter || reimbursementFilter) && (
                   <span>Filtros ativos</span>
                 )}
               </summary>
               <div className="mp-cost-filters">
                 {manager && <label>Perfil de quem lançou<select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}><option value="">Todos</option><option value="colaborador">Colaborador</option><option value="motorista">Motorista</option><option value="unknown">Perfil não registrado</option></select></label>}
-                {manager && [["Pagamento", paidFilter, setPaidFilter], ["Lançamento", postedFilter, setPostedFilter]].map(([label, value, setter]) => (
+                {[["Pagamento da despesa", paidFilter, setPaidFilter], ...(manager ? [["Lançamento", postedFilter, setPostedFilter]] : [])].map(([label, value, setter]) => (
                   <label key={label}>{label}<select value={value} onChange={(e) => setter(e.target.value)}>
                     <option value="">Todos</option><option value="true">Sim</option><option value="false">Não</option><option value="unknown">Não informado</option>
                   </select></label>
@@ -1599,7 +1618,7 @@ function MaintenanceForm({
                     placeholder="Filtrar lançamentos"
                   />
                 </label>
-                {(search || tripFilter || dateFrom || dateTo || textSearch || paidFilter || postedFilter || sourceFilter) && (
+                {(search || tripFilter || dateFrom || dateTo || textSearch || paidFilter || postedFilter || sourceFilter || reimbursementFilter) && (
                   <button
                     onClick={() => {
                       setSearch(""); setTripFilter("");
@@ -1608,7 +1627,7 @@ function MaintenanceForm({
                       setTextSearch("");
                       setSourceFilter("");
                       setPaidFilter("");
-                      setPostedFilter("");
+                      setPostedFilter(""); setReimbursementFilter("");
                     }}
                   >
                     Limpar filtros
@@ -1639,7 +1658,7 @@ function MaintenanceForm({
                   onClick={() => setFilter(key)}
                 >
                   {label}
-                  <span aria-hidden="true">{scoped.filter(r=>matchesStatus(r,key) && (!reimbursementFilter || reimbursementOf(r).status===reimbursementFilter)).length}</span>
+                  <span aria-hidden="true">{scoped.filter(r=>matchesStatus(r,key) && (matchesReimbursement(r,reimbursementFilter))).length}</span>
                 </button>
               ))}
             </div>
@@ -1668,7 +1687,7 @@ function MaintenanceForm({
                   {records.length > 0 && <button type="button" className="mp-secondary" onClick={() => { setFilter("all"); setReimbursementFilter(""); setSearch(""); setTripFilter(""); setTextSearch(""); setDateFrom(""); setDateTo(""); setSourceFilter(""); setPaidFilter(""); setPostedFilter(""); }}>Mostrar todo o histórico</button>}
                 </div>
               ) : (
-                <ExpenseHistory onPosting={canPost && !user.readOnly ? setPostingRecord : undefined} onReview={canReview && !user.readOnly ? setReviewRecord : undefined} onUndoReview={canReview && !user.readOnly ? record=>{setError("");setUndoReviewRecord(record);} : undefined} onReceipt={showReceipt} reviewDisabled={saving || user.readOnly} expandGroups={canReview && filter === "unchecked"} records={visible} isDriver={isDriver && !manager} currentPlate={expenseAccess?.plate} renderRecord={renderExpenseRecord} />
+                <ExpenseHistory onReimbursement={canReimburse && !user.readOnly ? setReimbursementRecord : undefined} onPosting={canPost && !user.readOnly ? setPostingRecord : undefined} onReview={canReview && !user.readOnly ? setReviewRecord : undefined} onUndoReview={canReview && !user.readOnly ? record=>{setError("");setUndoReviewRecord(record);} : undefined} onReceipt={showReceipt} reviewDisabled={saving || user.readOnly} expandGroups={canReview && filter === "unchecked"} records={visible} isDriver={isDriver && !manager} currentPlate={expenseAccess?.plate} renderRecord={renderExpenseRecord} />
               )}
             </div>
             {!manager && !recordsLoading && !recordsError && <ExpenseSummary records={visible} />}

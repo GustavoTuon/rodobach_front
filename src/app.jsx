@@ -22,6 +22,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/ {
 }; /*EDITMODE-END*/
 
 const NAV = [
+  {id:"adiantamentos",label:"Adiantamentos e saldos (teste)",icon:"money",title:"Controle de adiantamentos e saldos",section:"operacao",permission:"viagens"},
   {id:"bloco-notas",label:"Bloco de notas",icon:"file",title:"Bloco de notas",section:"ferramentas",permission:"bloco-notas"},
   {id:"painel-faturamento",label:"TV · Faturamento",icon:"chart",title:"Faturamento da frota",section:"ferramentas",permission:"faturamento-diario"},
   {id:"manutencao-plantao",label:"Despesas",icon:"wrench",title:"Despesas",subgroup:"frota",section:"frota",permissionsAny:["manutencao-plantao", "conferencia-manutencao", "pagamento-despesas", "lancamento-despesas", "reembolso-despesas"],href:"/manutencao-plantao"},
@@ -214,6 +215,9 @@ const NAV = [
     icon: "check",
     title: "Controle de canhotos",
     section: "operacao",
+  },
+  {
+    id: "colaboradores", label: "Colaboradores", icon: "user", title: "Gestão de colaboradores", subgroup: "frota", section: "frota",
   },
   {
     id: "pneus",
@@ -582,6 +586,9 @@ const App = () => {
     </FinancialScreenGroup>
   );
   switch (currentScreen) {
+    case "colaboradores":
+      body = <window.Colaboradores user={auth.user} />;
+      break;
     case "diretoria":
       body = <Diretoria onNavigate={onNavigate} />;
       break;
@@ -617,6 +624,9 @@ const App = () => {
       break;
     case "ociosidade-frota":
       body = <OciosidadeFrota onNavigate={onNavigate} />;
+      break;
+    case "adiantamentos":
+      body = <Adiantamentos />;
       break;
     case "trafegus":
       body = <Trafegus onNavigate={onNavigate} />;

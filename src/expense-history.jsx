@@ -1,3 +1,4 @@
+import {supplierLabel} from "./expense-supplier-origin.js";
 import {reimbursementOf,reimbursementLabels} from './expense-report.js';
 import React from "react";
 
@@ -26,13 +27,13 @@ export function ExpenseSummary({records}) {
   </section>;
 }
 
-export default function ExpenseHistory({records, isDriver, currentPlate, renderRecord, onReview, onUndoReview, onPosting, onReceipt, reviewDisabled=false, expandGroups=false}) {
+export default function ExpenseHistory({records, isDriver, currentPlate, renderRecord, onReview, onUndoReview, onPosting, onReimbursement, onReceipt, reviewDisabled=false, expandGroups=false}) {
   const sorted = [...records].sort((a,b)=>day(b).localeCompare(day(a)) || String(b.date).localeCompare(String(a.date)));
   function recordRows(rows) {
     return rows.map(row=><article className="mp-expense-row" key={row.id}>
       <details className="mp-expense-detail"><summary>
         <span className="mp-expense-date"><time>{day(row).split("-").reverse().join("/")}</time><span>{row.expenseTime?.slice(0,5) || "Data da despesa"}</span></span>
-        <span className="mp-expense-description"><strong>{row.service}</strong><span>{row.supplier || "Fornecedor não informado"}</span>
+        <span className="mp-expense-description"><strong>{row.service}</strong><span>{supplierLabel(row)}</span>
           <span className="mp-expense-evidence">{row.photoKinds?.invoice || row.hasReceipt ? "Nota anexada" : row.receiptReason ? "Ausência de nota justificada" : "Sem comprovante registrado"}</span>
         </span>
         <span className="mp-expense-amount"><b>{money(Number(row.amount))}</b><span className={`mp-status ${isExpenseChecked(row) ? "checked" : ""}`}>{isExpenseChecked(row) ? "Conferido" : "A conferir"}</span>{row.paid && <small>Pago</small>}{reimbursementOf(row).status !== "nao_aplicavel" && <small className={`mp-reimbursement-badge ${reimbursementOf(row).status}`}>{reimbursementLabels[reimbursementOf(row).status]}</small>}</span>
@@ -40,11 +41,12 @@ export default function ExpenseHistory({records, isDriver, currentPlate, renderR
       </summary>
         {renderRecord(row)}
       </details>
-      {(onReview || onUndoReview || onPosting) && <div className="mp-row-review">
+      {(onReview || onUndoReview || onPosting || onReimbursement) && <div className="mp-row-review">
         <span className={isExpenseChecked(row) ? "mp-review-done" : "mp-review-pending"}>
           {isExpenseChecked(row) ? `Conferido por ${row.checkedBy || "usuário autorizado"}${row.checkedAt ? ` em ${new Date(row.checkedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}` : ""}` : row.paid ? "Pago · conferência pendente" : "Conferência pendente"}
         </span>
         <div>{onReceipt && row.hasReceipt && <button type="button" className="mp-review-receipt" onClick={()=>onReceipt(row)}>Abrir comprovante</button>}
+          {onReimbursement && reimbursementOf(row).status !== "nao_aplicavel" && <button type="button" className="mp-review-receipt" disabled={reviewDisabled} onClick={()=>onReimbursement(row)}>{reimbursementOf(row).document ? "Editar reembolso" : "Lançar reembolso"}</button>}
           {onPosting && <button type="button" className="mp-review-receipt" disabled={reviewDisabled} onClick={()=>onPosting(row)}>{row.erpDocument ? "Editar vínculo ERP" : "Vincular documento ERP"}</button>}
           {onUndoReview && isExpenseChecked(row) && <button type="button" className="mp-review-receipt" disabled={reviewDisabled} onClick={()=>onUndoReview(row)}>Desfazer conferência</button>}
           {onReview && !isExpenseChecked(row) && <button type="button" className="mp-review-confirm" disabled={reviewDisabled} onClick={()=>onReview(row)}>Marcar como conferido</button>}

@@ -1,3 +1,5 @@
+import {useExpenseDuplicateWarning} from "./expense-duplicate-warning.jsx";
+import {supplierLabel} from "./expense-supplier-origin.js";
 import ExpensePaymentDetails from "./expense-payment-details.jsx";
 import SupplierSelect from "./expense-supplier-select.jsx";
 import ExpenseWhatsappSummary from "./expense-whatsapp-summary.jsx";
@@ -132,6 +134,7 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const busy = useRef(false);
+  const duplicateNotice=useExpenseDuplicateWarning();
   const draftWarning = useExpenseDraft(user,"expense",record,{category,plate,date,expenseTime,amount,liters,supplier,location,note,documentNumber,photos,fuelType,customerName,fuelAmount,hasArla,arlaLiters,arlaAmount,receiptReason,unloading,documentType,tireFireNumber,expenseTrip,paymentDetails,supplierSelection},!done && Boolean(category || photos.invoice));
   const knownPhotos=record?.photoKinds || {invoice:record?.hasReceipt};
   const hasPhoto=["odometer","pump","invoice"].some(kind=>photos[kind] !== undefined ? Boolean(photos[kind]) : knownPhotos[kind]);
@@ -190,6 +193,7 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
         arlaLiters: fuel && hasArla ? number(arlaLiters) : null, arlaAmount: fuel && hasArla ? number(arlaAmount) : null,
         photos, fuelAmount: fuel && fuelAmount ? number(fuelAmount) : null,
       };
+      if(!await duplicateNotice.check(body,record?.id))return;
       const result = record ? await window.RB_API.updatePlantao(record.id, { ...body, version: record.version }, manager) : await window.RB_API.createPlantao(body);
       try {clearExpenseDraft(user,"expense",record);} catch { /* Saving the expense already succeeded. */ }
       setSavedRecord(result.record); onSaved(result.record); setDone(true);
@@ -287,13 +291,14 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
           <label>{category === "Descarga" ? "Descreva os custos da descarga" : category === "Outros" ? "Descreva a despesa" : "O que foi feito? — opcional"}<textarea maxLength={300} rows={3} value={note} onChange={e => setNote(e.target.value)} placeholder={category==='Descarga' ? 'Ex.: chapa, movimentação de carga e outros serviços.' : "Conte o que aconteceu para ajudar a conferência."} /></label></>}
         {step === lastStep && <section className="mp-review"><div className="mp-review-total"><span>{category} · {plate}</span><strong>{currency(number(amount))}</strong></div><dl>
           {category==='Descarga' && [["Viagem do ERP",`${unloading.trip.number} · Empresa ${unloading.trip.company}`],["Documento",cteLabel(unloading.cte)],["Itinerário",documentItinerary(unloading.cte)],["Cliente do documento",unloading.cte.customerName],["Reembolso da descarga",unloading.reimbursement ? 'Sim' : 'Não']].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
-          {[["Tipo de documento",documentTypes[documentType] || "Não informado"],["Número de fogo",tireFireNumber || "—"],[fuel ? "Viagem do abastecimento" : "Viagem opcional",category!=="Descarga" ? expenseTrip?.trip?.number || "Sem vínculo" : "—"],["Data", date.split("-").reverse().join("/")], ["Horário da nota", expenseTime || "Não informado"], ["Justificativa sem nota", receiptReason || "—"], ["Combustível", fuelType || "Não informado"], ["Fornecedor", supplier || "Não informado"], ["Local", location || "Não informado"], ...(fuel ? [["Litros", liters], ["Valor do combustível",fuelAmount ? currency(number(fuelAmount)) : "Não informado"]] : []), ...(fuel && hasArla ? [["Litros de ARLA",arlaLiters],["Valor do ARLA",currency(number(arlaAmount))]] : []), ["Hodômetro", odometer ? `${odometer} km` : "Não informado"], ["Comprovante", documentNumber || "Não informado"], ["Foto", hasPhoto ? "Anexada" : "Sem foto"], ["Observação", note || "Sem observação"]].filter(([label]) => (label !== "Combustível" || fuel) && (label !== "Hodômetro" || fuel || odometer) && (label !== "Horário da nota" || fuel || expenseTime)).map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+          {[["Tipo de documento",documentTypes[documentType] || "Não informado"],["Número de fogo",tireFireNumber || "—"],[fuel ? "Viagem do abastecimento" : "Viagem opcional",category!=="Descarga" ? expenseTrip?.trip?.number || "Sem vínculo" : "—"],["Data", date.split("-").reverse().join("/")], ["Horário da nota", expenseTime || "Não informado"], ["Justificativa sem nota", receiptReason || "—"], ["Combustível", fuelType || "Não informado"], ["Fornecedor", supplierLabel({...supplierSelection,nome:supplier})], ["Local", location || "Não informado"], ...(fuel ? [["Litros", liters], ["Valor do combustível",fuelAmount ? currency(number(fuelAmount)) : "Não informado"]] : []), ...(fuel && hasArla ? [["Litros de ARLA",arlaLiters],["Valor do ARLA",currency(number(arlaAmount))]] : []), ["Hodômetro", odometer ? `${odometer} km` : "Não informado"], ["Comprovante", documentNumber || "Não informado"], ["Foto", hasPhoto ? "Anexada" : "Sem foto"], ["Observação", note || "Sem observação"]].filter(([label]) => (label !== "Combustível" || fuel) && (label !== "Hodômetro" || fuel || odometer) && (label !== "Horário da nota" || fuel || expenseTime)).map(([label,value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
         </dl></section>}
         {step === lastStep && <ExpensePaymentDetails paymentDetails={paymentDetails} setPaymentDetails={setPaymentDetails}/>}
+        {duplicateNotice.warning}
         {error && <p className="mp-feedback error" role="alert">{error}</p>}
       </div>
       <footer className="mp-wizard-actions"><button className="mp-cancel-edit" type="button" disabled={saving || photoLoading} onClick={() => step ? (setStep(stepIndexes[stepNumber - 2]),setError("")) : onClose()}>{step ? "Voltar" : "Voltar às despesas"}</button>
-        <button className="mp-submit" type="submit" disabled={saving || photoLoading || user.readOnly}>{saving ? "Enviando…" : step === lastStep ? record ? "Salvar despesa" : "Enviar para conferência" : "Próximo passo"}<span aria-hidden="true">→</span></button>
+        <button className="mp-submit" type="submit" disabled={saving || photoLoading || user.readOnly}>{duplicateNotice.warning ? "Aguardando sua decisão…" : saving ? "Enviando…" : step === lastStep ? record ? "Salvar despesa" : "Enviar para conferência" : "Próximo passo"}<span aria-hidden="true">→</span></button>
         <p>{step === lastStep ? "Seu registro será salvo ao enviar." : `${stepNumber} de ${stepIndexes.length} etapas`}</p></footer>
     </form>}
   </Dialog>;

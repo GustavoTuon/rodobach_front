@@ -5,6 +5,7 @@ export default function ExpensePosting({record,onSave,onClose,saving,review=fals
   const [document,setDocument]=useState(record.erpDocument || '');
   const [posted,setPosted]=useState(record.posted === true);
   const [query,setQuery]=useState(record.document || '');
+  const [series,setSeries]=useState('');
   const [results,setResults]=useState(null),[loading,setLoading]=useState(false),[error,setError]=useState('');
   const request=useRef(0);
   useEffect(()=>()=>{request.current++;},[]);
@@ -12,7 +13,7 @@ export default function ExpensePosting({record,onSave,onClose,saving,review=fals
     const id=++request.current;
     setLoading(true);setError('');setResults(null);
     try {
-      const data=await window.RB_API.searchPlantaoErpDocuments(query.trim());
+      const data=await window.RB_API.searchPlantaoErpDocuments({q:query.trim(),plate:record.plate,series:series.trim()});
       if(id===request.current)setResults(data);
     } catch(error) {if(id===request.current)setError(error.message || 'Não foi possível buscar os documentos. Tente novamente.');}
     finally {if(id===request.current)setLoading(false);}
@@ -24,15 +25,16 @@ export default function ExpensePosting({record,onSave,onClose,saving,review=fals
   }}>
     <header className="mp-section-title"><h2 id="mp-edit-title" data-step-title tabIndex={-1}>{review ? "Conferir despesa e vincular documento" : "Lançamento no ERP"}</h2><button type="button" className="mp-close" aria-label="Fechar lançamento" disabled={saving} onClick={onClose}>×</button></header>
     <div className="mp-posting-summary"><div><strong>{record.plate}</strong><span>{record.supplier}</span></div><strong>{Number(record.amount).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</strong></div>
-    <label>Número do documento no financeiro<input value={document} maxLength={80} disabled={saving} onChange={event=>setDocument(event.target.value)}/></label>
-    <p className="mp-field-help">Digite o número ou selecione um documento de contas a pagar. O documento fiscal da despesa permanece separado.</p>
+    <label>Número do documento no financeiro<input value={document} readOnly placeholder="Selecione um documento na busca"/></label>
+    <p className="mp-field-help">Selecione um documento de contas a pagar da placa {record.plate}. O documento fiscal da despesa permanece separado.</p>
     <div className="mp-posting-search">
-    <label>Buscar no financeiro<input value={query} maxLength={80} disabled={saving} placeholder="Número, fornecedor ou placa" onChange={event=>{request.current++;setLoading(false);setResults(null);setQuery(event.target.value);}} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();if(!saving && !loading && query.trim().length>=2)search();}}}/></label>
-    <button type="button" className="mp-finance-action" disabled={saving || loading || query.trim().length<2} onClick={search}>{loading ? 'Buscando…' : 'Buscar documentos'}</button>
+    <label>Buscar no financeiro<input value={query} maxLength={80} disabled={saving} placeholder="Número ou fornecedor" onChange={event=>{request.current++;setLoading(false);setResults(null);setQuery(event.target.value);}} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();if(!saving && !loading)search();}}}/></label>
+    <label>Série — opcional<input value={series} maxLength={20} disabled={saving} placeholder="Todas as séries" onChange={event=>{request.current++;setLoading(false);setResults(null);setSeries(event.target.value);}} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();if(!saving && !loading)search();}}}/></label>
+    <button type="button" className="mp-finance-action" disabled={saving || loading || !record.plate} onClick={search}>{loading ? 'Buscando…' : 'Buscar documentos'}</button>
     </div>
     {results && <div className="mp-posting-results" aria-label="Documentos financeiros" aria-live="polite">
-      {!results.documents.length && <p>Nenhum documento encontrado. Tente outro número, fornecedor ou placa.</p>}
-      {results.documents.map((item,index)=><button type="button" className="mp-fleet-option" key={index} disabled={saving} onClick={()=>{setDocument(String(item.number || item.document || ''));setResults(null);}}>
+      {!results.documents.length && <p>Nenhum documento encontrado para esta placa. Tente outro número, fornecedor ou série.</p>}
+      {results.documents.map((item,index)=><button type="button" className="mp-fleet-option" key={index} disabled={saving} onClick={()=>{setDocument(String(item.number || item.document || ''));setPosted(true);setResults(null);}}>
         <strong>Documento {item.number} · Empresa {item.company} · Série {item.series || '—'} · Parcela {item.installment}</strong>
         <small>{item.supplier} · {item.plate || 'Sem placa'} · {Number(item.amount).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</small>
         <small>Referência: {item.document || '—'} · Emissão: {item.date ? String(item.date).slice(0,10).split('-').reverse().join('/') : '—'}</small>

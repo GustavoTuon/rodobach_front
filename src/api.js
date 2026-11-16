@@ -102,6 +102,11 @@ window.RB_AUTH = {
 
 // ── API ───────────────────────────────────────────────────────────────────────
 window.RB_API = {
+  listDriverAdvances: () => apiRequest('/viagens/adiantamentos-motoristas'),
+  listColaboradores: (filters={}) => apiRequest(`/frota/colaboradores${buildQuery(filters)}`),
+  getColaborador: codigo => apiRequest(`/frota/colaboradores/${encodeURIComponent(codigo)}`),
+  saveColaboradorRegistro: (codigo,body) => apiRequest(`/frota/colaboradores/${encodeURIComponent(codigo)}/registros/${encodeURIComponent(body.id)}`,{method:'PUT',body:JSON.stringify(body)}),
+  getColaboradorAnexo: (codigo,id,index) => apiRequest(`/frota/colaboradores/${encodeURIComponent(codigo)}/registros/${encodeURIComponent(id)}/anexos/${index}`),
   consultarNcmRateio: (filters = {}) =>
     apiRequest(`/cte/ncm-rateio${buildQuery(filters)}`),
   consultarNfeIbrap: (nota, serie) =>
@@ -247,10 +252,10 @@ window.RB_API = {
     }),
   deleteViagemV2: (id) =>
     apiRequest(`/cargas-viagens-v2/viagens/${id}`, { method: "DELETE" }),
-  saveCargaDocumentosV2: (id, documentos) =>
+  saveCargaDocumentosV2: (id, documentos, bonificacao) =>
     apiRequest(`/cargas-viagens-v2/cargas/${id}/documentos`, {
       method: "PUT",
-      body: JSON.stringify({ documentos }),
+      body: JSON.stringify({ documentos, bonificacao }),
     }),
 
   // ── Financeiro ────────────────────────────────────────────────────────────
@@ -320,6 +325,8 @@ window.RB_API = {
       `/frota/multas/${encodeURIComponent(empresa)}/${encodeURIComponent(codigo)}/auditoria`,
     ),
   getCustoRastreabilidade: (id) => apiRequest(`/financeiro/custos-veiculos/rastreabilidade${buildQuery({id})}`),
+  getCostOperations: (filters = {}) => requestData(`/financeiro/custos-veiculos/evolucao${buildQuery({...filters, operationsOnly:true})}`),
+  getEvolucaoCustosDistance: (filters = {}) => requestData(`/financeiro/custos-veiculos/evolucao${buildQuery({...filters, distanceOnly:true})}`),
   getEvolucaoCustos: (filters = {}) => apiRequest(`/financeiro/custos-veiculos/evolucao${buildQuery(filters)}`),
   getCustosVeiculos: (filters = {}) =>
     apiRequest(`/financeiro/custos-veiculos${buildQuery(filters || {})}`),
@@ -426,11 +433,13 @@ window.RB_API = {
   getPlantaoLocation: plate => apiRequest(`/manutencao-plantao/placas/${encodeURIComponent(plate)}/localizacao`),
   getPlantaoOdometer: (plate, date, time) => apiRequest(`/manutencao-plantao/placas/${encodeURIComponent(plate)}/hodometro${buildQuery({date,time})}`),
   listVeiculosPlantao: () => apiRequest("/manutencao-plantao/placas"),
-  searchPlantaoErpDocuments: (q) => apiRequest(`/manutencao-plantao/documentos-erp${buildQuery({q})}`),
+  searchPlantaoErpDocuments: (filters) => apiRequest(`/manutencao-plantao/documentos-erp${buildQuery(filters)}`),
   listPlantao: (conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}`),
+  checkPlantaoDuplicates: (body) => apiRequest("/manutencao-plantao/duplicidades", {method:"POST",body:JSON.stringify(body)}),
   createPlantao: (body) => apiRequest("/manutencao-plantao/lancamentos", {method:"POST",body:JSON.stringify(body)}),
   listPlantaoPaymentMethods: () => apiRequest('/manutencao-plantao/formas-pagamento'),
   listPlantaoTires: plate => apiRequest(`/manutencao-plantao/placas/${encodeURIComponent(plate)}/pneus`),
+  listPlantaoReimbursementDocuments: (id, number = "") => apiRequest(`/manutencao-plantao/reembolsos/${encodeURIComponent(id)}/documentos?${new URLSearchParams({number})}`),
   listPlantaoUnloadingTrips: (plate, params = {}) => apiRequest(`/manutencao-plantao/placas/${encodeURIComponent(plate)}/descarga-viagens?${new URLSearchParams(params)}`),
   updatePlantaoControl: (id, body, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}/controle`, {method:"PATCH",body:JSON.stringify(body)}),
   updatePlantao: (id, body, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}`, {method:"PUT",body:JSON.stringify(body)}),

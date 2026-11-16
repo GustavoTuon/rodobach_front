@@ -1,9 +1,11 @@
 import React, {useEffect, useRef, useState} from "react";
+import {supplierOrigin} from './expense-supplier-origin.js';
 export default function SupplierSelect({ value, onChange, label = "Fornecedor — obrigatório" }) {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [warnings,setWarnings]=useState([]);
   const [active, setActive] = useState(-1);
   const input = useRef(null);
   useEffect(() => {
@@ -11,12 +13,13 @@ export default function SupplierSelect({ value, onChange, label = "Fornecedor �
     let live = true;
     setLoading(true);
     setError(false);
+    setWarnings([]);
     setOptions([]);
     setActive(-1);
     const timer = setTimeout(() => {
       Promise.resolve().then(() => window.RB_API.searchFornecedoresManutencao(value.nome))
         .then((data) => {
-          if (live) setOptions(data.fornecedores || []);
+          if (live) {setOptions(data.fornecedores || []);setWarnings(data.avisos||[]);}
         })
         .catch(() => {
           if (live) setError(true);
@@ -93,7 +96,8 @@ export default function SupplierSelect({ value, onChange, label = "Fornecedor �
       />
       {open && (
         <div className="mp-fleet-dropdown">
-          <div className="mp-fleet-caption">FORNECEDORES DO SISTEMA</div>
+          <div className="mp-fleet-caption">FORNECEDORES · NORTE E ERP</div>
+          {warnings.map(message=><p key={message} className="mp-fleet-empty" role="status">{message}</p>)}
           {loading && (
             <p className="mp-fleet-empty" role="status">
               Buscando fornecedores…
@@ -111,19 +115,21 @@ export default function SupplierSelect({ value, onChange, label = "Fornecedor �
           >
             {options.map((item, index) => (
               <div
-                key={`${item.empresa}-${item.codigo}`}
+                key={item.codigo!=null?`erp-${item.empresa}-${item.codigo}`:`norte-${item.nome.toLocaleLowerCase()}`}
                 id={`mp-supplier-${index}`}
                 role="option"
                 aria-selected={
-                  value.codigo === item.codigo && value.empresa === item.empresa
+                  item.codigo!=null
+                    ? String(value.codigo)===String(item.codigo)&&String(value.empresa)===String(item.empresa)
+                    : value.codigo==null&&value.nome.trim().toLocaleLowerCase()===item.nome.trim().toLocaleLowerCase()
                 }
                 className={`mp-fleet-option ${active === index ? "is-active" : ""}`}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => choose(item)}
               >
-                <strong>{item.nome}</strong>
+                <strong>{item.nome} <span>({supplierOrigin(item)})</span></strong>
                 <small>
-                  Cód. {item.codigo} · Emp. {item.empresa}
+                  {item.codigo!=null?`Cód. ${item.codigo} · Emp. ${item.empresa}`:'Já utilizado em despesas da Norte. Selecione para reutilizar.'}
                 </small>
               </div>
             ))}
@@ -133,7 +139,7 @@ export default function SupplierSelect({ value, onChange, label = "Fornecedor �
               Nenhum fornecedor encontrado. Use o nome digitado.
             </p>
           )}
-          {value.nome.trim() && (
+          {value.nome.trim() && !options.some(item=>item.codigo==null&&item.nome.trim().toLocaleLowerCase()===value.nome.trim().toLocaleLowerCase()) && (
             <button
               type="button"
               className="mp-supplier-manual"
@@ -141,15 +147,13 @@ export default function SupplierSelect({ value, onChange, label = "Fornecedor �
               onClick={() => choose({ nome: value.nome.trim() })}
             >
               <span aria-hidden="true">+</span>
-              Usar “{value.nome.trim()}” sem cadastro
+              Usar “{value.nome.trim()}” (Cadastrado pela Norte)
             </button>
           )}
         </div>
       )}
       <p className="mp-field-help">
-        {value.codigo != null
-          ? "Fornecedor selecionado no cadastro do sistema."
-          : "Não encontrou? Digite o nome para este lançamento."}
+        {value.nome.trim()?`(${supplierOrigin(value)})${value.codigo==null?' · O nome ficará disponível para outras despesas após salvar.':''}`:'Busque fornecedores do ERP ou já utilizados na Norte. Se não encontrar, digite um novo nome.'}
       </p>
     </div>
   );

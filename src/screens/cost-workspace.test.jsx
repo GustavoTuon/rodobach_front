@@ -4,6 +4,7 @@ import {afterEach,beforeEach,expect,it,vi} from 'vitest';
 import {cleanup,fireEvent,render,screen,waitFor,within} from '@testing-library/react';
 import {EvolucaoCustos} from './evolucao-custos.jsx';
 import {CostFocusActions} from './cost-focus-actions.jsx';
+import {ecFuelType} from './cost-analysis-model.js';
 
 const dates={startDate:'2026-08-01',endDate:'2026-08-31'};
 const launch=(id,placa,valor,extra={})=>({id,placa,valor,data:'2026-08-10',proprietario:'frota',tipoCusto:'Manutencao',fornecedor:'Oficina teste',fornecedorCodigo:'1',descricao:'Reparo',documento:id,...extra});
@@ -16,6 +17,49 @@ beforeEach(()=>{
 });
 afterEach(()=>{cleanup();vi.restoreAllMocks();});
 const navButton=name=>within(screen.getByRole('navigation',{name:'Visões da análise de custos'})).getByRole('button',{name:new RegExp(name)});
+
+it('ao selecionar agosto compara julho e mantém a seleção de mês sem outra consulta financeira',async()=>{
+  window.RB_API.getEvolucaoCustos.mockResolvedValue({...data,period:{startDate:'2026-07-01',endDate:'2026-09-30'},prior:{startDate:'2026-04-01',endDate:'2026-06-30'}});
+  render(<EvolucaoCustos/>);
+  await screen.findByRole('heading',{name:'Resumo executivo'});
+  fireEvent.click(screen.getByRole('button',{name:/ago.*400/}));
+  const summary=screen.getByRole('region',{name:'Resumo executivo'});
+  expect(within(summary).getByText('+300%')).toBeTruthy();
+  expect(screen.getByText(/Comparativo: 01\/07\/2026 a 31\/07\/2026/)).toBeTruthy();
+  expect(screen.queryByText('Remova o mês para comparar períodos')).toBeNull();
+  expect(window.RB_API.getEvolucaoCustos).toHaveBeenCalledOnce();
+});
+
+it('separa diesel e Arla sem consultar novamente e restaura o recorte ao limpar',async()=>{
+  window.RB_API.getEvolucaoCustos.mockResolvedValue({...data,launches:[
+    launch('DIESEL', 'ABC1D23', 500, {tipoCusto:'Abastecimento',descricao:'Diesel S-10'}),
+    launch('ARLA', 'ABC1D23', 70, {tipoCusto:'Abastecimento',descricao:'ARLA 32'}),
+  ]});
+  render(<EvolucaoCustos/>);
+  await screen.findByRole('heading',{name:'Resumo executivo'});
+  fireEvent.click(screen.getByRole('button',{name:/^Filtros/}));
+  fireEvent.click(screen.getByLabelText('Arla'));
+  fireEvent.click(navButton('Documentos'));
+  expect(screen.getByText('ARLA 32')).toBeTruthy();
+  expect(screen.queryByText('Diesel S-10')).toBeNull();
+  expect(globalThis.saveFilters).toHaveBeenLastCalledWith('evolucao-custos',expect.objectContaining({fuel:['Arla']}));
+  fireEvent.click(screen.getByRole('button',{name:'Remover filtro Arla'}));
+  expect(screen.getByText('Diesel S-10')).toBeTruthy();
+  expect(window.RB_API.getEvolucaoCustos).toHaveBeenCalledOnce();
+  expect(ecFuelType({tipoCusto:'Abastecimento',descricao:'Abastecimento operacional'})).toBe('Não identificado');
+  expect(ecFuelType({tipoCusto:'Abastecimento',descricao:'Diesel S-500'})).toBe('Diesel S500');
+});
+
+it('mostra os custos antes da telemetria e consulta KM somente quando necessário',async()=>{
+  window.RB_API.getEvolucaoCustosDistance=vi.fn().mockReturnValue(new Promise(()=>{}));
+  render(<EvolucaoCustos/>);
+  await screen.findByRole('heading',{name:'Resumo executivo'});
+  expect(window.RB_API.getEvolucaoCustos).toHaveBeenCalledWith(expect.objectContaining({includeDistance:false}));
+  expect(window.RB_API.getEvolucaoCustosDistance).not.toHaveBeenCalled();
+  fireEvent.click(navButton('Desvios'));
+  await waitFor(()=>expect(window.RB_API.getEvolucaoCustosDistance).toHaveBeenCalledOnce());
+  expect(screen.getByText('Dados carregados')).toBeTruthy();
+});
 
 it('separa investigações sem novas consultas e mantém filtros e contexto ao sair do foco',async()=>{
   const toggle=vi.fn();
