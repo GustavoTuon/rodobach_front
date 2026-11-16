@@ -720,7 +720,7 @@ it("registra reembolso recebido no detalhe da aba pagamentos", async () => {
   await waitFor(() => expect(window.RB_API.updatePlantaoControl).toHaveBeenCalledWith(record.id, {
     version:1,reimbursement:{status:'recebido',customer:'Cliente teste',document:'CT-e 123',erpDocument:null,receivedDate:'2026-09-30',note:''},
   }, false));
-  await screen.findByText('Reembolsado');
+  await within(screen.getByRole('article')).findByText('Reembolsado');
   expect(screen.getByRole('radio', {name:'Reembolso recebido'}).checked).toBe(true);
 });
 
