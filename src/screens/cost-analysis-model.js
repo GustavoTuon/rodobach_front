@@ -31,6 +31,7 @@ export function ecDocumentRows(rows) {
   }
   for(const document of documents.values()) {
     document.valor=Math.round((document.valor+Number.EPSILON)*100)/100;
+    if(document.sourceRows.some(row=>Array.isArray(row.fuelProducts)))document.fuelProducts=[...new Set(document.sourceRows.flatMap(row=>row.fuelProducts||[]))];
     for(const field of ['descricao','tipoCusto','historico'])document[field]=[...new Set(document.sourceRows.map(row=>row[field]).filter(Boolean))].join(' / ');
     document.data=document.sourceRows.map(row=>row.data).filter(Boolean).sort()[0];
   }
@@ -57,4 +58,20 @@ export function ecAlerts(rows,previous,monthSelected) {
     if(changes[0]) alerts.push({label:'Variação de custo',text:`${changes[0].name} aumentou ${ecPct(changes[0].change)} frente ao período anterior equivalente.`,attention:true});
   }
   return alerts;
+}
+
+// ERP descriptions are not always specific; never assume unidentified fuel is diesel.
+export function ecFuelType(row) {
+  if(Array.isArray(row.fuelProducts)) {
+    const types=[...new Set(row.fuelProducts.map(product=>ecFuelType({tipoCusto:'Abastecimento',descricao:product})))];
+    return types.length>1?'Misto (documento com vários produtos)':types[0]||'Não identificado';
+  }
+  const text=String(row.fuelType||row.tipoCombustivel||`${row.descricao||''} ${row.historico||''}`).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  if(/\barla\b/.test(text))return /diesel|gasolina|etanol|alcool/.test(text)?'Combustível + Arla (misto)':'Arla';
+  if(row.tipoCusto!=='Abastecimento')return '';
+  if(/diesel/.test(text))return /s[ -]?10(?!\d)/.test(text)?'Diesel S10':/s[ -]?500/.test(text)?'Diesel S500':'Diesel (não especificado)';
+  if(/gasolina/.test(text))return 'Gasolina';
+  if(/etanol|alcool/.test(text))return 'Etanol';
+  if(/\bgnv\b|gas natural/.test(text))return 'GNV';
+  return 'Não identificado';
 }

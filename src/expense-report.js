@@ -26,3 +26,5 @@ export function downloadExpenseReport(rows, columns=expenseReportColumns) {
   const link=document.createElement('a');link.href=url;link.download='despesas-filtradas.csv';
   document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+
+export const matchesReimbursement = (row, filter) => !filter || (filter === "aguardando" ? ["a_cobrar","cobrado"].includes(reimbursementOf(row).status) : filter === "com_reembolso" ? reimbursementOf(row).status !== "nao_aplicavel" : reimbursementOf(row).status === filter);

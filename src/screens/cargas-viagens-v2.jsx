@@ -15,6 +15,7 @@ const CV2_STATUS = {
 };
 
 const CV2_FINANCIAL = {
+  bonificacao: { label: "Bonificação", tone: "bonus" },
   sem_cte: { label: "Sem CT-e", tone: "neutral" },
   sem_titulo: { label: "Sem faturamento", tone: "neutral" },
   em_aberto: { label: "Em aberto", tone: "open" },
@@ -31,7 +32,9 @@ const CV2_TODAY = () => new Date().toISOString().slice(0, 10);
 const cv2Money = (value) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const cv2Weight = (value) => `${Number(value || 0).toLocaleString("pt-BR")} kg`;
 const cv2Date = (value) => value ? new Date(`${String(value).slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR") : "—";
-const cv2Error = (error) => error?.message || "Não foi possível concluir a operação.";
+const cv2Error = (error) => [502,503,504].includes(error?.status)
+  ? 'O servidor está temporariamente indisponível. Não foi possível confirmar o salvamento. Suas alterações continuam nesta janela; confira o registro antes de tentar novamente.'
+  : error?.message || "Não foi possível concluir a operação.";
 const cv2StoredArray = (key, fallback) => {
   try { const value = JSON.parse(window.localStorage.getItem(key)); return Array.isArray(value) ? value : fallback; }
   catch { return fallback; }
@@ -69,6 +72,7 @@ function Cv2FinancialStatus({ value }) {
 }
 
 function Cv2TripBilling({ financeiro }) {
+  if (financeiro?.status === 'bonificacao') return <section className="cv2-billing"><div className="cv2-billing-head"><div><h3>Frete bonificado</h3><p>As cargas desta viagem estão marcadas como bonificação, sem CT-e ou faturamento vinculado.</p></div><Cv2FinancialStatus value={financeiro}/></div></section>;
   const parcelas = financeiro?.parcelas || [];
   const total = Number(financeiro?.valorTotal || 0);
   const aberto = Number(financeiro?.valorAberto || 0);
@@ -398,6 +402,9 @@ export function Cv2CteModal({ carga, onClose, onSaved }) {
   const searchVersion = useRef(0);
   useEffect(() => () => { searchVersion.current += 1; }, []);
   const [documents, setDocuments] = useState(carga.documentos || []);
+  const [bonificacao, setBonificacao] = useState(carga.bonificacao === true);
+  const bonusChanged = bonificacao !== (carga.bonificacao === true);
+  const bonusConflict = documents.some(cv2IsTransportDocument) || selected.some(cv2IsTransportDocument);
   const removedDocuments = (carga.documentos || []).filter(doc => !documents.includes(doc));
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -443,13 +450,24 @@ export function Cv2CteModal({ carga, onClose, onSaved }) {
   const save = async () => {
     if (saving || loading) return;
     setSaving(true); setError("");
-    try { onSaved(await window.RB_API.saveCargaDocumentosV2(carga.id, mergeDocuments(documents, selected))); }
+    try {
+      const docs = mergeDocuments(documents, selected);
+      onSaved(await (bonificacao || carga.bonificacao
+        ? window.RB_API.saveCargaDocumentosV2(carga.id, docs, bonificacao)
+        : window.RB_API.saveCargaDocumentosV2(carga.id, docs)));
+    }
     catch (err) { setError(cv2Error(err)); }
     finally { setSaving(false); }
   };
   return <Cv2Modal className="cv2-cte-modal" title={`Gerenciar CT-es · ${carga.codigo}`} subtitle={`${carga.cliente} · ${carga.origem}/${carga.ufOrigem} → ${carga.destino}/${carga.ufDestino}`} onClose={() => { if (!saving) onClose(); }}>
     <div className="cv2-modal-body">
       {error && <div className="cv2-alert error">{error}</div>}
+      <section className={`cv2-bonus-option ${bonificacao ? 'selected' : ''}`}>
+        <div><strong>Frete bonificado</strong><p>{bonificacao ? 'Esta carga será identificada como bonificação, sem exigir CT-e ou orçamento.' : 'Não haverá documento para este frete? Marque como bonificação.'}</p></div>
+        <button type="button" className="btn" aria-pressed={bonificacao} disabled={saving || loading || (!bonificacao && bonusConflict)} onClick={()=>{resetSearch();setBonificacao(value=>!value);}}>{bonificacao ? '✓ Bonificação marcada' : 'Marcar bonificação'}</button>
+        {bonusConflict && <small>Para marcar como bonificação, desvincule os CT-es e orçamentos e limpe a seleção da pesquisa.</small>}
+      </section>
+      {!bonificacao && <>
       <div className="cv2-cte-modes" aria-label="Forma de pesquisa">
         <button type="button" className="btn" aria-pressed={!batch} disabled={saving} onClick={() => { resetSearch(); setBatch(false); }}>Número / chave</button>
         <button type="button" className="btn" aria-pressed={batch} disabled={saving} onClick={() => { resetSearch(); setBatch(true); }}>Placa e data</button>
@@ -482,13 +500,14 @@ export function Cv2CteModal({ carga, onClose, onSaved }) {
       </button>)}
       </div>
       {hasMore && <button type="button" className="btn" disabled={loading || saving} onClick={() => search(true)}>{loading ? "Buscando..." : "Carregar mais resultados"}</button>}
+      </>}
       <div className="cv2-doc-list"><b>Documentos da carga · {documents.filter(cv2IsTransportDocument).length} CT-e(s) / orçamento(s)</b>
-        {!documents.length && <span className="cv2-cte-empty">Nenhum documento selecionado.<small>Pesquise acima para adicionar os documentos desta carga.</small></span>}
+        {!documents.length && <span className="cv2-cte-empty">{bonificacao ? 'Frete bonificado · sem documento' : 'Nenhum documento selecionado.'}<small>{bonificacao ? 'Salve para aplicar a bonificação à carga e atualizar a situação da viagem.' : 'Pesquise acima para adicionar os documentos desta carga.'}</small></span>}
         {documents.map((doc, index) => <div key={`${doc.tipo}-${doc.numero}-${index}`}><span className="cv2-doc-type">{doc.tipo}</span><strong>{doc.numero || "Sem número"}{doc.serie ? ` · Série ${doc.serie}` : ""}{doc.empresa ? ` · Empresa ${doc.empresa}` : ""}</strong><small>{doc.chave ? `Chave ${doc.chave}` : doc.observacoes}</small><button type="button" disabled={saving} aria-label={`Desvincular ${doc.tipo} ${doc.numero}${doc.serie ? ` série ${doc.serie}` : ""}${doc.empresa ? ` empresa ${doc.empresa}` : ""}`} onClick={() => setDocuments(current => current.filter((_, i) => i !== index))}>Desvincular</button></div>)}
       </div>
       {!!removedDocuments.length && <div className="cv2-alert info" role="status"><b>Vínculos que serão removidos ao salvar:</b> {removedDocuments.map(doc => `${doc.tipo} ${doc.numero || "sem número"}`).join(', ')}.<p>A carga e a viagem serão mantidas. Os documentos e títulos no ERP não serão alterados. As NF-es permanecem vinculadas até que você as remova individualmente.</p><button type="button" className="btn" disabled={saving} onClick={() => setDocuments(current => [...current, ...removedDocuments])}>Desfazer remoções</button></div>}
     </div>
-    <footer className="cv2-modal-actions"><button type="button" className="btn" disabled={saving} onClick={onClose}>Cancelar</button><button type="button" className="btn primary" onClick={save} disabled={saving || loading || (!documents.length && !removedDocuments.length && !selected.length)}>{saving ? "Salvando..." : removedDocuments.length ? "Salvar alterações" : "Vincular documentos"}</button></footer>
+    <footer className="cv2-modal-actions"><button type="button" className="btn" disabled={saving} onClick={onClose}>Cancelar</button><button type="button" className="btn primary" onClick={save} disabled={saving || loading || (bonificacao && bonusConflict) || (!bonificacao && !bonusChanged && !documents.length && !removedDocuments.length && !selected.length)}>{saving ? "Salvando..." : bonificacao ? "Salvar bonificação" : bonusChanged || removedDocuments.length ? "Salvar alterações" : "Vincular documentos"}</button></footer>
   </Cv2Modal>;
 }
 
@@ -524,7 +543,7 @@ const cv2Escape = (value) => String(value ?? "—").replace(/[&<>"']/g, (char) =
 }[char]));
 const cv2Route = (item) => `${[item.origem, item.ufOrigem].filter(Boolean).join("/") || "—"} → ${[item.destino, item.ufDestino].filter(Boolean).join("/") || "—"}`;
 const cv2PrintCell = (label, value, detail = "") => `<div class="cell"><span>${cv2Escape(label)}</span><b>${cv2Escape(value || "—")}</b>${detail ? `<small>${cv2Escape(detail)}</small>` : ""}</div>`;
-const cv2CteNumbers = (carga) => (carga.documentos || [])
+const cv2CteNumbers = (carga) => carga.bonificacao ? "Bonificação" : (carga.documentos || [])
   .filter(cv2IsTransportDocument)
   .map((doc) => `${doc.tipo === "Orçamento" ? "Orç. " : ""}${String(doc.numero || "").trim()}`)
   .filter(Boolean)
@@ -776,7 +795,7 @@ export function Cv2TripDetails({ viagem: initialViagem, onClose, onLinkCte, onDu
       <Cv2TripBilling financeiro={viagem.financeiro} />
       <section className="cv2-erp-link"><div><span>Documento para impressão</span><strong>{viagem.documentoErp ? `${cv2ErpLabel(viagem.documentoErp)} ${viagem.documentoErp.numero}` : "Viagem frota / carta frete não vinculada"}</strong><small>{viagem.documentoErp ? `Empresa ${viagem.documentoErp.empresa}${viagem.documentoErp.serie ? ` · Série ${viagem.documentoErp.serie}` : ""}` : "Consulte o ERP e selecione o documento desta placa."}</small></div><button className="btn primary" onClick={()=>setLinking(true)}>{viagem.documentoErp?"Gerenciar vínculo":"Vincular viagem / carta frete"}</button></section>
       <h3 className="cv2-subtitle">Cargas vinculadas</h3>
-      <div className="cv2-linked-loads">{viagem.cargas.map((carga) => { const hasCte = (carga.documentos || []).some(cv2IsTransportDocument); return <div key={carga.id}><div><strong>{carga.codigo} · {carga.cliente}</strong><span>{carga.origem}/{carga.ufOrigem} → {carga.destino}/{carga.ufDestino}</span><small>CT-es: {cv2CteNumbers(carga) || "Nenhum vinculado"}</small></div><div className="cv2-linked-statuses"><Cv2Status value={carga.status} /><Cv2FinancialStatus value={carga.financeiro} /><button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => onLinkCte(carga)}><Icon name="file" size={13} /> {hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button><Cv2PrintLoadsButton ids={[carga.id]}>Imprimir carga</Cv2PrintLoadsButton>{onDuplicateCarga && <button className="btn" onClick={() => onDuplicateCarga(carga)}>Duplicar carga</button>}</div></div>; })}</div>
+      <div className="cv2-linked-loads">{viagem.cargas.map((carga) => { const hasCte = (carga.documentos || []).some(cv2IsTransportDocument); return <div key={carga.id}><div><strong>{carga.codigo} · {carga.cliente}</strong><span>{carga.origem}/{carga.ufOrigem} → {carga.destino}/{carga.ufDestino}</span><small>{carga.bonificacao ? "Frete bonificado" : `CT-es: ${cv2CteNumbers(carga) || "Nenhum vinculado"}`}</small></div><div className="cv2-linked-statuses"><Cv2Status value={carga.status} /><Cv2FinancialStatus value={carga.financeiro} /><button className={`btn ${hasCte || carga.bonificacao ? "" : "primary"}`} onClick={() => onLinkCte(carga)}><Icon name="file" size={13} /> {carga.bonificacao ? "Gerenciar bonificação" : hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button><Cv2PrintLoadsButton ids={[carga.id]}>Imprimir carga</Cv2PrintLoadsButton>{onDuplicateCarga && <button className="btn" onClick={() => onDuplicateCarga(carga)}>Duplicar carga</button>}</div></div>; })}</div>
     </div>
     <footer className="cv2-modal-actions"><button className="btn" onClick={onClose}>Fechar</button><Cv2ItineraryButton viagemId={viagem.id} disabled={!viagem.cargas?.length} /><Cv2PrintLoadsButton viagemId={viagem.id} disabled={!viagem.cargas?.length}>Imprimir cargas da viagem</Cv2PrintLoadsButton><button className="btn primary" onClick={() => cv2PrintTrip(viagem)}>Imprimir folha da viagem</button></footer>
   </Cv2Modal>;
@@ -955,7 +974,7 @@ const CargasViagensV2 = ({ user }) => {
     return <div className="cv2-row-actions">
       <button className="btn" disabled={duplicating} onClick={() => openDuplicateCarga(carga)}>Duplicar carga</button>
       {carga.status === "aguardando_viagem" && <button className="btn primary" onClick={() => openViagemForm(carga.id)}>Programar veículo</button>}
-      <button className={`btn ${hasCte ? "" : "primary"}`} onClick={() => setModal({ type: "cte", item: carga })}>{hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button>
+      <button className={`btn ${hasCte || carga.bonificacao ? "" : "primary"}`} onClick={() => setModal({ type: "cte", item: carga })}>{carga.bonificacao ? "Gerenciar bonificação" : hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button>
       <details className="cv2-more"><summary aria-label="Mais ações">•••</summary><div>
         <button onClick={() => cv2PrintLoad(carga)}><Icon name="file" size={13} /> Imprimir folha da carga</button>
         <button onClick={() => setModal({ type: "carga", item: carga })}>Editar carga</button>

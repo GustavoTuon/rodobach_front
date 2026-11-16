@@ -143,3 +143,29 @@ it('preserva CT-e anterior, adiciona dois novos e evita duplicar CT-es e NF-es',
   expect(docs.filter(doc => doc.tipo === 'NF-e')).toHaveLength(1);
   expect(docs[0]).toEqual(original);
 });
+it('marca bonificação sem documentos, preserva NF-e e mantém a opção após falha',async()=>{
+  window.React=React;const {Cv2CteModal}=await import('./cargas-viagens-v2.jsx');
+  const nfe={tipo:'NF-e',numero:'55'};
+  const save=vi.fn().mockRejectedValueOnce(Object.assign(new Error('Erro HTTP 502'),{status:502})).mockResolvedValue({id:1,bonificacao:true,documentos:[nfe]});
+  window.RB_API={saveCargaDocumentosV2:save};
+  render(<Cv2CteModal carga={{id:1,codigo:'C-1',documentos:[nfe]}} onClose={()=>{}} onSaved={()=>{}}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Marcar bonificação'}));
+  expect(screen.queryByRole('button',{name:'Pesquisar'})).toBeNull();
+  fireEvent.click(screen.getByRole('button',{name:'Salvar bonificação'}));
+  await screen.findByText(/O servidor está temporariamente indisponível/);
+  expect(screen.getByRole('button',{name:'✓ Bonificação marcada'}).getAttribute('aria-pressed')).toBe('true');
+  fireEvent.click(screen.getByRole('button',{name:'Salvar bonificação'}));
+  await waitFor(()=>expect(save).toHaveBeenLastCalledWith(1,[nfe],true));
+});
+it('desmarca bonificação sem exigir documento e bloqueia conflito com CT-e',async()=>{
+  window.React=React;const {Cv2CteModal}=await import('./cargas-viagens-v2.jsx');
+  const save=vi.fn().mockResolvedValue({id:1,bonificacao:false,documentos:[]});window.RB_API={saveCargaDocumentosV2:save};
+  render(<Cv2CteModal carga={{id:1,codigo:'C-1',bonificacao:true,documentos:[]}} onClose={()=>{}} onSaved={()=>{}}/>);
+  fireEvent.click(screen.getByRole('button',{name:'✓ Bonificação marcada'}));
+  fireEvent.click(screen.getByRole('button',{name:'Salvar alterações'}));
+  await waitFor(()=>expect(save).toHaveBeenCalledWith(1,[],false));
+  cleanup();render(<Cv2CteModal carga={{id:2,codigo:'C-2',documentos:[{tipo:'CT-e',numero:'10'}]}} onClose={()=>{}} onSaved={()=>{}}/>);
+  expect(screen.getByRole('button',{name:'Marcar bonificação'}).disabled).toBe(true);
+  fireEvent.click(screen.getByRole('button',{name:'Desvincular CT-e 10'}));
+  expect(screen.getByRole('button',{name:'Marcar bonificação'}).disabled).toBe(false);
+});

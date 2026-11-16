@@ -5,7 +5,8 @@
 .mp-posting-summary span { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .mp-posting-summary > strong { white-space: nowrap; }
 .mp-posting-modal .mp-field-help { margin: 8px 0 0; line-height: 1.6; }
-.mp-posting-search { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; margin: 24px 0; }
+.mp-posting-search { display: grid; grid-template-columns: minmax(0, 1fr) minmax(100px, .6fr); align-items: end; gap: 12px; margin: 24px 0; }
+.mp-posting-search > button { grid-column: 1 / -1; }
 .mp-app .mp-posting-search .mp-finance-action { min-height: 46px; }
 .mp-app .mp-posting-modal .mp-posted-action { display: flex; justify-content: flex-start; width: 100%; box-sizing: border-box; gap: 12px; padding: 16px; text-align: left; }
 .mp-app .mp-posting-modal .mp-posted-action input { width: 20px; height: 20px; min-height: 20px; flex: 0 0 20px; margin: 0; padding: 0; border-radius: 4px; cursor: pointer; }

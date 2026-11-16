@@ -72,14 +72,14 @@ describe('interações da análise',()=>{
    window.RB_API={getEvolucaoCustos:query,getCustosVeiculosFiltros:vi.fn().mockResolvedValue({veiculos:[]})};
    const Page=window.EvolucaoCustos;
    const first=render(<Page/>);
-   await waitFor(()=>expect(first.container.querySelectorAll('.ec-multi-menu input')).toHaveLength(4));
+   await waitFor(()=>expect(first.container.querySelectorAll('.ec-main-grid .ec-multi-menu input')).toHaveLength(4));
    first.container.querySelectorAll('.ec-multi').forEach(d=>d.setAttribute('open',''));
-   first.container.querySelectorAll('.ec-multi-menu input').forEach(input=>fireEvent.click(input));
+   first.container.querySelectorAll('.ec-main-grid .ec-multi-menu input').forEach(input=>fireEvent.click(input));
    await waitFor(()=>expect(saved.plate).toHaveLength(2));
    expect(saved.category).toHaveLength(2);expect(query).toHaveBeenCalledTimes(1);
    first.unmount();
    const second=render(<Page/>);
-   await waitFor(()=>expect(second.container.querySelectorAll('.ec-multi-menu input:checked')).toHaveLength(4));
+   await waitFor(()=>expect(second.container.querySelectorAll('.ec-main-grid .ec-multi-menu input:checked')).toHaveLength(4));
    expect(query).toHaveBeenCalledTimes(2);
    expect(saved.dates).toEqual({startDate:'2026-08-01',endDate:'2026-08-31'});
  });

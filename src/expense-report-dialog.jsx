@@ -1,5 +1,5 @@
 import React,{useState} from 'react';
-import {downloadExpenseReport,expenseReportColumns,reimbursementLabels,reimbursementOf,reportExpenseDate} from './expense-report.js';
+import {downloadExpenseReport,expenseReportColumns,reimbursementLabels,reportExpenseDate,matchesReimbursement} from './expense-report.js';
 import ExpenseTripFilter from './expense-trip-filter.jsx';
 
 const empty={dateFrom:'',dateTo:'',plate:'',trip:'',service:'',paid:'',checked:'',posted:'',reimbursement:'',text:'',source:'',status:'all'};
@@ -17,7 +17,7 @@ export function filterReportRecords(records,filters) {
       && (!f.posted || String(row.posted ?? 'unknown')===f.posted)
       && (!f.checked || String(Boolean(row.checked))===f.checked)
       && (!f.source || (row.authorProfile || 'unknown')===f.source)
-      && (!f.reimbursement || reimbursementOf(row).status===f.reimbursement)
+      && (matchesReimbursement(row,f.reimbursement))
       && (f.status==='all' || (f.status==='pending' ? row.paid!==true : f.status==='unposted' ? row.posted!==true : f.status==='checked' ? Boolean(row.checked) : !row.checked))
       && normalize([row.supplier,row.document,row.author,row.note,row.tireFireNumber,trip?.number,row.service,row.unloading?.cte?.number || row.unloading?.cte?.code,row.unloading?.cte?.customerName].join(' ')).includes(normalize(f.text));
   });
@@ -47,7 +47,7 @@ export default function ExpenseReportDialog({records,initialFilters,Dialog,onClo
         <ExpenseTripFilter value={filters.trip} onChange={value=>set('trip',value)} options={trips}/>
         <label>Tipo de despesa<select value={filters.service} onChange={e=>set('service',e.target.value)}><option value="">Todos os tipos</option>{services.map(service=><option key={service}>{service}</option>)}</select></label>
         {[['paid','Pagamento'],['checked','Conferência'],['posted','Lançado no ERP']].map(([key,label])=><label key={key}>{label}<select value={filters[key]} onChange={e=>set(key,e.target.value)}><option value="">Todos</option><option value="true">Sim</option><option value="false">Não</option>{key!=='checked' && <option value="unknown">Não informado</option>}</select></label>)}
-        <label>Reembolso<select value={filters.reimbursement} onChange={e=>set('reimbursement',e.target.value)}><option value="">Todas as situações</option>{Object.entries(reimbursementLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+        <label>Reembolso<select value={filters.reimbursement} onChange={e=>set('reimbursement',e.target.value)}><option value="">Todas as situações</option><option value="aguardando">Aguardando reembolso (todos os pendentes)</option><option value="com_reembolso">Com reembolso (todos)</option>{Object.entries(reimbursementLabels).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
         <label>Perfil de quem lançou<select value={filters.source} onChange={e=>set('source',e.target.value)}><option value="">Todos</option><option value="colaborador">Colaborador</option><option value="motorista">Motorista</option><option value="unknown">Perfil não registrado</option></select></label>
         <label>Pendência<select value={filters.status} onChange={e=>set('status',e.target.value)}><option value="all">Todas</option><option value="pending">Aguardando pagamento</option><option value="unposted">Aguardando lançamento</option><option value="unchecked">Aguardando conferência</option><option value="checked">Conferidas</option></select></label>
         <label>Buscar fornecedor, documento ou descrição<input value={filters.text} onChange={e=>set('text',e.target.value)}/></label>

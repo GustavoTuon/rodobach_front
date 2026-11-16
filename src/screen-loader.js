@@ -1,5 +1,7 @@
 import { trackLoadingActivity } from "./loading-activity.js";
 export const SCREEN_FILES = {
+  adiantamentos: "adiantamentos",
+  colaboradores: "colaboradores",
   "bloco-notas": "bloco-notas",
   "painel-faturamento": "painel-faturamento",
   compras: "compras",

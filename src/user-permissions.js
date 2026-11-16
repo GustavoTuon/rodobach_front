@@ -28,6 +28,7 @@ export const PERMISSION_GROUPS = [
     item("abastecimentos", "Abastecimentos", "Análise dos abastecimentos da frota."),
     item("precos_combustivel", "Preços dos Postos", "Consulta e cadastro de preços combinados de combustível."),
     item("pneus", "Pneus", "Controle e movimentação de pneus."),
+    item("colaboradores", "Colaboradores", "Histórico, ocorrências e entregas dos colaboradores."),
     item("multas_frota", "Multas", "Controle de multas da frota."),
     item("manutencao_posicoes", "Manutenções por posição", "Gestão de peças e componentes por posição."),
     item("manutencoes_veiculos", "Manutenções por Veículo", "Consulta de custos e histórico de manutenções por veículo."),

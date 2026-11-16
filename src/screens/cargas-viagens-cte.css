@@ -72,3 +72,6 @@
 
 .cv2-itinerary-list .cv2-itinerary-position{flex:0 0 64px;width:64px;min-height:44px;padding:8px 4px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);color:var(--text);text-align:center;font:inherit;font-weight:700}
 .cv2-itinerary-position:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cv2-bonus-option{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:16px 18px;margin-bottom:20px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2)}
+.cv2-bonus-option>div{flex:1;min-width:200px}.cv2-bonus-option strong{font-size:14px}.cv2-bonus-option p{margin:6px 0 0;font-size:12px;color:var(--muted);line-height:1.6}.cv2-bonus-option>small{width:100%;font-size:11px;color:var(--muted);line-height:1.6}
+.cv2-bonus-option.selected{border-color:#8d78bd;background:color-mix(in srgb,#9578c4 10%,var(--surface))}.cv2-bonus-option.selected .btn{border-color:#8d78bd;color:#b29bd6}.cv2-status.finance.bonus{background:color-mix(in srgb,#9578c4 13%,var(--surface));color:#a789d5;border-color:#8d78bd}
