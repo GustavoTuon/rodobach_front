@@ -187,6 +187,8 @@ window.RB_API = {
   searchViagemClientes: (q = "") =>
     apiRequest(`/viagens/opcoes/clientes${buildQuery({ q })}`),
   listCargaResponsaveis: () => apiRequest("/cargas-viagens-v2/responsaveis"),
+  listItineraryExtras: () => apiRequest('/cargas-viagens-v2/volumes-extras'),
+  saveItineraryExtra: description => apiRequest('/cargas-viagens-v2/volumes-extras', {method:'POST',body:JSON.stringify({description})}),
   searchViagemVendedores: (q = "") =>
     apiRequest(`/viagens/opcoes/vendedores${buildQuery({ q })}`),
   searchViagemDocumentos: (q = "") =>

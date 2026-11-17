@@ -4,6 +4,33 @@ import {afterEach,expect,it,vi} from 'vitest';
 import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
 import {buildItinerary,itineraryHtml,volumesSummary} from '../carga-itinerary.js';
 afterEach(()=>{cleanup();vi.restoreAllMocks();});
+it('sugere cadastro existente, soma itens repetidos e preserva o formulário em falha',async()=>{
+  window.React=React;window.Icon=()=>null;
+  const item={id:'42',description:'Máquina de cartão'};
+  const save=vi.fn(async()=>item);
+  window.RB_API={listItineraryExtras:vi.fn(async()=>[item]),saveItineraryExtra:save,getViagemV2:vi.fn(async()=>({id:1,cargas:[{id:1}]})),getCargaV2:vi.fn(async()=>load)};
+  const {Cv2ItineraryButton}=await import('./cargas-viagens-v2.jsx');
+  render(<Cv2ItineraryButton viagemId={1} />);
+  fireEvent.click(screen.getByText('Itinerário / conferência'));
+  await screen.findByText('Entrega · Entrega final');
+  for(let index=0;index<2;index++){
+    fireEvent.click(screen.getByText('Adicionar volume extra'));
+    fireEvent.change(screen.getByLabelText('Descrição do volume extra'),{target:{value:' MAQUINA   de cartao '}});
+    expect(screen.getByText('✓ Item já cadastrado. Vamos reutilizar este nome.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button',{name:'Máquina de cartão'}));
+    fireEvent.click(screen.getByText('Incluir extra'));
+    await waitFor(()=>expect(screen.queryByText('Incluir extra')).toBeNull());
+  }
+  expect(screen.getAllByLabelText('Remover extra Máquina de cartão')).toHaveLength(1);
+  expect(screen.getByText('Extra: Máquina de cartão · 2 volume(s)')).toBeTruthy();
+  save.mockRejectedValueOnce(new Error('Sem conexão'));
+  fireEvent.click(screen.getByText('Adicionar volume extra'));
+  fireEvent.change(screen.getByLabelText('Descrição do volume extra'),{target:{value:'Envelope'}});
+  fireEvent.click(screen.getByText('Incluir extra'));
+  await screen.findByRole('alert');
+  expect(screen.getByLabelText('Descrição do volume extra').value).toBe('Envelope');
+  expect(screen.queryByText('Extra: Envelope · 1 volume(s)')).toBeNull();
+});
 it('abre fora do rodapé da viagem e fecha sem fechar os detalhes',async()=>{
   window.React=React;window.Icon=()=>null;
   const trip={id:1,numero:'V-1',cargas:[{id:1,documentos:[]}]};
@@ -50,7 +77,7 @@ it('distribui total nas entregas sem duplicar; preserva pendências e não expõ
 });
 it('permite revisar ordem e imprimir dados completos das cargas',async()=>{
   window.React=React;window.Icon=()=>null;
-  window.RB_API={listCargaResponsaveis:vi.fn(async()=>[{codigo:"1",empresa:"1",nome:"Responsavel ERP"}]),getViagemV2:vi.fn(async()=>({id:1,numero:'V-1',cargas:[{id:1}]})),getCargaV2:vi.fn(async()=>load)};
+  window.RB_API={listCargaResponsaveis:vi.fn(async()=>[{codigo:"1",empresa:"1",nome:"Responsavel ERP"}]),getViagemV2:vi.fn(async()=>({id:1,numero:'V-1',cargas:[{id:1}]})),listItineraryExtras:vi.fn(async()=>[]),saveItineraryExtra:vi.fn(async description=>({id:'1',description})),getCargaV2:vi.fn(async()=>load)};
   const {Cv2ItineraryButton}=await import('./cargas-viagens-v2.jsx');
   const popup={document:{write:vi.fn(),close:vi.fn(),getElementById:()=>null}};
   vi.spyOn(window,'open').mockReturnValue(popup);
@@ -138,4 +165,56 @@ it('preserva a ordem em cada grupo e omite grupos vazios',()=>{
       expect([...table.querySelectorAll('tbody tr')].map(row=>row.cells[1].textContent)).toEqual(selected.flatMap((stop,index)=>stop.tipo===type?[String(index+1)]:[]));
     }
   }
+});
+it('mantém extras na parada ao reordenar, imprime com segurança e remove',async()=>{
+  window.React=React;window.Icon=()=>null;
+  window.RB_API={getViagemV2:vi.fn(async()=>({id:1,numero:'V-1',cargas:[{id:1}]})),listItineraryExtras:vi.fn(async()=>[]),saveItineraryExtra:vi.fn(async description=>({id:'1',description})),getCargaV2:vi.fn(async()=>load)};
+  const {Cv2ItineraryButton}=await import('./cargas-viagens-v2.jsx');
+  const popup={document:{write:vi.fn(),close:vi.fn(),getElementById:()=>null}};
+  vi.spyOn(window,'open').mockReturnValue(popup);
+  render(<Cv2ItineraryButton viagemId={1} />);
+  fireEvent.click(screen.getByText('Itinerário / conferência'));
+  await screen.findByText('Entrega · Entrega final');
+  fireEvent.click(screen.getByText('Adicionar volume extra'));
+  expect(screen.getByText('Imprimir itinerário').disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText('Descrição do volume extra'),{target:{value:'Máquina <cartão>'}});
+  fireEvent.change(screen.getByLabelText('Quantidade extra'),{target:{value:'2'}});
+  fireEvent.change(screen.getByLabelText('Parada do volume extra'),{target:{value:'1-entrega'}});
+  fireEvent.click(screen.getByText('Incluir extra'));
+  await screen.findByLabelText('Remover extra Máquina <cartão>');
+  fireEvent.click(screen.getByLabelText('Subir parada 3'));
+  expect(screen.getByText('Extra: Máquina <cartão> · 2 volume(s)').closest('li').textContent).toContain('Entrega final');
+  fireEvent.click(screen.getByText('Imprimir itinerário'));
+  const html=popup.document.write.mock.calls[0][0];
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const row=doc.querySelector('[data-extra-volumes] tbody tr');
+  expect(row.cells[1].textContent).toContain('2. Entrega · Entrega final');
+  expect(row.cells[2].textContent).toBe('Máquina <cartão>');
+  expect(row.cells[3].textContent).toBe('2');
+  expect(html).toContain('Máquina &lt;cartão&gt;');
+  expect(load.volumes).toBe(23);
+  fireEvent.click(screen.getByLabelText('Remover extra Máquina <cartão>'));
+  fireEvent.click(screen.getByText('Imprimir itinerário'));
+  expect(popup.document.write.mock.calls[1][0]).not.toContain('data-extra-volumes');
+  fireEvent.click(screen.getByText('Adicionar volume extra'));
+  fireEvent.click(screen.getByText('Cancelar'));
+  expect(screen.getByText('Imprimir itinerário').disabled).toBe(false);
+});
+it('acompanha revisão opcional e reinicia ao alterar a sequência',async()=>{
+  window.React=React;window.Icon=()=>null;
+  window.RB_API={getViagemV2:vi.fn(async()=>({id:1,numero:'V-1',cargas:[{id:1}]})),listItineraryExtras:vi.fn(async()=>[]),saveItineraryExtra:vi.fn(async description=>({id:'1',description})),getCargaV2:vi.fn(async()=>load)};
+  const {Cv2ItineraryButton}=await import('./cargas-viagens-v2.jsx');
+  render(<Cv2ItineraryButton viagemId={1} />);
+  fireEvent.click(screen.getByText('Itinerário / conferência'));
+  await screen.findByText('Entrega · Entrega final');
+  const progress=()=>screen.getByRole('progressbar').getAttribute('aria-valuenow');
+  expect(progress()).toBe('0');
+  expect(screen.getByText('Imprimir itinerário').disabled).toBe(false);
+  for(let i=1;i<=3;i++)fireEvent.click(screen.getByLabelText(`Revisar parada ${i}`));
+  expect(progress()).toBe('3');
+  expect(screen.getByText('Rota revisada. Próxima etapa: imprimir!')).toBeTruthy();
+  fireEvent.click(screen.getByLabelText('Revisar parada 2'));
+  expect(progress()).toBe('2');
+  fireEvent.click(screen.getByLabelText('Descer parada 1'));
+  expect(progress()).toBe('0');
 });
