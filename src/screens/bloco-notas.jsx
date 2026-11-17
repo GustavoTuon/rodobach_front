@@ -8,6 +8,7 @@ export default function BlocoNotas({user}) {
  const [tick,setTick]=useState(0),[creating,setCreating]=useState(false),[title,setTitle]=useState(''),[checked,setChecked]=useState([]),[taskSearch,setTaskSearch]=useState(''),[saving,setSaving]=useState(false),[batchId,setBatchId]=useState('');
  const [categories,setCategories]=useState(['caminhao','carreta']),[createMenu,setCreateMenu]=useState(false),[noteRequest,setNoteRequest]=useState(0);
  const [editing,setEditing]=useState(null),[editTitle,setEditTitle]=useState('');
+ const [fleetUnavailable,setFleetUnavailable]=useState(true),[loadError,setLoadError]=useState('');
  const taskKey=task=>`${task.authorId}:${task.id}:${task.plate}`;
  const noteEditor=useRef(null),menuWrap=useRef(null);
  const busy=useRef(false),revision=useRef(0),detail=useRef(null);
@@ -15,9 +16,18 @@ export default function BlocoNotas({user}) {
   let live=true,inFlight=false;
   async function refresh(){
    if(inFlight||busy.current)return;inFlight=true;const started=revision.current;setLoading(true);
-   try{const [fleet,data]=await Promise.all([window.RB_API.noteFleet(),window.RB_API.noteTasks()]);if(live&&started===revision.current){setVehicles(fleet.vehicles);setTasks(data.tasks);setError('');}}
-   catch(e){if(live)setError(e.message||'Não foi possível carregar a frota.');}
-   finally{inFlight=false;if(live)setLoading(false);}
+   const canApply=()=>live&&started===revision.current;
+   const results=await Promise.allSettled([
+    window.RB_API.noteFleet().then(fleet=>{if(canApply()){setVehicles(fleet.vehicles);setFleetUnavailable(false);}}),
+    window.RB_API.noteTasks().then(data=>{if(canApply())setTasks(data.tasks);})
+   ]);
+   if(canApply()){
+    const failures=[];
+    if(results[0].status==='rejected'){setFleetUnavailable(true);failures.push('Não foi possível consultar a frota no ERP. As tarefas e notas salvas continuam disponíveis; o cadastro de veículos pode estar incompleto.');}
+    if(results[1].status==='rejected')failures.push('Não foi possível atualizar as tarefas. '+(results[1].reason?.message||'Tente novamente.'));
+    setLoadError(failures.join(' '));
+   }
+   inFlight=false;if(live)setLoading(false);
   }
   refresh();const timer=setInterval(refresh,30000);window.addEventListener('focus',refresh);
   return()=>{live=false;clearInterval(timer);window.removeEventListener('focus',refresh);};
@@ -28,7 +38,7 @@ export default function BlocoNotas({user}) {
  const forVehicle=plate=>tasks.filter(t=>t.plate===plate||(vehicles.find(v=>v.plate===plate)?.implements||[]).includes(t.plate));
  const pending=plate=>forVehicle(plate).filter(t=>!t.done).length;
  // Keep tasks for vehicles removed from the current fleet reachable.
- const allVehicles=[...vehicles,...[...new Set(tasks.map(t=>t.plate))].filter(p=>!vehicles.some(v=>v.plate===p)).map(plate=>({plate,model:'Fora do cadastro atual',category:'caminhao',implements:[],archived:true}))].filter(v=>v.category!=='implemento'&&!vehicles.some(main=>main.implements.includes(v.plate)));
+ const allVehicles=[...vehicles,...[...new Set(tasks.map(t=>t.plate))].filter(p=>!vehicles.some(v=>v.plate===p)).map(plate=>({plate,model:fleetUnavailable?'Cadastro da frota indisponível':'Fora do cadastro atual',category:'caminhao',implements:[],archived:true}))].filter(v=>v.category!=='implemento'&&!vehicles.some(main=>main.implements.includes(v.plate)));
  const matches=(v,q)=>`${v.plate} ${v.model||''}`.toUpperCase().replace(/[^A-Z0-9]/g,'').includes(q.toUpperCase().replace(/[^A-Z0-9]/g,''));
  const inCategory=v=>categories.includes(v.category||'caminhao');
  const visible=allVehicles.filter(v=>inCategory(v)&&matches(v,query)&&(!pendingOnly||pending(v.plate)>0));
@@ -58,7 +68,7 @@ export default function BlocoNotas({user}) {
  }
  return <section className="bn-page bn-fleet">
   <header className="bn-heading"><div><span>ORGANIZAÇÃO DA FROTA</span><h1>Tarefas e notas<span>.</span></h1><p>Uma placa, suas tarefas e tudo que você precisa lembrar.</p></div><div className="bn-create" ref={menuWrap}><button className="bn-primary" aria-expanded={createMenu} aria-controls="bn-create-options" onClick={()=>setCreateMenu(v=>!v)} disabled={user.readOnly||saving}>＋ Criar <span aria-hidden="true">⌄</span></button>{createMenu&&<div className="bn-create-options" id="bn-create-options"><button onClick={begin} disabled={loading||creating}><strong>✓ Nova tarefa</strong><small>Um objetivo para uma ou várias placas</small></button><button onClick={()=>{setCreateMenu(false);if(!selected)setSelected('all-notes');setNoteRequest(n=>n+1);}}><strong>✎ Nova anotação</strong><small>Guarde um lembrete rápido</small></button></div>}</div></header>
-  {error&&<p className="bn-error" role="alert">{error}</p>}{message&&<p className="bn-success" role="status">{message}</p>}
+  {loadError&&<p className="bn-error" role="alert">{loadError}</p>}{error&&<p className="bn-error" role="alert">{error}</p>}{message&&<p className="bn-success" role="status">{message}</p>}
   {creating&&<form className="bn-task-form" onSubmit={create} aria-label="Nova tarefa para a frota">
    <h2>Lançar tarefa para as placas</h2><label className="bn-search">O que precisa ser feito?<input autoFocus maxLength={200} value={title} onChange={e=>setTitle(e.target.value)} placeholder="Ex.: trocar o adesivo da empresa" disabled={saving} required/></label>
    <label className="bn-search">Buscar placas para a tarefa<input type="search" value={taskSearch} onChange={e=>setTaskSearch(e.target.value)} placeholder="Placa ou modelo"/></label>
@@ -72,7 +82,7 @@ export default function BlocoNotas({user}) {
     <fieldset className="bn-category-filter"><legend>Mostrar veículos</legend>{[['caminhao','Caminhões'],['carreta','Carretas'],['carro','Carros']].map(([value,label])=><label key={value}><input type="checkbox" checked={categories.includes(value)} onChange={e=>{setCategories(old=>e.target.checked?[...old,value]:old.filter(c=>c!==value));}}/>{label}</label>)}</fieldset>
     <label className="bn-check-filter"><input type="checkbox" checked={pendingOnly} onChange={e=>setPendingOnly(e.target.checked)}/> Somente com tarefas pendentes</label>
     <div className="bn-list-heading"><span>FROTA · {visible.length}</span><button onClick={()=>setTick(t=>t+1)} disabled={loading||saving}>{loading?'Atualizando…':'Atualizar'}</button></div>
-    <div className="bn-list">{visible.map(v=><button key={v.plate} className={`bn-note ${selected===v.plate?'is-selected':''}`} aria-pressed={selected===v.plate} onClick={()=>setSelected(v.plate)}><span className="bn-plate-model"><strong>{v.plate}</strong><span>{v.model}</span></span><p>{pending(v.plate)?`${pending(v.plate)} tarefa(s) pendente(s)`:'Nenhuma tarefa pendente'}{v.archived?' · Fora do cadastro atual':''}</p></button>)}</div>
+    <div className="bn-list">{visible.map(v=><button key={v.plate} className={`bn-note ${selected===v.plate?'is-selected':''}`} aria-pressed={selected===v.plate} onClick={()=>setSelected(v.plate)}><span className="bn-plate-model"><strong>{v.plate}</strong><span>{v.model}</span></span><p>{pending(v.plate)?`${pending(v.plate)} tarefa(s) pendente(s)`:'Nenhuma tarefa pendente'}{v.archived&&!fleetUnavailable?' · Fora do cadastro atual':''}</p></button>)}</div>
     {!loading&&!visible.length&&<p className="bn-help">Nenhum veículo encontrado.</p>}
     <button className={`bn-note ${selected==='all-notes'?'is-selected':''}`} onClick={()=>setSelected('all-notes')}>Todas as anotações<small>Inclui suas notas antigas e sem placa</small></button>
     <p className="bn-private">Notas e tarefas compartilhadas com a equipe autorizada. Rascunhos ficam neste aparelho até salvar.</p>

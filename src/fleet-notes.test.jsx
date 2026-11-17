@@ -4,6 +4,28 @@ import {it,expect,vi,afterEach} from 'vitest';
 import {render,screen,fireEvent,cleanup,within,waitFor} from '@testing-library/react';
 import Fleet from './screens/bloco-notas.jsx';
 afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks();});
+it('keeps saved tasks usable when the ERP is unreachable and recovers on refresh',async()=>{
+ api();let rejectFleet;
+ window.RB_API.noteFleet.mockReturnValueOnce(new Promise((resolve,reject)=>{rejectFleet=reject;}));
+ window.RB_API.noteTasks.mockResolvedValue({tasks:[{id:'t',plate:'ABC1234',title:'Adesivo',done:false,version:1,authorId:42,canEdit:true}]});
+ render(<Fleet user={{id:42}}/>);
+ // Saved tasks appear without waiting for the ERP connection timeout.
+ fireEvent.click(await screen.findByRole('button',{name:/ABC1234/}));
+ expect(screen.getByRole('button',{name:'Editar tarefa: Adesivo'})).toBeTruthy();
+ rejectFleet(new Error('EHOSTUNREACH'));
+ expect(await screen.findByRole('alert')).toHaveProperty('textContent',expect.stringContaining('consultar a frota no ERP'));
+ expect(screen.getByRole('button',{name:'Excluir tarefa: Adesivo'})).toBeTruthy();
+ fireEvent.click(screen.getByRole('button',{name:'Atualizar'}));
+ await waitFor(()=>expect(screen.queryByRole('alert')).toBeNull());
+ expect(screen.getByRole('button',{name:/ABC1234/}).textContent).toContain('VOLVO FH');
+});
+
+it('loads the fleet even when tasks fail to refresh',async()=>{
+ api();window.RB_API.noteTasks.mockRejectedValue(new Error('Falha nas tarefas'));
+ render(<Fleet user={{id:42}}/>);
+ expect(await screen.findByRole('button',{name:/ABC1234/})).toBeTruthy();
+ expect(await screen.findByRole('alert')).toHaveProperty('textContent',expect.stringContaining('atualizar as tarefas'));
+});
 function api(){window.RB_API={
  noteFleet:vi.fn().mockResolvedValue({vehicles:[{plate:'ABC1234',model:'VOLVO FH',category:'carreta',implements:['DEF5678']},{plate:'GHI9012',model:'VW 24.280',category:'caminhao',implements:[]},{plate:'CAR1234',model:'VW Golf',category:'carro',implements:[]},{plate:'DEF5678',model:'RANDON',category:'implemento',implements:[]}]}),
  noteTasks:vi.fn().mockResolvedValue({tasks:[]}),listNotes:vi.fn().mockResolvedValue({notes:[]}),notePlates:vi.fn().mockResolvedValue({plates:[]}),
