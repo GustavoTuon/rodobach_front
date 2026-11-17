@@ -7,6 +7,8 @@ export default function BlocoNotas({user}) {
  const [query,setQuery]=useState(''),[pendingOnly,setPendingOnly]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState(''),[message,setMessage]=useState('');
  const [tick,setTick]=useState(0),[creating,setCreating]=useState(false),[title,setTitle]=useState(''),[checked,setChecked]=useState([]),[taskSearch,setTaskSearch]=useState(''),[saving,setSaving]=useState(false),[batchId,setBatchId]=useState('');
  const [categories,setCategories]=useState(['caminhao','carreta']),[createMenu,setCreateMenu]=useState(false),[noteRequest,setNoteRequest]=useState(0);
+ const [editing,setEditing]=useState(null),[editTitle,setEditTitle]=useState('');
+ const taskKey=task=>`${task.authorId}:${task.id}:${task.plate}`;
  const noteEditor=useRef(null),menuWrap=useRef(null);
  const busy=useRef(false),revision=useRef(0),detail=useRef(null);
  useEffect(()=>{
@@ -42,9 +44,16 @@ export default function BlocoNotas({user}) {
   try{const data=await window.RB_API.createNoteTask({id:batchId,title:title.trim(),plates:checked});setTasks(old=>[...data.tasks,...old.filter(t=>t.id!==batchId)]);setCreating(false);setMessage(`Tarefa lançada para ${checked.length} veículo(s).`);}
   catch(e){setError(e.message);}finally{busy.current=false;setSaving(false);}
  }
- async function toggle(task){
-  if(busy.current||user.readOnly)return;busy.current=true;revision.current++;setSaving(true);setError('');
-  try{const data=await window.RB_API.updateNoteTask(task,!task.done);setTasks(old=>old.map(t=>t.id===task.id&&t.plate===task.plate?data.task:t));setMessage(data.task.done?"✓ Tarefa concluída! Mais um passo para deixar o veículo em dia.":"Tarefa reaberta.");}
+ async function updateTask(task,changes){
+  if(busy.current||user.readOnly||!task.canEdit)return;busy.current=true;revision.current++;setSaving(true);setError('');
+  try{const data=await window.RB_API.updateNoteTask(task,changes);setTasks(old=>old.map(t=>taskKey(t)===taskKey(task)?data.task:t));if(changes.title!==undefined){setEditing(null);setMessage('Tarefa atualizada.');}else setMessage(data.task.done?"✓ Tarefa concluída! Mais um passo para deixar o veículo em dia.":"Tarefa reaberta.");}
+  catch(e){setError(e.message);if(e.status===409)setTick(t=>t+1);}finally{busy.current=false;setSaving(false);}
+ }
+ async function deleteTask(task){
+  if(busy.current||user.readOnly||!task.canEdit)return;
+  if(!window.confirm(`Excluir a tarefa "${task.title}" da placa ${task.plate}? Esta ação não pode ser desfeita. As outras placas não serão afetadas.`))return;
+  busy.current=true;revision.current++;setSaving(true);setError('');setMessage('');
+  try{await window.RB_API.deleteNoteTask(task);setTasks(old=>old.filter(t=>taskKey(t)!==taskKey(task)));setMessage('Tarefa excluída.');}
   catch(e){setError(e.message);if(e.status===409)setTick(t=>t+1);}finally{busy.current=false;setSaving(false);}
  }
  return <section className="bn-page bn-fleet">
@@ -66,11 +75,18 @@ export default function BlocoNotas({user}) {
     <div className="bn-list">{visible.map(v=><button key={v.plate} className={`bn-note ${selected===v.plate?'is-selected':''}`} aria-pressed={selected===v.plate} onClick={()=>setSelected(v.plate)}><span className="bn-plate-model"><strong>{v.plate}</strong><span>{v.model}</span></span><p>{pending(v.plate)?`${pending(v.plate)} tarefa(s) pendente(s)`:'Nenhuma tarefa pendente'}{v.archived?' · Fora do cadastro atual':''}</p></button>)}</div>
     {!loading&&!visible.length&&<p className="bn-help">Nenhum veículo encontrado.</p>}
     <button className={`bn-note ${selected==='all-notes'?'is-selected':''}`} onClick={()=>setSelected('all-notes')}>Todas as anotações<small>Inclui suas notas antigas e sem placa</small></button>
-    <p className="bn-private">Notas compartilhadas com a equipe autorizada. Tarefas pessoais. Rascunhos ficam neste aparelho até salvar.</p>
+    <p className="bn-private">Notas e tarefas compartilhadas com a equipe autorizada. Rascunhos ficam neste aparelho até salvar.</p>
    </aside>
    <main className="bn-editor-wrap" ref={detail}>
     {current&&<><div className="bn-vehicle-heading"><div><h2>{current.plate} <span className="bn-model">{current.model}</span></h2></div><span>{currentTasks.filter(t=>t.done).length} de {currentTasks.length} concluídas</span></div>
-     <section className="bn-tasks" aria-label={`Tarefas de ${current.plate}`}><div className="bn-mission-head"><div><span className="bn-eyebrow">MISSÕES DO VEÍCULO</span><h3>{percent===100?'🏆 Tudo em dia!':currentTasks.length?'Cada tarefa, um avanço.':'Pronto para a primeira missão?'}</h3></div><div className={`bn-score ${percent===100?'is-complete':''}`}><strong>{percent}%</strong><small>concluído</small></div></div><div className="bn-progress" role="progressbar" aria-label="Progresso das tarefas" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><span style={{width:`${percent}%`}}/></div><div className="bn-milestones"><span>✓ {completed} concluídas</span><span>◎ {currentTasks.length-completed} para finalizar</span><span>{percent===100?'Meta alcançada':percent>=50?'Mais da metade!':'Um passo de cada vez'}</span></div>{!currentTasks.length&&<p className="bn-help">Nenhuma tarefa por aqui. Use “Nova tarefa” para começar.</p>}{currentTasks.map(task=><label className={`bn-task ${task.done?'is-done':''}`} key={`${task.id}:${task.plate}`}><input type="checkbox" checked={task.done} disabled={saving||user.readOnly} onChange={()=>toggle(task)}/><span>{task.title}<small>{task.done?'✓ Concluída':'Pendente'}</small></span></label>)}</section>
+     <section className="bn-tasks" aria-label={`Tarefas de ${current.plate}`}><div className="bn-mission-head"><div><span className="bn-eyebrow">MISSÕES DO VEÍCULO</span><h3>{percent===100?'🏆 Tudo em dia!':currentTasks.length?'Cada tarefa, um avanço.':'Pronto para a primeira missão?'}</h3></div><div className={`bn-score ${percent===100?'is-complete':''}`}><strong>{percent}%</strong><small>concluído</small></div></div><div className="bn-progress" role="progressbar" aria-label="Progresso das tarefas" aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}><span style={{width:`${percent}%`}}/></div><div className="bn-milestones"><span>✓ {completed} concluídas</span><span>◎ {currentTasks.length-completed} para finalizar</span><span>{percent===100?'Meta alcançada':percent>=50?'Mais da metade!':'Um passo de cada vez'}</span></div>{!currentTasks.length&&<p className="bn-help">Nenhuma tarefa por aqui. Use “Nova tarefa” para começar.</p>}{currentTasks.map(task=><div className={`bn-task ${task.done?'is-done':''}`} key={taskKey(task)}>
+      {editing&&taskKey(editing)===taskKey(task)?<form className="bn-task-edit" aria-label="Editar tarefa" onSubmit={e=>{e.preventDefault();if(editTitle.trim())updateTask(editing,{title:editTitle.trim()});}}>
+       <label className="bn-search">Descrição da tarefa<input autoFocus required maxLength={200} value={editTitle} onChange={e=>setEditTitle(e.target.value)} disabled={saving}/></label>
+       <small>A alteração vale apenas para a placa {task.plate}.</small>
+       <div className="bn-task-toolbar"><button type="button" disabled={saving} onClick={()=>setEditing(null)}>Cancelar</button><button className="bn-primary" disabled={saving||!editTitle.trim()||user.readOnly||!task.canEdit}>{saving?'Salvando…':'Salvar alterações'}</button></div>
+      </form>:<><label className="bn-task-label"><input type="checkbox" checked={task.done} disabled={saving||user.readOnly||!task.canEdit} onChange={()=>updateTask(task,{done:!task.done})}/><span>{task.title}<small>{task.done?'✓ Concluída':'Pendente'}</small></span></label>{task.canEdit&&!user.readOnly&&<button type="button" disabled={saving} aria-label={`Editar tarefa: ${task.title}`} onClick={()=>{setEditing(task);setEditTitle(task.title);setError('');setMessage('');}}>Editar</button>}</>}
+      {(!editing||taskKey(editing)!==taskKey(task))&&task.canEdit&&!user.readOnly&&<button type="button" disabled={saving} aria-label={`Excluir tarefa: ${task.title}`} onClick={()=>deleteTask(task)}>Excluir</button>}
+     </div>)}</section>
     </>}
     {selected ? <NoteEditor ref={noteEditor} compact key={selected} user={user} plate={selected==='all-notes'?undefined:selected}/> : <div className="bn-welcome"><span aria-hidden="true">✓</span><h2>Sua frota, organizada por placa.</h2><p>Escolha um veículo para ver tarefas e fazer anotações.<br/>Para uma tarefa em vários veículos, selecione as placas em “Nova tarefa”.</p></div>}
    </main>

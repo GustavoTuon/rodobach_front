@@ -31,14 +31,26 @@ const apiRequest = (path, options = {}) => trackLoadingActivity(() => requestDat
 async function requestData(path, options = {}) {
   const token = localStorage.getItem(TOKEN_KEY);
 
-  const response = await fetchWithTimeout(`${API_BASE}${path}`, {
+  let response;
+  try {
+    response = await fetchWithTimeout(`${API_BASE}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
-  });
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error("Não foi possível conectar ao servidor. Verifique sua conexão e tente atualizar. Se persistir, o serviço pode estar indisponível.", { cause: error });
+    }
+    throw error;
+  }
+
+  if ([502, 503, 504].includes(response.status)) {
+    throw Object.assign(new Error("O servidor está temporariamente indisponível. Tente atualizar em alguns instantes."), { status: response.status });
+  }
 
   if (response.status === 401) {
     localStorage.removeItem(TOKEN_KEY);
@@ -302,7 +314,8 @@ window.RB_API = {
   noteFleet: () => apiRequest('/notas/frota'),
   noteTasks: () => apiRequest('/notas/tarefas'),
   createNoteTask: body => apiRequest('/notas/tarefas',{method:'POST',body:JSON.stringify(body)}),
-  updateNoteTask: (task,done) => apiRequest(`/notas/tarefas/${encodeURIComponent(task.id)}/${encodeURIComponent(task.plate)}`,{method:'PATCH',body:JSON.stringify({done,version:task.version})}),
+  updateNoteTask: (task,changes) => apiRequest(`/notas/tarefas/${encodeURIComponent(task.id)}/${encodeURIComponent(task.plate)}`,{method:'PATCH',body:JSON.stringify({...changes,version:task.version})}),
+  deleteNoteTask: task => apiRequest(`/notas/tarefas/${encodeURIComponent(task.id)}/${encodeURIComponent(task.plate)}`,{method:'DELETE',body:JSON.stringify({version:task.version})}),
   notePlates: () => apiRequest('/notas/placas'),
   getPainelTv: () => apiRequest('/frota/painel-tv'),
   getPainelCargaHistorico: placa => apiRequest(`/frota/painel-tv/confirmacoes${buildQuery({placa})}`),
