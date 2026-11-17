@@ -663,12 +663,29 @@ export function Cv2ItineraryButton({ viagemId, disabled=false }) {
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
   const [report,setReport]=useState(null);
+  const [extraDraft,setExtraDraft]=useState(null);
+  const [extraCatalog,setExtraCatalog]=useState([]);
+  const [catalogError,setCatalogError]=useState('');
+  const [catalogLoading,setCatalogLoading]=useState(false);
+  const [savingExtra,setSavingExtra]=useState(false);
+  const extraBusy=useRef(false);
+  const catalogKey=value=>value.trim().replace(/\s+/g,' ').normalize('NFD').replace(/\p{M}/gu,'').toLocaleLowerCase('pt-BR');
+  const matchingExtra=extraDraft&&extraCatalog.find(item=>catalogKey(item.description)===catalogKey(extraDraft.description));
+  const suggestions=extraDraft?extraCatalog.filter(item=>catalogKey(item.description).includes(catalogKey(extraDraft.description))).slice(0,8):[];
+  const extraSequence=useRef(0);
   const version=useRef(0);
   useEffect(()=>()=>{version.current++;},[]);
   const close=()=>{version.current++;setOpen(false);setLoading(false);};
+  const loadCatalog=async(current=version.current)=>{
+    setCatalogLoading(true);setCatalogError('');
+    try { const items=await window.RB_API.listItineraryExtras();if(current===version.current)setExtraCatalog(items); }
+    catch(err){if(current===version.current)setCatalogError(`Não foi possível consultar os itens. ${cv2Error(err)}`);}
+    finally{if(current===version.current)setCatalogLoading(false);}
+  };
   const prepare=async()=>{
     const current=++version.current;
-    setOpen(true);setLoading(true);setError("");setReport(null);
+    setOpen(true);setLoading(true);setError("");setReport(null);setExtraDraft(null);
+    setSavingExtra(false);setExtraCatalog([]);loadCatalog(current);
     try {
       const trip=await window.RB_API.getViagemV2(viagemId);
       const ids=[...new Set((trip.cargas||[]).map(load=>load.id))];
@@ -688,8 +705,35 @@ export function Cv2ItineraryButton({ viagemId, disabled=false }) {
     const stops=[...current.stops];
     const [stop]=stops.splice(index,1);
     stops.splice(target,0,stop);
-    return {...current,stops};
+    return {...current,stops:stops.map(stop=>({...stop,reviewed:false}))};
   });
+  const addExtra=async event=>{
+    event.preventDefault();
+    const quantity=Number(extraDraft.quantity);
+    if(!extraDraft.description.trim() || !Number.isSafeInteger(quantity) || quantity<1 || !report.stops.some(stop=>stop.id===extraDraft.stopId))return;
+    if(extraBusy.current)return;
+    extraBusy.current=true;setSavingExtra(true);setCatalogError('');
+    const currentVersion=version.current;
+    try {
+      const item=await window.RB_API.saveItineraryExtra(extraDraft.description);
+      if(currentVersion!==version.current)return;
+      const extra={id:++extraSequence.current,catalogId:item.id,description:item.description,quantity};
+      setExtraCatalog(items=>items.some(existing=>existing.id===item.id)?items:[...items,item]);
+      setReport(current=>({...current,stops:current.stops.map(stop=>{
+        if(stop.id!==extraDraft.stopId)return stop;
+        const extras=stop.extras||[];
+        const existing=extras.find(entry=>entry.catalogId===item.id);
+        return {...stop,reviewed:false,extras:existing?extras.map(entry=>entry.id===existing.id?{...entry,quantity:entry.quantity+quantity}:entry):[...extras,extra]};
+      })}));
+      setExtraDraft(null);
+    } catch(err) { if(currentVersion===version.current)setCatalogError(`Não foi possível incluir o item. ${cv2Error(err)}`); }
+    finally {extraBusy.current=false;if(currentVersion===version.current)setSavingExtra(false);}
+  };
+  const removeExtra=(stopId,extraId)=>setReport(current=>({...current,stops:current.stops.map(stop=>stop.id===stopId?{...stop,reviewed:false,extras:stop.extras.filter(extra=>extra.id!==extraId)}:stop)}));
+  const reviewed=report?.stops.filter(stop=>stop.reviewed).length||0;
+  const progress=report?Math.round(reviewed/report.stops.length*100):0;
+  const extraCount=report?.stops.reduce((total,stop)=>total+(stop.extras||[]).reduce((sum,extra)=>sum+extra.quantity,0),0)||0;
+  const toggleReview=id=>setReport(current=>({...current,stops:current.stops.map(stop=>stop.id===id?{...stop,reviewed:!stop.reviewed}:stop)}));
   const print=()=>{
     const popup=window.open("","_blank","width=980,height=760");
     if(!popup){setError("Permita pop-ups para abrir a impressão.");return;}
@@ -697,22 +741,44 @@ export function Cv2ItineraryButton({ viagemId, disabled=false }) {
     popup.document.getElementById("print-document")?.addEventListener("click",()=>popup.print());
     popup.document.getElementById("close-print")?.addEventListener("click",()=>popup.close());
   };
-  return <><button className="btn" disabled={disabled||loading} onClick={prepare}>Itinerário / conferência</button>{open && <Cv2Modal title="Itinerário de conferência" subtitle="Organize a sequência de atendimento antes de imprimir" onClose={close} wide portal>
-    <div className="cv2-modal-body">
+  return <><button className="btn" disabled={disabled||loading} onClick={prepare}>Itinerário / conferência</button>{open && <Cv2Modal title="Itinerário de conferência" subtitle="Organize a sequência de atendimento antes de imprimir" onClose={close} wide portal className="cv2-itinerary-modal">
+    <div className="cv2-modal-body cv2-journey">
       {error && <div className="cv2-alert error" role="alert">{error}<button className="btn" onClick={prepare}>Tentar novamente</button></div>}
       {loading && <p role="status">Carregando volumes e paradas das cargas…</p>}
-      {report && <><div className="cv2-alert info"><b>{report.trip.numero} · {report.trip.placa}</b><p>Volumes previstos: {volumesSummary(report.loads).text}</p><small>A ordem abaixo vale para esta impressão. Revise coletas e entregas antes da saída. Quantidades conferidas serão preenchidas no papel.</small></div>
-        <p id="cv2-itinerary-order-help" className="cv2-cte-hint">Para mover direto, altere o número da posição e pressione Enter ou saia do campo. As demais paradas se ajustam automaticamente.</p>
-        <ol className="cv2-itinerary-list">{report.stops.map((stop,index)=><li key={stop.id}><input key={index} className="cv2-itinerary-position" type="number" min="1" max={report.stops.length} step="1" defaultValue={index+1} aria-label={`Posição da parada ${index+1}`} aria-describedby="cv2-itinerary-order-help" onFocus={event=>event.target.select()} onBlur={event=>{
+      {report && <><section className={`cv2-journey-hero ${progress===100?'complete':''}`}>
+        <div className="cv2-journey-heading"><div><span className="cv2-journey-eyebrow">PREPARAÇÃO DA ROTA</span><h3>{progress===100?'Rota revisada. Próxima etapa: imprimir!':'Cada parada, tudo no lugar.'}</h3><p>{report.trip.numero} · {report.trip.placa}</p></div><div className="cv2-journey-score" style={{'--progress':`${progress}%`}}><span>{progress}<small>% revisado</small></span></div></div>
+        <div className="cv2-journey-stats"><span><strong>{report.stops.filter(stop=>stop.tipo==='coleta').length}</strong> coletas</span><span><strong>{report.stops.filter(stop=>stop.tipo==='entrega').length}</strong> entregas</span><span><strong>{extraCount}</strong> volumes extras</span></div>
+        <div className="cv2-journey-progress-label" aria-live="polite"><span>{reviewed} de {report.stops.length} paradas revisadas</span><span>{progress===100?'✓ Revisão concluída':'Sua missão: revisar a sequência'}</span></div>
+        <div className="cv2-journey-progress" role="progressbar" aria-label="Progresso da revisão" aria-valuemin={0} aria-valuemax={report.stops.length} aria-valuenow={reviewed}><span style={{width:`${progress}%`}} /></div>
+        <p className="cv2-journey-note">A revisão é opcional e vale para esta impressão. Não confirma coleta ou entrega.</p>
+      </section>
+        <div className="cv2-journey-volumes"><span>Volumes previstos: <strong>{volumesSummary(report.loads).text}</strong></span><small>Quantidades conferidas serão preenchidas no papel.</small></div>
+        <div className="cv2-itinerary-extras">
+          <div className="cv2-extra-heading"><div><span className="cv2-journey-eyebrow">KIT DA VIAGEM</span><h4>Algo mais para levar?</h4><span>Máquina de cartão, documentos ou outros itens.</span></div><button type="button" className="btn" disabled={!!extraDraft} onClick={()=>setExtraDraft({description:'',quantity:'1',stopId:report.stops.find(stop=>stop.tipo==='entrega')?.id||report.stops[0]?.id})}>Adicionar volume extra</button></div>
+          <p className="cv2-cte-hint">Os nomes ficam salvos para as próximas viagens. Quantidades e paradas valem apenas para esta impressão.</p>
+          {catalogError && <div role="alert" className="cv2-catalog-message">{catalogError} <button type="button" className="btn" onClick={()=>loadCatalog()}>Consultar novamente</button></div>}
+          {extraDraft && <form className="cv2-extra-form" onSubmit={addExtra}>
+            <div className="cv2-extra-description"><label>Descrição do volume extra<input required disabled={savingExtra} autoComplete="off" maxLength={200} placeholder="Digite para buscar ou cadastrar" value={extraDraft.description} onChange={event=>setExtraDraft({...extraDraft,description:event.target.value})} /></label>
+              <div className="cv2-catalog-hint" aria-live="polite">{catalogLoading?'Consultando itens cadastrados…':matchingExtra?'✓ Item já cadastrado. Vamos reutilizar este nome.':extraDraft.description.trim()?'Novo item: será cadastrado ao incluir.':'Escolha um item cadastrado ou escreva um novo nome.'}</div>
+              {!!suggestions.length && <div className="cv2-extra-suggestions" role="group" aria-label="Itens já cadastrados">{suggestions.map(item=><button type="button" className="btn" key={item.id} disabled={savingExtra} onClick={()=>setExtraDraft({...extraDraft,description:item.description})}>{item.description}</button>)}</div>}
+            </div>
+            <label className="cv2-extra-quantity">Quantidade extra<input disabled={savingExtra} required type="number" min="1" max={Number.MAX_SAFE_INTEGER} step="1" value={extraDraft.quantity} onChange={event=>setExtraDraft({...extraDraft,quantity:event.target.value})} /></label>
+            <label className="cv2-extra-stop">Parada do volume extra<select disabled={savingExtra} required value={extraDraft.stopId} onChange={event=>setExtraDraft({...extraDraft,stopId:event.target.value})}>{report.stops.map((stop,index)=><option key={stop.id} value={stop.id}>{index+1}. {stop.tipo==='coleta'?'Coleta':'Entrega'} · {stop.cliente||'Local não informado'} · {stop.carga}</option>)}</select></label>
+            <div className="cv2-extra-actions"><button type="submit" className="btn primary" disabled={!extraDraft.description.trim()||savingExtra||catalogLoading}>{savingExtra?'Incluindo…':'Incluir extra'}</button><button type="button" className="btn" disabled={savingExtra} onClick={()=>setExtraDraft(null)}>Cancelar</button></div>
+          </form>}
+        </div>
+        <div className="cv2-journey-route-title"><h4>Etapas da rota</h4><span>Organize · revise · imprima</span></div>
+        <p id="cv2-itinerary-order-help" className="cv2-cte-hint">Use as setas ou altere o número da posição. Marque cada parada após revisar seus dados.</p>
+        <ol className="cv2-itinerary-list">{report.stops.map((stop,index)=><li className={`cv2-journey-stop ${stop.tipo} ${stop.reviewed?'reviewed':''}`} key={stop.id}><input key={index} className="cv2-itinerary-position" type="number" min="1" max={report.stops.length} step="1" defaultValue={index+1} aria-label={`Posição da parada ${index+1}`} aria-describedby="cv2-itinerary-order-help" onFocus={event=>event.target.select()} onBlur={event=>{
           const target=Number(event.target.value);
           event.target.value=String(index+1);
           if(Number.isInteger(target) && target>=1 && target<=report.stops.length)move(stop.id,target-1);
         }} onKeyDown={event=>{
           if(event.key==='Enter'){event.preventDefault();event.currentTarget.blur();}
           if(event.key==='Escape'){event.preventDefault();event.stopPropagation();event.currentTarget.value=String(index+1);event.currentTarget.blur();}
-        }} /><div><b>{stop.tipo==='coleta'?'Coleta':'Entrega'} · {stop.cliente||'Local não informado'}</b><small>{stop.carga} · {[stop.cidade,stop.uf].filter(Boolean).join('/')} · {stop.volumes==null?'Volumes a distribuir':`${formatVolumes(stop.volumes)} volume(s)`}</small>{stop.endereco && <small>{stop.endereco}</small>}</div><button className="btn" aria-label={`Subir parada ${index+1}`} disabled={index===0} onClick={()=>move(stop.id,index-1)}>↑</button><button className="btn" aria-label={`Descer parada ${index+1}`} disabled={index===report.stops.length-1} onClick={()=>move(stop.id,index+1)}>↓</button></li>)}</ol>
+        }} /><div className="cv2-stop-details"><b>{stop.tipo==='coleta'?'Coleta':'Entrega'} · {stop.cliente||'Local não informado'}</b><small>{stop.carga} · {[stop.cidade,stop.uf].filter(Boolean).join('/')} · {stop.volumes==null?'Volumes a distribuir':`${formatVolumes(stop.volumes)} volume(s)`}</small>{stop.endereco && <small>{stop.endereco}</small>}{(stop.extras||[]).map(extra=><div className="cv2-extra-item" key={extra.id}><span>Extra: {extra.description} · {formatVolumes(extra.quantity)} volume(s)</span><button type="button" className="btn" aria-label={`Remover extra ${extra.description}`} onClick={()=>removeExtra(stop.id,extra.id)}>Remover</button></div>)}</div><div className="cv2-stop-controls"><button type="button" className="btn cv2-review-button" aria-pressed={!!stop.reviewed} aria-label={`Revisar parada ${index+1}`} onClick={()=>toggleReview(stop.id)}>{stop.reviewed?"✓ Revisada":"Revisar"}</button><button className="btn" aria-label={`Subir parada ${index+1}`} disabled={index===0} onClick={()=>move(stop.id,index-1)}>↑</button><button className="btn" aria-label={`Descer parada ${index+1}`} disabled={index===report.stops.length-1} onClick={()=>move(stop.id,index+1)}>↓</button></div></li>)}</ol>
       </>}
-    </div><footer className="cv2-modal-actions"><button className="btn" onClick={close}>Fechar</button><button className="btn primary" disabled={!report||loading} onClick={print}>Imprimir itinerário</button></footer>
+    </div><footer className="cv2-modal-actions"><button className="btn" onClick={close}>Fechar</button><button className="btn primary" disabled={!report||loading||!!extraDraft} onClick={print}>Imprimir itinerário</button></footer>
   </Cv2Modal>}</>;
 }
 

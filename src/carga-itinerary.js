@@ -23,6 +23,8 @@ export function buildItinerary(loads) {
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function itineraryHtml(trip,loads,stops) {
   const summary=volumesSummary(loads);
+  const extras=stops.flatMap((stop,index)=>(stop.extras||[]).map(extra=>({...extra,stop,position:index+1})));
+  const extraTotal=extras.reduce((total,extra)=>total+extra.quantity,0);
   const document=trip.documentoErp ? `${trip.documentoErp.tipo==='viagem_frota'?'V':'C'}-${trip.documentoErp.numero}` : 'Não vinculado';
   const pending=summary.missing || stops.some(stop=>stop.volumes==null||stop.volumes==='');
   const groups=[{tipo:'coleta',title:'Coletas'},{tipo:'entrega',title:'Entregas'}]
@@ -34,12 +36,13 @@ export function itineraryHtml(trip,loads,stops) {
   </style></head><body><div class="toolbar"><span>Itinerário · lista de conferência A4</span><div><button id="close-print">Fechar</button><button id="print-document">Imprimir</button></div></div><main class="sheet">
   <header><div><h1>Itinerário de conferência</h1><small>Rodobach · Coletas e entregas</small></div><div class="reference"><b>${escape(trip.numero)}</b><small>Documento: ${escape(document)}</small></div></header>
   <div class="meta"><span><b>Placa:</b> ${escape(trip.placa||'Não informada')}</span><span><b>Motorista:</b> ${escape(trip.motorista||'Não informado')}</span><span><b>Data:</b> ${escape(String(trip.data||'').slice(0,10).split('-').reverse().join('/'))}</span>${trip.numeroMotorista?`<span><b>Contato:</b> ${escape(trip.numeroMotorista)}</span>`:''}</div>
-  <p class="summary"><b>Volumes previstos:</b> ${escape(summary.text)} · ${loads.length} carga(s) · ${stops.length} parada(s) &nbsp; <b>Total carregado:</b> __________</p>
+  <p class="summary"><b>Volumes previstos:</b> ${escape(summary.text)} · ${loads.length} carga(s) · ${stops.length} parada(s)${extras.length?` · <b>Volumes extras:</b> ${escape(formatVolumes(extraTotal))} (separados da carga)`:``} &nbsp; <b>Total carregado:</b> __________</p>
   <p class="instruction">Marque a caixa após conferir cada parada. Anote os volumes conferidos. A numeração identifica a posição da parada no itinerário.</p>
   ${pending?'<p class="pending-note"><b>Volumes pendentes:</b> complete as quantidades não informadas antes da saída. Campo vazio não significa zero.</p>':''}
   ${groups.map(group=>`<table data-stop-type="${group.tipo}"><caption>${group.title}</caption><colgroup><col style="width:5%"><col style="width:6%"><col style="width:14%"><col style="width:40%"><col style="width:17%"><col style="width:9%"><col style="width:9%"></colgroup><thead><tr><th class="center">OK</th><th class="center">Nº</th><th>Tipo / carga</th><th>Cliente / local</th><th>Material / NF</th><th class="center">Vol. prev.</th><th class="center">Vol. conf.</th></tr></thead><tbody>
   ${group.items.map(({stop,index})=>`<tr class="itinerary-stop"><td class="center check"><span class="box" aria-label="Conferir parada ${index+1}"></span></td><td class="center">${index+1}</td><td><b>${stop.tipo==='coleta'?'Coleta':'Entrega'}</b><small>${escape(stop.carga)}</small></td><td><b>${escape(stop.cliente||'Cliente/local não informado')}</b><small>${escape([stop.cidade,stop.uf].filter(Boolean).join(' / ')||'Cidade não informada')}</small>${stop.endereco?`<small>${escape(stop.endereco)}</small>`:''}</td><td>${escape(stop.material||'—')}${stop.nf?`<small>NF: ${escape(stop.nf)}</small>`:''}</td><td class="center">${stop.volumes==null||stop.volumes===''?'A definir':escape(formatVolumes(stop.volumes))}</td><td><span class="write-line"></span></td></tr>`).join('')}
   </tbody></table>`).join('')}
+  ${extras.length?`<table data-extra-volumes><caption>Volumes extras · conferir separadamente da carga</caption><thead><tr><th class="center">OK</th><th>Parada / cliente</th><th>Item extra</th><th>Vol. prev.</th><th>Vol. conf.</th></tr></thead><tbody>${extras.map(extra=>`<tr><td class="center"><span class="box" aria-label="Conferir volume extra"></span></td><td>${extra.position}. ${extra.stop.tipo==='coleta'?'Coleta':'Entrega'} · ${escape(extra.stop.cliente||'Local não informado')}<small>${escape(extra.stop.carga)}</small><small>${escape([extra.stop.cidade,extra.stop.uf].filter(Boolean).join(' / '))}</small></td><td>${escape(extra.description)}</td><td class="center">${escape(formatVolumes(extra.quantity))}</td><td><span class="write-line"></span></td></tr>`).join('')}</tbody></table>`:''}
   <div class="signatures"><div>Conferente · nome e assinatura</div><div>Motorista · nome e assinatura</div></div>
   </main></body></html>`;
 }
