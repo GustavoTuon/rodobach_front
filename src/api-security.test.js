@@ -2,6 +2,19 @@
 import { test, expect, vi, afterEach } from "vitest";
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
 
+test("task requests explain network and gateway failures without ending the session", async () => {
+  const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+  await import("./api.js");
+  localStorage.setItem("rodobach_token", "test-token");
+  fetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+  await expect(window.RB_API.noteTasks()).rejects.toThrow("Não foi possível conectar ao servidor");
+  for (const status of [502, 503, 504]) {
+    fetch.mockResolvedValueOnce({ ok: false, status });
+    await expect(window.RB_API.noteTasks()).rejects.toMatchObject({ status, message: "O servidor está temporariamente indisponível. Tente atualizar em alguns instantes." });
+  }
+  expect(localStorage.getItem("rodobach_token")).toBe("test-token");
+});
+
 test("API requests preserve authentication and use a deadline", async () => {
   localStorage.setItem("rodobach_token", "test-token");
   const fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ rows: [] }) });

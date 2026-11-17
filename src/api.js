@@ -31,14 +31,26 @@ const apiRequest = (path, options = {}) => trackLoadingActivity(() => requestDat
 async function requestData(path, options = {}) {
   const token = localStorage.getItem(TOKEN_KEY);
 
-  const response = await fetchWithTimeout(`${API_BASE}${path}`, {
+  let response;
+  try {
+    response = await fetchWithTimeout(`${API_BASE}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {}),
     },
-  });
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error("Não foi possível conectar ao servidor. Verifique sua conexão e tente atualizar. Se persistir, o serviço pode estar indisponível.", { cause: error });
+    }
+    throw error;
+  }
+
+  if ([502, 503, 504].includes(response.status)) {
+    throw Object.assign(new Error("O servidor está temporariamente indisponível. Tente atualizar em alguns instantes."), { status: response.status });
+  }
 
   if (response.status === 401) {
     localStorage.removeItem(TOKEN_KEY);
