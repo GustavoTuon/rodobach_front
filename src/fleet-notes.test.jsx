@@ -7,8 +7,8 @@ afterEach(()=>{cleanup();localStorage.clear();vi.restoreAllMocks();});
 function api(){window.RB_API={
  noteFleet:vi.fn().mockResolvedValue({vehicles:[{plate:'ABC1234',model:'VOLVO FH',category:'carreta',implements:['DEF5678']},{plate:'GHI9012',model:'VW 24.280',category:'caminhao',implements:[]},{plate:'CAR1234',model:'VW Golf',category:'carro',implements:[]},{plate:'DEF5678',model:'RANDON',category:'implemento',implements:[]}]}),
  noteTasks:vi.fn().mockResolvedValue({tasks:[]}),listNotes:vi.fn().mockResolvedValue({notes:[]}),notePlates:vi.fn().mockResolvedValue({plates:[]}),
- createNoteTask:vi.fn(async b=>({tasks:b.plates.map(plate=>({id:b.id,title:b.title,plate,done:false,version:1}))})),
- updateNoteTask:vi.fn(async(t,done)=>({task:{...t,done,version:t.version+1}}))
+ createNoteTask:vi.fn(async b=>({tasks:b.plates.map(plate=>({id:b.id,title:b.title,plate,done:false,version:1,authorId:42,canEdit:true}))})),
+ updateNoteTask:vi.fn(async(t,changes)=>({task:{...t,...changes,version:t.version+1}}))
 };}
 it('lança para várias placas e conclui cada uma separadamente',async()=>{
  api();render(<Fleet user={{id:42}}/>);
@@ -41,7 +41,7 @@ it('busca pelo modelo e preserva rascunhos ao trocar de veículo',async()=>{
  expect(screen.getByLabelText('Placa (opcional)').value).toBe('ABC1234');
 });
 it('falha ao concluir mantém a tarefa pendente e acesso de consulta bloqueia criação',async()=>{
- api();window.RB_API.noteTasks.mockResolvedValue({tasks:[{id:'t',plate:'ABC1234',title:'Adesivo',done:false,version:1}]});
+ api();window.RB_API.noteTasks.mockResolvedValue({tasks:[{id:'t',plate:'ABC1234',title:'Adesivo',done:false,version:1,authorId:42,canEdit:true}]});
  window.RB_API.updateNoteTask.mockRejectedValue(new Error('Sem conexão'));
  const view=render(<Fleet user={{id:42}}/>);fireEvent.click(await screen.findByRole('button',{name:/ABC1234/}));
  const region=screen.getByRole('region',{name:'Tarefas de ABC1234'});fireEvent.click(within(region).getByRole('checkbox'));
@@ -58,8 +58,68 @@ it('oculta carros e implementos por padrão, permite filtrar e mostra modelo e p
  fireEvent.click(screen.getByRole('button',{name:/ABC1234/}));expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('0');
 });
 it('tarefas antigas de implementos aparecem no cavalo',async()=>{
- api();window.RB_API.noteTasks.mockResolvedValue({tasks:[{id:'old',plate:'DEF5678',title:'Revisar lona',done:false,version:1}]});
+ api();window.RB_API.noteTasks.mockResolvedValue({tasks:[{id:'old',plate:'DEF5678',title:'Revisar lona',done:false,version:1,authorId:42,canEdit:true}]});
  render(<Fleet user={{id:42}}/>);fireEvent.click(await screen.findByRole('button',{name:/ABC1234/}));
  expect(within(screen.getByRole('region',{name:'Tarefas de ABC1234'})).getByText('Revisar lona')).toBeTruthy();
  expect(screen.queryByRole('button',{name:/DEF5678/})).toBeNull();
+});
+
+it('edita a descrição só na placa escolhida e permite cancelar',async()=>{
+ api();const task={id:'t',plate:'ABC1234',title:'Adesivo',done:true,version:1,authorId:42,canEdit:true};
+ window.RB_API.noteTasks.mockResolvedValue({tasks:[task,{...task,plate:'GHI9012'}]});
+ render(<Fleet user={{id:42}}/>);fireEvent.click(await screen.findByRole('button',{name:/ABC1234/}));
+ fireEvent.click(screen.getByRole('button',{name:'Editar tarefa: Adesivo'}));
+ fireEvent.change(screen.getByLabelText('Descrição da tarefa'),{target:{value:'Revisar freios'}});
+ fireEvent.click(screen.getByRole('button',{name:'Salvar alterações'}));
+ await screen.findByText('Tarefa atualizada.');
+ expect(window.RB_API.updateNoteTask).toHaveBeenCalledWith(task,{title:'Revisar freios'});
+ expect(within(screen.getByRole('region',{name:'Tarefas de ABC1234'})).getByRole('checkbox').checked).toBe(true);
+ fireEvent.click(screen.getByRole('button',{name:/GHI9012/}));
+ fireEvent.click(screen.getByRole('button',{name:'Editar tarefa: Adesivo'}));
+ fireEvent.change(screen.getByLabelText('Descrição da tarefa'),{target:{value:'Outro texto'}});
+ fireEvent.click(within(screen.getByRole('form',{name:'Editar tarefa'})).getByRole('button',{name:'Cancelar'}));
+ expect(screen.getByRole('button',{name:'Editar tarefa: Adesivo'})).toBeTruthy();
+ expect(window.RB_API.updateNoteTask).toHaveBeenCalledTimes(1);
+});
+it('mostra tarefas compartilhadas sem permitir alteração por outro autor',async()=>{
+ api();window.RB_API.noteTasks.mockResolvedValue({tasks:[{id:'t',plate:'ABC1234',title:'Adesivo',done:false,version:1,authorId:77,canEdit:false}]});
+ render(<Fleet user={{id:42}}/>);fireEvent.click(await screen.findByRole('button',{name:/ABC1234/}));
+ const region=screen.getByRole('region',{name:'Tarefas de ABC1234'});
+ expect(within(region).getByText('Adesivo')).toBeTruthy();expect(within(region).getByRole('checkbox').disabled).toBe(true);
+ expect(screen.queryByRole('button',{name:'Editar tarefa: Adesivo'})).toBeNull();
+});
+it('preserva texto digitado quando a edição falha',async()=>{
+ api();window.RB_API.noteTasks.mockResolvedValue({tasks:[{id:'t',plate:'ABC1234',title:'Adesivo',done:false,version:1,authorId:42,canEdit:true}]});
+ window.RB_API.updateNoteTask.mockRejectedValue(new Error('Sem conex?o'));
+ render(<Fleet user={{id:42}}/>);fireEvent.click(await screen.findByRole('button',{name:/ABC1234/}));
+ fireEvent.click(screen.getByRole('button',{name:'Editar tarefa: Adesivo'}));
+ fireEvent.change(screen.getByLabelText('Descrição da tarefa'),{target:{value:'Revisar freios'}});
+ fireEvent.click(screen.getByRole('button',{name:'Salvar alterações'}));
+ await screen.findByText('Sem conex?o');expect(screen.getByLabelText('Descrição da tarefa').value).toBe('Revisar freios');
+});
+
+it('confirms deletion, removes only selected plate and allows cancel',async()=>{
+ api();const task={id:'t',plate:'ABC1234',title:'Adesivo',done:false,version:1,authorId:42,canEdit:true};
+ window.RB_API.noteTasks.mockResolvedValue({tasks:[task,{...task,plate:'GHI9012'}]});
+ window.RB_API.deleteNoteTask=vi.fn().mockResolvedValue({ok:true});
+ const confirm=vi.spyOn(window,'confirm').mockReturnValue(false);
+ render(<Fleet user={{id:42}}/>);fireEvent.click(await screen.findByRole('button',{name:/ABC1234/}));
+ fireEvent.click(screen.getByRole('button',{name:'Excluir tarefa: Adesivo'}));expect(window.RB_API.deleteNoteTask).not.toHaveBeenCalled();
+ confirm.mockReturnValue(true);fireEvent.click(screen.getByRole('button',{name:'Excluir tarefa: Adesivo'}));
+ await waitFor(()=>expect(screen.queryByRole('button',{name:'Excluir tarefa: Adesivo'})).toBeNull());
+ expect(window.RB_API.deleteNoteTask).toHaveBeenCalledWith(task);expect(confirm).toHaveBeenCalledWith(expect.stringContaining('ABC1234'));
+ fireEvent.click(screen.getByRole('button',{name:/GHI9012/}));expect(screen.getByRole('button',{name:'Excluir tarefa: Adesivo'})).toBeTruthy();
+});
+it('failed deletion keeps task and read-only users cannot delete',async()=>{
+ api();const task={id:'t',plate:'ABC1234',title:'Adesivo',done:false,version:1,authorId:42,canEdit:true};
+ window.RB_API.noteTasks.mockResolvedValue({tasks:[task]});window.RB_API.deleteNoteTask=vi.fn().mockRejectedValue(new Error('Sem conexao'));
+ vi.spyOn(window,'confirm').mockReturnValue(true);
+ const view=render(<Fleet user={{id:42}}/>);fireEvent.click(await screen.findByRole('button',{name:/ABC1234/}));
+ fireEvent.click(screen.getByRole('button',{name:'Excluir tarefa: Adesivo'}));await screen.findByText('Sem conexao');
+ expect(screen.getByRole('button',{name:'Excluir tarefa: Adesivo'})).toBeTruthy();
+ view.rerender(<Fleet user={{id:42,readOnly:true}}/>);expect(screen.queryByRole('button',{name:'Excluir tarefa: Adesivo'})).toBeNull();
+ view.rerender(<Fleet user={{id:77}}/>);
+ window.RB_API.noteTasks.mockResolvedValue({tasks:[{...task,canEdit:false}]});
+ fireEvent.click(screen.getByRole('button',{name:'Atualizar'}));
+ await waitFor(()=>expect(screen.queryByRole('button',{name:'Excluir tarefa: Adesivo'})).toBeNull());
 });
