@@ -4,6 +4,18 @@ import {it,expect,vi,afterEach} from 'vitest';
 import {render,screen,fireEvent,cleanup,waitFor} from '@testing-library/react';
 import ExpensePosting from './expense-posting.jsx';
 afterEach(cleanup);
+it('informa a origem da placa e alerta divergências nos resultados',async()=>{
+  window.RB_API={searchPlantaoErpDocuments:vi.fn().mockResolvedValue({documents:[
+    {number:'527864',plate:'RAA8G18',amount:2654.59,plateSource:'invoice'},
+    {number:'527865',plate:'RAA8G18',amount:100,plateSource:'financial',plateConflict:true,financialPlate:'RAA8G18',invoicePlate:'BBB1C23'},
+  ]})};
+  render(<ExpensePosting record={{plate:'RAA8G18',amount:2654.59}} onSave={vi.fn()} onClose={vi.fn()}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Buscar documentos'}));
+  expect(await screen.findByText('Placa identificada na nota de entrada')).toBeTruthy();
+  expect(screen.getByRole('status').textContent).toContain('Financeiro: RAA8G18; nota de entrada: BBB1C23');
+  fireEvent.click(screen.getByRole('button',{name:/Documento 527864/}));
+  expect(screen.getByLabelText('Número do documento no financeiro').value).toBe('527864');
+});
 it('busca o documento financeiro e salva sem alterar pagamento ou conferência',async()=>{
   window.RB_API={searchPlantaoErpDocuments:vi.fn().mockResolvedValue({documents:[{number:'123',company:'1',series:'A',installment:'1',supplier:'Oficina',amount:100}]})};
   const save=vi.fn().mockResolvedValue(true),close=vi.fn();
