@@ -37,6 +37,8 @@ export default function ExpensePosting({record,onSave,onClose,saving,review=fals
       {results.documents.map((item,index)=><button type="button" className="mp-fleet-option" key={index} disabled={saving} onClick={()=>{setDocument(String(item.number || item.document || ''));setPosted(true);setResults(null);}}>
         <strong>Documento {item.number} · Empresa {item.company} · Série {item.series || '—'} · Parcela {item.installment}</strong>
         <small>{item.supplier} · {item.plate || 'Sem placa'} · {Number(item.amount).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</small>
+        {item.plateSource === 'invoice' && <small>Placa identificada na nota de entrada</small>}
+        {item.plateConflict && <small role="status">Atenção: placas diferentes no ERP. Financeiro: {item.financialPlate}; nota de entrada: {item.invoicePlate}. Confira antes de vincular.</small>}
         <small>Referência: {item.document || '—'} · Emissão: {item.date ? String(item.date).slice(0,10).split('-').reverse().join('/') : '—'}</small>
       </button>)}
       {results.hasMore && <p>Exibindo 30 resultados. Refine a busca para encontrar o documento.</p>}
