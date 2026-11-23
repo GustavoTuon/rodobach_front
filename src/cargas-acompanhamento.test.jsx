@@ -5,10 +5,10 @@ import {cleanup,render,screen,fireEvent,waitFor} from '@testing-library/react';
 import {ForecastFields,ForecastDashboard,ForecastHistory,NotLoadedForm} from './cargas-acompanhamento.jsx';
 afterEach(()=>{cleanup();vi.restoreAllMocks();});
 it('reagendamento pede motivo e informa a previsao anterior inclusive ao remover',()=>{
-  const set=vi.fn();render(<ForecastFields form={{previsao:''}} set={set} initial={{previsao:'2026-11-24T08:30'}} kind="carga"/>);
-  expect(screen.getByLabelText('Motivo do reagendamento').required).toBe(true);
+  const set=vi.fn();render(<ForecastFields form={{previsaoCarregamento:''}} set={set} initial={{previsaoCarregamento:'2026-11-24T08:30'}} kind="carga"/>);
+  expect(screen.getByLabelText('Motivo do reagendamento do carregamento').required).toBe(true);
   fireEvent.change(screen.getByLabelText(/Previsão de carregamento/),{target:{value:'2026-11-25T09:00'}});
-  expect(set).toHaveBeenCalledWith('previsaoAnterior','2026-11-24T08:30');
+  expect(set).toHaveBeenCalledWith('carregamentoAnterior','2026-11-24T08:30');
 });
 it('painel filtra pelo prazo e permite recuperar erro sem exibir contagem antiga',async()=>{
   const filter=vi.fn();window.RB_API={getPrevisoesV2:vi.fn().mockRejectedValueOnce(new Error('rede')).mockResolvedValue({carga:{vencida:4,hoje:2,amanha:1,sem_previsao:8}})};
@@ -44,8 +44,16 @@ it('cadastro envia previsao e duplicacao nao copia a programacao antiga',async()
   window.RB_API={listCargaResponsaveis:vi.fn(async()=>[{codigo:'1',empresa:'1',nome:'Responsável teste'}]),createCargaV2:save};
   const {Cv2CargaForm}=await import('./screens/cargas-viagens-v2.jsx');
   render(<Cv2CargaForm duplicateFrom={{codigo:'C-1',previsao:'2026-11-24T08:00',responsavel:{codigo:'1',empresa:'1'},paradas:[]}} onSaved={()=>{}}/>);
-  const date=screen.getByLabelText(/Previsão de carregamento/);expect(date.value).toBe('');
-  await screen.findByRole('option',{name:'Responsável teste'});fireEvent.change(date,{target:{value:'2026-11-25T08:00'}});
+  expect(screen.queryByLabelText(/Previsão de carregamento/)).toBeNull();
+  await screen.findByRole('option',{name:'Responsável teste'});
   fireEvent.click(screen.getByRole('button',{name:'Cadastrar carga',exact:true}));
-  await waitFor(()=>expect(save).toHaveBeenCalledWith(expect.objectContaining({previsao:'2026-11-25T08:00'})));
+  await waitFor(()=>expect(save).toHaveBeenCalled());
+  expect(save.mock.calls[0][0].previsao).toBeUndefined();
+});
+it('as duas previsoes da viagem sao opcionais e independentes',()=>{
+ const set=vi.fn();render(<><ForecastFields form={{}} set={set} kind="carregamento"/><ForecastFields form={{}} set={set} kind="viagem"/></>);
+ const loading=screen.getByLabelText(/Previsão de carregamento/),delivery=screen.getByLabelText(/Previsão de entrega/);
+ expect(loading.required).toBe(false);expect(delivery.required).toBe(false);
+ fireEvent.change(loading,{target:{value:'2026-11-25T08:00'}});
+ expect(set).toHaveBeenCalledWith('previsaoCarregamento','2026-11-25T08:00');expect(delivery.value).toBe('');
 });
