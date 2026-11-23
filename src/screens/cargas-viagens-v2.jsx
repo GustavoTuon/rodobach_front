@@ -1,3 +1,4 @@
+import { ForecastFields, ForecastBadge, ForecastDashboard, ForecastHistory, NotLoadedForm, NotLoadedReportButton } from "../cargas-acompanhamento.jsx";
 import { sameCargaDocumento } from "../carga-documentos.js";
 import { createPortal } from 'react-dom';
 import { buildItinerary, itineraryHtml, formatVolumes, volumesSummary } from '../carga-itinerary.js';
@@ -6,6 +7,7 @@ import { QuoteHistoryGrid } from './quote-history-grid.jsx';
 const { useEffect, useState, useRef } = React;
 
 const CV2_STATUS = {
+  nao_carregada: {label:"Não carregada",tone:"neutral"},
   aguardando_viagem: { label: "Somente carga", tone: "neutral" },
   aguardando_cte: { label: "Aguardando CT-e", tone: "warning" },
   em_transito: { label: "Em trânsito", tone: "blue" },
@@ -259,6 +261,7 @@ export function Cv2CargaForm({ initial, duplicateFrom, user, onClose, onSaved })
             <Cv2Field label="Condição de pagamento"><input value={form.condicaoPagamento} onChange={(e) => set("condicaoPagamento", e.target.value)} placeholder="Ex.: 30 dias" /></Cv2Field>
             <Cv2Field label="Valor do cliente (R$)"><input type="number" min="0" step="0.01" value={form.valorCliente} onChange={(e) => set("valorCliente", e.target.value)} /></Cv2Field>
           </div>
+          <ForecastFields form={form} set={set} initial={initial} kind="carga"/>
           <div className="cv2-section-title"><span>2</span><div><b>Rota e mercadoria</b><small>Esses dados alimentarão a consulta de fretes já realizados.</small></div></div>
           <div className="cv2-grid four">
             <Cv2Autocomplete label="Cidade de origem" value={form.origem} onChange={(value) => set("origem", value)}
@@ -354,6 +357,7 @@ export function Cv2ViagemForm({ initial, initialCargaId, cargas, onClose, onSave
             renderOption={(item) => <div className="cv2-vehicle-option"><strong>{item.placa}</strong><span>{item.ownershipType === "FROTA" ? "FROTA" : "TERCEIRO"}</span><em>{item.motorista || item.veiculo || "Sem motorista vinculado"}</em></div>} />
           <Cv2Field label="KM previsto"><input type="number" min="0" step="0.1" value={form.km} onChange={(e) => set("km", e.target.value)} /></Cv2Field>
         </div>
+        <ForecastFields form={form} set={set} initial={initial} kind="viagem"/>
         {form.tipoPropriedade && <div className={`cv2-alert ${isFrota ? "success" : "info"}`}><b>Veículo {isFrota ? "de frota" : "terceiro"}.</b> {isFrota ? "Motorista contratado: valor do motorista não é necessário." : "Informe os dados e o valor do motorista."}</div>}
         <div className="cv2-section-title"><span>2</span><div><b>Motorista, ANTT e pagamento</b><small>Ao escolher a placa, os dados cadastrados são preenchidos automaticamente.</small></div></div>
         <div className="cv2-grid three">
@@ -857,11 +861,17 @@ export function Cv2TripDetails({ viagem: initialViagem, onClose, onLinkCte, onDu
   if(linking) return <Cv2ErpDocumentModal viagem={viagem} onClose={()=>setLinking(false)} onSaved={documentoErp=>{setViagem(current=>({...current,documentoErp}));setLinking(false);}} />;
   return <Cv2Modal title={`Viagem ${viagem.numero}`} subtitle={`${cv2Date(viagem.data)} · ${viagem.placa || "Sem placa"}`} onClose={onClose} wide>
     <div className="cv2-modal-body">
+      <section className="cv2-delivery-forecast" aria-label="Data prevista de entrega">
+        <span>Data prevista de entrega</span>
+        {viagem.previsao ? <ForecastBadge item={viagem}/> : <strong>Não informada</strong>}
+        <small>{viagem.previsao ? 'Horário de Brasília' : 'Informe a previsão ao editar a viagem.'}</small>
+      </section>
+      <ForecastHistory item={viagem}/>
       <div className="cv2-detail-grid"><div><span>Operação</span><Cv2Status value={viagem.situacao} vehicleLinked={Boolean(viagem.placa)} /></div><div><span>Financeiro</span><Cv2FinancialStatus value={viagem.financeiro} /></div><div><span>Motorista</span><b>{viagem.motorista || "—"}</b></div><div><span>KM previsto</span><b>{viagem.km ?? "—"}</b></div><div><span>ANTT / RNTRC</span><b>{viagem.antt || "—"}</b></div><div><span>Celular / CNH</span><b>{[viagem.numeroMotorista, viagem.cnh].filter(Boolean).join(" · ") || "—"}</b></div></div>
       <Cv2TripBilling financeiro={viagem.financeiro} />
       <section className="cv2-erp-link"><div><span>Documento para impressão</span><strong>{viagem.documentoErp ? `${cv2ErpLabel(viagem.documentoErp)} ${viagem.documentoErp.numero}` : "Viagem frota / carta frete não vinculada"}</strong><small>{viagem.documentoErp ? `Empresa ${viagem.documentoErp.empresa}${viagem.documentoErp.serie ? ` · Série ${viagem.documentoErp.serie}` : ""}` : "Consulte o ERP e selecione o documento desta placa."}</small></div><button className="btn primary" onClick={()=>setLinking(true)}>{viagem.documentoErp?"Gerenciar vínculo":"Vincular viagem / carta frete"}</button></section>
       <h3 className="cv2-subtitle">Cargas vinculadas</h3>
-      <div className="cv2-linked-loads">{viagem.cargas.map((carga) => { const hasCte = (carga.documentos || []).some(cv2IsTransportDocument); return <div key={carga.id}><div><strong>{carga.codigo} · {carga.cliente}</strong><span>{carga.origem}/{carga.ufOrigem} → {carga.destino}/{carga.ufDestino}</span><small>{carga.bonificacao ? "Frete bonificado" : `CT-es: ${cv2CteNumbers(carga) || "Nenhum vinculado"}`}</small></div><div className="cv2-linked-statuses"><Cv2Status value={carga.status} /><Cv2FinancialStatus value={carga.financeiro} /><button className={`btn ${hasCte || carga.bonificacao ? "" : "primary"}`} onClick={() => onLinkCte(carga)}><Icon name="file" size={13} /> {carga.bonificacao ? "Gerenciar bonificação" : hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button><Cv2PrintLoadsButton ids={[carga.id]}>Imprimir carga</Cv2PrintLoadsButton>{onDuplicateCarga && <button className="btn" onClick={() => onDuplicateCarga(carga)}>Duplicar carga</button>}</div></div>; })}</div>
+      <div className="cv2-linked-loads">{viagem.cargas.map((carga) => { const hasCte = (carga.documentos || []).some(cv2IsTransportDocument); return <div key={carga.id}><div><strong>{carga.codigo} · {carga.cliente}</strong><span>{carga.origem}/{carga.ufOrigem} → {carga.destino}/{carga.ufDestino}</span><small>{carga.bonificacao ? "Frete bonificado" : `CT-es: ${cv2CteNumbers(carga) || "Nenhum vinculado"}`}</small></div><div className="cv2-linked-statuses"><Cv2Status value={carga.status} /><Cv2FinancialStatus value={carga.financeiro} />{carga.status !== "nao_carregada" && <button className={`btn ${hasCte || carga.bonificacao ? "" : "primary"}`} onClick={() => onLinkCte(carga)}><Icon name="file" size={13} /> {carga.bonificacao ? "Gerenciar bonificação" : hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button>}<Cv2PrintLoadsButton ids={[carga.id]}>Imprimir carga</Cv2PrintLoadsButton>{onDuplicateCarga && <button className="btn" onClick={() => onDuplicateCarga(carga)}>Duplicar carga</button>}</div></div>; })}</div>
     </div>
     <footer className="cv2-modal-actions"><button className="btn" onClick={onClose}>Fechar</button><Cv2ItineraryButton viagemId={viagem.id} disabled={!viagem.cargas?.length} /><Cv2PrintLoadsButton viagemId={viagem.id} disabled={!viagem.cargas?.length}>Imprimir cargas da viagem</Cv2PrintLoadsButton><button className="btn primary" onClick={() => cv2PrintTrip(viagem)}>Imprimir folha da viagem</button></footer>
   </Cv2Modal>;
@@ -935,11 +945,13 @@ const CargasViagensV2 = ({ user }) => {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("aguardando_viagem");
   const [financialStatus, setFinancialStatus] = useState("");
+  const [forecastLevel,setForecastLevel] = useState("");
+  const [forecastRevision,setForecastRevision] = useState(0);
   const [seller, setSeller] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [cargaFilters, setCargaFilters] = useState(emptyCargaFilters());
   const [filterOptions, setFilterOptions] = useState({ empresas: [], origens: [], ufsOrigem: [], destinos: [], ufsDestino: [], materiais: [], vendedores: [] });
-  useEffect(() => { setSelectedLoads([]); }, [tab, query, status, financialStatus, seller, cargaFilters.empresa, cargaFilters.origem, cargaFilters.ufOrigem, cargaFilters.destino, cargaFilters.ufDestino, cargaFilters.material]);
+  useEffect(() => { setSelectedLoads([]); }, [tab, query, status, financialStatus, forecastLevel, seller, cargaFilters.empresa, cargaFilters.origem, cargaFilters.ufOrigem, cargaFilters.destino, cargaFilters.ufDestino, cargaFilters.material]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [modal, setModal] = useState(null);
@@ -969,11 +981,11 @@ const CargasViagensV2 = ({ user }) => {
   const load = async (refreshMeta = false) => {
     const version = ++loadVersion.current;
     setLoading(true); setError("");
-    if (refreshMeta || !metadataLoaded.current) refreshMetadata();
+    if (refreshMeta || !metadataLoaded.current) {refreshMetadata();setForecastRevision(n=>n+1);}
     try {
       const request = tab === "cargas"
-        ? window.RB_API.listCargasV2({ q: query, status, financeiro: financialStatus, responsavel: seller, ...cargaFilters, page, pageSize })
-        : window.RB_API.listViagensV2({ q: query, status, financeiro: financialStatus, responsavel: seller, page, pageSize });
+        ? window.RB_API.listCargasV2({ q: query, status, alerta: forecastLevel, financeiro: financialStatus, responsavel: seller, ...cargaFilters, page, pageSize })
+        : window.RB_API.listViagensV2({ q: query, status, alerta: forecastLevel, financeiro: financialStatus, responsavel: seller, page, pageSize });
       const result = await request;
       if (version !== loadVersion.current) return;
       const rows = Array.isArray(result) ? result : result.items || [];
@@ -988,7 +1000,7 @@ const CargasViagensV2 = ({ user }) => {
     const timer = setTimeout(load, 260);
     const refresh = setInterval(() => { if (!document.hidden) load(true); }, 60_000);
     return () => { clearTimeout(timer); clearInterval(refresh); loadVersion.current += 1; };
-  }, [tab, page, pageSize, query, status, financialStatus, seller, cargaFilters.empresa, cargaFilters.origem, cargaFilters.ufOrigem, cargaFilters.destino, cargaFilters.ufDestino, cargaFilters.material]);
+  }, [tab, page, pageSize, query, status, financialStatus, forecastLevel, seller, cargaFilters.empresa, cargaFilters.origem, cargaFilters.ufOrigem, cargaFilters.destino, cargaFilters.ufDestino, cargaFilters.material]);
   const saved = (kind, item) => {
     setModal(kind === "viagem" ? { type: "tripDone", item } : null);
     load(true);
@@ -1022,7 +1034,7 @@ const CargasViagensV2 = ({ user }) => {
     await load(true);
   };
   const useStatusShortcut = (nextStatus = "", nextFinancial = "") => {
-    setPage(1); setStatus(nextStatus); setFinancialStatus(nextFinancial);
+    setPage(1); setForecastLevel(""); setStatus(nextStatus); setFinancialStatus(nextFinancial);
   };
   const duplicateLoading = useRef(false);
   const [duplicating, setDuplicating] = useState(false);
@@ -1038,13 +1050,15 @@ const CargasViagensV2 = ({ user }) => {
   const cargaActions = (carga) => {
     const hasCte = carga.documentos.some(cv2IsTransportDocument);
     return <div className="cv2-row-actions">
+      <button className="btn" onClick={()=>setModal({type:"forecastHistory",item:carga})}>Acompanhamento</button>
+      {["aguardando_viagem","nao_carregada"].includes(carga.status) && !carga.viagemId && <button className="btn" disabled={user?.readOnly} onClick={()=>setModal({type:"notLoaded",item:carga})}>{carga.status==="nao_carregada"?"Reabrir carga":"Não carregada"}</button>}
       <button className="btn" disabled={duplicating} onClick={() => openDuplicateCarga(carga)}>Duplicar carga</button>
       {carga.status === "aguardando_viagem" && <button className="btn primary" onClick={() => openViagemForm(carga.id)}>Programar veículo</button>}
-      <button className={`btn ${hasCte || carga.bonificacao ? "" : "primary"}`} onClick={() => setModal({ type: "cte", item: carga })}>{carga.bonificacao ? "Gerenciar bonificação" : hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button>
+      {carga.status !== 'nao_carregada' && <button className={`btn ${hasCte || carga.bonificacao ? "" : "primary"}`} onClick={() => setModal({ type: "cte", item: carga })}>{carga.bonificacao ? "Gerenciar bonificação" : hasCte ? "Gerenciar CT-es" : "Vincular CT-e"}</button>}
       <details className="cv2-more"><summary aria-label="Mais ações">•••</summary><div>
         <button onClick={() => cv2PrintLoad(carga)}><Icon name="file" size={13} /> Imprimir folha da carga</button>
         <button onClick={() => setModal({ type: "carga", item: carga })}>Editar carga</button>
-        <button className="danger" onClick={() => setModal({ type: "deleteCarga", item: carga })}>Excluir carga</button>
+        {!carga.acompanhamento?.historico?.some(entry=>entry.tipo==="nao_carregada") && <button className="danger" onClick={() => setModal({ type: "deleteCarga", item: carga })}>Excluir carga</button>}
       </div></details>
     </div>;
   };
@@ -1066,17 +1080,19 @@ const CargasViagensV2 = ({ user }) => {
       <button className="cv2-kpi delivered" onClick={() => useStatusShortcut("entregue")}><span>Entregues</span><b>{summary.viagens_entregues || 0}</b></button>
       <button className="cv2-kpi paid" onClick={() => useStatusShortcut("", "quitado")}><span>Quitadas</span><b>{summary.viagens_quitadas || 0}</b></button>
     </div>}
-    <div className="cv2-tabbar"><div className="cv2-tabs"><button className={tab === "cargas" ? "active" : ""} onClick={() => { setTab("cargas"); setPage(1); setStatus("aguardando_viagem"); setFinancialStatus(""); setQuery(""); }}>Cargas <small>{summary.cargas || 0}</small></button><button className={tab === "viagens" ? "active" : ""} onClick={() => { setTab("viagens"); setPage(1); setStatus(""); setFinancialStatus(""); setQuery(""); }}>Viagens <small>{summary.viagens || 0}</small></button></div></div>
+    <div className="cv2-tabbar"><div className="cv2-tabs"><button className={tab === "cargas" ? "active" : ""} onClick={() => { setTab("cargas"); setPage(1); setForecastLevel(""); setStatus("aguardando_viagem"); setFinancialStatus(""); setQuery(""); }}>Cargas <small>{summary.cargas || 0}</small></button><button className={tab === "viagens" ? "active" : ""} onClick={() => { setTab("viagens"); setPage(1); setForecastLevel(""); setStatus(""); setFinancialStatus(""); setQuery(""); }}>Viagens <small>{summary.viagens || 0}</small></button></div></div>
     <div className="cv2-seller-bar"><label><span>Responsável exibido</span><select value={seller} onChange={(event) => { setPage(1); setSeller(event.target.value); }}><option value="">Todos os responsáveis</option>{(filterOptions.responsaveis || []).map((item) => <option key={`${item.empresa}:${item.codigo}`} value={item.nome}>{item.nome}</option>)}</select></label>{seller ? <small>A tela está mostrando somente cargas e viagens de <b>{seller}</b>.</small> : <small>A tela está mostrando cargas e viagens de <b>todos os responsáveis</b>.</small>}</div>
+    <ForecastDashboard kind={tab === "cargas" ? "carga" : "viagem"} selected={forecastLevel} revision={forecastRevision} onFilter={level=>{setPage(1);setStatus("");setFinancialStatus("");setForecastLevel(level);}}/>
     <div className="cv2-toolbar"><div className="cv2-search"><Icon name="search" /><input value={query} onChange={(e) => { setPage(1); setQuery(e.target.value); }} placeholder={tab === "cargas" ? "Buscar carga, cliente, cidade, placa..." : "Buscar viagem, placa, motorista ou CT-e..."} /></div><div className="cv2-filters">
-      <button className={!status && !financialStatus ? "active" : ""} onClick={() => { setPage(1); setStatus(""); setFinancialStatus(""); }}>Todas</button>
-      {tab === "cargas" && <button className={status === "aguardando_viagem" ? "active" : ""} onClick={() => { setPage(1); setStatus("aguardando_viagem"); setFinancialStatus(""); }}>Somente carga</button>}
-      <button className={status === "aguardando_cte" ? "active warning" : ""} onClick={() => { setPage(1); setStatus("aguardando_cte"); setFinancialStatus(""); }}>Aguardando CT-e</button>
-      <button className={status === "em_transito" ? "active info" : ""} onClick={() => { setPage(1); setStatus("em_transito"); setFinancialStatus(""); }}>Em trânsito</button>
-      <button className={status === "entregue" ? "active delivered" : ""} onClick={() => { setPage(1); setStatus("entregue"); setFinancialStatus(""); }}>Entregue</button>
+      <button className={!status && !financialStatus ? "active" : ""} onClick={() => { setPage(1); setForecastLevel(""); setStatus(""); setFinancialStatus(""); }}>Todas</button>
+      {tab === "cargas" && <button className={status === "aguardando_viagem" ? "active" : ""} onClick={() => { setPage(1); setForecastLevel(""); setStatus("aguardando_viagem"); setFinancialStatus(""); }}>Somente carga</button>}
+      <button className={status === "aguardando_cte" ? "active warning" : ""} onClick={() => { setPage(1); setForecastLevel(""); setStatus("aguardando_cte"); setFinancialStatus(""); }}>Aguardando CT-e</button>
+      <button className={status === "em_transito" ? "active info" : ""} onClick={() => { setPage(1); setForecastLevel(""); setStatus("em_transito"); setFinancialStatus(""); }}>Em trânsito</button>
+      <button className={status === "entregue" ? "active delivered" : ""} onClick={() => { setPage(1); setForecastLevel(""); setStatus("entregue"); setFinancialStatus(""); }}>Entregue</button>
+      {tab === "cargas" && <button className={status === "nao_carregada" ? "active" : ""} onClick={()=>{setPage(1);setForecastLevel("");setStatus("nao_carregada");setFinancialStatus("");}}>Não carregadas</button>}
       <span className="cv2-filter-divider" />
-      <button className={financialStatus === "em_aberto" ? "active open" : ""} onClick={() => { setPage(1); setStatus(""); setFinancialStatus(financialStatus === "em_aberto" ? "" : "em_aberto"); }}>Financeiro em aberto</button>
-      <button className={financialStatus === "quitado" ? "active paid" : ""} onClick={() => { setPage(1); setStatus(""); setFinancialStatus(financialStatus === "quitado" ? "" : "quitado"); }}>Quitado</button>
+      <button className={financialStatus === "em_aberto" ? "active open" : ""} onClick={() => { setPage(1); setForecastLevel(""); setStatus(""); setFinancialStatus(financialStatus === "em_aberto" ? "" : "em_aberto"); }}>Financeiro em aberto</button>
+      <button className={financialStatus === "quitado" ? "active paid" : ""} onClick={() => { setPage(1); setForecastLevel(""); setStatus(""); setFinancialStatus(financialStatus === "quitado" ? "" : "quitado"); }}>Quitado</button>
       {tab === "cargas" && <button className="cv2-filter-toggle" onClick={() => setFiltersOpen((value) => !value)}><Icon name="filter" size={13} /> Filtros {filtersOpen ? "▴" : "▾"}</button>}
     </div></div>
     {tab === "viagens" && <p className="cv2-muted">Para localizar um CT-e, digite o número ou a chave na busca. Abra Detalhes → Gerenciar CT-es para conferir ou desvincular documentos.</p>}
@@ -1089,19 +1105,22 @@ const CargasViagensV2 = ({ user }) => {
       <label><span>Material</span><input list="cv2-materiais" value={cargaFilters.material} onChange={(e) => setCargaFilter("material", e.target.value)} placeholder="Todos" /><datalist id="cv2-materiais">{filterOptions.materiais.map((item) => <option key={item} value={item} />)}</datalist></label>
     </div></div>}
     {error && <div className="cv2-alert error">{error}</div>}
+    {tab === "cargas" && status === "nao_carregada" && <NotLoadedReportButton/>}
     {tab === "cargas" && <div className="cv2-bulk-print"><div><strong>{selectedLoads.length} carga(s) selecionada(s)</strong><small>Selecione as cargas abaixo. A seleção é mantida entre páginas e limpa ao mudar os filtros.</small></div><button className="btn" disabled={!selectedLoads.length} onClick={() => setSelectedLoads([])}>Limpar seleção</button><Cv2PrintLoadsButton ids={selectedLoads}>Imprimir selecionadas ({selectedLoads.length})</Cv2PrintLoadsButton></div>}
     {tab === "cargas" ? <div className="cv2-table-wrap"><table className="cv2-table"><thead><tr><th className="cv2-select-cell"><input type="checkbox" aria-label="Selecionar todas as cargas desta página" checked={allPageSelected} disabled={loading || !cargas.length} onChange={togglePrintPage} ref={node => { if (node) node.indeterminate = !allPageSelected && cargas.some(carga => selectedLoads.includes(carga.id)); }} /></th><th>Carga / data</th><th>Clientes</th><th>Origem</th><th>Destino</th><th>Material / peso</th><th>Valor da carga</th><th>Placa / viagem</th><th>Operação</th><th>Financeiro</th><th></th></tr></thead><tbody>
       {!loading && !cargas.length && <tr><td colSpan="11"><div className="cv2-empty"><b>Nenhuma carga encontrada.</b><span>Ajuste os filtros.</span></div></td></tr>}
-      {cargas.map((carga) => <tr key={carga.id}><td className="cv2-select-cell"><input type="checkbox" aria-label={`Selecionar carga ${carga.codigo}`} checked={selectedLoads.includes(carga.id)} disabled={loading} onChange={() => togglePrintLoad(carga.id)} /></td><td><strong>{carga.codigo}</strong><small>{cv2Date(carga.data)}</small></td><td className="cv2-client-cell"><small className="cv2-client-line"><b>Inicial</b><span>{carga.cliente || "—"}</span></small><small className="cv2-client-line"><b>Entrega</b><span>{carga.clienteFinal || "—"}</span></small><small className="cv2-client-line"><b>Tomador</b><span>{carga.tomadorServico || "—"}</span></small></td><td><strong>{carga.origem || "—"}</strong><small>{carga.ufOrigem || "Sem UF"}</small></td><td><strong>{carga.destino || "—"}</strong><small>{carga.ufDestino || "Sem UF"}</small></td><td><strong>{carga.material || "—"}</strong><small>{cv2Weight(carga.peso)} ? {formatVolumes(carga.volumes)} vol.</small></td><td><strong>{cv2Money(carga.valorCliente)}</strong><small>{cv2Money(carga.valorTon)}/ton</small></td><td>{carga.placa ? <><strong className="cv2-plate">{carga.placa}</strong><small>{[carga.numeroViagem, carga.motorista].filter(Boolean).join(" · ")}</small></> : <><strong>Sem veículo</strong><small>Não programada</small></>}</td><td><Cv2Status value={carga.status} vehicleLinked={Boolean(carga.placa)} detail={carga.status === "aguardando_viagem" ? "Sem veículo programado" : ""} /></td><td><Cv2FinancialStatus value={carga.financeiro} /></td><td>{cargaActions(carga)}</td></tr>)}
+      {cargas.map((carga) => <tr key={carga.id}><td className="cv2-select-cell"><input type="checkbox" aria-label={`Selecionar carga ${carga.codigo}`} checked={selectedLoads.includes(carga.id)} disabled={loading} onChange={() => togglePrintLoad(carga.id)} /></td><td><strong>{carga.codigo}</strong><small>{cv2Date(carga.data)}</small><ForecastBadge item={carga}/></td><td className="cv2-client-cell"><small className="cv2-client-line"><b>Inicial</b><span>{carga.cliente || "—"}</span></small><small className="cv2-client-line"><b>Entrega</b><span>{carga.clienteFinal || "—"}</span></small><small className="cv2-client-line"><b>Tomador</b><span>{carga.tomadorServico || "—"}</span></small></td><td><strong>{carga.origem || "—"}</strong><small>{carga.ufOrigem || "Sem UF"}</small></td><td><strong>{carga.destino || "—"}</strong><small>{carga.ufDestino || "Sem UF"}</small></td><td><strong>{carga.material || "—"}</strong><small>{cv2Weight(carga.peso)} ? {formatVolumes(carga.volumes)} vol.</small></td><td><strong>{cv2Money(carga.valorCliente)}</strong><small>{cv2Money(carga.valorTon)}/ton</small></td><td>{carga.placa ? <><strong className="cv2-plate">{carga.placa}</strong><small>{[carga.numeroViagem, carga.motorista].filter(Boolean).join(" · ")}</small></> : <><strong>Sem veículo</strong><small>Não programada</small></>}</td><td><Cv2Status value={carga.status} vehicleLinked={Boolean(carga.placa)} detail={carga.status === "aguardando_viagem" ? "Sem veículo programado" : ""} /></td><td><Cv2FinancialStatus value={carga.financeiro} /></td><td>{cargaActions(carga)}</td></tr>)}
     </tbody></table></div> : <div className="cv2-table-wrap"><table className="cv2-table"><thead><tr><th>Viagem / data</th><th>Motorista / placa</th><th>Rota</th><th>Cargas</th><th>Peso total</th><th>Receita</th><th>Operação</th><th>Financeiro</th><th></th></tr></thead><tbody>
       {!loading && !viagens.length && <tr><td colSpan="9"><div className="cv2-empty"><b>Nenhuma viagem encontrada.</b><span>Programe um veículo usando as cargas disponíveis.</span></div></td></tr>}
-      {viagens.map((viagem) => { const first = viagem.cargas[0] || {}; const destinations = [...new Set(viagem.cargas.map((carga) => [carga.destino, carga.ufDestino].filter(Boolean).join("/")).filter(Boolean))]; const delivered = viagem.cargas.filter((carga) => carga.status === "entregue").length; return <tr key={viagem.id}><td><strong>{viagem.numero}</strong><small>{cv2Date(viagem.data)}</small></td><td><strong>{viagem.motorista || "—"}</strong>{viagem.placa ? <small><span className="cv2-plate">{viagem.placa}</span></small> : <small>Sem placa</small>}</td><td className="cv2-route"><strong>{first.origem ? `${first.origem}/${first.ufOrigem}` : "—"}</strong><span>{destinations.length === 1 ? ` → ${destinations[0]}` : destinations.length > 1 ? ` → ${destinations.length} destinos` : ""}</span></td><td><button className="cv2-load-count" onClick={() => setModal({ type: "details", item: viagem })}><strong>{viagem.cargas.length} {viagem.cargas.length === 1 ? "carga" : "cargas"}</strong><small>{delivered}/{viagem.cargas.length} entregue(s)</small></button></td><td><strong>{cv2Weight(viagem.cargas.reduce((sum, carga) => sum + carga.peso, 0))}</strong></td><td><strong>{cv2Money(viagem.cargas.reduce((sum, carga) => sum + carga.valorCliente, 0))}</strong></td><td><Cv2Status value={viagem.situacao} vehicleLinked={Boolean(viagem.placa)} detail={`${delivered}/${viagem.cargas.length} cargas entregues`} /></td><td><Cv2FinancialStatus value={viagem.financeiro} /></td><td><div className="cv2-row-actions"><button className="btn" onClick={() => setModal({ type: "details", item: viagem })}>Detalhes</button><button className="btn primary" onClick={() => cv2PrintTrip(viagem)}><Icon name="file" size={13} /> Imprimir</button><details className="cv2-more"><summary aria-label="Mais ações">•••</summary><div><Cv2ItineraryButton viagemId={viagem.id} disabled={!viagem.cargas?.length} /><Cv2PrintLoadsButton viagemId={viagem.id} disabled={!viagem.cargas?.length}>Imprimir cargas da viagem</Cv2PrintLoadsButton><button onClick={() => openViagemEdit(viagem)}><Icon name="wrench" size={13} /> Editar viagem</button><button onClick={() => setModal({ type: "cargaViagem", viagem })}>+ Adicionar carga</button><button className="danger" onClick={() => setModal({ type: "deleteViagem", item: viagem })}>Excluir viagem</button></div></details></div></td></tr>; })}
+      {viagens.map((viagem) => { const first = viagem.cargas[0] || {}; const destinations = [...new Set(viagem.cargas.map((carga) => [carga.destino, carga.ufDestino].filter(Boolean).join("/")).filter(Boolean))]; const delivered = viagem.cargas.filter((carga) => carga.status === "entregue").length; return <tr key={viagem.id}><td><strong>{viagem.numero}</strong><small>{cv2Date(viagem.data)}</small><ForecastBadge item={viagem}/></td><td><strong>{viagem.motorista || "—"}</strong>{viagem.placa ? <small><span className="cv2-plate">{viagem.placa}</span></small> : <small>Sem placa</small>}</td><td className="cv2-route"><strong>{first.origem ? `${first.origem}/${first.ufOrigem}` : "—"}</strong><span>{destinations.length === 1 ? ` → ${destinations[0]}` : destinations.length > 1 ? ` → ${destinations.length} destinos` : ""}</span></td><td><button className="cv2-load-count" onClick={() => setModal({ type: "details", item: viagem })}><strong>{viagem.cargas.length} {viagem.cargas.length === 1 ? "carga" : "cargas"}</strong><small>{delivered}/{viagem.cargas.length} entregue(s)</small></button></td><td><strong>{cv2Weight(viagem.cargas.reduce((sum, carga) => sum + carga.peso, 0))}</strong></td><td><strong>{cv2Money(viagem.cargas.reduce((sum, carga) => sum + carga.valorCliente, 0))}</strong></td><td><Cv2Status value={viagem.situacao} vehicleLinked={Boolean(viagem.placa)} detail={`${delivered}/${viagem.cargas.length} cargas entregues`} /></td><td><Cv2FinancialStatus value={viagem.financeiro} /></td><td><div className="cv2-row-actions"><button className="btn" onClick={() => setModal({ type: "details", item: viagem })}>Detalhes</button><button className="btn primary" onClick={() => cv2PrintTrip(viagem)}><Icon name="file" size={13} /> Imprimir</button><details className="cv2-more"><summary aria-label="Mais ações">•••</summary><div><Cv2ItineraryButton viagemId={viagem.id} disabled={!viagem.cargas?.length} /><Cv2PrintLoadsButton viagemId={viagem.id} disabled={!viagem.cargas?.length}>Imprimir cargas da viagem</Cv2PrintLoadsButton><button onClick={() => openViagemEdit(viagem)}><Icon name="wrench" size={13} /> Editar viagem</button><button onClick={() => setModal({ type: "cargaViagem", viagem })}>+ Adicionar carga</button><button className="danger" onClick={() => setModal({ type: "deleteViagem", item: viagem })}>Excluir viagem</button></div></details></div></td></tr>; })}
     </tbody></table></div>}
     <Cv2Pagination page={page} pageSize={pageSize} total={pageInfo.total} totalPages={pageInfo.totalPages}
       onPage={setPage} onPageSize={(value) => { setPage(1); setPageSize(value); }} />
+    {modal?.type === "forecastHistory" && <Cv2Modal title={`Acompanhamento ${modal.item.codigo}`} onClose={()=>setModal(null)}><div className="cv2-modal-body"><ForecastBadge item={modal.item}/><ForecastHistory item={modal.item}/></div></Cv2Modal>}
+    {modal?.type === "notLoaded" && <Cv2Modal title={modal.item.status==="nao_carregada"?`Reabrir ${modal.item.codigo}`:`Não carregada: ${modal.item.codigo}`} onClose={()=>setModal(null)}><NotLoadedForm item={modal.item} onClose={()=>setModal(null)} onSaved={()=>{setModal(null);load(true);}}/></Cv2Modal>}
     {modal?.type === "quote" && <Cv2QuoteModal user={user} sellers={filterOptions.vendedores || []} onClose={() => setModal(null)} />}
     {modal?.type === "carga" && <Cv2CargaForm initial={modal.item} user={user} onClose={() => setModal(null)} onSaved={(item) => saved("carga", item)} />}
-    {modal?.type === "duplicateCarga" && <Cv2CargaForm duplicateFrom={modal.item} user={user} onClose={() => setModal(null)} onSaved={(item) => { setTab("cargas"); setPage(1); setStatus("aguardando_viagem"); setFinancialStatus(""); setQuery(""); setCargaFilters(emptyCargaFilters()); setSeller(""); saved("carga", item); }} />}
+    {modal?.type === "duplicateCarga" && <Cv2CargaForm duplicateFrom={modal.item} user={user} onClose={() => setModal(null)} onSaved={(item) => { setTab("cargas"); setPage(1); setForecastLevel(""); setStatus("aguardando_viagem"); setFinancialStatus(""); setQuery(""); setCargaFilters(emptyCargaFilters()); setSeller(""); saved("carga", item); }} />}
     {modal?.type === "viagem" && <Cv2ViagemForm initial={modal.item} initialCargaId={modal.initialCargaId} cargas={modal.cargas || []} onClose={() => setModal(null)} onCreateCarga={(viagem) => setModal({ type: "cargaViagem", viagem })} onSaved={(item) => { setModal(modal.item ? null : { type: "tripDone", item }); load(true); }} />}
     {modal?.type === "cargaViagem" && <Cv2CargaForm user={user} onClose={() => setModal({ type: "details", item: modal.viagem })} onSaved={(carga) => saveCargaInViagem(modal.viagem, carga).catch((err) => { setError(cv2Error(err)); setModal(null); })} />}
     {modal?.type === "cte" && <Cv2CteModal carga={modal.item} onClose={() => setModal(modal.viagem ? { type: "details", item: modal.viagem } : null)} onSaved={async (carga) => {

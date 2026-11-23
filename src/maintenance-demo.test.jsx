@@ -12,6 +12,15 @@ import {
 } from "@testing-library/react";
 import MaintenanceDemo, { sanitizeAmount } from "./maintenance-demo.jsx";
 const KEY = "rodobach-maintenance-demo-v2";
+it("usuário de lançamento informa reembolso ao criar manutenção",async()=>{
+ window.RB_AUTH.me.mockResolvedValue({user:{id:42,login:'colaborador',permissions:{'manutencao-plantao':true}}});
+ await ready();await details();
+ fireEvent.click(screen.getByRole('button',{name:'Sim, haverá reembolso'}));
+ await finish();
+ expect(window.RB_API.createPlantao).toHaveBeenCalledWith(expect.objectContaining({reimbursementExpected:true}));
+ await openForm();await details();
+ expect(screen.getByRole('button',{name:'Não haverá reembolso'}).getAttribute('aria-pressed')).toBe('true');
+});
 it('vincula pneu na borracharia, salva identidade e limpa ao trocar de placa',async()=>{
  const tire={code:'123',company:'2',plate:'ABC1234',positionName:'Dianteiro direito',brand:'Marca'};
  window.RB_API.listPlantaoTires.mockResolvedValue({tires:[tire]});
