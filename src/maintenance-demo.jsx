@@ -5,6 +5,7 @@ import ExpenseDetailStatus from './expense-detail-status.jsx';
 import ExpenseTirePicker from './expense-tire-picker.jsx';
 import ExpenseDetailFacts from './expense-detail-facts.jsx';
 import ExpenseReportDialog from './expense-report-dialog.jsx';
+import ExpenseReimbursementChoice from "./expense-reimbursement-choice.jsx";
 import ExpenseReimbursement from './expense-reimbursement.jsx';
 import {reimbursementOf,reimbursementLabels,matchesReimbursement} from './expense-report.js';
 import ExpensePaymentDetails from "./expense-payment-details.jsx";
@@ -446,9 +447,10 @@ function MaintenanceForm({
   const author = user.nome || user.login;
   const [service, setService] = useState(maintenanceDraft?.service || "Borracharia");
   const [note, setNote] = useState(maintenanceDraft?.note || "");
+  const [reimbursementExpected,setReimbursementExpected] = useState(maintenanceDraft?.reimbursementExpected ?? false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const draftWarning = useExpenseDraft(user,"maintenance",editing,{expenseDate,document,plate,amount,service,note,supplier,receiptReason,documentType,tireFireNumber,tire,expenseTrip,paymentDetails,photos:maintenancePhotos},wizardOpen && !completed);
+  const draftWarning = useExpenseDraft(user,"maintenance",editing,{reimbursementExpected,expenseDate,document,plate,amount,service,note,supplier,receiptReason,documentType,tireFireNumber,tire,expenseTrip,paymentDetails,photos:maintenancePhotos},wizardOpen && !completed);
   useEffect(() => {
     let active = true;
     setFleetLoading(true);
@@ -559,6 +561,7 @@ function MaintenanceForm({
     setEditing(null);
     setAmount("");
     setNote("");
+    setReimbursementExpected(false);
     setSupplier({ nome: "" });
     setDocument("");
     setExpenseDate(today());
@@ -824,6 +827,7 @@ function MaintenanceForm({
     setMessage("");
     try {
       const body = {
+        ...(!editing ? {reimbursementExpected} : {}),
         expenseDate,
         receiptReason,photos:maintenancePhotos,documentType,
         tireFireNumber:service === 'Borracharia' && (!tire || tire.plate === plate) ? tireFireNumber.trim() : '',
@@ -864,6 +868,7 @@ function MaintenanceForm({
       setExpenseDate(today());
       setAmount("");
       setNote("");
+    setReimbursementExpected(false);
       setSupplier({ nome: "" });
       setFilter("all");
       setMessage(
@@ -1408,6 +1413,7 @@ function MaintenanceForm({
                           onChange={setSupplier}
                         />
                         <ExpenseDocumentFields type={documentType} onTypeChange={setDocumentType} number={document} onNumberChange={setDocument}/>
+                        {!editing && <ExpenseReimbursementChoice value={reimbursementExpected} onChange={setReimbursementExpected}/>}
                         {fleet.includes(plate) && <ExpenseUnloading key={plate} plate={plate} value={expenseTrip} onChange={setExpenseTrip} tripOnly/>}
                         <ExpensePhotoAssist photos={maintenancePhotos} knownPhotos={editing?.photoKinds || {}} photoKinds={["invoice"]} suggestionFields={["supplier","documentNumber"]}
                           preparePhoto={prepareReceipt} onPhoto={(kind,photo)=>setMaintenancePhotos(current=>({...current,[kind]:photo}))}
@@ -1451,6 +1457,7 @@ function MaintenanceForm({
                               ["Número de fogo", service==='Borracharia' ? tireFireNumber || "Não informado" : "—"],
                               ...(service==='Borracharia' && tire ? [["Pneu vinculado",[tire.positionName,tire.brand,tire.size].filter(Boolean).join(' · ') || 'Identificado no cadastro']] : []),
                               ["Viagem", expenseTrip?.trip?.number || "Sem vínculo"],
+                              ...(!editing ? [["Reembolso pelo cliente",reimbursementExpected ? "Sim" : "Não"]] : []),
                               ["Comprovante", document || "Não informado"],
                               ["Nota anexada", (maintenancePhotos.invoice !== undefined ? maintenancePhotos.invoice : editing?.photoKinds?.invoice || editing?.hasReceipt) ? "Sim" : "Não"],
                               ["Justificativa sem nota", receiptReason || "—"],

@@ -226,6 +226,9 @@ window.RB_API = {
   getConsultaViagem: (empresa,numero) => apiRequest(`/financeiro/consulta-viagens/${encodeURIComponent(empresa)}/${encodeURIComponent(numero)}`),
   getConsultaViagemIndicadores: (empresa,numero,params = {}) => apiRequest(`/financeiro/consulta-viagens/${encodeURIComponent(empresa)}/${encodeURIComponent(numero)}/indicadores${buildQuery(params)}`),
 
+  getPrevisoesV2: () => apiRequest("/cargas-viagens-v2/alertas"),
+  reportNaoCarregadasV2: () => apiRequest("/cargas-viagens-v2/nao-carregadas"),
+  markNaoCarregadaV2: (id,payload) => apiRequest(`/cargas-viagens-v2/cargas/${id}/nao-carregada`,{method:"POST",body:JSON.stringify(payload)}),
   getCargasViagensV2Resumo: () => apiRequest("/cargas-viagens-v2/resumo"),
   getCargasViagensV2Filtros: () => apiRequest("/cargas-viagens-v2/filtros"),
   listCargasV2: (filters = {}) =>

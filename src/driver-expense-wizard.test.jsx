@@ -14,12 +14,14 @@ it("Outros pula KM e volta à placa sem exigir telemetria",()=>{
  const telemetry=vi.fn();window.RB_API={getPlantaoOdometer:telemetry};
  render(<Wizard user={{login:"teste"}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);
  fireEvent.click(screen.getByRole("button",{name:/Outros/}));next();
+ fireEvent.click(screen.getByRole('button',{name:'Sim, haverá reembolso'}));
  fireEvent.change(screen.getByLabelText("Placa"),{target:{value:"ABC1234"}});next();
  expect(screen.getByLabelText("Valor total da despesa (R$)")).toBeTruthy();
  expect(screen.queryByLabelText(/Hodômetro/)).toBeNull();
  expect(screen.getByRole("progressbar").getAttribute("aria-valuemax")).toBe("6");
  expect(telemetry).not.toHaveBeenCalled();
  fireEvent.click(screen.getByRole("button",{name:"Voltar"}));expect(screen.getByLabelText("Placa").value).toBe("ABC1234");
+ expect(screen.getByRole('button',{name:'Sim, haverá reembolso'}).getAttribute('aria-pressed')).toBe('true');
 });
 it("atalho de etapa permite corrigir a placa sem perder os valores",()=>{
  window.RB_API={};
