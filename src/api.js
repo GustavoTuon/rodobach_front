@@ -463,6 +463,7 @@ window.RB_API = {
   updatePlantao: (id, body, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}`, {method:"PUT",body:JSON.stringify(body)}),
   deletePlantao: (id, body, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}`, {method:"DELETE",body:JSON.stringify(body)}),
   receiptPlantao: (id, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}/comprovante`),
+  correctPlantaoAmount: (id, body) => apiRequest(`/manutencao-plantao/lancamentos/${encodeURIComponent(id)}/corrigir-valor`, {method:"PATCH",body:JSON.stringify(body)}),
   historyPlantao: (id, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}/historico`),
   checkPlantao: (id, version, changes = {}) => apiRequest(`/manutencao-plantao/conferencia/${encodeURIComponent(id)}`, {method:"PATCH",body:JSON.stringify({version,...changes})}),
   searchFornecedoresManutencao: (q = "") => apiRequest(`/manutencao/fornecedores${buildQuery({ q })}`),

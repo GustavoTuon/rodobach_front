@@ -27,7 +27,7 @@ export function ExpenseSummary({records}) {
   </section>;
 }
 
-export default function ExpenseHistory({records, isDriver, currentPlate, renderRecord, onReview, onUndoReview, onPosting, onReimbursement, onReceipt, reviewDisabled=false, expandGroups=false}) {
+export default function ExpenseHistory({records, isDriver, currentPlate, renderRecord, onReview, onUndoReview, onPosting, onCorrectAmount, onReimbursement, onReceipt, reviewDisabled=false, expandGroups=false}) {
   const sorted = [...records].sort((a,b)=>day(b).localeCompare(day(a)) || String(b.date).localeCompare(String(a.date)));
   function recordRows(rows) {
     return rows.map(row=><article className="mp-expense-row" key={row.id}>
@@ -41,12 +41,13 @@ export default function ExpenseHistory({records, isDriver, currentPlate, renderR
       </summary>
         {renderRecord(row)}
       </details>
-      {(onReview || onUndoReview || onPosting || onReimbursement) && <div className="mp-row-review">
+      {(onReview || onUndoReview || onPosting || onReimbursement || onCorrectAmount) && <div className="mp-row-review">
         <span className={isExpenseChecked(row) ? "mp-review-done" : "mp-review-pending"}>
           {isExpenseChecked(row) ? `Conferido por ${row.checkedBy || "usuário autorizado"}${row.checkedAt ? ` em ${new Date(row.checkedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}` : ""}` : row.paid ? "Pago · conferência pendente" : "Conferência pendente"}
         </span>
         <div>{onReceipt && row.hasReceipt && <button type="button" className="mp-review-receipt" onClick={()=>onReceipt(row)}>Abrir comprovante</button>}
           {onReimbursement && reimbursementOf(row).status !== "nao_aplicavel" && <button type="button" className="mp-review-receipt" disabled={reviewDisabled} onClick={()=>onReimbursement(row)}>{reimbursementOf(row).document ? "Editar reembolso" : "Lançar reembolso"}</button>}
+          {onCorrectAmount && <button type="button" className="mp-review-receipt" disabled={reviewDisabled} onClick={()=>onCorrectAmount(row)}>Corrigir valor</button>}
           {onPosting && <button type="button" className="mp-review-receipt" disabled={reviewDisabled} onClick={()=>onPosting(row)}>{row.erpDocument ? "Editar vínculo ERP" : "Vincular documento ERP"}</button>}
           {onUndoReview && isExpenseChecked(row) && <button type="button" className="mp-review-receipt" disabled={reviewDisabled} onClick={()=>onUndoReview(row)}>Desfazer conferência</button>}
           {onReview && !isExpenseChecked(row) && <button type="button" className="mp-review-confirm" disabled={reviewDisabled} onClick={()=>onReview(row)}>Marcar como conferido</button>}

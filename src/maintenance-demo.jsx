@@ -1,6 +1,7 @@
 import {useExpenseDuplicateWarning} from "./expense-duplicate-warning.jsx";
 import {supplierLabel} from "./expense-supplier-origin.js";
 import ExpensePosting from './expense-posting.jsx';
+import ExpenseAmountCorrection from './expense-amount-correction.jsx';
 import ExpenseDetailStatus from './expense-detail-status.jsx';
 import ExpenseTirePicker from './expense-tire-picker.jsx';
 import ExpenseDetailFacts from './expense-detail-facts.jsx';
@@ -406,6 +407,7 @@ function MaintenanceForm({
   const [reviewRecord,setReviewRecord] = useState(null);
   const [undoReviewRecord,setUndoReviewRecord] = useState(null);
   const [postingRecord,setPostingRecord] = useState(null);
+  const [correctionRecord,setCorrectionRecord] = useState(null);
   const [reportOpen,setReportOpen] = useState(false);
   const [reimbursementFilter,setReimbursementFilter] = useState("");
   const [paidFilter, setPaidFilter] = useState("");
@@ -1061,6 +1063,7 @@ function MaintenanceForm({
                                   check: "Conferido",
                                   uncheck: "Conferência desfeita",
                                   status: "Controle atualizado",
+                                  correct_amount: "Valor corrigido",
                                 }[h.evento] || h.evento}
                               </strong>{" "}
                               · {h.usuario_login} ·{" "}
@@ -1070,6 +1073,7 @@ function MaintenanceForm({
                               {h.evento === "status" && <p>Pagamento: {h.depois?.data_pagamento ? displayDay(String(h.depois.data_pagamento).slice(0,10)) : "Não registrado"} · Forma: {h.depois?.forma_pagamento_nome || "Não informada"}</p>}
                               {h.depois?.reembolso && <p>Reembolso: {reimbursementLabels[h.depois.reembolso.status]} · {h.depois.reembolso.customer} · {h.depois.reembolso.document} {h.depois.reembolso.receivedDate && `· Recebido em ${displayDay(h.depois.reembolso.receivedDate)}`}</p>}
                               {h.depois?.descarga && <p>Descarga · Viagem {h.depois.descarga.trip.number} · {cteLabel(h.depois.descarga.cte)} · {documentItinerary(h.depois.descarga.cte)} · {h.depois.descarga.cte.customerName} · Reembolso: {h.depois.descarga.reimbursement ? 'Sim' : 'Não'}</p>}
+                              {h.evento === "correct_amount" && <p>Valor anterior: {money(Number(h.antes?.valor))} · Novo valor: {money(Number(h.depois?.valor))}<br/>Justificativa: {h.depois?.justificativa_correcao}</p>}
                               {h.evento === "edit" && (
                                 <p>
                                   Antes: {h.antes.placa} ·{" "}
@@ -1147,6 +1151,15 @@ function MaintenanceForm({
         <div className="mp-payment-modal-actions"><button type="button" className="mp-cancel-edit" disabled={saving} onClick={()=>setUndoReviewRecord(null)}>Cancelar</button><button type="button" className="mp-submit" disabled={saving} onClick={async()=>{if(await confirmRecord(undoReviewRecord,{checked:false}))setUndoReviewRecord(null);}}>{saving ? "Salvando…" : "Confirmar reversão"}</button></div>
       </div></MaintenanceDialog>}
       {canPost && postingRecord && <MaintenanceDialog onClose={()=>setPostingRecord(null)} saving={saving} step="posting"><ExpensePosting record={postingRecord} onSave={updateControl} onClose={()=>setPostingRecord(null)} saving={saving}/></MaintenanceDialog>}
+      {user.admin === true && !isDriver && !user.readOnly && correctionRecord && <MaintenanceDialog onClose={()=>{if(!savingRef.current)setCorrectionRecord(null);}} saving={saving} step="correction"><ExpenseAmountCorrection record={correctionRecord} onClose={()=>setCorrectionRecord(null)} onSave={async body=>{
+        if(savingRef.current)throw new Error('Aguarde a operação em andamento.');
+        savingRef.current=true;setSaving(true);
+        try {
+          const result=await window.RB_API.correctPlantaoAmount(correctionRecord.id,body);
+          setRecords(items=>items.map(item=>item.id===correctionRecord.id?result.record:item));
+          setHistory(null);setMessage('Valor corrigido e registrado no histórico.');
+        } finally {savingRef.current=false;setSaving(false);}
+      }}/></MaintenanceDialog>}
       {canPay && paymentRecord && (
         <MaintenanceDialog onClose={() => setPaymentRecord(null)} saving={saving} step="payment">
           <form className="mp-form mp-payment-modal" onSubmit={savePayment}>
@@ -1694,7 +1707,7 @@ function MaintenanceForm({
                   {records.length > 0 && <button type="button" className="mp-secondary" onClick={() => { setFilter("all"); setReimbursementFilter(""); setSearch(""); setTripFilter(""); setTextSearch(""); setDateFrom(""); setDateTo(""); setSourceFilter(""); setPaidFilter(""); setPostedFilter(""); }}>Mostrar todo o histórico</button>}
                 </div>
               ) : (
-                <ExpenseHistory onReimbursement={canReimburse && !user.readOnly ? setReimbursementRecord : undefined} onPosting={canPost && !user.readOnly ? setPostingRecord : undefined} onReview={canReview && !user.readOnly ? setReviewRecord : undefined} onUndoReview={canReview && !user.readOnly ? record=>{setError("");setUndoReviewRecord(record);} : undefined} onReceipt={showReceipt} reviewDisabled={saving || user.readOnly} expandGroups={canReview && filter === "unchecked"} records={visible} isDriver={isDriver && !manager} currentPlate={expenseAccess?.plate} renderRecord={renderExpenseRecord} />
+                <ExpenseHistory onCorrectAmount={user.admin === true && !isDriver && !user.readOnly ? setCorrectionRecord : undefined} onReimbursement={canReimburse && !user.readOnly ? setReimbursementRecord : undefined} onPosting={canPost && !user.readOnly ? setPostingRecord : undefined} onReview={canReview && !user.readOnly ? setReviewRecord : undefined} onUndoReview={canReview && !user.readOnly ? record=>{setError("");setUndoReviewRecord(record);} : undefined} onReceipt={showReceipt} reviewDisabled={saving || user.readOnly} expandGroups={canReview && filter === "unchecked"} records={visible} isDriver={isDriver && !manager} currentPlate={expenseAccess?.plate} renderRecord={renderExpenseRecord} />
               )}
             </div>
             {!manager && !recordsLoading && !recordsError && <ExpenseSummary records={visible} />}
