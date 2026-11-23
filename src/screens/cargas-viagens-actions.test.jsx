@@ -116,6 +116,28 @@ it('histórico de cotação informa falha e permite repetir a consulta',async()=
   expect(query.mock.calls[1][0]).toMatchObject({meses:'24',page:1,pageSize:25});
 });
 
+it('seleciona e salva razão social nos três clientes preservando dados do cadastro',async()=>{
+  const owner={codigo:'1',empresa:'1',nome:'Responsavel ERP'};
+  const search=vi.fn(async()=>[{nome:'GM FRUTAS',fantasia:'GM FRUTAS',razaoSocial:'  GM COMERCIO DE FRUTAS LTDA  ',documento:'12345678000199',cidade:'Cidade ERP',uf:'SC',condicaoPagamento:'30 dias',responsavel:owner}]);
+  const save=vi.fn(async()=>({id:1}));
+  const {Cv2CargaForm}=await components({searchViagemClientes:search,createCargaV2:save});
+  render(<Cv2CargaForm user={{}} onClose={()=>{}} onSaved={()=>{}}/>);
+  for(const label of ['Cliente inicial','Cliente final','Tomador do serviço']) {
+    const input=screen.getByLabelText(label);
+    fireEvent.change(input,{target:{value:'GM'}});
+    const option=await screen.findByRole('button',{name:/GM COMERCIO DE FRUTAS LTDA/});
+    expect(option.querySelector('strong').textContent).toBe('GM COMERCIO DE FRUTAS LTDA');
+    expect(option.textContent).toContain('GM FRUTAS');
+    fireEvent.click(option);
+    expect(input.value).toBe('GM COMERCIO DE FRUTAS LTDA');
+  }
+  fireEvent.click(screen.getByRole('button',{name:'Cadastrar carga',exact:true}));
+  await waitFor(()=>expect(save).toHaveBeenCalledWith(expect.objectContaining({
+    cliente:'GM COMERCIO DE FRUTAS LTDA',clienteFinal:'GM COMERCIO DE FRUTAS LTDA',tomadorServico:'GM COMERCIO DE FRUTAS LTDA',
+    origem:'Cidade ERP',ufOrigem:'SC',destino:'Cidade ERP',ufDestino:'SC',condicaoPagamento:'30 dias',responsavel:owner,
+  })));
+});
+
 it('autocomplete ignora cliente de uma pesquisa anterior mais lenta',async()=>{
   let resolveOld;
   const search=vi.fn(q=>q==='Antigo'?new Promise(r=>{resolveOld=r;}):Promise.resolve([{nome:'Cliente novo',cidade:'Cidade nova'}]));

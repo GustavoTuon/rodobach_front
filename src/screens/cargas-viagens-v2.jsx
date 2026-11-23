@@ -32,6 +32,10 @@ const cv2IsTransportDocument = doc => ["CTE", "ORCAMENTO"].includes(String(doc.t
 
 const CV2_TODAY = () => new Date().toISOString().slice(0, 10);
 const cv2Money = (value) => Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+const cv2ClientName = (item) => String(item.razaoSocial || "").trim() || item.nome || "";
+function Cv2ClientOption({item}) {
+  return <><strong>{cv2ClientName(item)}</strong><span>{[item.fantasia, item.documento, item.cidade, item.uf].filter(Boolean).join(" · ")}</span></>;
+}
 const cv2Weight = (value) => `${Number(value || 0).toLocaleString("pt-BR")} kg`;
 const cv2Date = (value) => value ? new Date(`${String(value).slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR") : "—";
 const cv2Error = (error) => [502,503,504].includes(error?.status)
@@ -239,16 +243,16 @@ export function Cv2CargaForm({ initial, duplicateFrom, user, onClose, onSaved })
             <Cv2Field label="Data"><input type="date" value={form.data} onChange={(e) => set("data", e.target.value)} /></Cv2Field>
             <Cv2Autocomplete label="Cliente inicial" hint="Onde a carga começa" value={form.cliente} onChange={(value) => set("cliente", value)}
               search={window.RB_API.searchViagemClientes} placeholder="Onde a carga começa"
-              onSelect={(item) => setForm((current) => ({ ...current, cliente: item.nome, origem: item.cidade || current.origem, ufOrigem: item.uf || current.ufOrigem, condicaoPagamento: item.condicaoPagamento || current.condicaoPagamento, responsavel: item.responsavel || current.responsavel }))}
-              renderOption={(item) => <><strong>{item.nome}</strong><span>{[item.documento, item.cidade, item.uf].filter(Boolean).join(" · ")}</span></>} />
+              onSelect={(item) => setForm((current) => ({ ...current, cliente: cv2ClientName(item), origem: item.cidade || current.origem, ufOrigem: item.uf || current.ufOrigem, condicaoPagamento: item.condicaoPagamento || current.condicaoPagamento, responsavel: item.responsavel || current.responsavel }))}
+              renderOption={(item) => <Cv2ClientOption item={item} />} />
             <Cv2Autocomplete label="Cliente final" hint="Onde a carga será entregue" value={form.clienteFinal} onChange={(value) => set("clienteFinal", value)}
               search={window.RB_API.searchViagemClientes} placeholder="Onde a carga será entregue"
-              onSelect={(item) => setForm((current) => ({ ...current, clienteFinal: item.nome, destino: item.cidade || current.destino, ufDestino: item.uf || current.ufDestino }))}
-              renderOption={(item) => <><strong>{item.nome}</strong><span>{[item.documento, item.cidade, item.uf].filter(Boolean).join(" · ")}</span></>} />
+              onSelect={(item) => setForm((current) => ({ ...current, clienteFinal: cv2ClientName(item), destino: item.cidade || current.destino, ufDestino: item.uf || current.ufDestino }))}
+              renderOption={(item) => <Cv2ClientOption item={item} />} />
             <Cv2Autocomplete label="Tomador do serviço" hint="Quem vai pagar o frete" value={form.tomadorServico} onChange={(value) => set("tomadorServico", value)}
               search={window.RB_API.searchViagemClientes} placeholder="Quem vai pagar o frete"
-              onSelect={(item) => setForm((current) => ({ ...current, tomadorServico: item.nome, condicaoPagamento: item.condicaoPagamento || current.condicaoPagamento, responsavel: item.responsavel || current.responsavel }))}
-              renderOption={(item) => <><strong>{item.nome}</strong><span>{[item.documento, item.cidade, item.uf].filter(Boolean).join(" · ")}</span></>} />
+              onSelect={(item) => setForm((current) => ({ ...current, tomadorServico: cv2ClientName(item), condicaoPagamento: item.condicaoPagamento || current.condicaoPagamento, responsavel: item.responsavel || current.responsavel }))}
+              renderOption={(item) => <Cv2ClientOption item={item} />} />
             <Cv2Field label="Responsável" hint="Quem negociou o frete, conforme cadastro do ERP">
               <select aria-label="Responsável" required value={form.responsavel ? `${form.responsavel.empresa}:${form.responsavel.codigo}` : ""}
                 onChange={event=>set("responsavel",responsaveis.find(item=>`${item.empresa}:${item.codigo}`===event.target.value) || null)}>

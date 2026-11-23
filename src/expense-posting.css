@@ -16,6 +16,12 @@
 .mp-posting-results .mp-fleet-option strong { font-family: inherit; font-size: 13px; letter-spacing: 0; overflow-wrap: anywhere; }
 .mp-posting-results small { color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
 .mp-posting-modal .mp-payment-modal-actions { padding-top: 20px; border-top: 1px solid var(--border); }
+.mp-posting-selected { display: grid; gap: 10px; margin-top: 16px; }
+.mp-posting-selected-item { display: flex; gap: 12px; align-items: center; justify-content: space-between; border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.mp-posting-selected-item > div { display: grid; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.mp-posting-selected-item small { color: var(--muted); line-height: 1.5; }
+.mp-posting-selected-item button { flex-shrink: 0; }
+.mp-posting-total { display: grid; gap: 6px; padding: 12px; border-radius: 10px; background: var(--surface-2); line-height: 1.5; }
 @media (max-width: 540px) {
   .mp-posting-search { grid-template-columns: 1fr; }
   .mp-posting-summary { align-items: flex-start; flex-wrap: wrap; }
