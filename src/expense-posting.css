@@ -27,3 +27,35 @@
   .mp-posting-summary { align-items: flex-start; flex-wrap: wrap; }
   .mp-posting-modal .mp-payment-modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 }
+.mp-dialog .mp-form.mp-posting-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 42px);
+  padding: 0;
+  overflow: hidden;
+}
+.mp-posting-modal > .mp-section-title {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 24px 28px 16px;
+}
+.mp-posting-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 28px 24px;
+}
+.mp-dialog .mp-posting-modal > .mp-payment-modal-actions {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 16px 28px max(16px, env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 760px) {
+  .mp-dialog .mp-form.mp-posting-modal { max-height: 100dvh; height: 100%; }
+  .mp-posting-modal > .mp-section-title { padding: 20px 18px 12px; }
+  .mp-posting-body { padding: 8px 18px 20px; }
+  .mp-dialog .mp-posting-modal > .mp-payment-modal-actions { padding: 12px 18px max(12px, env(safe-area-inset-bottom)); }
+}
