@@ -1649,6 +1649,9 @@ button.mp-payment-button:hover:not(:disabled) { border-color: var(--accent); }
 .mp-app .mp-posted-check input { width: 20px; height: 20px; min-height: 20px; margin: 0; flex-shrink: 0; accent-color: #329968; cursor: pointer; }
 .mp-payment-controls :disabled { cursor: default; opacity: .65; }
 .mp-payment-modal { padding: 28px; }
+.mp-amount-correction { display: grid; gap: 16px; }
+.mp-amount-correction > label { display: grid; gap: 8px; }
+.mp-amount-correction textarea { min-height: 110px; }
 .mp-payment-modal h2 { font-size: 22px; }
 .mp-payment-recipient { margin: 0 0 24px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 .mp-payment-recipient h3 { margin: 0 0 14px; font-size: 14px; color: var(--text); }
