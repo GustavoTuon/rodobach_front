@@ -12,6 +12,29 @@ import {
 } from "@testing-library/react";
 import MaintenanceDemo, { sanitizeAmount } from "./maintenance-demo.jsx";
 const KEY = "rodobach-maintenance-demo-v2";
+it('visao de reembolsos separa etapas e recebimento move o item sem alterar pagamento',async()=>{
+ const rows=['a_cobrar','cobrado','recebido','nao_aplicavel'].map((status,i)=>({id:`re-${i}`,version:1,plate:'ABC1234',amount:100,service:'Mecânica',supplier:'Oficina',date:'2026-11-24T12:00:00Z',expenseDate:'2026-11-24',paid:true,checked:true,reimbursement:{status,customer:'Cliente teste',document:'DOC-1',receivedDate:status==='recebido'?'2026-11-23':null,note:''}}));
+ window.RB_API.listPlantao.mockResolvedValue({records:rows});
+ window.RB_API.updatePlantaoControl=vi.fn(async(id,body)=>({record:{...rows.find(r=>r.id===id),...body,version:2}}));
+ const {container}=render(<MaintenanceDemo/>);
+ fireEvent.click(await screen.findByRole('button',{name:'Reembolsos',exact:true}));
+ await waitFor(()=>expect(container.querySelectorAll('.mp-reimbursement-row')).toHaveLength(3));
+ fireEvent.click(screen.getByRole('button',{name:'A cobrar',exact:true}));
+ expect(container.querySelectorAll('.mp-reimbursement-row')).toHaveLength(1);
+ fireEvent.click(screen.getByRole('button',{name:'Registrar recebimento',exact:true}));
+ expect(screen.getByRole('radio',{name:'Reembolso recebido'}).checked).toBe(true);
+ expect(window.RB_API.updatePlantaoControl).not.toHaveBeenCalled();
+ fireEvent.change(screen.getByLabelText('Data do recebimento'),{target:{value:'2026-11-23'}});
+ fireEvent.click(screen.getByRole('button',{name:'Salvar reembolso',exact:true}));
+ await waitFor(()=>expect(screen.queryByRole('dialog')).toBeNull());
+ expect(window.RB_API.updatePlantaoControl).toHaveBeenCalledWith('re-0',{version:1,reimbursement:expect.objectContaining({status:'recebido',receivedDate:'2026-11-23'})},false);
+ expect(container.querySelectorAll('.mp-reimbursement-row')).toHaveLength(0);
+ fireEvent.click(screen.getByRole('button',{name:'Recebidos',exact:true}));
+ expect(container.querySelectorAll('.mp-reimbursement-row')).toHaveLength(2);
+ expect(screen.queryByRole('button',{name:'Registrar recebimento',exact:true})).toBeNull();
+ fireEvent.click(screen.getByRole('button',{name:'Todos com reembolso',exact:true}));
+ expect(container.querySelectorAll('.mp-reimbursement-row')).toHaveLength(3);
+});
 it("usuário de lançamento informa reembolso ao criar manutenção",async()=>{
  window.RB_AUTH.me.mockResolvedValue({user:{id:42,login:'colaborador',permissions:{'manutencao-plantao':true}}});
  await ready();await details();

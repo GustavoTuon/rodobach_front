@@ -2,8 +2,8 @@ import React,{useRef,useState} from 'react';
 import {reimbursementOf,reimbursementLabels} from './expense-report.js';
 import ReimbursementDocument from './expense-reimbursement-document.jsx';
 
-export default function ExpenseReimbursement({record,onSave,disabled=false}) {
-  const [value,setValue]=useState(()=>reimbursementOf(record));
+export default function ExpenseReimbursement({record,onSave,disabled=false,initialStatus}) {
+  const [value,setValue]=useState(()=>({...reimbursementOf(record),...(initialStatus?{status:initialStatus,receivedDate:initialStatus==='recebido'?reimbursementOf(record).receivedDate:null}:{})}));
   const [error,setError]=useState('');
   const [saved,setSaved]=useState(()=>reimbursementOf(record));
   const [pending,setPending]=useState(false);

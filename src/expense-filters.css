@@ -1,4 +1,20 @@
 .mp-expense-filters { margin: 20px 0; }
+.mp-expense-view-switch { display: flex; gap: 6px; padding: 5px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); width: fit-content; margin: 16px 0; }
+.mp-expense-view-switch button { padding: 12px 24px; border: 1px solid transparent; border-radius: 9px; font: inherit; font-weight: 600; cursor: pointer; background: transparent; color: var(--text-2); }
+.mp-expense-view-switch button[aria-pressed="true"] { background: var(--surface); color: var(--accent); border-color: var(--border); box-shadow: 0 2px 4px #0000000a; }
+.mp-reimbursement-list { display: grid; gap: 12px; }
+.mp-app .mp-reimbursement-value-note { color: var(--text-2); font-size: 12px; margin-bottom: 4px; }
+.mp-reimbursement-row { display: grid; grid-template-columns: minmax(0,1fr) 200px minmax(180px,240px); gap: 20px; align-items: center; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+.mp-reimbursement-row > div { display: grid; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.mp-reimbursement-customer { font-weight: 600; color: var(--accent); font-size: 16px; }
+.mp-reimbursement-row small { color: var(--text-2); font-size: 12px; }
+.mp-reimbursement-row-value strong { font-size: 20px; }
+.mp-reimbursement-stage { padding: 6px 10px; width: fit-content; border-radius: 8px; background: var(--surface-2); font-size: 12px; }
+.mp-reimbursement-stage.recebido { color: #176445; background: #e9f8ef; }
+.mp-reimbursement-row-actions button { padding: 10px 12px; min-height: 42px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--accent); font: inherit; font-size: 12px; cursor: pointer; }
+.mp-reimbursement-row-actions button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.mp-dialog:has(.mp-reimbursement-modal) { overflow-y: auto; }
+@media(max-width:800px){.mp-reimbursement-row{grid-template-columns:minmax(0,1fr)}.mp-expense-view-switch{width:100%}.mp-expense-view-switch button{flex:1;padding:12px}.mp-reimbursement-row-actions{grid-template-columns:1fr}}
 .mp-pending-cards { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
 .mp-app .mp-pending-card { display: grid; gap: 12px; text-align: left; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); cursor: pointer; font: inherit; min-width: 0; }
 .mp-pending-card-title { display: flex; justify-content: space-between; align-items: start; gap: 8px; font-weight: 600; }
