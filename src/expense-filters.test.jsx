@@ -5,6 +5,21 @@ import {render,screen,fireEvent,cleanup} from '@testing-library/react';
 import ExpenseFilters,{matchesExpenseFlag,matchesExpenseSearch} from './expense-filters.jsx';
 import {filterReportRecords} from './expense-report-dialog.jsx';
 afterEach(cleanup);
+it('limpa opcoes adicionais preservando busca e periodo e explica pagamento',()=>{
+ render(<Harness/>);
+ fireEvent.change(screen.getByLabelText('Buscar despesas'),{target:{value:'ABC'}});
+ fireEvent.click(screen.getByRole('button',{name:'Hoje',exact:true}));
+ fireEvent.click(screen.getByText('Mais filtros'));
+ fireEvent.change(screen.getByLabelText('Pagamento da despesa'),{target:{value:'pending'}});
+ fireEvent.change(screen.getByLabelText('Conferência'),{target:{value:'checked'}});
+ expect(screen.getByText('2 ativos')).toBeTruthy();
+ const payment=screen.getByLabelText('Pagamento da despesa');
+ expect(document.getElementById(payment.getAttribute('aria-describedby')).textContent).toContain('sem pagamento informado');
+ fireEvent.click(screen.getByRole('button',{name:'Limpar opções adicionais'}));
+ expect(payment.value).toBe('');expect(screen.getByLabelText('Conferência').value).toBe('all');
+ expect(screen.getByLabelText('Buscar despesas').value).toBe('ABC');expect(screen.getByLabelText('De').value).toBe('2026-11-23');
+ expect(screen.getByRole('button',{name:'Limpar opções adicionais'}).disabled).toBe(true);
+});
 const rows=[{id:1,plate:'ABC1D23',supplier:'Oficina São José',amount:180,paid:true,posted:false,checked:false,erpDocument:'NF-987',expenseDate:'2026-11-23'},{id:2,plate:'DEF4G56',amount:40,paid:false,posted:false,checked:true,expenseDate:'2026-11-22'},{id:3,plate:'ABC1D23',amount:20,paid:true,posted:true,checked:true,expenseDate:'2026-11-23'}];
 const empty={text:'',dateFrom:'',dateTo:'',paid:'',posted:'',status:'all',trip:'',source:'',reimbursement:''};
 function Harness(){const [v,set]=useState(empty);return <ExpenseFilters values={v} onChange={(key,value)=>set(x=>({...x,[key]:value}))} onClear={()=>set(empty)} trips={[]} manager today={()=>'2026-11-23'} records={filterReportRecords(rows,v)} cardRecords={filterReportRecords(rows,{...v,paid:"",posted:"",status:"all",reimbursement:""})}/>;}
