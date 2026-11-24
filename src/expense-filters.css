@@ -1,0 +1,12 @@
+.mp-expense-filters { margin: 20px 0; }
+.mp-expense-filters .mp-unified-search { flex: 2 1 300px; }
+.mp-date-shortcuts, .mp-active-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.mp-date-shortcuts button, .mp-active-filters button { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.mp-active-filters { margin-top: 16px; }
+.mp-active-filters button { background: var(--surface-2); overflow-wrap: anywhere; max-width: 100%; text-align: left; }
+.mp-active-filters .mp-clear-filters { color: var(--accent); background: var(--surface); }
+.mp-app .mp-filter-hint { color: var(--text-2); margin: 8px 0 16px; font-size: 12px; }
+.mp-app .mp-filter-result { margin: 16px 0; font-weight: 600; }
+.mp-expense-filters .mp-cost-filters > * { min-width: 0; }
+@media(max-width:600px){.mp-expense-filters .mp-period-filters{gap:10px}.mp-expense-filters .mp-period-filters label{flex-basis:130px}.mp-expense-filters .mp-period-filters .mp-unified-search{flex-basis:100%}.mp-date-shortcuts button{flex:1 1 40%}}
+@media(max-width:480px){.mp-expense-filters .mp-state-filters label{flex-basis:100%}}

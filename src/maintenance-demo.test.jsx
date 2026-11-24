@@ -117,12 +117,12 @@ it("filtra o histórico sem usar a placa do formulário", async () => {
   await submit("ABC1234");
   await submit("DEF4G56");
   expect(screen.getAllByRole("article")).toHaveLength(2);
-  fireEvent.click(screen.getByText("Filtrar lançamentos"));
-  fireEvent.change(screen.getByPlaceholderText("Todas as placas"), {
+  fireEvent.click(screen.getByText("Mais filtros"));
+  fireEvent.change(screen.getByPlaceholderText("Placa, fornecedor, nota ou responsável"), {
     target: { value: "ABC" },
   });
   expect(screen.getAllByRole("article")).toHaveLength(1);
-  fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+  fireEvent.click(screen.getByRole("button", { name: "Limpar tudo" }));
   expect(screen.getAllByRole("article")).toHaveLength(2);
 });
 it("acesso antigo abre tela única sem liberar conferência a quem só registra", async () => {
@@ -525,7 +525,7 @@ it("bloqueia placas fora da frota, valor inválido e falhas ao salvar", async ()
 it("permite conferir registros pendentes", async () => {
   await ready();
   await submit();
-  fireEvent.click(screen.getByRole("button", { name: "Aguardando pagamento" }));
+  fireEvent.change(screen.getByLabelText('Pagamento da despesa'),{target:{value:'pending'}});
   fireEvent.click(
     await screen.findByRole("button", { name: "Marcar como conferido", exact: true }),
   );
@@ -533,7 +533,8 @@ it("permite conferir registros pendentes", async () => {
   fireEvent.click(screen.getByRole('button',{name:'Salvar e conferir'}));
   await waitFor(() => expect(screen.queryByRole("button", { name: "Marcar como conferido", exact: true })).toBeNull());
   expect(screen.getAllByRole("article")).toHaveLength(1);
-  fireEvent.click(screen.getByRole("button", { name: "Aguardando lançamento" }));
+  fireEvent.change(screen.getByLabelText('Pagamento da despesa'),{target:{value:''}});
+  fireEvent.change(screen.getByLabelText('Lançamento'),{target:{value:'pending'}});
   expect(screen.getAllByRole("article")).toHaveLength(1);
 });
 it("pede login sem sessão e não consulta a frota", async () => {
@@ -632,7 +633,7 @@ it("conferente consulta status e confere sem editar ou controlar pagamentos", as
   window.RB_AUTH.me.mockResolvedValue({user:{id:43,login:"duda",permissions:{"conferencia-manutencao":true}}});
   render(<MaintenanceDemo/>);
   await screen.findByRole("article");
-  expect(screen.getByRole("button",{name:"Aguardando conferência"}).getAttribute("aria-pressed")).toBe("true");
+  expect(screen.getByLabelText("Conferência").value).toBe("unchecked");
   expect(screen.getByRole("article").textContent).toContain("Pago");
   expect(screen.getByRole("article").textContent).toContain("Lançado");
   expect(screen.queryByRole("button",{name:"Editar",exact:true})).toBeNull();
@@ -649,7 +650,7 @@ it("conferente consulta status e confere sem editar ou controlar pagamentos", as
   fireEvent.click(screen.getByRole('button',{name:'Salvar e conferir'}));
   await waitFor(()=>expect(window.RB_API.checkPlantao).toHaveBeenCalledWith("test",1,{posted:true,erpDocuments:[{number:'123',company:'1',series:'A',installment:'1',supplierCode:'7'}]}));
   await waitFor(()=>expect(screen.queryByRole('dialog')).toBeNull());
-  fireEvent.click(screen.getByRole('button',{name:'Conferidas',exact:true}));
+  fireEvent.change(screen.getByLabelText('Conferência'),{target:{value:'checked'}});
   fireEvent.click(screen.getByRole('button',{name:'Desfazer conferência'}));
   fireEvent.click(screen.getByRole('button',{name:'Confirmar reversão'}));
   await waitFor(()=>expect(window.RB_API.checkPlantao).toHaveBeenCalledWith("test",1,{checked:false}));
@@ -660,12 +661,12 @@ it("filtra por data e comprovante e mantém o formulário se duplicidade for rej
     target: { value: "2026-09-30" },
   });
   await submit();
-  fireEvent.click(screen.getByText("Filtrar lançamentos"));
+  fireEvent.click(screen.getByText("Mais filtros"));
   fireEvent.change(screen.getByLabelText("De"), {
     target: { value: "2026-10-01" },
   });
   expect(screen.queryByRole("article")).toBeNull();
-  fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
+  fireEvent.click(screen.getByRole("button", { name: "Limpar tudo" }));
   expect(screen.getAllByRole("article")).toHaveLength(1);
   window.RB_API.createPlantao.mockRejectedValueOnce(
     new Error("Possível duplicidade"),
@@ -691,7 +692,7 @@ it("controles autorizados ficam na própria despesa", async () => {
   expect(record).not.toHaveProperty("paid");
   expect(record).not.toHaveProperty("posted");
   expect(screen.queryByLabelText("Pago — ABC1234")).toBeNull();
-  fireEvent.click(screen.getByText("Filtrar lançamentos"));
+  fireEvent.click(screen.getByText("Mais filtros"));
   expect(screen.getByLabelText("Pagamento da despesa")).toBeTruthy();
   await screen.findByRole('button', {name:'Vincular documento ERP'});
   window.RB_API.updatePlantaoControl = vi.fn(async (_id, body) => ({ record: { ...record, ...body, erpDocument: body.erpDocuments?.map(item=>item.number).join(", ") || record.erpDocument, paid: false, version: 2 } }));

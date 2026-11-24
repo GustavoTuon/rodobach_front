@@ -67,9 +67,10 @@ it("histórico pessoal começa completo e resumo acompanha período, placa e sit
   fireEvent.click(screen.getByRole("button",{name:"Todo o período"}));
   expect(summary().getByText("R$ 170,30")).toBeTruthy();
   expect(container.querySelectorAll(".mp-plate-group")).toHaveLength(2);
-  fireEvent.change(screen.getByPlaceholderText("Todas as placas"),{target:{value:"DEF"}});
+  fireEvent.change(screen.getByPlaceholderText("Placa, fornecedor, nota ou responsável"),{target:{value:"DEF"}});
   expect(summary().getByText(/1 despesa/)).toBeTruthy();
-  fireEvent.click(screen.getByRole("button",{name:"Aguardando lançamento",exact:true}));
+  fireEvent.change(screen.getByLabelText('Pagamento da despesa'),{target:{value:''}});
+  fireEvent.change(screen.getByLabelText('Lançamento'),{target:{value:'pending'}});
   await waitFor(()=>expect(container.querySelectorAll(".mp-plate-group")).toHaveLength(0));
   expect(summary().getByText(/0 despesa/)).toBeTruthy();
   fireEvent.click(screen.getByRole("button",{name:"Mostrar todo o histórico"}));
@@ -82,10 +83,11 @@ it("filtros de pagamento distinguem despesas conferidas sem pagamento",async()=>
   const {container}=render(<MaintenanceDemo/>);
   await screen.findByRole("region",{name:"Resumo do período"});
   expect(expenseTotals([paid,records[1]])).toMatchObject({pending:100.1,checked:50.2});
-  expect(screen.getByRole('button',{name:'Aguardando pagamento',exact:true}).textContent).toBe('Aguardando pagamento1');
-  fireEvent.click(screen.getByRole('button',{name:'Aguardando pagamento',exact:true}));
+  expect(screen.getByLabelText('Pagamento da despesa').value).toBe('');
+  fireEvent.change(screen.getByLabelText('Pagamento da despesa'),{target:{value:'pending'}});
   expect(container.querySelectorAll('.mp-expense-row')).toHaveLength(1);
-  fireEvent.click(screen.getByRole('button',{name:'Aguardando lançamento',exact:true}));
+  fireEvent.change(screen.getByLabelText('Pagamento da despesa'),{target:{value:''}});
+  fireEvent.change(screen.getByLabelText('Lançamento'),{target:{value:'pending'}});
   expect(container.querySelectorAll('.mp-expense-row')).toHaveLength(1);
   expect(container.textContent).not.toContain('Pago, aguardando conferência');
 });
@@ -107,7 +109,7 @@ it("filtra viagens por empresa e numero, incluindo descarga e registros sem vinc
   fireEvent.click(screen.getByRole('button',{name:'Sem viagem vinculada',exact:true}));
   expect(container.querySelectorAll('.mp-expense-row')).toHaveLength(1);
   expect(container.querySelector('.mp-expense-row').textContent).toContain('Outros');
-  fireEvent.click(screen.getByRole('button',{name:'Limpar filtros'}));
+  fireEvent.click(screen.getByRole('button',{name:'Limpar tudo'}));
   expect(container.querySelectorAll('.mp-expense-row')).toHaveLength(3);
 });
 
