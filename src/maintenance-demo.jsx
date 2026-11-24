@@ -514,11 +514,9 @@ function MaintenanceForm({
   const tripKey = trip => trip ? `${trip.company}:${trip.number}` : "unlinked";
   const tripOptions = [...new Map(records.map(recordTrip).filter(Boolean).map(trip=>[tripKey(trip),trip])).entries()]
     .sort((a,b)=>String(a[1].number).localeCompare(String(b[1].number),undefined,{numeric:true}));
-  const scoped = records.filter(
+  const contextual = records.filter(
     (r) =>
       (!manager || !sourceFilter || (r.authorProfile || "unknown") === sourceFilter) &&
-      matchesExpenseFlag(r.paid,paidFilter) &&
-      (!manager || matchesExpenseFlag(r.posted,postedFilter)) &&
       (!tripFilter || tripKey(recordTrip(r)) === tripFilter) &&
       (!dateFrom || expenseDay(r) >= dateFrom) &&
       (!dateTo || expenseDay(r) <= dateTo) &&
@@ -645,6 +643,7 @@ function MaintenanceForm({
     }
   }
   const matchesStatus = (r,key) => key === "all" || (key === "pending" ? r.paid !== true : key === "unchecked" ? !isExpenseChecked(r) : key === "checked" ? isExpenseChecked(r) : r.posted !== true);
+  const scoped = contextual.filter(r=>matchesExpenseFlag(r.paid,paidFilter) && matchesExpenseFlag(r.posted,postedFilter));
   const visible = scoped
     .filter(r => matchesReimbursement(r,reimbursementFilter))
     .filter(
@@ -1573,11 +1572,10 @@ function MaintenanceForm({
                 Atualizar lista
               </button>
             </div>
-            {manager && !recordsLoading && !recordsError && <ExpenseSummary records={visible} />}
             <ExpenseFilters values={{text:textSearch,dateFrom,dateTo,paid:paidFilter,posted:postedFilter,status:filter,trip:tripFilter,reimbursement:reimbursementFilter,source:sourceFilter}}
               onChange={(key,value)=>({text:setTextSearch,dateFrom:setDateFrom,dateTo:setDateTo,paid:setPaidFilter,posted:setPostedFilter,status:setFilter,trip:setTripFilter,reimbursement:setReimbursementFilter,source:setSourceFilter})[key](value)}
               onClear={()=>{setTextSearch("");setDateFrom("");setDateTo("");setPaidFilter("");setPostedFilter("");setFilter("all");setTripFilter("");setReimbursementFilter("");setSourceFilter("");}}
-              trips={tripOptions} manager={manager} today={today} records={visible} loading={recordsLoading||Boolean(recordsError)}/>
+              trips={tripOptions} manager={manager} today={today} records={visible} cardRecords={contextual} loading={recordsLoading||Boolean(recordsError)}/>
             <div className="mp-records">
               {recordsLoading && <p role="status">Carregando lançamentos…</p>}
               {recordsError && (

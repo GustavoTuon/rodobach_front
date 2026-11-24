@@ -1,4 +1,16 @@
 .mp-expense-filters { margin: 20px 0; }
+.mp-pending-cards { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+.mp-app .mp-pending-card { display: grid; gap: 12px; text-align: left; padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); cursor: pointer; font: inherit; min-width: 0; }
+.mp-pending-card-title { display: flex; justify-content: space-between; align-items: start; gap: 8px; font-weight: 600; }
+.mp-pending-card strong { font-size: 28px; line-height: 1.2; }
+.mp-pending-card strong small { font-size: 12px; font-weight: 400; }
+.mp-app .mp-pending-card[aria-pressed="true"] { border: 2px solid var(--accent); padding: 19px; background: var(--surface-2); box-shadow: 0 0 0 2px color-mix(in srgb,var(--accent) 12%,transparent); }
+.mp-pending-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+.mp-pending-card:hover { border-color: var(--accent); }
+.mp-app .mp-card-help { font-size: 12px; color: var(--text-2); margin: 12px 0 20px; }
+.mp-expense-filters > .mp-filter-panel { margin-top: 16px; }
+@media(max-width:900px){.mp-pending-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.mp-app .mp-pending-card{padding:14px;gap:10px}.mp-app .mp-pending-card[aria-pressed="true"]{padding:13px}.mp-pending-card-title{font-size:12px;min-height:36px}.mp-pending-card strong{font-size:24px}.mp-pending-card strong small{display:block;margin-top:4px}.mp-pending-card>span:last-child{font-size:13px}}
 .mp-expense-filters .mp-unified-search { flex: 2 1 300px; }
 .mp-date-shortcuts, .mp-active-filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .mp-date-shortcuts button, .mp-active-filters button { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }

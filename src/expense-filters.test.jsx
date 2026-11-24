@@ -7,7 +7,7 @@ import {filterReportRecords} from './expense-report-dialog.jsx';
 afterEach(cleanup);
 const rows=[{id:1,plate:'ABC1D23',supplier:'Oficina São José',amount:180,paid:true,posted:false,checked:false,erpDocument:'NF-987',expenseDate:'2026-11-23'},{id:2,plate:'DEF4G56',amount:40,paid:false,posted:false,checked:true,expenseDate:'2026-11-22'},{id:3,plate:'ABC1D23',amount:20,paid:true,posted:true,checked:true,expenseDate:'2026-11-23'}];
 const empty={text:'',dateFrom:'',dateTo:'',paid:'',posted:'',status:'all',trip:'',source:'',reimbursement:''};
-function Harness(){const [v,set]=useState(empty);return <ExpenseFilters values={v} onChange={(key,value)=>set(x=>({...x,[key]:value}))} onClear={()=>set(empty)} trips={[]} manager today={()=>'2026-11-23'} records={filterReportRecords(rows,v)}/>;}
+function Harness(){const [v,set]=useState(empty);return <ExpenseFilters values={v} onChange={(key,value)=>set(x=>({...x,[key]:value}))} onClear={()=>set(empty)} trips={[]} manager today={()=>'2026-11-23'} records={filterReportRecords(rows,v)} cardRecords={filterReportRecords(rows,{...v,paid:"",posted:"",status:"all",reimbursement:""})}/>;}
 it('combina situacoes, mostra totais e remove filtros individualmente',()=>{
  render(<Harness/>);
  fireEvent.change(screen.getByLabelText('Pagamento da despesa'),{target:{value:'true'}});
@@ -36,4 +36,27 @@ it('atalhos usam datas inclusivas e remover periodo preserva outras escolhas',()
  fireEvent.click(screen.getByRole('button',{name:'Hoje'}));expect(screen.getByLabelText('De').value).toBe('2026-11-23');
  fireEvent.click(screen.getByRole('button',{name:'Mês atual'}));expect(screen.getByLabelText('De').value).toBe('2026-11-01');
  fireEvent.click(screen.getByRole('button',{name:'Todo o período'}));expect(screen.getByLabelText('Até').value).toBe('');
+});
+
+it('cartoes trocam a pendencia sem acumular filtros e preservam busca e periodo',()=>{
+ render(<Harness/>);
+ fireEvent.change(screen.getByLabelText('Buscar despesas'),{target:{value:'ABC'}});
+ fireEvent.click(screen.getByRole('button',{name:'Hoje',exact:true}));
+ const all=screen.getByRole('button',{name:'Todas',exact:true});
+ expect(all.textContent).toContain('2');
+ fireEvent.click(screen.getByRole('button',{name:'Falta pagar',exact:true}));
+ expect(screen.getByRole('status').textContent).toContain('0 despesas');
+ fireEvent.click(screen.getByRole('button',{name:'Falta lan\u00e7ar no ERP',exact:true}));
+ expect(screen.getByRole('status').textContent).toContain('1 despesa');
+ expect(screen.getByLabelText('Pagamento da despesa').value).toBe('');
+ expect(all.textContent).toContain('2');
+ fireEvent.click(all);expect(screen.getByRole('status').textContent).toContain('2 despesas');
+ expect(screen.getByLabelText('Buscar despesas').value).toBe('ABC');expect(screen.getByLabelText('De').value).toBe('2026-11-23');
+});
+it('falta reembolsar inclui a cobrar e cobrado, sem misturar recebido e nao aplicavel',()=>{
+ const data=['a_cobrar','cobrado','recebido','nao_aplicavel'].map((status,i)=>({...rows[0],id:i,amount:100,reimbursement:{status}}));
+ function View(){const [v,set]=useState(empty);return <ExpenseFilters values={v} onChange={(key,value)=>set(x=>({...x,[key]:value}))} onClear={()=>set(empty)} trips={[]} manager today={()=>'2026-11-23'} records={filterReportRecords(data,v)} cardRecords={data}/>;}
+ render(<View/>);const card=screen.getByRole('button',{name:'Falta reembolsar'});
+ expect(card.textContent.replace(/\s/g,' ')).toContain('R$ 200,00');fireEvent.click(card);
+ expect(screen.getByRole('status').textContent).toContain('2 despesas');expect(card.getAttribute('aria-pressed')).toBe('true');
 });
