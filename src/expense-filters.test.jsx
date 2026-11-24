@@ -89,10 +89,10 @@ it('cartoes trocam a pendencia sem acumular filtros e preservam busca e periodo'
  fireEvent.click(all);expect(screen.getByRole('status').textContent).toContain('2 despesas');
  expect(screen.getByLabelText('Buscar despesas').value).toBe('ABC');expect(screen.getByLabelText('De').value).toBe('2026-11-23');
 });
-it('falta reembolsar inclui a cobrar e cobrado, sem misturar recebido e nao aplicavel',()=>{
+it('pendente de cobranca inclui somente a cobrar, sem misturar cobrado e recebido',()=>{
  const data=['a_cobrar','cobrado','recebido','nao_aplicavel'].map((status,i)=>({...rows[0],id:i,amount:100,reimbursement:{status}}));
  function View(){const [v,set]=useState(empty);return <ExpenseFilters values={v} onChange={(key,value)=>set(x=>({...x,[key]:value}))} onClear={()=>set(empty)} trips={[]} manager today={()=>'2026-11-23'} records={filterReportRecords(data,v)} cardRecords={data}/>;}
- render(<View/>);const card=screen.getByRole('button',{name:'Falta reembolsar'});
- expect(card.textContent.replace(/\s/g,' ')).toContain('R$ 200,00');fireEvent.click(card);
- expect(screen.getByRole('status').textContent).toContain('2 despesas');expect(card.getAttribute('aria-pressed')).toBe('true');
+ render(<View/>);const card=screen.getByRole('button',{name:/Pendente de cobran/});
+ expect(card.textContent).toContain('1');fireEvent.click(card);
+ expect(screen.getByRole('status').textContent).toContain('1 despesa');expect(card.getAttribute('aria-pressed')).toBe('true');
 });
