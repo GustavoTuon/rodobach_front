@@ -5,6 +5,27 @@ import {render,screen,fireEvent,cleanup} from '@testing-library/react';
 import ExpenseFilters,{matchesExpenseFlag,matchesExpenseSearch} from './expense-filters.jsx';
 import {filterReportRecords} from './expense-report-dialog.jsx';
 afterEach(cleanup);
+it('atalhos combinam pendencias sem acumular e limpar campo preserva as demais escolhas',()=>{
+ render(<Harness/>);
+ fireEvent.change(screen.getByLabelText('Buscar despesas'),{target:{value:'ABC'}});
+ fireEvent.click(screen.getByRole('button',{name:'Hoje',exact:true}));
+ fireEvent.click(screen.getByText('Mais filtros'));
+ fireEvent.click(screen.getByRole('button',{name:'Pagas, falta lançar',exact:true}));
+ expect(screen.getByLabelText('Pagamento da despesa').value).toBe('true');
+ expect(screen.getByLabelText('Lançamento').value).toBe('pending');
+ expect(screen.getByRole('status').textContent).toContain('1 despesa');
+ fireEvent.click(screen.getByRole('button',{name:'Pagas, falta reembolso',exact:true}));
+ expect(screen.getByLabelText('Lançamento').value).toBe('');
+ expect(screen.getByLabelText('Reembolso').value).toBe('aguardando');
+ fireEvent.click(screen.getByRole('button',{name:'Limpar Pagamento da despesa',exact:true}));
+ expect(screen.getByLabelText('Pagamento da despesa').value).toBe('');
+ expect(screen.getByLabelText('Reembolso').value).toBe('aguardando');
+ expect(screen.getByLabelText('Buscar despesas').value).toBe('ABC');
+ expect(screen.getByLabelText('De').value).toBe('2026-11-23');
+ fireEvent.click(screen.getByRole('button',{name:'Falta conferir',exact:true}));
+ expect(screen.getByLabelText('Reembolso').value).toBe('');
+ expect(screen.getByLabelText('Conferência').value).toBe('unchecked');
+});
 it('limpa opcoes adicionais preservando busca e periodo e explica pagamento',()=>{
  render(<Harness/>);
  fireEvent.change(screen.getByLabelText('Buscar despesas'),{target:{value:'ABC'}});
