@@ -457,7 +457,7 @@ window.RB_API = {
   createPlantao: (body) => apiRequest("/manutencao-plantao/lancamentos", {method:"POST",body:JSON.stringify(body)}),
   listPlantaoPaymentMethods: () => apiRequest('/manutencao-plantao/formas-pagamento'),
   listPlantaoTires: plate => apiRequest(`/manutencao-plantao/placas/${encodeURIComponent(plate)}/pneus`),
-  listPlantaoReimbursementDocuments: (id, number = "") => apiRequest(`/manutencao-plantao/reembolsos/${encodeURIComponent(id)}/documentos?${new URLSearchParams({number})}`),
+  listPlantaoReimbursementDocuments: (id, number = "", series = "") => apiRequest(`/manutencao-plantao/reembolsos/${encodeURIComponent(id)}/documentos?${new URLSearchParams({number,series})}`),
   listPlantaoUnloadingTrips: (plate, params = {}) => apiRequest(`/manutencao-plantao/placas/${encodeURIComponent(plate)}/descarga-viagens?${new URLSearchParams(params)}`),
   updatePlantaoControl: (id, body, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}/controle`, {method:"PATCH",body:JSON.stringify(body)}),
   updatePlantao: (id, body, conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}/${encodeURIComponent(id)}`, {method:"PUT",body:JSON.stringify(body)}),

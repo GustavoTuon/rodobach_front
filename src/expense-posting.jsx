@@ -31,6 +31,7 @@ export default function ExpensePosting({record,onSave,onClose,saving,review=fals
     else setError('Não foi possível salvar. Feche e atualize a lista antes de tentar novamente.');
   }}>
     <header className="mp-section-title"><h2 id="mp-edit-title" data-step-title tabIndex={-1}>{review ? "Conferir despesa e vincular documento" : "Lançamento no ERP"}</h2><button type="button" className="mp-close" aria-label="Fechar lançamento" disabled={saving} onClick={onClose}>×</button></header>
+    <div className="mp-posting-body">
     <div className="mp-posting-summary"><div><strong>{record.plate}</strong><span>{record.supplier}</span></div><strong>{Number(record.amount).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</strong></div>
     <label>Documentos no financeiro<input value={documents.map(item=>item.number).join(', ')} readOnly placeholder="Adicione documentos pela busca"/></label>
     <p className="mp-field-help">Adicione um ou mais documentos de contas a pagar da placa {record.plate}, por exemplo diesel e Arla. O documento fiscal da despesa permanece separado.</p>
@@ -76,6 +77,7 @@ export default function ExpensePosting({record,onSave,onClose,saving,review=fals
     <label className="mp-posted-action"><input type="checkbox" checked={posted} disabled={saving} onChange={event=>setPosted(event.target.checked)}/><span>Lançamento confirmado no ERP</span></label>
     <p className="mp-field-help">{review ? "Confira o documento antes de salvar. A despesa será marcada como conferida somente ao confirmar abaixo." : "O registro mantém pagamento e conferência independentes."}</p>
     {error && <p role="alert" className="mp-feedback error">{error}</p>}
+    </div>
     <div className="mp-payment-modal-actions"><button type="button" className="mp-cancel-edit" disabled={saving} onClick={onClose}>Cancelar</button><button className="mp-submit" disabled={saving}>{saving ? 'Salvando…' : review ? 'Salvar e conferir' : 'Salvar lançamento'}</button></div>
   </form>;
 }

@@ -25,9 +25,9 @@ it('busca CT-e complementar pela despesa e preenche documento e cliente pelo tec
   const input=screen.getByRole('combobox',{name:'CT-e / documento de cobrança'});
   fireEvent.focus(input);
   await screen.findByRole('option');
-  expect(window.RB_API.listPlantaoReimbursementDocuments).toHaveBeenCalledWith('a','');
+  expect(window.RB_API.listPlantaoReimbursementDocuments).toHaveBeenCalledWith('a','','');
   fireEvent.change(input,{target:{value:'4762'}});
-  await waitFor(()=>expect(window.RB_API.listPlantaoReimbursementDocuments).toHaveBeenCalledWith('a','4762'));
+  await waitFor(()=>expect(window.RB_API.listPlantaoReimbursementDocuments).toHaveBeenCalledWith('a','4762',''));
   await screen.findByRole('option');
   fireEvent.keyDown(input,{key:'ArrowDown'});
   fireEvent.keyDown(input,{key:'Enter'});
@@ -121,4 +121,29 @@ it('filtra todos os reembolsos independentemente do pagamento da despesa',()=>{
   expect(matchesReimbursement({paid:false,reimbursement:{status:'recebido'}},'com_reembolso')).toBe(true);
   expect(matchesReimbursement({paid:true},'com_reembolso')).toBe(false);
   expect(matchesReimbursement({paid:true,reimbursement:{status:'a_cobrar'}},'recebido')).toBe(false);
+});
+
+it('documento vinculado usa recebimento do ERP sem controle manual',()=>{
+ const record={id:'linked',reimbursement:{status:'recebido',customer:'Cliente',document:'CT-e 123',erpDocument:{company:'2',series:'1',code:'123'},receivedDate:'2026-11-23',note:''}};
+ render(<ExpenseReimbursement record={record} onSave={vi.fn()}/>);
+ expect(screen.queryByRole('radio',{name:'Reembolso recebido'})).toBeNull();
+ expect(screen.queryByLabelText('Data do recebimento')).toBeNull();
+ expect(screen.getByText(/Recebido no ERP em 23\/11\/2026/)).toBeTruthy();
+});
+
+it('busca numero e serie e salva a identidade da opcao selecionada',async()=>{
+ const docs=['1','2'].map(series=>({company:'2',series,code:series==='1'?'100':'200',number:'4762',customerName:'Cliente ERP'}));
+ window.RB_API={listPlantaoReimbursementDocuments:vi.fn(async(_id,_number,series)=>({ctes:series?docs.filter(d=>d.series===series):docs}))};
+ const save=vi.fn();
+ render(<ExpenseReimbursement record={{id:'a',plate:'ABC1234',unloading:{reimbursement:true}}} onSave={save}/>);
+ const input=screen.getByRole('combobox');
+ fireEvent.change(input,{target:{value:'4762'}});
+ await waitFor(()=>expect(screen.getAllByRole('option')).toHaveLength(2));
+ fireEvent.change(screen.getByPlaceholderText('Todas as séries'),{target:{value:'2'}});
+ await waitFor(()=>expect(window.RB_API.listPlantaoReimbursementDocuments).toHaveBeenLastCalledWith('a','4762','2'));
+ await waitFor(()=>expect(screen.getAllByRole('option')).toHaveLength(1));
+ fireEvent.focus(input);
+ fireEvent.keyDown(input,{key:'ArrowDown'});fireEvent.keyDown(input,{key:'Enter'});
+ fireEvent.click(screen.getByRole('button',{name:'Salvar reembolso'}));
+ await waitFor(()=>expect(save).toHaveBeenCalledWith(expect.objectContaining({erpDocument:{company:'2',series:'2',code:'200'}})));
 });

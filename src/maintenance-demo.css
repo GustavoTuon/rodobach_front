@@ -2174,3 +2174,16 @@ button.mp-payment-button:hover:not(:disabled) { border-color: var(--accent); }
 .mp-recent-duplicate h3{font-size:16px}.mp-recent-duplicate p,.mp-recent-duplicate li{font-size:13px;line-height:1.6;margin:10px 0;overflow-wrap:anywhere}
 .mp-recent-duplicate ul{max-height:220px;overflow:auto;padding-left:20px}
 .mp-recent-duplicate-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}.mp-app .mp-recent-duplicate-actions .mp-submit{width:auto;margin:0;padding:12px 18px}
+
+/* Keep reimbursement actions outside the scrolling form. */
+.mp-dialog:has(.mp-reimbursement-modal){overflow:hidden;max-height:calc(100dvh - 24px)}
+.mp-dialog .mp-reimbursement-modal{display:flex;flex-direction:column;height:min(860px,calc(100dvh - 26px));max-height:none;padding:0;gap:0;overflow:hidden}
+.mp-reimbursement-header{flex:none;padding:20px 24px 16px;border-bottom:1px solid var(--border)}
+.mp-reimbursement-header h2{margin:0}.mp-reimbursement-header p{margin:6px 0 0}
+.mp-reimbursement-modal .mp-reimbursement{display:flex;flex:1;flex-direction:column;min-height:0;margin:0;padding:0;border:0;border-radius:0;overflow:hidden}
+.mp-reimbursement-modal .mp-reimbursement-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:20px 24px;scrollbar-gutter:stable}
+.mp-reimbursement-modal .mp-reimbursement-footer{flex:none;margin:0;padding:14px 24px;background:var(--surface);border-top:1px solid var(--border)}
+.mp-reimbursement-modal .mp-reimbursement-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;width:100%}
+.mp-reimbursement-modal .mp-reimbursement-actions button{min-height:44px;margin:0}
+.mp-reimbursement-modal .mp-reimbursement-document .mp-fleet-dropdown{position:static;max-height:240px;overflow:auto;margin-top:8px}
+@media(max-width:650px){.mp-reimbursement-modal .mp-reimbursement-status{grid-template-columns:repeat(2,minmax(0,1fr))}.mp-reimbursement-header{padding:16px}.mp-reimbursement-modal .mp-reimbursement-body{padding:16px}.mp-reimbursement-modal .mp-reimbursement-footer{padding:12px 16px}.mp-reimbursement-modal .mp-reimbursement-actions button{flex:1 1 auto}}
