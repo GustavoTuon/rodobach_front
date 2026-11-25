@@ -2,6 +2,18 @@
 import { test, expect, vi, afterEach } from "vitest";
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
 
+test('financial search explicitly preserves an empty plate', async()=>{
+  const fetch=vi.fn().mockResolvedValue({ok:true,status:200,json:async()=>({documents:[]})});
+  vi.stubGlobal('fetch',fetch);
+  await import('./api.js');
+  await window.RB_API.searchPlantaoErpDocuments({q:'100',plate:'',series:'1'});
+  const query=new URL(fetch.mock.calls[0][0], 'http://localhost').searchParams;
+  expect(query.has('plate')).toBe(true);
+  expect(query.get('plate')).toBe('');
+  expect(query.get('q')).toBe('100');
+  expect(query.get('series')).toBe('1');
+});
+
 test("task requests explain network and gateway failures without ending the session", async () => {
   const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
   await import("./api.js");

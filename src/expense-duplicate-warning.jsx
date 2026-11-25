@@ -23,7 +23,7 @@ function ExpenseDuplicateWarning({pending,onDecide}) {
   const money=value=>Number(value).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
   return <section className="mp-recent-duplicate" role="alert" tabIndex={-1} ref={ref} aria-label="Aviso de possível duplicidade">
     <h3>{pending.failed?'Não foi possível verificar despesas recentes':'Atenção: despesa semelhante lançada nos últimos 3 dias'}</h3>
-    <p><strong>{pending.plate} · {pending.supplier} · {money(pending.amount)}</strong></p>
+    <p><strong>{pending.plate || 'Sem veículo'} · {pending.supplier} · {money(pending.amount)}</strong></p>
     <p>{pending.failed?'A consulta falhou. Você pode revisar ou continuar sem a verificação.':'Encontramos a mesma placa, fornecedor e valor em lançamentos feitos nas últimas 72 horas. Pode ser outro serviço; este aviso não impede o registro.'}</p>
     {pending.matches.length>0&&<ul>{pending.matches.map(row=><li key={row.id}><strong>{row.service} · {money(row.amount)}</strong><br/>Documento: {row.document||'Sem número informado'} · Lançado em {new Date(row.createdAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</li>)}</ul>}
     <div className="mp-recent-duplicate-actions"><button type="button" className="mp-cancel-edit" onClick={()=>onDecide(false)}>Voltar e revisar</button><button type="button" className="mp-submit" onClick={()=>onDecide(true)}>Lançar mesmo assim</button></div>

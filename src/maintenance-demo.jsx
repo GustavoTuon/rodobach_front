@@ -1,3 +1,5 @@
+import {matchesExpenseVehicle} from './expense-vehicle.js';
+import ExpenseWithoutVehicle from './expense-without-vehicle.jsx';
 import ExpenseFilters,{matchesExpenseSearch,matchesExpenseFlag} from './expense-filters.jsx';
 import {useExpenseDuplicateWarning} from "./expense-duplicate-warning.jsx";
 import {supplierLabel} from "./expense-supplier-origin.js";
@@ -418,6 +420,7 @@ function MaintenanceForm({
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [textSearch, setTextSearch] = useState("");
+  const [vehicleFilter,setVehicleFilter]=useState("");
   const [tripFilter, setTripFilter] = useState("");
   const [deleting, setDeleting] = useState(null);
   const [deleteReason, setDeleteReason] = useState("");
@@ -429,6 +432,7 @@ function MaintenanceForm({
   const [reimbursementWarning,setReimbursementWarning]=useState("");
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
+  const [withoutVehicle,setWithoutVehicle]=useState(user.expenseProfile !== "motorista" && Boolean(maintenanceDraft?.withoutVehicle));
   const [plate, setPlate] = useState(maintenanceDraft?.plate || "");
   const [fleet, setFleet] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
@@ -454,7 +458,7 @@ function MaintenanceForm({
   const [reimbursementExpected,setReimbursementExpected] = useState(maintenanceDraft?.reimbursementExpected ?? false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const draftWarning = useExpenseDraft(user,"maintenance",editing,{reimbursementExpected,expenseDate,document,plate,amount,service,note,supplier,receiptReason,documentType,tireFireNumber,tire,expenseTrip,paymentDetails,photos:maintenancePhotos},wizardOpen && !completed);
+  const draftWarning = useExpenseDraft(user,"maintenance",editing,{withoutVehicle,reimbursementExpected,expenseDate,document,plate,amount,service,note,supplier,receiptReason,documentType,tireFireNumber,tire,expenseTrip,paymentDetails,photos:maintenancePhotos},wizardOpen && !completed);
   useEffect(() => {
     let active = true;
     setFleetLoading(true);
@@ -520,6 +524,7 @@ function MaintenanceForm({
   const contextual = records.filter(
     (r) =>
       (!manager || !sourceFilter || (r.authorProfile || "unknown") === sourceFilter) &&
+      matchesExpenseVehicle(r,vehicleFilter) &&
       (!tripFilter || tripKey(recordTrip(r)) === tripFilter) &&
       (!dateFrom || expenseDay(r) >= dateFrom) &&
       (!dateTo || expenseDay(r) <= dateTo) &&
@@ -567,6 +572,7 @@ function MaintenanceForm({
     setExpenseDate(today());
     setError("");
     setPlate("");
+    setWithoutVehicle(false);
     setService("Borracharia");
   }
   function editRecord(r) {
@@ -581,6 +587,7 @@ function MaintenanceForm({
     setMaintenancePhotos(draft?.photos || {});
     setPaymentDetails(draft?.paymentDetails !== undefined ? draft.paymentDetails : r.paymentDetails ?? null);
     setEditing(r);
+    setWithoutVehicle(!isDriver && (draft?.withoutVehicle ?? !r.plate));
     setPlate(draft?.plate ?? r.plate);
     setAmount(draft?.amount ?? r.amount.toFixed(2).replace(".", ","));
     setService(draft?.service ?? r.service);
@@ -757,7 +764,7 @@ function MaintenanceForm({
     if (savingRef.current || photoBusy) return;
     setError("");
     if (step === 0) {
-      if (fleetLoading || fleetError || !fleet.includes(plate)) {
+      if (!withoutVehicle && (fleetLoading || fleetError || !fleet.includes(plate))) {
         setError("Selecione uma placa cadastrada na frota.");
         return;
       }
@@ -799,7 +806,7 @@ function MaintenanceForm({
       return;
     }
     const value = Number(amount.trim().replace(/\./g, "").replace(",", "."));
-    if (fleetLoading || fleetError || !fleet.includes(plate)) {
+    if (!withoutVehicle && (fleetLoading || fleetError || !fleet.includes(plate))) {
       setError("Selecione uma placa cadastrada na frota.");
       return;
     }
@@ -831,11 +838,12 @@ function MaintenanceForm({
         ...(!editing ? {reimbursementExpected} : {}),
         expenseDate,
         receiptReason,photos:maintenancePhotos,documentType,
-        tireFireNumber:service === 'Borracharia' && (!tire || tire.plate === plate) ? tireFireNumber.trim() : '',
-        tire:service === 'Borracharia' && tire?.plate === plate ? {code:tire.code,company:tire.company} : null,
-        trip:expenseTrip?.trip ? {company:expenseTrip.trip.company,number:expenseTrip.trip.number} : null,
+        tireFireNumber:!withoutVehicle && service === 'Borracharia' && (!tire || tire.plate === plate) ? tireFireNumber.trim() : '',
+        tire:!withoutVehicle && service === 'Borracharia' && tire?.plate === plate ? {code:tire.code,company:tire.company} : null,
+        trip:!withoutVehicle && expenseTrip?.trip ? {company:expenseTrip.trip.company,number:expenseTrip.trip.number} : null,
         document: document.trim(),
-        plate,
+        plate:withoutVehicle ? "" : plate,
+        withoutVehicle,
         amount: value,
         service,
         note: note.trim(),
@@ -863,6 +871,7 @@ function MaintenanceForm({
       try {clearExpenseDraft(user,"maintenance",editing);} catch { /* Expense already saved. */ }
       setReceiptReason("");setMaintenancePhotos({});setDocumentType("");setTireFireNumber("");setTire(null);setExpenseTrip(null);
       setPlate("");
+      setWithoutVehicle(false);
       setService("Borracharia");
       setEditing(null);
       setDocument("");
@@ -896,7 +905,7 @@ function MaintenanceForm({
                       <div className="mp-record-description">
                         <span className="mp-plate-badge">
                           <Icon name="truck" size={15} />
-                          {r.plate}
+                          {r.plate || 'Sem ve?culo'}
                         </span>
                         <h3>{r.service}</h3>
                         {manager && <span className="driver-source-tag">{r.authorProfile === "motorista" ? "Motorista" : r.authorProfile === "colaborador" ? "Colaborador" : "Perfil não registrado"}</span>}
@@ -911,7 +920,7 @@ function MaintenanceForm({
                     <section className="mp-detail-section"><h4>Pagamento</h4>
                     <div className="mp-payment-controls mp-financial-status" aria-label="Status financeiro">
                       <div className={`mp-payment-button ${r.paid ? "is-paid" : ""}`}><span><small>PAGAMENTO</small><strong>{r.paymentDate ? `Pago em ${displayDay(r.paymentDate)}` : r.paid ? "Pago · data não informada" : r.paid === false ? "Não pago" : "Não informado"}</strong></span>
-                        {canPay && !user.readOnly && <button type="button" className="mp-finance-action" disabled={saving} aria-label={`${r.paid ? "Editar pagamento" : "Registrar pagamento"} — ${r.plate}`} onClick={()=>openPayment(r)}>{r.paid ? "Editar pagamento" : "Registrar pagamento"}</button>}
+                        {canPay && !user.readOnly && <button type="button" className="mp-finance-action" disabled={saving} aria-label={`${r.paid ? "Editar pagamento" : "Registrar pagamento"} — ${r.plate || 'Sem ve?culo'}`} onClick={()=>openPayment(r)}>{r.paid ? "Editar pagamento" : "Registrar pagamento"}</button>}
                       </div>
                     </div>
                     {canReimburse && !user.readOnly && <ExpenseReimbursement key={`${r.id}:${r.version}`} record={r} disabled={saving || user.readOnly} onSave={value=>updateControl(r,"reimbursement",value)}/>}
@@ -1011,7 +1020,7 @@ function MaintenanceForm({
                         aria-label="Confirmar exclusão"
                       >
                         <strong>
-                          Excluir {r.plate} · {money(r.amount)}?
+                          Excluir {r.plate || 'Sem ve?culo'} · {money(r.amount)}?
                         </strong>
                         <p>
                           O lançamento sairá da lista. O motivo e os dados serão
@@ -1120,7 +1129,7 @@ function MaintenanceForm({
             if(receipt.amount) setAmount(receipt.amount);
             if(receipt.supplier) setSupplier({nome:receipt.supplier});
             if(receipt.documentNumber) setDocument(receipt.documentNumber);
-            if(receipt.plate && receipt.plate !== plate) {setPlate(receipt.plate);setTire(null);setTireFireNumber('');}
+            if(!withoutVehicle && receipt.plate && receipt.plate !== plate) {setPlate(receipt.plate);setTire(null);setTireFireNumber('');}
             setStep(0);
           }
           try {clearExpenseDraft(user,"expense");} catch {} setDriverWizard(null); openWizard();
@@ -1131,10 +1140,10 @@ function MaintenanceForm({
         }} />}
       {reimbursementRecord && canReimburse && <MaintenanceDialog onClose={()=>setReimbursementRecord(null)} saving={saving} step="reimbursement"><div className="mp-form mp-payment-modal mp-reimbursement-modal">
         <header className="mp-reimbursement-header"><h2 id="mp-edit-title" data-step-title tabIndex={-1}>Lançar reembolso</h2>
-        <p>{reimbursementRecord.plate} · {money(reimbursementRecord.amount)}</p></header>
+        <p>{reimbursementRecord.plate || 'Sem ve?culo'} · {money(reimbursementRecord.amount)}</p></header>
         <ExpenseReimbursement onClose={()=>setReimbursementRecord(null)} initialStatus={reimbursementRecord.reimbursementInitialStatus} record={reimbursementRecord} disabled={saving} onSave={async value=>{const ok=await updateControl(reimbursementRecord,"reimbursement",value);if(ok)setReimbursementRecord(null);return ok;}}/>
       </div></MaintenanceDialog>}
-      {reportOpen && manager && <ExpenseReportDialog records={records} initialFilters={{dateFrom,dateTo,plate:"",trip:tripFilter,paid:paidFilter,posted:postedFilter,reimbursement:effectiveReimbursementFilter,text:textSearch,source:sourceFilter,status:filter}} Dialog={MaintenanceDialog} onClose={()=>setReportOpen(false)}/>}
+      {reportOpen && manager && <ExpenseReportDialog records={records} initialFilters={{dateFrom,dateTo,plate:"",trip:tripFilter,vehicle:vehicleFilter,paid:paidFilter,posted:postedFilter,reimbursement:effectiveReimbursementFilter,text:textSearch,source:sourceFilter,status:filter}} Dialog={MaintenanceDialog} onClose={()=>setReportOpen(false)}/>}
       {receiptView && <MaintenanceDialog onClose={() => setReceiptView(null)} saving={false} step="receipt">
         <div className="mp-form mp-payment-modal"><div className="mp-section-title"><h2 id="mp-edit-title" data-step-title tabIndex={-1}>Comprovante da despesa</h2><button className="mp-close" onClick={() => setReceiptView(null)} aria-label="Fechar comprovante">×</button></div>
           {receiptView.loading ? <p role="status">Carregando foto…</p> : receiptView.error ? <p role="alert">{receiptView.error}</p> : <div>{Object.entries(receiptView.photos || {invoice:receiptView.receipt}).filter(([,photo])=>photo).map(([kind,photo])=><figure key={kind}><figcaption>{{odometer:"Painel / hodômetro",pump:"Bomba de combustível",invoice:"Nota / comprovante"}[kind]}</figcaption><img className="driver-receipt" src={photo} alt={kind === "invoice" ? "Foto do comprovante da despesa" : `Foto de ${kind === "pump" ? "bomba" : "painel"}`} /></figure>)}</div>}
@@ -1165,7 +1174,7 @@ function MaintenanceForm({
               <div><p className="mp-eyebrow">CONTROLE FINANCEIRO</p><h2 id="mp-edit-title" data-step-title tabIndex={-1}>Pagamento da manutenção</h2></div>
               <button className="mp-close" type="button" aria-label="Fechar pagamento" disabled={saving || photoBusy} onClick={() => setPaymentRecord(null)}>×</button>
             </header>
-            <div className="mp-payment-summary"><span>{paymentRecord.plate} · {paymentRecord.service}</span><strong>{money(paymentRecord.amount)}</strong></div>
+            <div className="mp-payment-summary"><span>{paymentRecord.plate || 'Sem ve?culo'} · {paymentRecord.service}</span><strong>{money(paymentRecord.amount)}</strong></div>
             <section className="mp-payment-recipient" aria-label="Dados para pagamento">
               <h3>Dados para pagamento</h3>
               <dl>
@@ -1297,10 +1306,11 @@ function MaintenanceForm({
                     <div className="mp-wizard-body">
                       <section hidden={step !== 0}>
                         <p className="mp-step-intro">
-                          Informe o veículo, o valor e a data da despesa.
+                          {withoutVehicle ? "Informe o valor e a data da despesa sem veículo." : "Informe o veículo, o valor e a data da despesa."}
                         </p>
+                        {!isDriver && <ExpenseWithoutVehicle value={withoutVehicle} disabled={saving} onChange={value=>{setWithoutVehicle(value);setPlate("");setExpenseTrip(null);setTire(null);setTireFireNumber("");}}/>}
                         <div className="mp-fields">
-                          <FleetSelect
+                          {!withoutVehicle && <FleetSelect
                             fleet={fleet}
                             value={plate}
                             loading={fleetLoading}
@@ -1315,7 +1325,7 @@ function MaintenanceForm({
                               setPlate(value);setExpenseTrip(null);
                               setMessage("");
                             }}
-                          />
+                          />}
                           <label>
                             Valor da despesa
                             <div className="mp-money-input">
@@ -1346,7 +1356,7 @@ function MaintenanceForm({
                             </div>
                           </label>
                         </div>
-                        {fleetLoading ? (
+                        {withoutVehicle ? <p className="mp-field-help">Sem placa e sem viagem vinculada.</p> : fleetLoading ? (
                           <p className="mp-field-help" role="status">
                             Carregando placas da frota…
                           </p>
@@ -1418,14 +1428,14 @@ function MaintenanceForm({
                             ))}
                           </div>
                         </fieldset>
-                        {step===1 && service==='Borracharia' && <ExpenseTirePicker key={`tire:${plate}`}  plate={plate} value={tire?.plate === plate ? tire : null} number={tireFireNumber} onChange={(selected,number)=>{setTire(selected);setTireFireNumber(number);}} disabled={saving || photoBusy}/>}
+                        {step===1 && !withoutVehicle && service==='Borracharia' && <ExpenseTirePicker key={`tire:${plate}`}  plate={plate} value={tire?.plate === plate ? tire : null} number={tireFireNumber} onChange={(selected,number)=>{setTire(selected);setTireFireNumber(number);}} disabled={saving || photoBusy}/>}
                         <SupplierSelect
                           value={supplier}
                           onChange={setSupplier}
                         />
                         <ExpenseDocumentFields type={documentType} onTypeChange={setDocumentType} number={document} onNumberChange={setDocument}/>
                         {!editing && <ExpenseReimbursementChoice value={reimbursementExpected} onChange={setReimbursementExpected}/>}
-                        {fleet.includes(plate) && <ExpenseUnloading key={plate} plate={plate} value={expenseTrip} onChange={setExpenseTrip} tripOnly/>}
+                        {!withoutVehicle && fleet.includes(plate) && <ExpenseUnloading key={plate} plate={plate} value={expenseTrip} onChange={setExpenseTrip} tripOnly/>}
                         <ExpensePhotoAssist photos={maintenancePhotos} knownPhotos={editing?.photoKinds || {}} photoKinds={["invoice"]} suggestionFields={["supplier","documentNumber"]}
                           preparePhoto={prepareReceipt} onPhoto={(kind,photo)=>setMaintenancePhotos(current=>({...current,[kind]:photo}))}
                           onApply={(field,value)=>field==="supplier" ? setSupplier({nome:value}) : field==="documentNumber" ? setDocument(value) : null}
@@ -1450,7 +1460,7 @@ function MaintenanceForm({
                           </p>
                           <div className="mp-review-total">
                             <span>
-                              {plate} · {service}
+                              {plate || 'Sem veículo'} · {service}
                             </span>
                             <strong>
                               {money(
@@ -1511,9 +1521,7 @@ function MaintenanceForm({
                           saving ||
                           photoBusy ||
                           user.readOnly ||
-                          fleetLoading ||
-                          Boolean(fleetError) ||
-                          fleet.length === 0
+                          (!withoutVehicle && (fleetLoading || Boolean(fleetError) || fleet.length === 0))
                         }
                       >
                         {duplicateNotice.warning ? "Aguardando sua decisão…" : saving
@@ -1575,9 +1583,9 @@ function MaintenanceForm({
               </button>
             </div>
             {reimbursementWarning && <p role="alert">{reimbursementWarning}</p>}
-            <ExpenseFilters values={{text:textSearch,dateFrom,dateTo,paid:paidFilter,posted:postedFilter,status:filter,trip:tripFilter,reimbursement:effectiveReimbursementFilter,source:sourceFilter}}
-              onChange={(key,value)=>({text:setTextSearch,dateFrom:setDateFrom,dateTo:setDateTo,paid:setPaidFilter,posted:setPostedFilter,status:setFilter,trip:setTripFilter,reimbursement:setReimbursementFilter,source:setSourceFilter})[key](value)}
-              onClear={()=>{setTextSearch("");setDateFrom("");setDateTo("");setPaidFilter("");setPostedFilter("");setFilter("all");setTripFilter("");setReimbursementFilter("");setSourceFilter("");}}
+            <ExpenseFilters values={{vehicle:vehicleFilter,text:textSearch,dateFrom,dateTo,paid:paidFilter,posted:postedFilter,status:filter,trip:tripFilter,reimbursement:effectiveReimbursementFilter,source:sourceFilter}}
+              onChange={(key,value)=>({vehicle:setVehicleFilter,text:setTextSearch,dateFrom:setDateFrom,dateTo:setDateTo,paid:setPaidFilter,posted:setPostedFilter,status:setFilter,trip:setTripFilter,reimbursement:setReimbursementFilter,source:setSourceFilter})[key](value)}
+              onClear={()=>{setTextSearch("");setDateFrom("");setDateTo("");setPaidFilter("");setPostedFilter("");setFilter("all");setTripFilter("");setReimbursementFilter("");setSourceFilter("");setVehicleFilter("");}}
               trips={tripOptions} manager={manager} today={today} records={visible} cardRecords={contextual} loading={recordsLoading||Boolean(recordsError)}/>
             <div className="mp-records">
               {recordsLoading && <p role="status">Carregando lançamentos…</p>}
@@ -1601,7 +1609,7 @@ function MaintenanceForm({
                       ? "Tente outra placa ou outro filtro."
                       : records.length ? "Os registros continuam no histórico. Ajuste os filtros para encontrá-los." : "Ainda não há despesas cadastradas na frota."}
                   </p>
-                  {records.length > 0 && <button type="button" className="mp-secondary" onClick={() => { setFilter("all"); setReimbursementFilter(""); setTripFilter(""); setTextSearch(""); setDateFrom(""); setDateTo(""); setSourceFilter(""); setPaidFilter(""); setPostedFilter(""); }}>Mostrar todo o histórico</button>}
+                  {records.length > 0 && <button type="button" className="mp-secondary" onClick={() => { setFilter("all"); setReimbursementFilter(""); setTripFilter(""); setTextSearch(""); setDateFrom(""); setDateTo(""); setSourceFilter("");setVehicleFilter(""); setPaidFilter(""); setPostedFilter(""); }}>Mostrar todo o histórico</button>}
                 </div>
               ) : (
                 <ExpenseHistory onCorrectAmount={user.admin === true && !isDriver && !user.readOnly ? setCorrectionRecord : undefined} onReimbursement={canReimburse && !user.readOnly ? setReimbursementRecord : undefined} onPosting={canPost && !user.readOnly ? setPostingRecord : undefined} onReview={canReview && !user.readOnly ? setReviewRecord : undefined} onUndoReview={canReview && !user.readOnly ? record=>{setError("");setUndoReviewRecord(record);} : undefined} onReceipt={showReceipt} reviewDisabled={saving || user.readOnly} expandGroups={canReview && filter === "unchecked"} records={visible} isDriver={isDriver && !manager} currentPlate={expenseAccess?.plate} renderRecord={renderExpenseRecord} />

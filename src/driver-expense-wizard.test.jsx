@@ -112,3 +112,22 @@ it("despesa antiga mantém local manual e apresenta somente a referência",async
  fireEvent.change(screen.getByLabelText("Data da despesa"),{target:{value:"2025-01-02"}});next();await waitFor(()=>expect(screen.getByLabelText("Hodômetro (km)").value).toBe("197611,7"));toLocation();
  await screen.findByText(/Esta posição pode ser posterior/);expect(screen.getByLabelText("Cidade / local — opcional").value).toBe("");
 });
+
+it('Outros sem veiculo limpa placa e viagem e nao exige frota ou telemetria',()=>{
+ const telemetry=vi.fn();window.RB_API={getPlantaoOdometer:telemetry};
+ localStorage.setItem('rodobach:expense-draft:v1:teste:expense:new',JSON.stringify({version:null,data:{plate:'ABC1234',expenseTrip:{trip:{company:'1',number:'880'}}}}));
+ render(<Wizard user={{login:'teste'}} fleet={fleet} fleetError="Frota indisponivel" Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);
+ fireEvent.click(screen.getByRole('button',{name:/Outros/}));next();
+ fireEvent.click(screen.getByRole('checkbox',{name:/Despesa sem ve\u00edculo vinculado/}));
+ expect(screen.queryByLabelText('Placa')).toBeNull();next();
+ expect(screen.getByLabelText('Valor total da despesa (R$)')).toBeTruthy();
+ const draft=JSON.parse(localStorage.getItem('rodobach:expense-draft:v1:teste:expense:new')).data;
+ expect(draft).toMatchObject({withoutVehicle:true,plate:'',expenseTrip:null});
+ expect(telemetry).not.toHaveBeenCalled();
+});
+it('motorista e abastecimento nao oferecem lancamento sem veiculo',()=>{
+ window.RB_API={};
+ render(<Wizard user={{login:'teste',expenseProfile:'motorista'}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);
+ fireEvent.click(screen.getByRole('button',{name:/Outros/}));next();
+ expect(screen.queryByRole('checkbox',{name:/Despesa sem ve\u00edculo/})).toBeNull();
+});

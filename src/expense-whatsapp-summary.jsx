@@ -6,7 +6,7 @@ export function formatExpenseWhatsapp(record) {
   const clean = value => String(value ?? '').replace(/[\r\n]+/g, ' ').trim();
   const trip = record.unloading?.trip || record.trip;
   const lines = ['*Rodobach | Resumo da despesa*', '',
-    `*${clean(record.service)} · ${clean(record.plate)}*`,
+    `*${clean(record.service)} · ${clean(record.plate || 'Sem veículo')}*`,
     `Data: ${clean(record.expenseDate).split('-').reverse().join('/')}`,
     `Valor: ${Number(record.amount || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'})}`,
     `Fornecedor: ${clean(record.supplier)}`];

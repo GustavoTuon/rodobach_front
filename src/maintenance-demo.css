@@ -2187,3 +2187,7 @@ button.mp-payment-button:hover:not(:disabled) { border-color: var(--accent); }
 .mp-reimbursement-modal .mp-reimbursement-actions button{min-height:44px;margin:0}
 .mp-reimbursement-modal .mp-reimbursement-document .mp-fleet-dropdown{position:static;max-height:240px;overflow:auto;margin-top:8px}
 @media(max-width:650px){.mp-reimbursement-modal .mp-reimbursement-status{grid-template-columns:repeat(2,minmax(0,1fr))}.mp-reimbursement-header{padding:16px}.mp-reimbursement-modal .mp-reimbursement-body{padding:16px}.mp-reimbursement-modal .mp-reimbursement-footer{padding:12px 16px}.mp-reimbursement-modal .mp-reimbursement-actions button{flex:1 1 auto}}
+
+.mp-app .mp-without-vehicle{display:flex;align-items:flex-start;gap:12px;padding:16px;margin:12px 0 20px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);cursor:pointer}
+.mp-app .mp-without-vehicle input{width:18px;height:18px;flex:0 0 18px;margin:2px 0 0;accent-color:var(--accent)}
+.mp-without-vehicle span{display:grid;gap:6px}.mp-without-vehicle small{font-weight:400;color:var(--text-2);line-height:1.5}.mp-without-vehicle:has(input:checked){border-color:var(--accent)}

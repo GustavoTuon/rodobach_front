@@ -33,9 +33,9 @@ export default function ReimbursementDocument({record,value,onChange,disabled}) 
         if(['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();setOpen(true);setActive(index=>options.length ? (index+(event.key==='ArrowDown' ? 1 : -1)+options.length)%options.length : -1);}
         if(event.key==='Enter' && open){event.preventDefault();if(options[active])choose(options[active]);}
       }}/>
-    <p className="mp-field-help">Busque pelo número e, se necessário, pela série. Confira também a empresa antes de selecionar. Mesma placa, de 30 dias antes da despesa até hoje; até 50 resultados.</p>
+    <p className="mp-field-help">Busque pelo número e, se necessário, pela série. Confira também a empresa antes de selecionar. {record.plate ? "Mesma placa" : "Busca sem restrição de placa"}, de 30 dias antes da despesa até hoje; até 50 resultados.</p>
     {open && <div className="mp-fleet-dropdown">
-      <div className="mp-fleet-caption">CT-e complementar · {record.plate}</div>
+      <div className="mp-fleet-caption">CT-e complementar · {record.plate || "Sem veículo"}</div>
       {loading && <p role="status" className="mp-fleet-empty">Consultando o ERP…</p>}
       {error && <p role="alert" className="mp-fleet-empty">Não foi possível consultar. <button type="button" onClick={()=>setAttempt(n=>n+1)}>Tentar novamente</button></p>}
       <div role="listbox" id={`${id}-list`} aria-label="Documentos para reembolso">

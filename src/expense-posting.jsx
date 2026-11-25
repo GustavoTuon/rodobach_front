@@ -32,9 +32,9 @@ export default function ExpensePosting({record,onSave,onClose,saving,review=fals
   }}>
     <header className="mp-section-title"><h2 id="mp-edit-title" data-step-title tabIndex={-1}>{review ? "Conferir despesa e vincular documento" : "Lançamento no ERP"}</h2><button type="button" className="mp-close" aria-label="Fechar lançamento" disabled={saving} onClick={onClose}>×</button></header>
     <div className="mp-posting-body">
-    <div className="mp-posting-summary"><div><strong>{record.plate}</strong><span>{record.supplier}</span></div><strong>{Number(record.amount).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</strong></div>
+    <div className="mp-posting-summary"><div><strong>{record.plate || "Sem veículo"}</strong><span>{record.supplier}</span></div><strong>{Number(record.amount).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</strong></div>
     <label>Documentos no financeiro<input value={documents.map(item=>item.number).join(', ')} readOnly placeholder="Adicione documentos pela busca"/></label>
-    <p className="mp-field-help">Adicione um ou mais documentos de contas a pagar da placa {record.plate}, por exemplo diesel e Arla. O documento fiscal da despesa permanece separado.</p>
+    <p className="mp-field-help">{record.plate ? `Adicione documentos de contas a pagar da placa ${record.plate}.` : "Adicione documentos de contas a pagar sem placa no ERP."} O documento fiscal da despesa permanece separado.</p>
     {documents.length > 0 && <section className="mp-posting-selected" aria-label="Documentos vinculados">
       {documents.map(item=><div className="mp-posting-selected-item" key={documentKey(item)}>
         <div><strong>Documento {item.number}</strong>
@@ -57,7 +57,7 @@ export default function ExpensePosting({record,onSave,onClose,saving,review=fals
     <div className="mp-posting-search">
     <label>Buscar no financeiro<input value={query} maxLength={80} disabled={saving} placeholder="Número ou fornecedor" onChange={event=>{request.current++;setLoading(false);setResults(null);setQuery(event.target.value);}} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();if(!saving && !loading)search();}}}/></label>
     <label>Série — opcional<input value={series} maxLength={20} disabled={saving} placeholder="Todas as séries" onChange={event=>{request.current++;setLoading(false);setResults(null);setSeries(event.target.value);}} onKeyDown={event=>{if(event.key==='Enter'){event.preventDefault();if(!saving && !loading)search();}}}/></label>
-    <button type="button" className="mp-finance-action" disabled={saving || loading || !record.plate} onClick={search}>{loading ? 'Buscando…' : 'Buscar documentos'}</button>
+    <button type="button" className="mp-finance-action" disabled={saving || loading} onClick={search}>{loading ? 'Buscando…' : 'Buscar documentos'}</button>
     </div>
     {results && <div className="mp-posting-results" aria-label="Documentos financeiros" aria-live="polite">
       {!results.documents.length && <p>Nenhum documento encontrado para esta placa. Tente outro número, fornecedor ou série.</p>}

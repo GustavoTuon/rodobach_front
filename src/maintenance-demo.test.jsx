@@ -864,3 +864,27 @@ it('abre o reembolso diretamente na lista e permite filtrar despesas com reembol
  fireEvent.click(within(dialog).getByRole('button',{name:'Fechar'}));
  expect(screen.queryByRole('dialog')).toBeNull();
 });
+
+it('manutencao sem veiculo salva vazia, permite editar e filtra sem contar como placa',async()=>{
+ await ready();
+ fireEvent.click(screen.getByRole('checkbox',{name:/Despesa sem ve\u00edculo vinculado/}));
+ expect(screen.queryByLabelText('Placa do ve\u00edculo')).toBeNull();
+ fireEvent.change(screen.getByLabelText('Valor da despesa'),{target:{value:'200,00'}});
+ fireEvent.click(screen.getByRole('button',{name:'Continuar',exact:true}));
+ expect(screen.queryByRole('button',{name:/Selecionar viagem/})).toBeNull();
+ expect(screen.queryByText(/Pneus vinculados/)).toBeNull();
+ await finish();
+ expect(window.RB_API.createPlantao).toHaveBeenCalledWith(expect.objectContaining({plate:'',withoutVehicle:true,trip:null,tire:null,tireFireNumber:''}));
+ fireEvent.change(screen.getByLabelText('Ve\u00edculo'),{target:{value:'without'}});
+ expect(screen.getAllByRole('article')).toHaveLength(1);
+ expect(screen.getByText(/0 ve\u00edculos/)).toBeTruthy();
+ fireEvent.change(screen.getByLabelText('Ve\u00edculo'),{target:{value:'with'}});
+ expect(screen.queryByRole('article')).toBeNull();
+ fireEvent.change(screen.getByLabelText('Ve\u00edculo'),{target:{value:'without'}});
+ fireEvent.click(screen.getByRole('button',{name:'Editar',exact:true}));
+ expect(screen.getByRole('checkbox',{name:/Despesa sem ve\u00edculo vinculado/}).checked).toBe(true);
+ fireEvent.click(screen.getByRole('checkbox',{name:/Despesa sem ve\u00edculo vinculado/}));
+ expect(screen.getByLabelText('Placa do ve\u00edculo').value).toBe('');
+ fireEvent.click(screen.getByRole('button',{name:'Continuar',exact:true}));
+ expect(screen.getByRole('alert').textContent).toContain('placa cadastrada');
+});
