@@ -70,3 +70,14 @@
 @media(max-width:700px){.mp-reimbursement-indicators{display:block;padding:16px}.mp-reimbursement-counts{margin-top:14px}.mp-reimbursement-counts button{padding:12px;grid-template-columns:1fr}.mp-reimbursement-counts strong{grid-column:1;grid-row:2}.mp-reimbursement-counts span{font-size:12px}}
 
 .mp-period-filters select{min-height:44px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font:inherit}
+
+.mp-expense-filters .mp-period-filters{display:grid;grid-template-columns:minmax(240px,2fr) minmax(130px,1fr) minmax(180px,1.3fr) repeat(2,minmax(145px,1fr));align-items:end;gap:12px}
+.mp-expense-filters .mp-period-filters>*{min-width:0}
+.mp-expense-filters .mp-period-filters .mp-trip-filter{width:100%;min-width:0}
+.mp-expense-filters .mp-period-filters .mp-trip-filter>span{display:block;margin-bottom:8px;font-size:12px;color:var(--text-2)}
+.mp-expense-filters .mp-period-filters .mp-trip-filter summary{min-height:44px;box-sizing:border-box}
+@media(max-width:1100px){.mp-expense-filters .mp-period-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.mp-expense-filters .mp-unified-search{grid-column:1 / -1}}
+
+.mp-reimbursement-review{width:100%;padding:12px 16px;border:1px solid #e4c686;border-radius:12px;background:#fff9eb;color:#765015;text-align:left;font:inherit;line-height:1.5;cursor:pointer;}
+.mp-reimbursement-review:hover,.mp-reimbursement-review[aria-pressed="true"]{background:#fff0cd;border-color:#a87419;}
+.mp-reimbursement-review:focus-visible{outline:2px solid #306faf;outline-offset:3px;}

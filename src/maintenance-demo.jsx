@@ -11,7 +11,7 @@ import ExpenseDetailFacts from './expense-detail-facts.jsx';
 import ExpenseReportDialog from './expense-report-dialog.jsx';
 import ExpenseReimbursementChoice from "./expense-reimbursement-choice.jsx";
 import ExpenseReimbursement from './expense-reimbursement.jsx';
-import {reimbursementOf,reimbursementLabels,matchesReimbursement} from './expense-report.js';
+import {reimbursementOf,reimbursementDisplay,reimbursementLabels,matchesReimbursement} from './expense-report.js';
 import ExpensePaymentDetails from "./expense-payment-details.jsx";
 import SupplierSelect from "./expense-supplier-select.jsx";
 import ExpenseWhatsappSummary from "./expense-whatsapp-summary.jsx";
@@ -429,6 +429,7 @@ function MaintenanceForm({
   const [recordsLoading, setRecordsLoading] = useState(true);
   const [recordsAttempt, setRecordsAttempt] = useState(0);
   const [recordsError, setRecordsError] = useState("");
+  const [reimbursementCheckedAt,setReimbursementCheckedAt]=useState(null);
   const [reimbursementWarning,setReimbursementWarning]=useState("");
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
@@ -502,7 +503,7 @@ function MaintenanceForm({
     setRecords([]);
     window.RB_API.listPlantao(false)
       .then((data) => {
-        if (active) {setRecords(data.records);setReimbursementWarning(data.reimbursementWarning || "");}
+        if (active) {setRecords(data.records);setReimbursementWarning(data.reimbursementWarning || "");setReimbursementCheckedAt(data.reimbursementCheckedAt || null);}
       })
       .catch((error) => {
         if (active)
@@ -669,7 +670,7 @@ function MaintenanceForm({
     setError("");
     try {
       const result = await window.RB_API.updatePlantaoControl(record.id, { version: record.version, [field]: value, ...extra }, false);
-      setRecords(items => items.map(item => item.id === record.id ? {...result.record,...(field!=="reimbursement" && item.reimbursement?.erpDocument ? {reimbursement:item.reimbursement} : {})} : item));
+      setRecords(items => items.map(item => item.id === record.id ? {...result.record,...(field!=="reimbursement" && item.reimbursement?.erpDocument ? {reimbursement:item.reimbursement,reimbursementSync:item.reimbursementSync} : {})} : item));
       setHistory(null);
       setMessage("Controle atualizado e registrado no histórico.");
       return true;
@@ -729,7 +730,7 @@ function MaintenanceForm({
         changes,
       );
       setRecords((items) =>
-        items.map((item) => (item.id === record.id ? {...result.record,...(item.reimbursement?.erpDocument ? {reimbursement:item.reimbursement} : {})} : item)),
+        items.map((item) => (item.id === record.id ? {...result.record,...(item.reimbursement?.erpDocument ? {reimbursement:item.reimbursement,reimbursementSync:item.reimbursementSync} : {})} : item)),
       );
       setHistory(null);
       setMessage(changes.checked === false ? `Conferência da placa ${record.plate} desfeita.` : `Lançamento da placa ${record.plate} conferido.`);
@@ -934,7 +935,7 @@ function MaintenanceForm({
                       <span>Viagem ERP <b>{r.unloading.trip.number} · Empresa {r.unloading.trip.company}</b></span>
                       <span>Documento <b>{cteLabel(r.unloading.cte)}</b></span><span>Itinerário <b>{documentItinerary(r.unloading.cte)}</b></span>
                       <span>Cliente do documento <b>{r.unloading.cte.customerName}</b></span>
-                      <span>Situação do reembolso <b>{reimbursementLabels[reimbursementOf(r).status]}</b></span>
+                      <span>Situação do reembolso <b>{reimbursementDisplay(r)}</b></span>
                     </div>}
                     </section>
                     <section className="mp-detail-section"><h4>Registro e conferência</h4>
@@ -1163,7 +1164,7 @@ function MaintenanceForm({
         savingRef.current=true;setSaving(true);
         try {
           const result=await window.RB_API.correctPlantaoAmount(correctionRecord.id,body);
-          setRecords(items=>items.map(item=>item.id===correctionRecord.id?{...result.record,...(item.reimbursement?.erpDocument?{reimbursement:item.reimbursement}:{})}:item));
+          setRecords(items=>items.map(item=>item.id===correctionRecord.id?{...result.record,...(item.reimbursement?.erpDocument?{reimbursement:item.reimbursement,reimbursementSync:item.reimbursementSync}:{})}:item));
           setHistory(null);setMessage('Valor corrigido e registrado no histórico.');
         } finally {savingRef.current=false;setSaving(false);}
       }}/></MaintenanceDialog>}
@@ -1582,6 +1583,7 @@ function MaintenanceForm({
                 Atualizar lista
               </button>
             </div>
+            {reimbursementCheckedAt && <p className="mp-card-help">Reembolsos consultados no ERP em {new Date(reimbursementCheckedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}. Use Atualizar lista para consultar novamente.</p>}
             {reimbursementWarning && <p role="alert">{reimbursementWarning}</p>}
             <ExpenseFilters values={{vehicle:vehicleFilter,text:textSearch,dateFrom,dateTo,paid:paidFilter,posted:postedFilter,status:filter,trip:tripFilter,reimbursement:effectiveReimbursementFilter,source:sourceFilter}}
               onChange={(key,value)=>({vehicle:setVehicleFilter,text:setTextSearch,dateFrom:setDateFrom,dateTo:setDateTo,paid:setPaidFilter,posted:setPostedFilter,status:setFilter,trip:setTripFilter,reimbursement:setReimbursementFilter,source:setSourceFilter})[key](value)}

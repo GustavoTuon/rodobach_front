@@ -17,3 +17,16 @@ it('preserva status financeiros desconhecidos e usa o dia local no CSV',()=>{
   const explicit=expenseCsv([{expenseDate:'2026-10-01',date:'2026-10-01T01:30:00Z',amount:10,paid:false,posted:true}],['Data da despesa','Pago','Lançado no ERP']);
   expect(explicit).toContain('"2026-10-01";"Não";"Sim"');
 });
+
+it('missing ERP link is independent from manual reimbursement status',async()=>{
+ const {matchesReimbursement}=await import('./expense-report.js');
+ for(const status of ['a_cobrar','cobrado','recebido']) {
+  const row={reimbursement:{status,document:'123'}};
+  expect(matchesReimbursement(row,'sem_vinculo')).toBe(true);
+  row.reimbursement.erpDocument={company:'2',series:'1',code:'123'};
+  expect(matchesReimbursement(row,'sem_vinculo')).toBe(false);
+  row.reimbursementSync={status:'needs_review'};
+  expect(matchesReimbursement(row,'verificar_vinculo')).toBe(true);
+ }
+ expect(matchesReimbursement({reimbursement:{status:'nao_aplicavel'}},'sem_vinculo')).toBe(false);
+});

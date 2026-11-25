@@ -124,3 +124,17 @@ it('vínculo ERP abre pela conferência sem expandir os detalhes',()=>{
   rerender(<ExpenseHistory records={[{...records[0],erpDocument:'123',checked:true}]} expandGroups onPosting={posting} reviewDisabled renderRecord={()=>null}/>);
   expect(screen.getByRole('button',{name:'Editar vínculo ERP'}).disabled).toBe(true);
 });
+
+it('mounts details on demand and preserves unsaved input when collapsed',async()=>{
+ const content=vi.fn(row=><input aria-label={`Draft ${row.id}`} defaultValue="original"/>);
+ const {container}=render(<ExpenseHistory records={records} expandGroups renderRecord={content}/>);
+ expect(content).not.toHaveBeenCalled();
+ const detail=container.querySelector('.mp-expense-detail');
+ fireEvent.click(detail.querySelector('summary'));
+ const input=await screen.findByLabelText('Draft a');
+ fireEvent.change(input,{target:{value:'unsaved'}});
+ fireEvent.click(detail.querySelector('summary'));
+ fireEvent.click(detail.querySelector('summary'));
+ expect(input.value).toBe('unsaved');
+ expect(content.mock.calls.every(([row])=>row.id==='a')).toBe(true);
+});
