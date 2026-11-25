@@ -89,10 +89,27 @@ it('cartoes trocam a pendencia sem acumular filtros e preservam busca e periodo'
  fireEvent.click(all);expect(screen.getByRole('status').textContent).toContain('2 despesas');
  expect(screen.getByLabelText('Buscar despesas').value).toBe('ABC');expect(screen.getByLabelText('De').value).toBe('2026-11-23');
 });
-it('pendente de cobranca inclui somente a cobrar, sem misturar cobrado e recebido',()=>{
+it('falta vincular inclui referencia manual mesmo cobrada ou recebida',()=>{
  const data=['a_cobrar','cobrado','recebido','nao_aplicavel'].map((status,i)=>({...rows[0],id:i,amount:100,reimbursement:{status}}));
  function View(){const [v,set]=useState(empty);return <ExpenseFilters values={v} onChange={(key,value)=>set(x=>({...x,[key]:value}))} onClear={()=>set(empty)} trips={[]} manager today={()=>'2026-11-23'} records={filterReportRecords(data,v)} cardRecords={data}/>;}
- render(<View/>);const card=screen.getByRole('button',{name:/Pendente de cobran/});
- expect(card.textContent).toContain('1');fireEvent.click(card);
- expect(screen.getByRole('status').textContent).toContain('1 despesa');expect(card.getAttribute('aria-pressed')).toBe('true');
+ render(<View/>);const card=screen.getByRole('button',{name:/Falta vincular CT-e/});
+ expect(card.textContent).toContain('3');fireEvent.click(card);
+ expect(screen.getByRole('status').textContent).toContain('3 despesas');expect(card.getAttribute('aria-pressed')).toBe('true');
+});
+
+it('viagem fica ao lado de veiculo e combina sem placa com sem viagem',()=>{
+ const data=[{...rows[0],id:'no-vehicle',plate:'',trip:null},{...rows[0],id:'no-trip',trip:null},{...rows[1],id:'trip',trip:{company:'1',number:'880'}}];
+ function View(){const [v,set]=useState({...empty,vehicle:''});return <ExpenseFilters values={v} onChange={(key,value)=>set(x=>({...x,[key]:value}))} onClear={()=>set(empty)} trips={[["1:880",{company:'1',number:'880'}]]} manager today={()=>'2026-11-25'} records={filterReportRecords(data,v)} cardRecords={data}/>;}
+ const {container}=render(<View/>);
+ expect(container.querySelector('.mp-period-filters .mp-trip-filter')).toBeTruthy();
+ fireEvent.change(screen.getByLabelText('Ve\u00edculo'),{target:{value:'without'}});
+ fireEvent.click(screen.getByLabelText('Filtrar por viagem'));
+ fireEvent.click(screen.getByRole('button',{name:'Sem viagem vinculada',exact:true}));
+ expect(screen.getByRole('status').textContent).toContain('1 despesa');
+ fireEvent.change(screen.getByLabelText('Pagamento da despesa'),{target:{value:'pending'}});
+ fireEvent.click(screen.getByRole('button',{name:'Limpar op\u00e7\u00f5es adicionais'}));
+ expect(screen.getByLabelText('Ve\u00edculo').value).toBe('without');
+ expect(screen.getByLabelText('Filtrar por viagem').textContent).toContain('Sem viagem vinculada');
+ fireEvent.click(screen.getByRole('button',{name:'Limpar tudo'}));
+ expect(screen.getByRole('status').textContent).toContain('3 despesas');
 });

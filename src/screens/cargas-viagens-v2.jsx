@@ -967,31 +967,33 @@ const CargasViagensV2 = ({ user }) => {
   const [error, setError] = useState("");
   const [modal, setModal] = useState(null);
   const loadVersion = useRef(0);
+  const loadInFlight = useRef(null);
   const metadataVersion = useRef(0);
   const metadataLoaded = useRef(false);
   const refreshMetadata = () => {
     metadataLoaded.current = true;
     const version = ++metadataVersion.current;
-    Promise.allSettled([
-      window.RB_API.getCargasViagensV2Resumo(),
-      window.RB_API.getCargasViagensV2Filtros(),
-    ]).then(([stats, options]) => {
+    const failed = () => {
       if (version !== metadataVersion.current) return;
-      if (stats.status === "fulfilled") setSummary(stats.value);
-      if (options.status === "fulfilled") {
-        setFilterOptions(options.value);
-        if (seller && options.value.responsaveis?.length && !options.value.responsaveis.some(item=>item.nome===seller)) setSeller("");
-      }
-      if (stats.status === "rejected" || options.status === "rejected") {
-        metadataLoaded.current = false;
-        setError("A lista est? dispon?vel, mas n?o foi poss?vel atualizar o resumo ou os filtros. Tente novamente.");
-      }
-    });
+      metadataLoaded.current = false;
+      setError("A lista está disponível, mas não foi possível atualizar o resumo ou os filtros. Tente novamente.");
+    };
+    window.RB_API.getCargasViagensV2Resumo().then(stats=>{
+      if(version===metadataVersion.current)setSummary(stats);
+    }).catch(failed);
+    window.RB_API.getCargasViagensV2Filtros().then(options=>{
+      if(version!==metadataVersion.current)return;
+      setFilterOptions(options);
+      if(seller && options.responsaveis?.length && !options.responsaveis.some(item=>item.nome===seller))setSeller("");
+    }).catch(failed);
   };
   useEffect(() => () => { metadataVersion.current += 1; }, []);
-  const load = async (refreshMeta = false) => {
+  const load = async (refreshMeta = false, background = false) => {
+    if(background && loadInFlight.current!==null)return;
     const version = ++loadVersion.current;
-    setLoading(true); setError("");
+    loadInFlight.current=version;
+    if (!background) setLoading(true);
+    setError("");
     if (refreshMeta || !metadataLoaded.current) {refreshMetadata();setForecastRevision(n=>n+1);}
     try {
       const request = tab === "cargas"
@@ -1005,11 +1007,11 @@ const CargasViagensV2 = ({ user }) => {
       setPageInfo({ total: Number(result.total ?? rows.length), totalPages });
       if (page > totalPages) setPage(totalPages);
     } catch (err) { if (version === loadVersion.current) setError(cv2Error(err)); }
-    finally { if (version === loadVersion.current) setLoading(false); }
+    finally { if(loadInFlight.current===version)loadInFlight.current=null; if (version === loadVersion.current) setLoading(false); }
   };
   useEffect(() => {
     const timer = setTimeout(load, 260);
-    const refresh = setInterval(() => { if (!document.hidden) load(true); }, 60_000);
+    const refresh = setInterval(() => { if (!document.hidden) load(true, true); }, 60_000);
     return () => { clearTimeout(timer); clearInterval(refresh); loadVersion.current += 1; };
   }, [tab, page, pageSize, query, status, financialStatus, forecastLevel, forecastType, seller, cargaFilters.empresa, cargaFilters.origem, cargaFilters.ufOrigem, cargaFilters.destino, cargaFilters.ufDestino, cargaFilters.material]);
   const saved = (kind, item) => {

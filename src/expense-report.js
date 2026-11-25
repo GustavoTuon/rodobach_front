@@ -1,5 +1,7 @@
 export const reimbursementLabels = {nao_aplicavel:'Sem reembolso',a_cobrar:'Reembolso a cobrar',cobrado:'Aguardando reembolso',recebido:'Reembolso recebido'};
 export const reimbursementOf = row => row.reimbursement || {status:row.unloading?.reimbursement ? 'a_cobrar' : 'nao_aplicavel',customer:row.unloading?.cte?.customerName || '',document:'',receivedDate:null,note:''};
+export const hasReimbursementLink = row => ['company','series','code'].every(key=>String(reimbursementOf(row).erpDocument?.[key] ?? '').trim());
+export const reimbursementDisplay = row => row.reimbursementSync?.status==='needs_review' ? 'Verificar vínculo' : row.reimbursementSync?.status==='unavailable' ? 'ERP indisponível: situação não atualizada' : reimbursementLabels[reimbursementOf(row).status];
 const csvCell = value => {
   let text=String(value ?? '');
   if (/^[\s]*[=+@-]/.test(text) || /^[\t\r\n]/.test(text)) text="'"+text;
@@ -17,7 +19,7 @@ export function expenseCsv(rows, columns=expenseReportColumns) {
     return [row.id,reportExpenseDate(row),row.plate || "Sem veículo",trip?.company,trip?.number,row.service,row.supplier,
       row.unloading?.cte?.customerName || row.customerName,row.document,Number(row.amount).toFixed(2).replace('.',','),
       financialFlag(row.paid),row.paymentDate,row.paymentMethod?.name,row.checked ? 'Sim' : 'Não',financialFlag(row.posted),
-      reimbursementLabels[reembolso.status],reembolso.customer,reembolso.document,reembolso.receivedDate,row.note,row.erpDocument];
+      reimbursementDisplay(row),reembolso.customer,reembolso.document,reembolso.receivedDate,row.note,row.erpDocument];
   });
   return '\uFEFF'+[header,...data].map(row=>indexes.map(index=>csvCell(row[index])).join(';')).join('\r\n');
 }
@@ -27,4 +29,4 @@ export function downloadExpenseReport(rows, columns=expenseReportColumns) {
   document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
-export const matchesReimbursement = (row, filter) => !filter || (filter === "aguardando" ? ["a_cobrar","cobrado"].includes(reimbursementOf(row).status) : filter === "com_reembolso" ? reimbursementOf(row).status !== "nao_aplicavel" : reimbursementOf(row).status === filter);
+export const matchesReimbursement = (row, filter) => !filter || (filter === 'sem_vinculo' ? reimbursementOf(row).status !== 'nao_aplicavel' && !hasReimbursementLink(row) : filter === 'verificar_vinculo' ? row.reimbursementSync?.status === 'needs_review' : filter === "aguardando" ? ["a_cobrar","cobrado"].includes(reimbursementOf(row).status) : filter === "com_reembolso" ? reimbursementOf(row).status !== "nao_aplicavel" : reimbursementOf(row).status === filter);

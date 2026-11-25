@@ -68,3 +68,34 @@ it('oferece vínculo em carga sem viagem e permite selecionar todos os responsá
   fireEvent.click(screen.getByRole('button',{name:/Veículo vinculado/}));
   await waitFor(()=>expect(window.RB_API.listCargasV2).toHaveBeenLastCalledWith(expect.objectContaining({status:'veiculo_vinculado'})));
 });
+
+it('shows filter options while summary is still pending',async()=>{
+ window.React=React;window.Icon=()=>null;
+ let resolveSummary;
+ window.RB_API={
+  listCargasV2:vi.fn(async()=>({items:[],total:0,totalPages:1})),
+  getCargasViagensV2Resumo:vi.fn(()=>new Promise(resolve=>{resolveSummary=resolve;})),
+  getCargasViagensV2Filtros:vi.fn(async()=>({responsaveis:[{codigo:'1',empresa:'1',nome:'Ready seller'}]})),
+ };
+ await import('./cargas-viagens-v2.jsx');
+ const Screen=window.CargasViagensV2;render(<Screen user={{admin:true}}/>);
+ expect(await screen.findByRole('option',{name:'Ready seller'})).toBeTruthy();
+ await act(async()=>resolveSummary({cargas:42}));
+ expect(screen.getByRole('button',{name:/Cargas cadastradas/}).textContent).toContain('42');
+});
+
+it('background refresh does not overlap a slow request',async()=>{
+ window.React=React;window.Icon=()=>null;
+ await import('./cargas-viagens-v2.jsx');
+ vi.useFakeTimers();vi.spyOn(document,'hidden','get').mockReturnValue(false);
+ let resolveRefresh;
+ const list=vi.fn().mockResolvedValueOnce({items:[],total:0,totalPages:1}).mockImplementation(()=>new Promise(resolve=>{resolveRefresh=resolve;}));
+ window.RB_API={listCargasV2:list,getCargasViagensV2Resumo:async()=>({}),getCargasViagensV2Filtros:async()=>({responsaveis:[]})};
+ try {
+  const Screen=window.CargasViagensV2;render(<Screen user={{admin:true}}/>);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(260);});expect(list).toHaveBeenCalledTimes(1);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(60000);});expect(list).toHaveBeenCalledTimes(2);
+  await act(async()=>{await vi.advanceTimersByTimeAsync(60000);});expect(list).toHaveBeenCalledTimes(2);
+  await act(async()=>resolveRefresh({items:[],total:0,totalPages:1}));
+ } finally {cleanup();vi.useRealTimers();}
+});

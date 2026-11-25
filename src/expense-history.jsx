@@ -1,6 +1,6 @@
 import {supplierLabel} from "./expense-supplier-origin.js";
-import {reimbursementOf,reimbursementLabels} from './expense-report.js';
-import React from "react";
+import {reimbursementOf,reimbursementDisplay} from './expense-report.js';
+import React,{useState} from "react";
 
 const money = value => value.toLocaleString("pt-BR", {style:"currency",currency:"BRL"});
 const day = row => row.expenseDate || new Date(row.date).toLocaleDateString("en-CA",{timeZone:"America/Sao_Paulo"});
@@ -27,20 +27,27 @@ export function ExpenseSummary({records}) {
   </section>;
 }
 
+// Mount expensive editors only when requested, then retain them to preserve drafts.
+function ExpenseDetails({children,renderContent}) {
+  const [visited,setVisited]=useState(false);
+  return <details className="mp-expense-detail" onToggle={event=>{if(event.currentTarget.open)setVisited(true);}}>
+    {children}{visited && renderContent()}
+  </details>;
+}
+
 export default function ExpenseHistory({records, isDriver, currentPlate, renderRecord, onReview, onUndoReview, onPosting, onCorrectAmount, onReimbursement, onReceipt, reviewDisabled=false, expandGroups=false}) {
   const sorted = [...records].sort((a,b)=>day(b).localeCompare(day(a)) || String(b.date).localeCompare(String(a.date)));
   function recordRows(rows) {
     return rows.map(row=><article className="mp-expense-row" key={row.id}>
-      <details className="mp-expense-detail"><summary>
+      <ExpenseDetails renderContent={()=>renderRecord(row)}><summary>
         <span className="mp-expense-date"><time>{day(row).split("-").reverse().join("/")}</time><span>{row.expenseTime?.slice(0,5) || "Data da despesa"}</span></span>
         <span className="mp-expense-description"><strong>{row.service}</strong><span>{supplierLabel(row)}</span>
           <span className="mp-expense-evidence">{row.photoKinds?.invoice || row.hasReceipt ? "Nota anexada" : row.receiptReason ? "Ausência de nota justificada" : "Sem comprovante registrado"}</span>
         </span>
-        <span className="mp-expense-amount"><b>{money(Number(row.amount))}</b><span className={`mp-status ${isExpenseChecked(row) ? "checked" : ""}`}>{isExpenseChecked(row) ? "Conferido" : "A conferir"}</span>{row.paid && <small>Pago</small>}{reimbursementOf(row).status !== "nao_aplicavel" && <small className={`mp-reimbursement-badge ${reimbursementOf(row).status}`}>{reimbursementLabels[reimbursementOf(row).status]}</small>}</span>
+        <span className="mp-expense-amount"><b>{money(Number(row.amount))}</b><span className={`mp-status ${isExpenseChecked(row) ? "checked" : ""}`}>{isExpenseChecked(row) ? "Conferido" : "A conferir"}</span>{row.paid && <small>Pago</small>}{reimbursementOf(row).status !== "nao_aplicavel" && <small className={`mp-reimbursement-badge ${reimbursementOf(row).status}`}>{reimbursementDisplay(row)}</small>}</span>
         <span className="mp-expense-toggle"><span className="mp-expense-view">Ver detalhes</span><span className="mp-expense-hide">Fechar detalhes</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg><span className="mp-sr-only"> de {row.service} em {day(row).split("-").reverse().join("/")}</span></span>
       </summary>
-        {renderRecord(row)}
-      </details>
+      </ExpenseDetails>
       {(onReview || onUndoReview || onPosting || onReimbursement || onCorrectAmount) && <div className="mp-row-review">
         <span className={isExpenseChecked(row) ? "mp-review-done" : "mp-review-pending"}>
           {isExpenseChecked(row) ? `Conferido por ${row.checkedBy || "usuário autorizado"}${row.checkedAt ? ` em ${new Date(row.checkedAt).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}` : ""}` : row.paid ? "Pago · conferência pendente" : "Conferência pendente"}
