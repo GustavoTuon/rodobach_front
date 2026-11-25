@@ -59,8 +59,8 @@ export default function ExpenseHistory({records, isDriver, currentPlate, renderR
     const plates = [...new Set(rows.map(row=>row.plate))].sort();
     return plates.map(plate=>{
       const items=rows.filter(row=>row.plate===plate), sums=expenseTotals(items);
-      return <details className="mp-plate-group" key={plate} open={expandGroups || undefined}>
-        <summary><span className="mp-group-identity"><strong>{plate}</strong><span>{items.length} {items.length === 1 ? "despesa" : "despesas"}</span></span><span className="mp-group-value">Total no período <b>{money(sums.total)}</b></span><span className={`mp-group-value ${items.some(item=>!isExpenseChecked(item)) ? "has-pending" : "all-checked"}`}>{items.some(item=>!isExpenseChecked(item)) ? "A conferir" : "Tudo conferido"}<b>{items.some(item=>!isExpenseChecked(item)) ? money(sums.pending) : "✓"}</b></span><span className="mp-group-chevron" aria-hidden="true">⌄</span></summary>
+      return <details className="mp-plate-group" key={plate || "without-vehicle"} open={expandGroups || undefined}>
+        <summary><span className="mp-group-identity"><strong>{plate || "Sem veículo"}</strong><span>{items.length} {items.length === 1 ? "despesa" : "despesas"}</span></span><span className="mp-group-value">Total no período <b>{money(sums.total)}</b></span><span className={`mp-group-value ${items.some(item=>!isExpenseChecked(item)) ? "has-pending" : "all-checked"}`}>{items.some(item=>!isExpenseChecked(item)) ? "A conferir" : "Tudo conferido"}<b>{items.some(item=>!isExpenseChecked(item)) ? money(sums.pending) : "✓"}</b></span><span className="mp-group-chevron" aria-hidden="true">⌄</span></summary>
         <div className="mp-group-records">{recordRows(items)}</div>
       </details>;
     });

@@ -14,7 +14,7 @@ export function expenseCsv(rows, columns=expenseReportColumns) {
   const header=expenseReportColumns;
   const data=rows.map(row=>{
     const trip=row.unloading?.trip || row.trip, reembolso=reimbursementOf(row);
-    return [row.id,reportExpenseDate(row),row.plate,trip?.company,trip?.number,row.service,row.supplier,
+    return [row.id,reportExpenseDate(row),row.plate || "Sem veículo",trip?.company,trip?.number,row.service,row.supplier,
       row.unloading?.cte?.customerName || row.customerName,row.document,Number(row.amount).toFixed(2).replace('.',','),
       financialFlag(row.paid),row.paymentDate,row.paymentMethod?.name,row.checked ? 'Sim' : 'Não',financialFlag(row.posted),
       reimbursementLabels[reembolso.status],reembolso.customer,reembolso.document,reembolso.receivedDate,row.note,row.erpDocument];

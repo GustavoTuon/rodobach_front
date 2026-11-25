@@ -38,3 +38,10 @@ it('bloqueia período invertido e cancelar não exporta',()=>{
   fireEvent.click(screen.getByRole('button',{name:'Cancelar'}));
   expect(close).toHaveBeenCalledOnce();expect(download).not.toHaveBeenCalled();
 });
+
+it('filtro sem placa combina pendencia e CSV identifica despesas sem veiculo',()=>{
+ const rows=[{id:'a',plate:'',amount:25,posted:false,expenseDate:'2026-11-24'},{id:'b',plate:'ABC1234',amount:30,posted:false,expenseDate:'2026-11-24'},{id:'c',plate:'',amount:40,posted:true,expenseDate:'2026-11-24'}];
+ expect(filterReportRecords(rows,{vehicle:'without',posted:'pending'}).map(r=>r.id)).toEqual(['a']);
+ expect(filterReportRecords(rows,{vehicle:'with'}).map(r=>r.id)).toEqual(['b']);
+ expect(expenseCsv(filterReportRecords(rows,{vehicle:'without',posted:'pending'}))).toContain('"Sem ve\u00edculo"');
+});

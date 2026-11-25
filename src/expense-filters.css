@@ -68,3 +68,5 @@
 .mp-reimbursement-counts strong{font-size:26px;grid-column:2;grid-row:1 / 3}.mp-reimbursement-counts small{color:var(--muted,#666)}
 .mp-reimbursement-counts button[aria-pressed=true]{background:#edf4ff;border-color:#3973b5;box-shadow:0 0 0 1px #3973b5}.mp-reimbursement-counts button:focus-visible{outline:3px solid #3973b5;outline-offset:3px}
 @media(max-width:700px){.mp-reimbursement-indicators{display:block;padding:16px}.mp-reimbursement-counts{margin-top:14px}.mp-reimbursement-counts button{padding:12px;grid-template-columns:1fr}.mp-reimbursement-counts strong{grid-column:1;grid-row:2}.mp-reimbursement-counts span{font-size:12px}}
+
+.mp-period-filters select{min-height:44px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font:inherit}

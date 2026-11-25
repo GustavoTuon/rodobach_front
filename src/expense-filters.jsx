@@ -1,3 +1,4 @@
+import {vehicleOptions} from './expense-vehicle.js';
 import React,{useId} from 'react';
 import ExpenseTripFilter from './expense-trip-filter.jsx';
 import {matchesReimbursement} from './expense-report.js';
@@ -31,6 +32,7 @@ export default function ExpenseFilters({values:v,onChange:set,onClear,trips,mana
   const range=days=>{const end=today();const date=new Date(`${end}T12:00:00Z`);date.setUTCDate(date.getUTCDate()-(days-1));set('dateFrom',date.toISOString().slice(0,10));set('dateTo',end);};
   const chips=[];
   const add=(key,text,empty='')=>chips.push({key,text,remove:()=>set(key,empty)});
+  if(v.vehicle)add('vehicle',`Veículo: ${labelOf(vehicleOptions,v.vehicle)}`);
   if(v.text)add('text',`Busca: ${v.text}`);
   if(v.dateFrom||v.dateTo)chips.push({key:'period',text:`Período: ${v.dateFrom?v.dateFrom.split('-').reverse().join('/'):'início'} até ${v.dateTo?v.dateTo.split('-').reverse().join('/'):'sem data final'}`,remove:()=>{set('dateFrom','');set('dateTo','');}});
   if(v.paid)add('paid',`Pagamento: ${labelOf(paymentOptions,v.paid)}`);
@@ -48,6 +50,7 @@ export default function ExpenseFilters({values:v,onChange:set,onClear,trips,mana
       <div className="mp-reimbursement-counts">{[['com_reembolso','Total com reembolso'],['a_cobrar','Pendente de cobrança']].map(([key,label])=><button type="button" key={key} disabled={loading} aria-pressed={v.reimbursement===key&&!v.paid&&!v.posted&&v.status==='all'} onClick={()=>choose(v.reimbursement===key?'all':key)}><span>{label}</span><strong>{loading?'—':cardRecords.filter(row=>matchesReimbursement(row,key)).length}</strong><small>lançamentos <span aria-hidden="true">→</span></small></button>)}</div>
     </section>
     <div className="mp-period-filters"><label className="mp-unified-search">Buscar despesas<input type="search" placeholder="Placa, fornecedor, nota ou responsável" value={v.text} onChange={e=>set('text',e.target.value)}/></label>
+      <label>Veículo<select aria-label="Veículo" value={v.vehicle || ''} onChange={e=>set('vehicle',e.target.value)}>{vehicleOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
       <label>De<input type="date" value={v.dateFrom} onChange={e=>set('dateFrom',e.target.value)}/></label><label>Até<input type="date" min={v.dateFrom} value={v.dateTo} onChange={e=>set('dateTo',e.target.value)}/></label>
     </div>
     <div className="mp-date-shortcuts" aria-label="Atalhos de período"><button type="button" onClick={()=>range(1)}>Hoje</button><button type="button" onClick={()=>range(7)}>Últimos 7 dias</button><button type="button" onClick={()=>{set('dateFrom',`${today().slice(0,7)}-01`);set('dateTo',today());}}>Mês atual</button><button type="button" onClick={()=>{set('dateFrom','');set('dateTo','');}}>Todo o período</button></div>
@@ -70,6 +73,6 @@ export default function ExpenseFilters({values:v,onChange:set,onClear,trips,mana
     </details>
     {chips.length>0&&<div className="mp-active-filters" aria-label="Filtros ativos">{chips.map(chip=><button type="button" key={chip.key} onClick={chip.remove} aria-label={`Remover filtro ${chip.text}`}>{chip.text}<span aria-hidden="true"> ×</span></button>)}<button type="button" className="mp-clear-filters" onClick={onClear}>Limpar tudo</button></div>}
     {v.dateFrom&&v.dateTo&&v.dateFrom>v.dateTo&&<p role="alert">O início do período deve ser anterior ao fim.</p>}
-    {!loading&&<p className="mp-filter-result" role="status">{active&&active!=='all'?`${cards.find(c=>c.key===active)?.label || labelOf(reimbursementOptions,active)}: `:''}{records.length} {records.length===1?'despesa':'despesas'} · {new Set(records.map(r=>r.plate)).size} {new Set(records.map(r=>r.plate)).size===1?'veículo':'veículos'} · {total.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</p>}
+    {!loading&&<p className="mp-filter-result" role="status">{active&&active!=='all'?`${cards.find(c=>c.key===active)?.label || labelOf(reimbursementOptions,active)}: `:''}{records.length} {records.length===1?'despesa':'despesas'} · {new Set(records.map(r=>r.plate).filter(Boolean)).size} {new Set(records.map(r=>r.plate).filter(Boolean)).size===1?'veículo':'veículos'} · {total.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}{records.some(r=>!r.plate) && ` · ${records.filter(r=>!r.plate).length} sem veículo`}</p>}
   </section>;
 }

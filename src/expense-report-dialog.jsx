@@ -1,9 +1,10 @@
+import {matchesExpenseVehicle,vehicleOptions} from './expense-vehicle.js';
 import {matchesExpenseSearch,matchesExpenseFlag} from './expense-filters.jsx';
 import React,{useState} from 'react';
 import {downloadExpenseReport,expenseReportColumns,reimbursementLabels,reportExpenseDate,matchesReimbursement} from './expense-report.js';
 import ExpenseTripFilter from './expense-trip-filter.jsx';
 
-const empty={dateFrom:'',dateTo:'',plate:'',trip:'',service:'',paid:'',checked:'',posted:'',reimbursement:'',text:'',source:'',status:'all'};
+const empty={dateFrom:'',dateTo:'',plate:'',vehicle:'',trip:'',service:'',paid:'',checked:'',posted:'',reimbursement:'',text:'',source:'',status:'all'};
 const normalize=value=>String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 export function filterReportRecords(records,filters) {
   const f={...empty,...filters};
@@ -12,6 +13,7 @@ export function filterReportRecords(records,filters) {
     const date=reportExpenseDate(row);
     return (!f.dateFrom || date>=f.dateFrom) && (!f.dateTo || date<=f.dateTo)
       && normalize(row.plate).replace(/[^a-z0-9]/g,'').includes(normalize(f.plate).replace(/[^a-z0-9]/g,''))
+      && matchesExpenseVehicle(row,f.vehicle)
       && (!f.trip || f.trip===(trip ? `${trip.company}:${trip.number}` : 'unlinked'))
       && (!f.service || row.service===f.service)
       && matchesExpenseFlag(row.paid,f.paid)
@@ -44,6 +46,7 @@ export default function ExpenseReportDialog({records,initialFilters,Dialog,onClo
       <fieldset><legend>Quais despesas incluir?</legend><div className="mp-report-filters">
         <label>Data inicial<input type="date" value={filters.dateFrom} onChange={e=>set('dateFrom',e.target.value)}/></label>
         <label>Data final<input type="date" value={filters.dateTo} min={filters.dateFrom} onChange={e=>set('dateTo',e.target.value)}/></label>
+        <label>Veículo<select value={filters.vehicle} onChange={e=>set("vehicle",e.target.value)}>{vehicleOptions.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
         <label>Placa<input value={filters.plate} placeholder="Todas as placas" maxLength={8} onChange={e=>set('plate',e.target.value.toUpperCase())}/></label>
         <ExpenseTripFilter value={filters.trip} onChange={value=>set('trip',value)} options={trips}/>
         <label>Tipo de despesa<select value={filters.service} onChange={e=>set('service',e.target.value)}><option value="">Todos os tipos</option>{services.map(service=><option key={service}>{service}</option>)}</select></label>
@@ -58,7 +61,7 @@ export default function ExpenseReportDialog({records,initialFilters,Dialog,onClo
       {!columns.length && <p role="alert">Selecione pelo menos uma coluna.</p>}
       {!invalid && !rows.length && <p role="status">Nenhuma despesa corresponde aos filtros. Ajuste a seleção.</p>}
       {error && <p role="alert">{error}</p>}
-      <footer className="mp-report-footer"><div aria-live="polite"><strong>{rows.length} despesa(s)</strong></div><span className="mp-report-total">Total: {(rows.reduce((sum,row)=>sum+Math.round(Number(row.amount)*100),0)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} · {columns.length} colunas</span><div><button type="button" className="mp-cancel-edit" onClick={onClose}>Cancelar</button><button type="submit" className="mp-submit" disabled={Boolean(invalid) || !rows.length || !columns.length}>Baixar CSV</button></div></footer>
+      <footer className="mp-report-footer"><div aria-live="polite"><strong>{rows.length} despesa(s)</strong></div><span className="mp-report-total">Total: {(rows.reduce((sum,row)=>sum+Math.round(Number(row.amount)*100),0)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})} · {columns.length} colunas{rows.some(row=>!row.plate) && <small> · Sem veículo: {(rows.filter(row=>!row.plate).reduce((sum,row)=>sum+Math.round(Number(row.amount)*100),0)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</small>}</span><div><button type="button" className="mp-cancel-edit" onClick={onClose}>Cancelar</button><button type="submit" className="mp-submit" disabled={Boolean(invalid) || !rows.length || !columns.length}>Baixar CSV</button></div></footer>
     </form>
   </Dialog>;
 }

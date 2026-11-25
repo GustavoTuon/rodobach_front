@@ -451,7 +451,7 @@ window.RB_API = {
   getPlantaoLocation: plate => apiRequest(`/manutencao-plantao/placas/${encodeURIComponent(plate)}/localizacao`),
   getPlantaoOdometer: (plate, date, time) => apiRequest(`/manutencao-plantao/placas/${encodeURIComponent(plate)}/hodometro${buildQuery({date,time})}`),
   listVeiculosPlantao: () => apiRequest("/manutencao-plantao/placas"),
-  searchPlantaoErpDocuments: (filters) => apiRequest(`/manutencao-plantao/documentos-erp${buildQuery(filters)}`),
+  searchPlantaoErpDocuments: ({q='',plate,series=''}) => apiRequest(`/manutencao-plantao/documentos-erp?${new URLSearchParams({q,plate,series})}`),
   listPlantao: (conference = false) => apiRequest(`/manutencao-plantao/${conference ? "conferencia" : "lancamentos"}`),
   checkPlantaoDuplicates: (body) => apiRequest("/manutencao-plantao/duplicidades", {method:"POST",body:JSON.stringify(body)}),
   createPlantao: (body) => apiRequest("/manutencao-plantao/lancamentos", {method:"POST",body:JSON.stringify(body)}),
