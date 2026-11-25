@@ -1,5 +1,5 @@
-import {matchesExpenseVehicle} from './expense-vehicle.js';
 import ExpenseWithoutVehicle from './expense-without-vehicle.jsx';
+import {matchesExpenseVehicle} from './expense-vehicle.js';
 import ExpenseFilters,{matchesExpenseSearch,matchesExpenseFlag} from './expense-filters.jsx';
 import {useExpenseDuplicateWarning} from "./expense-duplicate-warning.jsx";
 import {supplierLabel} from "./expense-supplier-origin.js";
@@ -433,7 +433,7 @@ function MaintenanceForm({
   const [reimbursementWarning,setReimbursementWarning]=useState("");
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
-  const [withoutVehicle,setWithoutVehicle]=useState(user.expenseProfile !== "motorista" && Boolean(maintenanceDraft?.withoutVehicle));
+  const [withoutVehicle,setWithoutVehicle]=useState(user.expenseProfile !== "motorista" && maintenanceDraft?.service === "Outros" && Boolean(maintenanceDraft?.withoutVehicle));
   const [plate, setPlate] = useState(maintenanceDraft?.plate || "");
   const [fleet, setFleet] = useState([]);
   const [fleetLoading, setFleetLoading] = useState(true);
@@ -588,7 +588,7 @@ function MaintenanceForm({
     setMaintenancePhotos(draft?.photos || {});
     setPaymentDetails(draft?.paymentDetails !== undefined ? draft.paymentDetails : r.paymentDetails ?? null);
     setEditing(r);
-    setWithoutVehicle(!isDriver && (draft?.withoutVehicle ?? !r.plate));
+    setWithoutVehicle(!isDriver && (draft?.service ?? r.service) === "Outros" && (draft?.withoutVehicle ?? !r.plate));
     setPlate(draft?.plate ?? r.plate);
     setAmount(draft?.amount ?? r.amount.toFixed(2).replace(".", ","));
     setService(draft?.service ?? r.service);
@@ -1309,8 +1309,8 @@ function MaintenanceForm({
                         <p className="mp-step-intro">
                           {withoutVehicle ? "Informe o valor e a data da despesa sem veículo." : "Informe o veículo, o valor e a data da despesa."}
                         </p>
-                        {!isDriver && <ExpenseWithoutVehicle value={withoutVehicle} disabled={saving} onChange={value=>{setWithoutVehicle(value);setPlate("");setExpenseTrip(null);setTire(null);setTireFireNumber("");}}/>}
                         <div className="mp-fields">
+                        {!isDriver && service === "Outros" && <ExpenseWithoutVehicle value={withoutVehicle} disabled={saving} onChange={value=>{setWithoutVehicle(value);setPlate("");setExpenseTrip(null);setTire(null);setTireFireNumber("");}}/>}
                           {!withoutVehicle && <FleetSelect
                             fleet={fleet}
                             value={plate}
@@ -1422,7 +1422,7 @@ function MaintenanceForm({
                                 key={item}
                                 aria-pressed={service === item}
                                 className={service === item ? "selected" : ""}
-                                onClick={() => {setService(item);if(item !== service){setTire(null);setTireFireNumber('');}}}
+                                onClick={() => {setService(item);if(item !== "Outros")setWithoutVehicle(false);if(item !== service){setTire(null);setTireFireNumber('');}}}
                               >
                                 {item}
                               </button>

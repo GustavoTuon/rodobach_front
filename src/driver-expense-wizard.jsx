@@ -65,7 +65,7 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
   const [expenseTrip,setExpenseTrip]=useState(draft?.expenseTrip ?? (record?.trip ? {trip:record.trip} : null));
   const [reimbursementExpected,setReimbursementExpected]=useState(draft?.reimbursementExpected ?? false);
   const [unloading,setUnloading]=useState(draft?.unloading ?? record?.unloading ?? null);
-  const [withoutVehicle,setWithoutVehicle]=useState(user.expenseProfile !== "motorista" && (draft?.withoutVehicle ?? Boolean(record && !record.plate)));
+  const [withoutVehicle,setWithoutVehicle]=useState(user.expenseProfile !== "motorista" && category === "Outros" && (draft?.withoutVehicle ?? Boolean(record && !record.plate)));
   const [plate, setPlate] = useState(draft?.plate ?? (record?.plate || (user.expenseProfile === "motorista" ? fleet[0] || "" : "")));
   const [date, setDate] = useState(draft?.date ?? (record?.expenseDate || today()));
   function changePlate(value) {if(value===plate)return;setPlate(value);setUnloading(null);setExpenseTrip(null);}
@@ -234,14 +234,14 @@ export default function DriverExpenseWizard({ record, user, fleet, fleetLoading,
               values={{amount,fuelAmount,liters,date:dateConfirmed ? date : "",expenseTime,supplier,location,documentNumber,fuelType,customerName}} />
           </details>
           <p className="mp-field-help">Você também pode preencher manualmente. Escolha o tipo de despesa para continuar.</p>
-          <div className="driver-categories">{categories.map(([name, icon, description]) => <button type="button" key={name} aria-pressed={category === name} className={category === name ? "selected" : ""} disabled={photoLoading} onClick={() => {setCategory(name);if(!["Manutenção","Outros"].includes(name)){setWithoutVehicle(false);}setError("");}}><span aria-hidden="true">{icon}</span><span><strong>{name}</strong><small>{description}</small></span><b aria-hidden="true">{category === name ? "✓" : "→"}</b></button>)}</div>
+          <div className="driver-categories">{categories.map(([name, icon, description]) => <button type="button" key={name} aria-pressed={category === name} className={category === name ? "selected" : ""} disabled={photoLoading} onClick={() => {setCategory(name);if(name !== "Outros"){setWithoutVehicle(false);}setError("");}}><span aria-hidden="true">{icon}</span><span><strong>{name}</strong><small>{description}</small></span><b aria-hidden="true">{category === name ? "✓" : "→"}</b></button>)}</div>
           {fuel && <details className="driver-step-photos driver-time-correction" open={showTimeCorrection} onToggle={e=>setShowTimeCorrection(e.currentTarget.open)}>
             <summary>Ajustar horário da nota</summary>
             <p className="mp-field-help">Use apenas se a leitura não encontrou o horário ou se precisar corrigi-lo. Ele permite consultar o KM do abastecimento.</p>
             <label>Horário da nota<input type="time" step="1" value={expenseTime} onChange={e=>setExpenseTime(e.target.value)} /></label>
           </details>}
         </>}
-        {step === 1 && <>{user.expenseProfile !== "motorista" && ["Manutenção","Outros"].includes(category) && <ExpenseWithoutVehicle value={withoutVehicle} disabled={saving} onChange={value=>{setWithoutVehicle(value);changePlate("");setUnloading(null);setExpenseTrip(null);setOdometer("");setTireFireNumber("");}}/>}
+        {step === 1 && <>{user.expenseProfile !== "motorista" && category === "Outros" && <ExpenseWithoutVehicle value={withoutVehicle} disabled={saving} onChange={value=>{setWithoutVehicle(value);changePlate("");setUnloading(null);setExpenseTrip(null);setOdometer("");setTireFireNumber("");}}/>}
           {!withoutVehicle && <FleetSelect fleet={fleet} value={plate} onChange={changePlate} loading={fleetLoading} disabled={user.expenseProfile === "motorista" || fleetLoading || Boolean(fleetError)} />}
           {!withoutVehicle && fleetError && <p role="alert">{fleetError} <button type="button" onClick={onRetryFleet}>Tentar carregar frota</button></p>}
           <label>Data da despesa<input type="date" max={today()} value={date} onChange={e => editDate(e.target.value)} /></label>
