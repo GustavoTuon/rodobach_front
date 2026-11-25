@@ -131,3 +131,31 @@ it('motorista e abastecimento nao oferecem lancamento sem veiculo',()=>{
  fireEvent.click(screen.getByRole('button',{name:/Outros/}));next();
  expect(screen.queryByRole('checkbox',{name:/Despesa sem ve\u00edculo/})).toBeNull();
 });
+
+it('maintenance requires plate even with an old unassigned draft but allows no trip',()=>{
+ window.RB_API={listPlantaoUnloadingTrips:vi.fn(async()=>({trips:[]}))};
+ localStorage.setItem('rodobach:expense-draft:v1:teste:expense:new',JSON.stringify({version:null,data:{category:'Manutenção',withoutVehicle:true,plate:''}}));
+ render(<Wizard user={{login:'teste'}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);
+ next();expect(screen.queryByRole('checkbox',{name:/Despesa sem ve/})).toBeNull();next();
+ expect(screen.getByRole('alert').textContent).toContain('placa');
+ fireEvent.change(screen.getByLabelText('Placa'),{target:{value:'ABC1234'}});next();
+ expect(screen.getByLabelText('Valor total da despesa (R$)')).toBeTruthy();
+});
+it('changing Outros without vehicle to maintenance requires a plate again',()=>{
+ window.RB_API={};render(<Wizard user={{login:'teste'}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);
+ fireEvent.click(screen.getByRole('button',{name:/Outros/}));next();
+ fireEvent.click(screen.getByRole('checkbox',{name:/Despesa sem ve/}));
+ fireEvent.click(screen.getByRole('button',{name:'Voltar'}));
+ fireEvent.click(screen.getByRole('button',{name:/Manuten/}));next();
+ expect(screen.getByLabelText('Placa')).toBeTruthy();next();expect(screen.getByRole('alert').textContent).toContain('placa');
+});
+for(const category of ['Abastecimento','Descarga'])it(`${category} requires both plate and trip`,()=>{
+ window.RB_API={listPlantaoUnloadingTrips:vi.fn(async()=>({trips:[]}))};
+ render(<Wizard user={{login:'teste'}} fleet={fleet} Dialog={Dialog} FleetSelect={FleetSelect} sanitizeAmount={sanitizeAmount}/>);
+ fireEvent.click(screen.getByRole('button',{name:new RegExp(category)}));
+ if(category==='Abastecimento')fireEvent.change(screen.getByLabelText('Horário da nota'),{target:{value:'00:00:00'}});
+ next();next();expect(screen.getByRole('alert').textContent).toContain('placa');
+ fireEvent.change(screen.getByLabelText('Placa'),{target:{value:'ABC1234'}});next();
+ expect(screen.getByRole('alert').textContent).toContain('viagem');
+ expect(screen.queryByRole('checkbox',{name:/Despesa sem ve/})).toBeNull();
+});
