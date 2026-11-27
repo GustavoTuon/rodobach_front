@@ -1170,11 +1170,12 @@ function MaintenanceForm({
       }}/></MaintenanceDialog>}
       {canPay && paymentRecord && (
         <MaintenanceDialog onClose={() => setPaymentRecord(null)} saving={saving} step="payment">
-          <form className="mp-form mp-payment-modal" onSubmit={savePayment}>
+          <form className="mp-form mp-payment-modal mp-payment-entry" onSubmit={savePayment}>
             <header className="mp-section-title">
               <div><p className="mp-eyebrow">CONTROLE FINANCEIRO</p><h2 id="mp-edit-title" data-step-title tabIndex={-1}>Pagamento da manutenção</h2></div>
               <button className="mp-close" type="button" aria-label="Fechar pagamento" disabled={saving || photoBusy} onClick={() => setPaymentRecord(null)}>×</button>
             </header>
+            <div className="mp-payment-entry-body">
             <div className="mp-payment-summary"><span>{paymentRecord.plate || 'Sem ve?culo'} · {paymentRecord.service}</span><strong>{money(paymentRecord.amount)}</strong></div>
             <section className="mp-payment-recipient" aria-label="Dados para pagamento">
               <h3>Dados para pagamento</h3>
@@ -1189,6 +1190,8 @@ function MaintenanceForm({
             {paymentMethodsError && <div role="alert"><p>{paymentMethodsError}</p><button type="button" onClick={loadPaymentMethods}>Tentar carregar novamente</button></div>}
             <p className="mp-field-help">Ao salvar, a despesa será marcada como paga. A conferência é feita separadamente pelos usuários autorizados.</p>
             {paymentError && <p className="mp-feedback error" role="alert">{paymentError}</p>}
+            </div>
+            <footer className="mp-payment-entry-footer">
             <div className="mp-payment-modal-actions">
               <button className="mp-cancel-edit" type="button" disabled={saving || photoBusy} onClick={() => setPaymentRecord(null)}>Cancelar</button>
               <button className="mp-submit" type="submit" disabled={saving || !paymentDate || !paymentMethod || paymentMethodsLoading || Boolean(paymentMethodsError)}>{saving ? "Salvando…" : "Salvar pagamento"}<Icon name="check" size={18} /></button>
@@ -1197,6 +1200,7 @@ function MaintenanceForm({
               setPaymentError("");
               if (await updateControl(paymentRecord, "paymentDate", null)) setPaymentRecord(null);
             }}>Remover registro de pagamento</button>}
+          </footer>
           </form>
         </MaintenanceDialog>
       )}

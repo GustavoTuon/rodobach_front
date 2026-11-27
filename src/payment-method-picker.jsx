@@ -8,15 +8,32 @@ function MethodIcon() {
 
 export default function PaymentMethodPicker({methods,value,onChange,disabled,loading}) {
   const [open,setOpen]=useState(false), [query,setQuery]=useState(''), [active,setActive]=useState(0);
-  const id=useId(), trigger=useRef(null), search=useRef(null), list=useRef(null);
+  const id=useId(), trigger=useRef(null), search=useRef(null), list=useRef(null), root=useRef(null), pointerInside=useRef(false);
   const selected=methods.find(method=>keyOf(method)===value);
-  const filtered=methods.filter(method=>normalize(`${method.name} ${method.company}`).includes(normalize(query)));
+  const terms=normalize(query).trim().split(/\s+/).filter(Boolean);
+  const filtered=methods.filter(method=>terms.every(term=>normalize(`${method.name} ${method.company}`).includes(term)));
   const multipleCompanies=new Set(methods.map(method=>method.company)).size>1;
   useEffect(()=>{if(open)search.current?.focus();},[open]);
-  useEffect(()=>{list.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({block:'nearest'});},[active,query]);
+  useEffect(()=>{
+    const container=list.current, option=container?.querySelector('[aria-selected="true"]');
+    if(!container||!option)return;
+    const box=container.getBoundingClientRect(),item=option.getBoundingClientRect();
+    if(item.top<box.top)container.scrollTop-=box.top-item.top;
+    else if(item.bottom>box.bottom)container.scrollTop+=item.bottom-box.bottom;
+  },[active,query,open]);
+  useEffect(()=>{
+    if(!open)return;
+    pointerInside.current=false;
+    const outside=event=>{if(!root.current?.contains(event.target))setOpen(false);};
+    const release=()=>{pointerInside.current=false;};
+    document.addEventListener('pointerdown',outside);
+    document.addEventListener('pointerup',release);
+    document.addEventListener('pointercancel',release);
+    return ()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('pointerup',release);document.removeEventListener('pointercancel',release);};
+  },[open]);
   useEffect(()=>{if(disabled)setOpen(false);},[disabled]);
   function choose(method) {onChange(keyOf(method));setOpen(false);trigger.current?.focus();}
-  return <div className="mp-method-picker" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))setOpen(false);}}>
+  return <div ref={root} className="mp-method-picker" onPointerDownCapture={()=>{pointerInside.current=true;}} onBlur={event=>{if(!pointerInside.current&&event.relatedTarget&&!event.currentTarget.contains(event.relatedTarget))setOpen(false);}}>
     <span className="mp-method-label" id={`${id}-label`}>Forma de pagamento</span>
     <button ref={trigger} type="button" className={`mp-method-trigger ${selected ? 'has-value' : ''}`} aria-labelledby={`${id}-label ${id}-value`} aria-expanded={open} aria-controls={`${id}-panel`} disabled={disabled}
       onClick={()=>{setQuery('');setActive(0);setOpen(!open);}}>
