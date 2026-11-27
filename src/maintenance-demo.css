@@ -2191,3 +2191,13 @@ button.mp-payment-button:hover:not(:disabled) { border-color: var(--accent); }
 .mp-app .mp-without-vehicle{display:flex;align-items:flex-start;gap:12px;padding:16px;margin:12px 0 20px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2);cursor:pointer}
 .mp-app .mp-without-vehicle input{width:18px;height:18px;flex:0 0 18px;margin:2px 0 0;accent-color:var(--accent)}
 .mp-without-vehicle span{display:grid;gap:6px}.mp-without-vehicle small{font-weight:400;color:var(--text-2);line-height:1.5}.mp-without-vehicle:has(input:checked){border-color:var(--accent)}
+
+/* Payment entry keeps its actions visible while the content and method list scroll. */
+.mp-dialog .mp-payment-entry{display:flex;flex-direction:column;max-height:calc(100dvh - 42px);min-height:0;padding:0;overflow:hidden}
+.mp-payment-entry>.mp-section-title{flex-shrink:0;padding:22px 24px 14px;margin:0}
+.mp-payment-entry-body{min-height:0;overflow-y:auto;padding:0 24px 18px;scrollbar-gutter:stable;overscroll-behavior:contain}
+.mp-payment-entry-footer{flex-shrink:0;padding:16px 24px;border-top:1px solid var(--border);background:var(--surface)}
+.mp-payment-entry-footer .mp-payment-modal-actions{margin:0;flex-wrap:wrap}
+.mp-payment-entry-footer .mp-undo-payment{margin-top:12px}
+.mp-payment-entry .mp-method-list{scrollbar-width:auto;scrollbar-gutter:stable;max-height:min(230px,35dvh)}
+@media(max-width:480px){.mp-payment-entry>.mp-section-title{padding:18px 16px 12px}.mp-payment-entry-body{padding:0 16px 16px}.mp-payment-entry-footer{padding:12px 16px}.mp-payment-entry-footer .mp-payment-modal-actions{gap:8px}}
