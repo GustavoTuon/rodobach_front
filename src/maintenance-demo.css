@@ -2199,5 +2199,8 @@ button.mp-payment-button:hover:not(:disabled) { border-color: var(--accent); }
 .mp-payment-entry-footer{flex-shrink:0;padding:16px 24px;border-top:1px solid var(--border);background:var(--surface)}
 .mp-payment-entry-footer .mp-payment-modal-actions{margin:0;flex-wrap:wrap}
 .mp-payment-entry-footer .mp-undo-payment{margin-top:12px}
-.mp-payment-entry .mp-method-list{scrollbar-width:auto;scrollbar-gutter:stable;max-height:min(230px,35dvh)}
+/* One scroll owner: the payment body, including all payment options. */
+.mp-payment-entry .mp-method-list{max-height:none;overflow:visible;overscroll-behavior:auto}
+.mp-payment-entry .mp-method-panel{overflow:visible}
+.mp-payment-entry .mp-method-search-area{position:sticky;top:0;z-index:2;padding-top:1px;background:var(--surface);border-radius:14px 14px 0 0}
 @media(max-width:480px){.mp-payment-entry>.mp-section-title{padding:18px 16px 12px}.mp-payment-entry-body{padding:0 16px 16px}.mp-payment-entry-footer{padding:12px 16px}.mp-payment-entry-footer .mp-payment-modal-actions{gap:8px}}
